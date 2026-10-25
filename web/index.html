@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cactusdb</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌵</text></svg>">
+<style>
+  :root {
+    --bg: #f6f7f5; --panel: #ffffff; --panel-2: #f0f2ee; --border: #dde1da;
+    --text: #1d2420; --muted: #66706a; --accent: #2f7d4f; --accent-2: #24643f;
+    --accent-soft: #e3f1e8; --danger: #b3261e; --danger-soft: #fbe9e7;
+    --null: #9aa39d; --row-alt: #fafbf9; --row-hover: #eef6f0;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141816; --panel: #1b201d; --panel-2: #222824; --border: #2f3732;
+      --text: #e3e8e4; --muted: #95a099; --accent: #4fb57a; --accent-2: #63c78c;
+      --accent-soft: #1f3328; --danger: #f2867c; --danger-soft: #3a1f1d;
+      --null: #66706a; --row-alt: #1e2420; --row-hover: #243229;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+  .badge { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; }
+  header .status { color: var(--muted); font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .status b { color: var(--accent); font-weight: 600; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
+  aside {
+    background: var(--panel); border-right: 1px solid var(--border);
+    overflow-y: auto; display: flex; flex-direction: column;
+  }
+  section.box { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  section.box h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--muted); margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input, select, textarea {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
+  .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--text); }
+  .check input { width: auto; }
+  button {
+    font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px; padding: 6px 12px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent-2); }
+  button.small { padding: 2px 8px; font-size: 12px; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .actions .primary { flex: 1; }
+  .engines { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .engines button { padding: 6px 2px; font-size: 12px; }
+  .engines button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li {
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px;
+    cursor: pointer; white-space: nowrap; overflow: hidden;
+  }
+  ul.list li:hover { background: var(--row-hover); }
+  ul.list li.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  ul.list li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  ul.list li .tag { font-size: 10px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  ul.list li .icon { opacity: .55; font-size: 12px; }
+  ul.list li button { display: none; }
+  ul.list li:hover button { display: inline-block; }
+  ul.drivers li { cursor: default; font-size: 12px; }
+  ul.drivers li:hover { background: none; }
+  ul.drivers .ok { color: var(--accent); }
+  ul.drivers .ver { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
+  #tablesBox { flex: 1; display: flex; flex-direction: column; min-height: 200px; }
+  #tableList { overflow-y: auto; flex: 1; margin-top: 8px; font-family: var(--mono); font-size: 13px; }
+  main { display: grid; grid-template-rows: auto auto auto 1fr; min-width: 0; min-height: 0; }
+  .editor { padding: 12px 16px 8px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  textarea#sql { font-family: var(--mono); font-size: 13px; min-height: 76px; height: 96px; resize: vertical; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .toolbar select { width: auto; padding: 5px 6px; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar .group { display: flex; gap: 4px; align-items: center; }
+  .toolbar .group span { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .info { padding: 6px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); min-height: 29px; }
+  .info.error { color: var(--danger); background: var(--danger-soft); white-space: pre-wrap; }
+  .exportnote { padding: 6px 16px; font-size: 12px; background: var(--accent-soft); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+  .exportnote code { font-family: var(--mono); }
+  .exportnote a { color: var(--accent); font-weight: 600; }
+  .grid { grid-row: 4; overflow: auto; min-height: 0; background: var(--panel); }
+  table { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  th, td { padding: 5px 10px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  th {
+    position: sticky; top: 0; z-index: 1; background: var(--panel-2); font-weight: 600;
+    cursor: pointer; user-select: none;
+  }
+  th:hover { color: var(--accent); }
+  th .dir { color: var(--accent); font-size: 10px; margin-left: 4px; }
+  td.n, th.n { position: sticky; left: 0; background: var(--panel-2); color: var(--muted); text-align: right; font-family: var(--mono); font-size: 11px; cursor: default; }
+  th.n { z-index: 2; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12px; }
+  td.null { color: var(--null); font-style: italic; }
+  tbody tr:nth-child(even) td:not(.n) { background: var(--row-alt); }
+  tbody tr:hover td:not(.n) { background: var(--row-hover); }
+  .placeholder { display: grid; place-items: center; height: 100%; color: var(--muted); text-align: center; padding: 24px; }
+  .placeholder .big { font-size: 46px; }
+  .toast {
+    position: fixed; right: 16px; bottom: 16px; padding: 10px 14px; border-radius: 8px;
+    background: var(--text); color: var(--bg); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 420px;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { background: var(--danger); color: #fff; }
+  @media (max-width: 760px) {
+    body { overflow: auto; }
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--border); }
+    main { min-height: 70vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌵 cactusdb</h1>
+  <span class="badge" title="INSERT, UPDATE, DELETE and schema changes are blocked">read-only</span>
+  <div class="status" id="status">Not connected</div>
+  <button id="disconnectBtn" class="small" hidden>Disconnect</button>
+</header>
+
+<div class="layout">
+  <aside>
+    <section class="box">
+      <h2>Connection</h2>
+      <div class="engines" id="engines"></div>
+
+      <div id="fileFields">
+        <label for="dbFile">SQLite database file</label>
+        <input id="dbFile" placeholder="/path/to/database.db" spellcheck="false">
+      </div>
+
+      <div id="serverFields" hidden>
+        <div class="row2">
+          <div><label for="host">Host</label><input id="host" value="localhost" spellcheck="false"></div>
+          <div><label for="port">Port</label><input id="port" type="number" min="0" max="65535"></div>
+        </div>
+        <label for="user">Username</label>
+        <input id="user" autocomplete="username" spellcheck="false">
+        <label for="pass">Password</label>
+        <input id="pass" type="password" autocomplete="current-password">
+        <label for="dbName" id="dbNameLabel">Database</label>
+        <input id="dbName" spellcheck="false">
+      </div>
+
+      <label class="check"><input type="checkbox" id="saveConn"> Save connection (incl. password)</label>
+      <div id="saveNameWrap" hidden>
+        <label for="connName">Connection name</label>
+        <input id="connName" placeholder="e.g. Production MySQL">
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="connectBtn">Connect</button>
+        <button id="saveOnlyBtn" title="Save without connecting">Save</button>
+      </div>
+    </section>
+
+    <section class="box">
+      <h2>Saved connections</h2>
+      <ul class="list" id="savedList"><li class="empty">None yet</li></ul>
+    </section>
+
+    <section class="box">
+      <h2>Drivers</h2>
+      <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
+    </section>
+
+    <section class="box" id="tablesBox">
+      <h2>Tables <span id="tableCount"></span></h2>
+      <input id="tableFilter" placeholder="Filter tables…" disabled>
+      <ul class="list" id="tableList"><li class="empty">Connect to a database to see its tables</li></ul>
+    </section>
+  </aside>
+
+  <main>
+    <div class="editor">
+      <textarea id="sql" spellcheck="false" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
+      <div class="toolbar">
+        <button class="primary" id="runBtn" disabled>▶ Run <small>(Ctrl+Enter)</small></button>
+        <div class="group">
+          <span>Show</span>
+          <select id="limit">
+            <option value="100">100 rows</option>
+            <option value="1000" selected>1,000 rows</option>
+            <option value="10000">10,000 rows</option>
+            <option value="100000">100,000 rows</option>
+          </select>
+        </div>
+        <div class="spacer"></div>
+        <div class="group">
+          <span>Export all rows to folder</span>
+          <button data-fmt="xlsx" class="exp" disabled>Excel</button>
+          <button data-fmt="json" class="exp" disabled>JSON</button>
+          <button data-fmt="xml" class="exp" disabled>XML</button>
+          <button data-fmt="csv" class="exp" disabled>CSV</button>
+        </div>
+      </div>
+    </div>
+    <div class="info" id="info"></div>
+    <div class="exportnote" id="exportNote" hidden></div>
+    <div class="grid" id="grid">
+      <div class="placeholder"><div><div class="big">🌵</div><p>Connect to a database, then pick a table on the left.</p></div></div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { engines: [], engine: "sqlite", session: null, label: "", tables: [], table: null, result: null, sort: null };
+
+async function api(method, url, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const res = await fetch(url, opt);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+let toastTimer;
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = "toast"), isErr ? 5000 : 2500);
+}
+
+function setInfo(msg, isErr) {
+  const i = $("info"); i.textContent = msg; i.className = "info" + (isErr ? " error" : "");
+}
+
+// ---- engine & form -------------------------------------------------------
+function renderEngines() {
+  $("engines").innerHTML = state.engines.map((e) =>
+    `<button data-engine="${e.id}" class="${e.id === state.engine ? "on" : ""}">${esc(e.name)}</button>`).join("");
+}
+
+function selectEngine(id, keepPort) {
+  state.engine = id;
+  renderEngines();
+  const isFile = id === "sqlite";
+  $("fileFields").hidden = !isFile;
+  $("serverFields").hidden = isFile;
+  const eng = state.engines.find((e) => e.id === id);
+  if (!keepPort && eng) $("port").value = eng.defaultPort || "";
+  $("dbNameLabel").textContent = id === "firebird" ? "Database path or alias" : "Database";
+  $("dbName").placeholder = id === "firebird" ? "/var/lib/firebird/data/employee.fdb" : "database name";
+  if (id === "firebird" && !$("user").value) $("user").value = "SYSDBA";
+}
+
+function formParams() {
+  const isFile = state.engine === "sqlite";
+  return {
+    engine: state.engine,
+    host: isFile ? "" : $("host").value.trim(),
+    port: isFile ? 0 : parseInt($("port").value, 10) || 0,
+    username: isFile ? "" : $("user").value,
+    password: isFile ? "" : $("pass").value,
+    database: isFile ? $("dbFile").value.trim() : $("dbName").value.trim(),
+  };
+}
+
+function fillForm(c) {
+  selectEngine(c.engine, true);
+  if (c.engine === "sqlite") { $("dbFile").value = c.database; }
+  else {
+    $("host").value = c.host; $("port").value = c.port || "";
+    $("user").value = c.username; $("pass").value = c.password; $("dbName").value = c.database;
+  }
+  $("connName").value = c.name;
+}
+
+// ---- saved connections ---------------------------------------------------
+async function loadSaved() {
+  try {
+    const list = await api("GET", "/api/connections");
+    state.saved = list;
+    $("savedList").innerHTML = list.length ? list.map((c) => `
+      <li data-id="${c.id}" title="Click to connect">
+        <span class="tag">${esc(c.engine)}</span>
+        <span class="name">${esc(c.name)}</span>
+        <button class="small" data-act="edit" title="Load into form">Edit</button>
+        <button class="small" data-act="del" title="Delete">✕</button>
+      </li>`).join("") : `<li class="empty">None yet</li>`;
+  } catch (e) { toast(e.message, true); }
+}
+
+$("savedList").addEventListener("click", async (ev) => {
+  const li = ev.target.closest("li[data-id]");
+  if (!li) return;
+  const id = +li.dataset.id;
+  const c = state.saved.find((x) => x.id === id);
+  const act = ev.target.dataset.act;
+  if (act === "edit") { fillForm(c); return; }
+  if (act === "del") {
+    if (!confirm(`Delete saved connection "${c.name}"?`)) return;
+    await api("DELETE", "/api/connections/" + id).catch((e) => toast(e.message, true));
+    loadSaved(); return;
+  }
+  fillForm(c);
+  connect({ savedId: id });
+});
+
+$("saveConn").addEventListener("change", () => { $("saveNameWrap").hidden = !$("saveConn").checked; });
+
+$("saveOnlyBtn").addEventListener("click", async () => {
+  try {
+    await api("POST", "/api/connections", { name: $("connName").value, ...formParams() });
+    toast("Connection saved to cactus.conn.db");
+    loadSaved();
+  } catch (e) { toast(e.message, true); }
+});
+
+// ---- connect -------------------------------------------------------------
+async function connect(extra = {}) {
+  const btn = $("connectBtn");
+  btn.disabled = true; btn.textContent = "Connecting…";
+  try {
+    const body = { ...formParams(), ...extra };
+    if (!extra.savedId && $("saveConn").checked) { body.save = true; body.name = $("connName").value; }
+    const res = await api("POST", "/api/connect", body);
+    if (state.session) api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
+    state.session = res.session; state.label = res.label; state.engine = res.engine;
+    state.tables = res.tables; state.table = null;
+    $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${res.tables.length} tables`;
+    $("disconnectBtn").hidden = false;
+    $("tableFilter").disabled = false; $("tableFilter").value = "";
+    $("runBtn").disabled = false;
+    renderTables();
+    clearGrid("Pick a table on the left to view its data.");
+    if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
+    else if (res.savedId) { toast("Connected and saved"); loadSaved(); }
+    else toast("Connected");
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = "Connect";
+  }
+}
+$("connectBtn").addEventListener("click", () => connect());
+
+$("disconnectBtn").addEventListener("click", async () => {
+  await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
+  state.session = null; state.tables = []; state.table = null; state.result = null;
+  $("status").textContent = "Not connected";
+  $("disconnectBtn").hidden = true; $("runBtn").disabled = true;
+  $("tableFilter").disabled = true; $("tableCount").textContent = "";
+  $("tableList").innerHTML = `<li class="empty">Connect to a database to see its tables</li>`;
+  setExportEnabled(false); setInfo("");
+  clearGrid("Connect to a database, then pick a table on the left.");
+});
+
+// ---- tables --------------------------------------------------------------
+function renderTables() {
+  const f = $("tableFilter").value.toLowerCase();
+  const list = state.tables.filter((t) => t.toLowerCase().includes(f));
+  $("tableCount").textContent = state.tables.length ? `${list.length}/${state.tables.length}` : "";
+  $("tableList").innerHTML = list.length
+    ? list.map((t) => `<li data-table="${esc(t)}" class="${t === state.table ? "on" : ""}"><span class="icon">▦</span><span class="name">${esc(t)}</span></li>`).join("")
+    : `<li class="empty">${state.tables.length ? "No match" : "No tables in this database"}</li>`;
+}
+$("tableFilter").addEventListener("input", renderTables);
+
+$("tableList").addEventListener("click", async (ev) => {
+  const li = ev.target.closest("li[data-table]");
+  if (!li) return;
+  state.table = li.dataset.table;
+  renderTables();
+  setInfo("Loading " + state.table + "…");
+  try {
+    const q = new URLSearchParams({ session: state.session, table: state.table, limit: $("limit").value });
+    const res = await api("GET", "/api/select?" + q);
+    $("sql").value = res.sql;
+    res.table = state.table;
+    showResult(res);
+  } catch (e) { setInfo(e.message, true); }
+});
+
+// ---- query & grid --------------------------------------------------------
+async function run() {
+  if (!state.session) return;
+  const sql = $("sql").value.trim();
+  if (!sql) return;
+  setInfo("Running…");
+  $("runBtn").disabled = true;
+  try {
+    const res = await api("POST", "/api/query", { session: state.session, sql, limit: +$("limit").value });
+    showResult(res);
+  } catch (e) {
+    setInfo(e.message, true);
+  } finally { $("runBtn").disabled = false; }
+}
+$("runBtn").addEventListener("click", run);
+$("sql").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); }
+});
+$("limit").addEventListener("change", () => { if (state.result) run(); });
+
+function showResult(res) {
+  state.result = res; state.sort = null;
+  const n = res.rows.length;
+  setInfo(`${n.toLocaleString()} row${n === 1 ? "" : "s"}` +
+    (res.truncated ? ` shown (limited to ${res.limit.toLocaleString()} – exports include all rows)` : "") +
+    ` · ${res.columns.length} columns · ${res.elapsedMs} ms`);
+  setExportEnabled(res.columns.length > 0);
+  renderGrid();
+}
+
+function clearGrid(msg) {
+  state.result = null;
+  $("grid").innerHTML = `<div class="placeholder"><div><div class="big">🌵</div><p>${esc(msg)}</p></div></div>`;
+}
+
+function renderGrid() {
+  const res = state.result;
+  if (!res.columns.length) { clearGrid("Statement executed. No result set returned."); return; }
+  let rows = res.rows.map((r, i) => [i, r]);
+  if (state.sort) {
+    const { col, dir } = state.sort;
+    rows.sort((a, b) => cmp(a[1][col], b[1][col]) * dir);
+  }
+  const head = `<tr><th class="n">#</th>` + res.columns.map((c, i) =>
+    `<th data-col="${i}" title="${esc(c)} – click to sort">${esc(c)}${state.sort && state.sort.col === i ? `<span class="dir">${state.sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
+  const body = rows.map(([i, r]) => `<tr><td class="n">${i + 1}</td>` + r.map((v) => {
+    if (v === null) return `<td class="null">NULL</td>`;
+    const s = String(v);
+    const cls = typeof v === "number" ? ` class="num"` : "";
+    return `<td${cls} title="${s.length > 40 ? esc(s.slice(0, 2000)) : ""}">${esc(s.length > 500 ? s.slice(0, 500) + "…" : s)}</td>`;
+  }).join("") + `</tr>`).join("");
+  $("grid").innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+function cmp(a, b) {
+  if (a === b) return 0;
+  if (a === null) return -1;
+  if (b === null) return 1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b), undefined, { numeric: true });
+}
+
+$("grid").addEventListener("click", (ev) => {
+  const th = ev.target.closest("th[data-col]");
+  if (!th) return;
+  const col = +th.dataset.col;
+  state.sort = state.sort && state.sort.col === col
+    ? (state.sort.dir > 0 ? { col, dir: -1 } : null)
+    : { col, dir: 1 };
+  renderGrid();
+});
+
+// ---- export --------------------------------------------------------------
+function setExportEnabled(on) {
+  document.querySelectorAll(".exp").forEach((b) => (b.disabled = !on));
+}
+
+document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", async () => {
+  const fmt = b.dataset.fmt;
+  const sql = (state.result && state.result.sql) || $("sql").value;
+  const name = (state.result && state.result.table) || "query";
+  b.disabled = true; const label = b.textContent; b.textContent = "…";
+  try {
+    const res = await api("POST", "/api/export", { session: state.session, sql, format: fmt, name });
+    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(res.download)}" download>Download</a>`;
+    $("exportNote").hidden = false;
+    toast("Saved " + res.file);
+  } catch (e) { toast("Export failed: " + e.message, true); }
+  finally { b.disabled = false; b.textContent = label; }
+}));
+
+// ---- init ----------------------------------------------------------------
+$("engines").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-engine]");
+  if (b) selectEngine(b.dataset.engine);
+});
+
+(async function init() {
+  try { state.engines = await api("GET", "/api/engines"); } catch (e) { toast(e.message, true); }
+  selectEngine("sqlite");
+  loadSaved();
+  api("GET", "/api/drivers").then((list) => {
+    $("driverList").innerHTML = list.map((d) =>
+      `<li title="${esc(d.module)} – compiled into cactusdb, no download needed"><span class="ok">✔</span><span class="name">${esc(d.engines)}</span><span class="ver">${esc(d.version)}</span></li>`).join("");
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
