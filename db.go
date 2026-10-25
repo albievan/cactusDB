@@ -17,12 +17,15 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/microsoft/go-mssqldb"
 	_ "github.com/nakagami/firebirdsql"
 	_ "modernc.org/sqlite"
 )
 
 // ConnParams describes how to reach a database. For SQLite only Database
-// (the file path) is used.
+// (the file path) is used. For SQL Server, Host may name an instance
+// (host\INSTANCE).
 type ConnParams struct {
 	Engine   string `json:"engine"`
 	Host     string `json:"host"`
@@ -37,6 +40,8 @@ const (
 	EngineMySQL    = "mysql"
 	EngineMariaDB  = "mariadb"
 	EngineFirebird = "firebird"
+	EngineMSSQL    = "mssql"
+	EnginePostgres = "postgres"
 )
 
 var engines = []map[string]any{
@@ -44,6 +49,8 @@ var engines = []map[string]any{
 	{"id": EngineMySQL, "name": "MySQL", "defaultPort": 3306},
 	{"id": EngineMariaDB, "name": "MariaDB", "defaultPort": 3306},
 	{"id": EngineFirebird, "name": "Firebird", "defaultPort": 3050},
+	{"id": EngineMSSQL, "name": "SQL Server", "defaultPort": 1433},
+	{"id": EnginePostgres, "name": "PostgreSQL", "defaultPort": 5432},
 }
 
 // driverModules maps each engine to the Go module that implements it. All of
@@ -53,6 +60,8 @@ var driverModules = []struct{ Engines, Module string }{
 	{"SQLite", "modernc.org/sqlite"},
 	{"MySQL, MariaDB", "github.com/go-sql-driver/mysql"},
 	{"Firebird", "github.com/nakagami/firebirdsql"},
+	{"SQL Server", "github.com/microsoft/go-mssqldb"},
+	{"PostgreSQL", "github.com/jackc/pgx/v5"},
 }
 
 func driverInfo() []map[string]string {
@@ -131,6 +140,12 @@ func openDB(ctx context.Context, p ConnParams) (*sql.DB, error) {
 		}
 		driver = "firebirdsql"
 		dsn = u.String()
+	case EngineMSSQL:
+		driver = "sqlserver"
+		dsn = mssqlDSN(p)
+	case EnginePostgres:
+		driver = "pgx"
+		dsn = postgresDSN(p)
 	default:
 		return nil, fmt.Errorf("unsupported engine %q", p.Engine)
 	}
@@ -168,6 +183,51 @@ func sqliteURI(path string) string {
 	return "file:" + p
 }
 
+// mssqlDSN builds a sqlserver:// URL. "host\INSTANCE" connects to a named
+// instance (resolved by SQL Browser unless a port is given).
+func mssqlDSN(p ConnParams) string {
+	host, instance, _ := strings.Cut(p.Host, `\`)
+	if host == "" {
+		host = "localhost"
+	}
+	q := url.Values{}
+	if p.Database != "" {
+		q.Set("database", p.Database)
+	}
+	q.Set("app name", "cactusdb")
+	q.Set("dial timeout", "10")
+	// Most servers use self-signed certificates; accept them like SSMS's
+	// "Trust server certificate" option.
+	q.Set("TrustServerCertificate", "true")
+	u := url.URL{Scheme: "sqlserver", User: url.UserPassword(p.Username, p.Password), RawQuery: q.Encode()}
+	switch {
+	case instance != "" && p.Port == 0:
+		u.Host, u.Path = host, instance
+	case instance != "":
+		u.Host, u.Path = hostPort(host, p.Port, 1433), instance
+	default:
+		u.Host = hostPort(host, p.Port, 1433)
+	}
+	return u.String()
+}
+
+// postgresDSN builds a postgres:// URL. Every session starts read-only
+// (default_transaction_read_only), which in PostgreSQL also blocks DDL.
+func postgresDSN(p ConnParams) string {
+	q := url.Values{}
+	q.Set("application_name", "cactusdb")
+	q.Set("connect_timeout", "10")
+	q.Set("default_transaction_read_only", "on")
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(p.Username, p.Password),
+		Host:     hostPort(p.Host, p.Port, 5432),
+		Path:     "/" + p.Database,
+		RawQuery: q.Encode(),
+	}
+	return u.String()
+}
+
 func hostPort(host string, port, def int) string {
 	if host == "" {
 		host = "localhost"
@@ -176,22 +236,6 @@ func hostPort(host string, port, def int) string {
 		port = def
 	}
 	return host + ":" + strconv.Itoa(port)
-}
-
-// listTables returns all user tables and views of the connected database.
-func listTables(ctx context.Context, engine string, db *sql.DB) ([]string, error) {
-	var q string
-	switch engine {
-	case EngineSQLite:
-		q = `SELECT name FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name`
-	case EngineMySQL, EngineMariaDB:
-		q = `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name`
-	case EngineFirebird:
-		q = `SELECT TRIM(RDB$RELATION_NAME) FROM RDB$RELATIONS WHERE COALESCE(RDB$SYSTEM_FLAG, 0) = 0 ORDER BY 1`
-	default:
-		return nil, fmt.Errorf("unsupported engine %q", engine)
-	}
-	return queryStrings(ctx, db, q)
 }
 
 // listColumns returns the column names of a table in ordinal order.
@@ -217,6 +261,25 @@ func listColumns(ctx context.Context, engine string, db *sql.DB, table string) (
 			return nil, err
 		}
 		return scanStrings(rows)
+	case EnginePostgres:
+		rows, err := db.QueryContext(ctx, `SELECT a.attname FROM pg_attribute a
+			JOIN pg_class c ON c.oid = a.attrelid
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname || '.' || c.relname = $1 AND a.attnum > 0 AND NOT a.attisdropped
+			ORDER BY a.attnum`, table)
+		if err != nil {
+			return nil, err
+		}
+		return scanStrings(rows)
+	case EngineMSSQL:
+		rows, err := db.QueryContext(ctx, `SELECT c.name FROM sys.columns c
+			JOIN sys.objects o ON o.object_id = c.object_id
+			JOIN sys.schemas s ON s.schema_id = o.schema_id
+			WHERE s.name + '.' + o.name = @p1 ORDER BY c.column_id`, table)
+		if err != nil {
+			return nil, err
+		}
+		return scanStrings(rows)
 	}
 	return nil, fmt.Errorf("unsupported engine %q", engine)
 }
@@ -228,19 +291,32 @@ func buildSelect(ctx context.Context, engine string, db *sql.DB, table string) (
 		return "", err
 	}
 	if len(cols) == 0 {
-		return "SELECT * FROM " + quoteIdent(engine, table), nil
+		return "SELECT * FROM " + quoteObject(engine, table), nil
 	}
 	quoted := make([]string, len(cols))
 	for i, c := range cols {
 		quoted[i] = quoteIdent(engine, c)
 	}
-	return "SELECT " + strings.Join(quoted, ", ") + "\nFROM " + quoteIdent(engine, table), nil
+	return "SELECT " + strings.Join(quoted, ", ") + "\nFROM " + quoteObject(engine, table), nil
+}
+
+// quoteObject quotes a table or view name. SQL Server and PostgreSQL objects
+// are listed as "schema.name" and quoted as [schema].[name] / "schema"."name".
+func quoteObject(engine, name string) string {
+	if engine == EngineMSSQL || engine == EnginePostgres {
+		if schema, obj, ok := strings.Cut(name, "."); ok {
+			return quoteIdent(engine, schema) + "." + quoteIdent(engine, obj)
+		}
+	}
+	return quoteIdent(engine, name)
 }
 
 func quoteIdent(engine, name string) string {
 	switch engine {
 	case EngineMySQL, EngineMariaDB:
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	case EngineMSSQL:
+		return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
 	default:
 		return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 	}
@@ -283,8 +359,11 @@ func streamQuery(ctx context.Context, engine string, db *sql.DB, q string, heade
 		// The SQLite connection itself is opened read-only (mode=ro, query_only).
 		rows, err = db.QueryContext(ctx, q)
 	} else {
+		// SQL Server has no READ ONLY transactions, but its DML and DDL are
+		// transactional, so the unconditional rollback below undoes them.
+		opts := &sql.TxOptions{ReadOnly: engine != EngineMSSQL}
 		var tx *sql.Tx
-		tx, err = db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+		tx, err = db.BeginTx(ctx, opts)
 		if err != nil {
 			return err
 		}
@@ -350,7 +429,7 @@ func normalize(v any, dbType string) any {
 }
 
 func isDecimalType(t string) bool {
-	return strings.Contains(t, "DECIMAL") || strings.Contains(t, "NUMERIC")
+	return strings.Contains(t, "DECIMAL") || strings.Contains(t, "NUMERIC") || strings.Contains(t, "MONEY")
 }
 
 func normalizeValue(v any, dbType string) any {
@@ -358,6 +437,9 @@ func normalizeValue(v any, dbType string) any {
 	case nil:
 		return nil
 	case []byte:
+		if dbType == "UNIQUEIDENTIFIER" && len(t) == 16 {
+			return formatGUID(t)
+		}
 		if utf8.Valid(t) {
 			return string(t)
 		}
@@ -391,6 +473,9 @@ func normalizeValue(v any, dbType string) any {
 		case strings.HasPrefix(dbType, "TIME") && !strings.HasPrefix(dbType, "TIMESTAMP"):
 			return t.Format("15:04:05.999999")
 		}
+		if strings.Contains(dbType, "TZ") || strings.Contains(dbType, "OFFSET") || strings.Contains(dbType, "TIME ZONE") {
+			return t.Format("2006-01-02 15:04:05.999999-07:00") // keep the offset of zone-aware types
+		}
 		return t.Format("2006-01-02 15:04:05.999999")
 	default:
 		// Exact numeric types such as Firebird's scaled NUMERIC (decimal.Decimal)
@@ -404,3 +489,9 @@ func normalizeValue(v any, dbType string) any {
 }
 
 var plainNumber = regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`)
+
+// formatGUID renders SQL Server's mixed-endian UNIQUEIDENTIFIER bytes.
+func formatGUID(b []byte) string {
+	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+		b[3], b[2], b[1], b[0], b[5], b[4], b[7], b[6], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15])
+}

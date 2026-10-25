@@ -46,6 +46,18 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
     color: var(--muted); margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center;
   }
+  section.box h2 .toggle {
+    all: unset; cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1;
+    font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
+  }
+  section.box h2 .toggle:hover { color: var(--text); }
+  section.box h2 .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  section.box h2 .toggle::before { content: "▾"; font-size: 10px; width: 10px; }
+  section.box h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 4px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  section.box.collapsed { padding-bottom: 4px; }
+  section.box.collapsed h2 .toggle::before { content: "▸"; }
+  section.box.collapsed > :not(h2) { display: none !important; }
+  section.box:not(.collapsed) h2 .sub { display: none; }
   label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
   input, select, textarea {
     width: 100%; font: inherit; color: var(--text); background: var(--bg);
@@ -66,7 +78,7 @@
   button.small { padding: 2px 8px; font-size: 12px; }
   .actions { display: flex; gap: 8px; margin-top: 12px; }
   .actions .primary { flex: 1; }
-  .engines { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
   .engines button { padding: 6px 2px; font-size: 12px; }
   .engines button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
   ul.list { list-style: none; margin: 0; padding: 0; }
@@ -86,9 +98,36 @@
   ul.drivers .ok { color: var(--accent); }
   ul.drivers .ver { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
-  #tablesBox { flex: 1; display: flex; flex-direction: column; min-height: 200px; }
-  #tableList { overflow-y: auto; flex: 1; margin-top: 8px; font-family: var(--mono); font-size: 13px; }
-  main { display: grid; grid-template-rows: auto auto auto 1fr; min-width: 0; min-height: 0; }
+  #objectsBox:not(.collapsed) { flex: 1; display: flex; flex-direction: column; min-height: 320px; }
+  .filterrow { display: flex; gap: 6px; }
+  .objtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .objtabs:empty { display: none; }
+  .objtabs button { padding: 3px 8px; font-size: 12px; border-radius: 999px; display: inline-flex; gap: 5px; align-items: center; }
+  .objtabs button .cnt { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .objtabs button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .objtabs button.on .cnt { color: var(--accent); }
+  .objtabs button.none { opacity: .45; }
+  #objTree { overflow-y: auto; flex: 1; min-height: 0; margin-top: 8px; }
+  #objTree ul.list { font-family: var(--mono); font-size: 13px; }
+  main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+  .tabs button { border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; background: none; padding: 6px 14px; margin-bottom: -1px; color: var(--muted); }
+  .tabs button.on { background: var(--panel); border-color: var(--border); color: var(--text); font-weight: 600; }
+  .tabs .title { margin-left: 12px; font-size: 12px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pane { min-height: 0; min-width: 0; }
+  #dataPane { display: grid; grid-template-rows: auto auto auto 1fr; }
+  #dataPane[hidden], #defPane[hidden] { display: none; }
+  #defPane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); }
+  .defbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .defbar .kind { font-size: 10px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
+  .defbar .spacer { flex: 1; }
+  pre#defSrc { margin: 0; padding: 14px 16px; overflow: auto; font: 13px/1.5 var(--mono); white-space: pre; tab-size: 4; }
+  pre#defSrc.error { color: var(--danger); white-space: pre-wrap; }
+  .hl-k { color: var(--accent); font-weight: 600; }
+  .hl-s { color: #b5651d; }
+  .hl-c { color: var(--muted); font-style: italic; }
+  .hl-n { color: #7a4bc2; }
+  @media (prefers-color-scheme: dark) { .hl-s { color: #e3a46b; } .hl-n { color: #b59bf0; } }
   .editor { padding: 12px 16px 8px; background: var(--panel); border-bottom: 1px solid var(--border); }
   textarea#sql { font-family: var(--mono); font-size: 13px; min-height: 76px; height: 96px; resize: vertical; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
@@ -143,8 +182,8 @@
 
 <div class="layout">
   <aside>
-    <section class="box">
-      <h2>Connection</h2>
+    <section class="box" data-sec="connection">
+      <h2><button class="toggle" aria-expanded="true">Connection<span class="sub" id="connSub"></span></button></h2>
       <div class="engines" id="engines"></div>
 
       <div id="fileFields">
@@ -177,24 +216,34 @@
       </div>
     </section>
 
-    <section class="box">
-      <h2>Saved connections</h2>
+    <section class="box" data-sec="saved">
+      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button></h2>
       <ul class="list" id="savedList"><li class="empty">None yet</li></ul>
     </section>
 
-    <section class="box">
-      <h2>Drivers</h2>
+    <section class="box" data-sec="drivers">
+      <h2><button class="toggle" aria-expanded="true">Drivers<span class="sub" id="driversSub"></span></button></h2>
       <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
     </section>
 
-    <section class="box" id="tablesBox">
-      <h2>Tables <span id="tableCount"></span></h2>
-      <input id="tableFilter" placeholder="Filter tables…" disabled>
-      <ul class="list" id="tableList"><li class="empty">Connect to a database to see its tables</li></ul>
+    <section class="box" id="objectsBox" data-sec="objects">
+      <h2><button class="toggle" aria-expanded="true">Objects</button><span id="objCount"></span></h2>
+      <div class="filterrow">
+        <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
+        <button id="refreshBtn" class="small" title="Reload the object list" disabled>⟳</button>
+      </div>
+      <div class="objtabs" id="objTabs" role="tablist"></div>
+      <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p></div>
     </section>
   </aside>
 
   <main>
+    <div class="tabs">
+      <button data-tab="data" class="on">Data</button>
+      <button data-tab="def">Definition</button>
+      <span class="title" id="tabTitle"></span>
+    </div>
+    <div class="pane" id="dataPane">
     <div class="editor">
       <textarea id="sql" spellcheck="false" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
       <div class="toolbar">
@@ -223,13 +272,23 @@
     <div class="grid" id="grid">
       <div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>Connect to a database, then pick a table on the left.</p></div></div>
     </div>
+    </div>
+    <div class="pane" id="defPane" hidden>
+      <div class="defbar">
+        <span class="kind" id="defKind"></span><b id="defName"></b>
+        <span class="spacer"></span>
+        <button class="small" id="copyDefBtn" disabled>Copy</button>
+      </div>
+      <pre id="defSrc">Select an object on the left to see its definition.</pre>
+    </div>
   </main>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const state = { engines: [], engine: "sqlite", session: null, label: "", tables: [], table: null, result: null, sort: null };
+const state = { engines: [], engine: "sqlite", session: null, label: "", objects: [], sel: null, table: null,
+  result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
 async function api(method, url, body) {
   const opt = { method, headers: {} };
@@ -270,8 +329,12 @@ function selectEngine(id, keepPort) {
   const eng = state.engines.find((e) => e.id === id);
   if (!keepPort && eng) $("port").value = eng.defaultPort || "";
   $("dbNameLabel").textContent = id === "firebird" ? "Database path or alias" : "Database";
-  $("dbName").placeholder = id === "firebird" ? "/var/lib/firebird/data/employee.fdb" : "database name";
+  $("dbName").placeholder = id === "firebird" ? "/var/lib/firebird/data/employee.fdb"
+    : id === "mssql" ? "database name (blank = login default)"
+    : id === "postgres" ? "database name (blank = same as username)" : "database name";
+  $("host").placeholder = id === "mssql" ? "server or server\\INSTANCE" : "";
   if (id === "firebird" && !$("user").value) $("user").value = "SYSDBA";
+  if (id === "postgres" && !$("user").value) $("user").value = "postgres";
 }
 
 function formParams() {
@@ -301,6 +364,7 @@ async function loadSaved() {
   try {
     const list = await api("GET", "/api/connections");
     state.saved = list;
+    $("savedSub").textContent = "· " + list.length;
     $("savedList").innerHTML = list.length ? list.map((c) => `
       <li data-id="${c.id}" title="Click to connect">
         <span class="tag">${esc(c.engine)}</span>
@@ -347,13 +411,20 @@ async function connect(extra = {}) {
     const res = await api("POST", "/api/connect", body);
     if (state.session) api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
     state.session = res.session; state.label = res.label; state.engine = res.engine;
-    state.tables = res.tables; state.table = null;
-    $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${res.tables.length} tables`;
+    state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null;
+    const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
+    $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
     $("disconnectBtn").hidden = false;
-    $("tableFilter").disabled = false; $("tableFilter").value = "";
+    $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false;
     $("runBtn").disabled = false;
-    renderTables();
+    state.objTab = "table";
+    renderObjects();
+    $("connSub").textContent = "· " + res.label;
+    ["connection", "saved", "drivers"].forEach((sec) => setCollapsed(sec, true, false));
+    setCollapsed("objects", false, false);
     clearGrid("Pick a table on the left to view its data.");
+    clearDef("Select an object on the left to see its definition.");
+    showTab("data");
     if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
     else if (res.savedId) { toast("Connected and saved"); loadSaved(); }
     else toast("Connected");
@@ -367,40 +438,184 @@ $("connectBtn").addEventListener("click", () => connect());
 
 $("disconnectBtn").addEventListener("click", async () => {
   await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
-  state.session = null; state.tables = []; state.table = null; state.result = null;
+  state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null;
   $("status").textContent = "Not connected";
   $("disconnectBtn").hidden = true; $("runBtn").disabled = true;
-  $("tableFilter").disabled = true; $("tableCount").textContent = "";
-  $("tableList").innerHTML = `<li class="empty">Connect to a database to see its tables</li>`;
+  $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("objCount").textContent = "";
+  $("objTree").innerHTML = `<p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p>`;
+  $("objTabs").innerHTML = ""; $("connSub").textContent = "";
+  setCollapsed("connection", false, false);
+  clearDef("Select an object on the left to see its definition.");
+  $("tabTitle").textContent = "";
   setExportEnabled(false); setInfo("");
   clearGrid("Connect to a database, then pick a table on the left.");
 });
 
-// ---- tables --------------------------------------------------------------
-function renderTables() {
-  const f = $("tableFilter").value.toLowerCase();
-  const list = state.tables.filter((t) => t.toLowerCase().includes(f));
-  $("tableCount").textContent = state.tables.length ? `${list.length}/${state.tables.length}` : "";
-  $("tableList").innerHTML = list.length
-    ? list.map((t) => `<li data-table="${esc(t)}" class="${t === state.table ? "on" : ""}"><span class="icon">▦</span><span class="name">${esc(t)}</span></li>`).join("")
-    : `<li class="empty">${state.tables.length ? "No match" : "No tables in this database"}</li>`;
-}
-$("tableFilter").addEventListener("input", renderTables);
+// ---- objects --------------------------------------------------------------
+const ICONS = { table: "▦", view: "◫", matview: "◩", procedure: "ƒ", function: "λ", package: "▣", trigger: "⚡",
+  sequence: "#", domain: "◇", exception: "!", event: "⏱", index: "↯", synonym: "↪" };
 
-$("tableList").addEventListener("click", async (ev) => {
-  const li = ev.target.closest("li[data-table]");
-  if (!li) return;
-  state.table = li.dataset.table;
-  renderTables();
-  setInfo("Loading " + state.table + "…");
+function renderObjects() {
+  const f = $("objFilter").value.toLowerCase();
+  // One tab per object type that exists in this database (Tables always).
+  const groups = state.objects.filter((g) => g.items.length || g.type === "table")
+    .map((g) => ({ ...g, matches: g.items.filter((n) => n.toLowerCase().includes(f)) }));
+  let cur = groups.find((g) => g.type === state.objTab) || groups[0];
+  if (f && cur && !cur.matches.length) cur = groups.find((g) => g.matches.length) || cur; // jump to a tab with matches
+  if (cur) state.objTab = cur.type;
+
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  const shown = groups.reduce((n, g) => n + g.matches.length, 0);
+  $("objCount").textContent = total ? (f ? `${shown}/${total}` : total) : "";
+  $("objTabs").innerHTML = groups.map((g) => {
+    const on = cur && g.type === cur.type;
+    const n = f ? g.matches.length : g.items.length;
+    return `<button role="tab" aria-selected="${on}" data-objtab="${g.type}" class="${on ? "on" : ""}${f && !n ? " none" : ""}"` +
+      ` title="${esc(g.label)}">${ICONS[g.type] || "•"} ${esc(g.label)} <span class="cnt">${n}</span></button>`;
+  }).join("");
+  if (!cur) { $("objTree").innerHTML = `<p class="empty">No objects</p>`; return; }
+  $("objTree").innerHTML = cur.matches.length
+    ? `<ul class="list">` + cur.matches.map((n) => {
+        const on = state.sel && state.sel.type === cur.type && state.sel.name === n ? "on" : "";
+        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n)}</span></li>`;
+      }).join("") + `</ul>`
+    : `<p class="empty">${f ? "No match" : "None in this database"}</p>`;
+}
+$("objFilter").addEventListener("input", renderObjects);
+
+$("objTabs").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-objtab]");
+  if (!b) return;
+  state.objTab = b.dataset.objtab;
+  renderObjects();
+  $("objTree").scrollTop = 0;
+});
+
+// ---- collapsible sidebar sections -----------------------------------------
+const SECTION_KEY = "cactusdb.collapsed";
+function loadCollapsed() {
+  try { return JSON.parse(localStorage.getItem(SECTION_KEY) || "{}"); } catch { return {}; }
+}
+function setCollapsed(sec, collapsed, remember = true) {
+  const box = document.querySelector(`section.box[data-sec="${sec}"]`);
+  if (!box) return;
+  box.classList.toggle("collapsed", collapsed);
+  box.querySelector("h2 .toggle").setAttribute("aria-expanded", String(!collapsed));
+  if (remember) {
+    const c = loadCollapsed(); c[sec] = collapsed;
+    try { localStorage.setItem(SECTION_KEY, JSON.stringify(c)); } catch {}
+  }
+}
+document.querySelectorAll("section.box[data-sec] h2 .toggle").forEach((t) => t.addEventListener("click", () => {
+  const box = t.closest("section.box");
+  setCollapsed(box.dataset.sec, !box.classList.contains("collapsed"));
+}));
+for (const [sec, c] of Object.entries(loadCollapsed())) setCollapsed(sec, c, false);
+
+$("refreshBtn").addEventListener("click", async () => {
   try {
-    const q = new URLSearchParams({ session: state.session, table: state.table, limit: $("limit").value });
+    const res = await api("GET", "/api/objects?" + new URLSearchParams({ session: state.session }));
+    state.objects = res.objects; renderObjects(); toast("Object list refreshed");
+  } catch (e) { toast(e.message, true); }
+});
+
+$("objTree").addEventListener("click", async (ev) => {
+  const li = ev.target.closest("li[data-type]");
+  if (!li) return;
+  const type = li.dataset.type, name = li.dataset.name;
+  const group = state.objects.find((g) => g.type === type);
+  state.sel = { type, name, label: group ? group.label.replace(/s$/, "") : type };
+  renderObjects();
+  $("tabTitle").textContent = name;
+  if (group && group.queryable) {
+    state.table = name;
+    showTab("data");
+    loadTable(name);
+  } else {
+    showTab("def");
+  }
+});
+
+async function loadTable(name) {
+  setInfo("Loading " + name + "…");
+  try {
+    const q = new URLSearchParams({ session: state.session, table: name, limit: $("limit").value });
     const res = await api("GET", "/api/select?" + q);
     $("sql").value = res.sql;
-    res.table = state.table;
+    res.table = name;
     showResult(res);
   } catch (e) { setInfo(e.message, true); }
+}
+
+// ---- tabs & definition -----------------------------------------------------
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+function showTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  $("dataPane").hidden = tab !== "data";
+  $("defPane").hidden = tab !== "def";
+  if (tab === "def") loadDefinition();
+}
+
+async function loadDefinition() {
+  const sel = state.sel;
+  if (!sel || !state.session) return;
+  const key = sel.type + "\u0000" + sel.name;
+  if (state.defFor === key) return;
+  state.defFor = key;
+  $("defKind").textContent = sel.label; $("defName").textContent = sel.name;
+  $("defSrc").className = ""; $("defSrc").textContent = "Loading…"; $("copyDefBtn").disabled = true;
+  try {
+    const res = await api("GET", "/api/definition?" + new URLSearchParams({ session: state.session, type: sel.type, name: sel.name }));
+    if (state.defFor !== key) return;
+    $("defSrc").innerHTML = highlightSQL(res.source || "(empty definition)");
+    $("defSrc").dataset.raw = res.source || "";
+    $("copyDefBtn").disabled = false;
+  } catch (e) {
+    if (state.defFor !== key) return;
+    state.defFor = null;
+    $("defSrc").className = "error"; $("defSrc").textContent = e.message;
+  }
+}
+
+function clearDef(msg) {
+  state.defFor = null;
+  $("defKind").textContent = ""; $("defName").textContent = "";
+  $("defSrc").className = ""; $("defSrc").textContent = msg; $("copyDefBtn").disabled = true;
+}
+
+$("copyDefBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("defSrc").dataset.raw || ""); toast("Definition copied"); }
+  catch { toast("Copy failed – select the text and copy it manually", true); }
 });
+
+const SQL_KEYWORDS = new Set(("select from where and or not null is in as on join left right inner outer full cross " +
+  "group by order having union all distinct case when then else end create alter or replace view table procedure " +
+  "function trigger sequence generator domain exception package body begin declare variable returns return returning " +
+  "if while do for suspend exit into insert update delete values set before after active inactive position default " +
+  "primary key foreign references unique check constraint index asc desc with recursive limit offset first skip " +
+  "top exec execute proc go nocount cursor fetch next open close deallocate raise throw try catch transaction " +
+  "commit rollback start increment by minvalue maxvalue cycle no definer sql security invoker deterministic " +
+  "reads modifies data language external entry_point module_name computed collate character varying varchar char " +
+  "integer int smallint bigint numeric decimal float double precision date time timestamp blob sub_type text boolean " +
+  "event schedule every do leave iterate loop repeat until handler continue signal elseif while synonym").split(" "));
+
+function highlightSQL(src) {
+  const re = /(--[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^']|'')*')|("(?:[^"]|"")*"|`[^`]*`|\[[^\]\n]*\])|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_$]*)/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    const t = esc(m[0]);
+    if (m[1]) out += `<span class="hl-c">${t}</span>`;
+    else if (m[2]) out += `<span class="hl-s">${t}</span>`;
+    else if (m[4]) out += `<span class="hl-n">${t}</span>`;
+    else if (m[5] && SQL_KEYWORDS.has(m[5].toLowerCase())) out += `<span class="hl-k">${t}</span>`;
+    else out += t;
+    last = re.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
 
 // ---- query & grid --------------------------------------------------------
 async function run() {
@@ -504,6 +719,7 @@ $("engines").addEventListener("click", (ev) => {
   selectEngine("sqlite");
   loadSaved();
   api("GET", "/api/drivers").then((list) => {
+    $("driversSub").textContent = "· " + list.length + " built in";
     $("driverList").innerHTML = list.map((d) =>
       `<li title="${esc(d.module)} – compiled into cactusdb, no download needed"><span class="ok">✔</span><span class="name">${esc(d.engines)}</span><span class="ver">${esc(d.version)}</span></li>`).join("");
   }).catch(() => {});

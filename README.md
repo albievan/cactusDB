@@ -5,7 +5,9 @@
 **One small program. No installation. Browse your databases in a web browser.**
 
 cactusdb is a standalone app for **Linux, macOS and Windows** that lets you look at
-**SQLite**, **MySQL**, **MariaDB** and **Firebird** databases. It also exports their data to
+**SQLite**, **MySQL**, **MariaDB**, **PostgreSQL**, **Firebird** and **Microsoft SQL Server** databases,
+including their views, stored procedures, functions, triggers and generators/sequences. It
+also exports their data to
 **Excel**, **JSON**, **XML** or **CSV**. You start it from a terminal and use it in your browser.
 
 - No installer, no runtime, no database drivers or client libraries to install:
@@ -82,7 +84,7 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 
 ## 3. Using cactusdb
 
-1. **Choose the database type** at the top left: SQLite, MySQL, MariaDB or Firebird.
+1. **Choose the database type** at the top left: SQLite, MySQL, MariaDB, Firebird, SQL Server or PostgreSQL.
 2. **Fill in the connection details:**
 
    | Engine | What to enter |
@@ -90,12 +92,16 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    | SQLite | The path to the database file, e.g. `C:\data\shop.db` or `/home/me/shop.sqlite` |
    | MySQL / MariaDB | Host, port (default 3306), username, password, database name |
    | Firebird | Host, port (default 3050), username (often `SYSDBA`), password, and the database **path on the server** or an alias, e.g. `/var/lib/firebird/data/employee.fdb`, `C:\Data\EMPLOYEE.FDB` or `employee` |
+   | PostgreSQL | Host, port (default 5432), username (often `postgres`), password, database name (leave blank to use the database named after the user) |
+   | SQL Server | Host, port (default 1433), SQL Server login (e.g. `sa`) and password, database name (leave blank for the login's default database). For a named instance, enter the host as `server\INSTANCE` and clear the port. |
 
 3. *(Optional)* Tick **Save connection**, give it a name, and it will be remembered,
    including the password. Or click **Save** to store it without connecting.
-4. Click **Connect**. All tables and views in the database appear under **Tables**.
-   Type in the filter box to find one quickly.
-5. **Click a table.** cactusdb writes the query that selects every column
+4. Click **Connect**. The Connection, Saved connections and Drivers sections fold away so
+   the **Objects** list gets the whole sidebar. Click any section heading (▸/▾) to open or
+   close it again. Objects are split into tabs (Tables, Views, Procedures, Functions,
+   Triggers, Generators/Sequences…), see [Browsing objects](#browsing-objects).
+5. **Click a table or view.** cactusdb writes the query that selects every column
    (`SELECT "id", "name", … FROM "customers"`) and shows the data in the grid.
    - Click a column heading to sort; click again to reverse.
    - Use **Show** to view 100, 1,000, 10,000 or 100,000 rows on screen.
@@ -109,6 +115,39 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 **Saved connections** appear in their own list. Click one to connect, use **Edit** to
 load it into the form (change it and save again under the same name to update it), or
 **✕** to delete it.
+
+<a id="browsing-objects"></a>
+### Browsing objects: views, stored procedures, generators…
+
+The **Objects** section has one tab per object type that exists in the database, each with
+a count, e.g. `Tables 42` `Views 7` `Procedures 12` `Generators 9`. Click a tab to list
+those objects.
+
+- The **filter** box searches every tab at once. Each tab shows its number of matches,
+  and the list jumps to a tab that has matches.
+- **⟳** reloads the list after the database has changed.
+- Every sidebar section (Connection, Saved connections, Drivers, Objects) folds open and
+  closed from its heading, and cactusdb remembers your choice.
+
+| Engine | Object groups |
+|--------|---------------|
+| SQLite | Tables, Views, Triggers, Indexes |
+| MySQL / MariaDB | Tables, Views, Procedures, Functions, Triggers, Events, Sequences (MariaDB 10.3+) |
+| Firebird | Tables, Views, Procedures, Functions, Packages (Firebird 3+), Triggers, Generators, Domains, Exceptions |
+| PostgreSQL | Tables, Views, Materialized views, Functions, Procedures, Triggers, Sequences, Domains (shown as `schema.name`; functions include their argument types, so overloads are listed separately) |
+| SQL Server | Tables, Views, Procedures, Functions, Triggers, Sequences, Synonyms (shown as `schema.name`) |
+
+- **Tables, views and materialized views** open in the **Data** tab with their rows. Switch to the
+  **Definition** tab to see their `CREATE` statement.
+- **Procedures, functions, triggers, generators and all other objects** open in the
+  **Definition** tab, which shows their full source code with syntax colouring. Use
+  **Copy** to copy it to the clipboard.
+- **Generators / sequences** also show their **current value**. Reading it never
+  advances the generator. Queries that would advance one (`nextval()`, `GEN_ID()`,
+  `NEXT VALUE FOR`) are refused, because a sequence change can't be undone.
+- Procedures and functions are only shown, never executed, so cactusdb stays read-only.
+- If a definition is hidden (encrypted SQL Server modules, or a MySQL user without
+  privileges), cactusdb says so instead of showing the source.
 
 ### Export formats
 
@@ -134,10 +173,13 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
 2. **Database lock:** even if a query got past the check, the database itself refuses
    to write:
    - SQLite files are opened in read-only mode.
-   - MySQL and MariaDB sessions are switched to read-only, which also blocks
+   - MySQL, MariaDB and PostgreSQL sessions are switched to read-only, which also blocks
      `DROP TABLE` and similar commands.
-   - MySQL, MariaDB and Firebird queries run in a read-only transaction that is
-     always rolled back.
+   - MySQL, MariaDB, PostgreSQL and Firebird queries run in a read-only transaction
+     that is always rolled back.
+   - SQL Server queries run in a transaction that is always rolled back. SQL Server
+     can undo both data and table changes this way, and commands that can't run in
+     a transaction (`BACKUP`, `RESTORE`, `DBCC`, …) are refused.
 
 ## 4. Startup options
 
@@ -205,6 +247,10 @@ cactusdb --port 8080 --conn-db ~/.cactus.conn.db --exportto ~/cactusdb-exports
 | MySQL `Access denied for user` | Wrong username or password, or the user isn't allowed to connect from your machine's address. |
 | Firebird `I/O error … CreateFile (open)` or `file … is not a valid database` | The database path must be the path **on the Firebird server**, not on your computer, or an alias defined in the server's `databases.conf`. |
 | Firebird `Your user name and password are not defined` | Check the username and password. Both Srp and legacy authentication are supported. |
+| PostgreSQL `password authentication failed` / `no pg_hba.conf entry` | Check the username and password, and that the server's `pg_hba.conf` allows connections from your machine. |
+| PostgreSQL `database "…" does not exist` | Fill in the database name. When it's blank, PostgreSQL uses a database with the same name as the user. |
+| SQL Server `Login failed for user` | Check the login and password, and that the server allows **SQL Server authentication** (mixed mode). Windows/Active Directory logins aren't supported. |
+| SQL Server `unable to open tcp connection` / timeout | Check that TCP/IP is enabled in SQL Server Configuration Manager and the port (default 1433) isn't blocked by a firewall. For a named instance use `server\INSTANCE` with an empty port, and make sure the SQL Server Browser service is running. |
 | `cactusdb is read-only: only SELECT queries are allowed` | Working as intended: cactusdb doesn't run statements that change data. |
 | `result has more rows than Excel allows` | Excel holds at most 1,048,575 data rows. Add a `WHERE` clause, or export to CSV or JSON instead. |
 | `not connected (session expired)` | cactusdb was restarted. Connect again. |
@@ -217,10 +263,12 @@ cactusdb --port 8080 --conn-db ~/.cactus.conn.db --exportto ~/cactusdb-exports
 | MySQL | 5.6 and newer, including 8.x and 9.x |
 | MariaDB | 10.x and 11.x |
 | Firebird | 2.5, 3, 4 and 5, with Srp authentication and wire encryption |
+| PostgreSQL | 10 and newer (tested with PostgreSQL 17), and compatible servers such as Amazon RDS/Aurora, Azure Database for PostgreSQL and Supabase. TLS is used when the server offers it. |
+| Microsoft SQL Server | 2012 and newer (tested with SQL Server 2022); Azure SQL Database should work too. Uses SQL Server authentication; TLS encryption is used when the server offers it, and the server certificate is trusted like SSMS's *Trust server certificate* option. |
 
 All drivers are built into cactusdb and listed in the **Drivers** panel. Unlike tools such
 as DBeaver, there is nothing to download, and no client library (libmysqlclient,
-fbclient.dll, …) needs to be installed.
+fbclient.dll, libpq, ODBC drivers, …) needs to be installed.
 
 ---
 
@@ -241,14 +289,17 @@ servers. Start test databases and set `CACTUSDB_IT=1`:
 docker run -d --rm --name cdb-mysql -e MYSQL_ROOT_PASSWORD='p@ss:w/rd' -e MYSQL_DATABASE=shop -p 13306:3306 mysql
 docker run -d --rm --name cdb-maria -e MARIADB_ROOT_PASSWORD=secret -e MARIADB_DATABASE=shop -p 13307:3306 mariadb:11
 docker run -d --rm --name cdb-fb -e ISC_PASSWORD=masterkey -e FIREBIRD_DATABASE=test.fdb -p 13050:3050 jacobalberty/firebird
-# create a 2-row `customers` table (`CUSTOMER` in Firebird) in each, then:
+docker run -d --rm --name cdb-pg -e POSTGRES_PASSWORD='pg p@ss:/w' -e POSTGRES_DB=shop -p 15432:5432 postgres:17-alpine
+docker run -d --rm --name cdb-mssql --platform linux/amd64 -e ACCEPT_EULA=Y -e 'MSSQL_SA_PASSWORD=Cactus#Pass123' -p 11433:1433 mcr.microsoft.com/mssql/server:2022-latest
+# create a 2-row `customers` table (`CUSTOMER` in Firebird, `dbo.customers` in a `shop` database on SQL Server, `public.customers` on PostgreSQL) in each, then:
 CACTUSDB_IT=1 go test ./...
 ```
 
 | File | Contents |
 |------|----------|
 | `main.go` | Command-line options, web server, API |
-| `db.go` | Connecting, listing tables and columns, running queries |
+| `db.go` | Connecting, listing columns, running queries |
+| `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `readonly.go` | The read-only query check |
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections (`cactus.conn.db`) |

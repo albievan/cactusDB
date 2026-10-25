@@ -17,4 +17,6 @@ licenses:
   modernc.org/sqlite               BSD-3-Clause
   github.com/go-sql-driver/mysql   MPL-2.0
   github.com/nakagami/firebirdsql  MIT
+  github.com/microsoft/go-mssqldb  BSD-3-Clause
+  github.com/jackc/pgx/v5          MIT
   github.com/xuri/excelize/v2      BSD-3-Clause
