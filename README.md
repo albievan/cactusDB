@@ -70,10 +70,12 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.0.0
+cactusdb 1.2.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
+  driver SQL Server      github.com/microsoft/go-mssqldb v1.11.2 (bundled)
+  driver PostgreSQL      github.com/jackc/pgx/v5 v5.11.0 (bundled)
   saved connections: /home/me/cactusdb/cactus.conn.db (credentials encrypted with key file /home/me/cactusdb/cactus.key)
   export folder:     /home/me/cactusdb/export
   open http://127.0.0.1:8080
@@ -337,6 +339,10 @@ CACTUSDB_IT=1 go test ./...
 | `store.go` | Saved connections (`cactus.conn.db`) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
+
+## Changes
+
+See [CHANGELOG.md](CHANGELOG.md) for what's new in each version.
 
 ## License
 
