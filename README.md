@@ -10,6 +10,20 @@ cactusdb --port 8087 --exportto ./export   # or choose the export folder
 # then open http://localhost:8080
 ```
 
+## Download
+
+Ready-to-run binaries are in [`dist/`](dist):
+
+| OS | Intel / AMD | ARM |
+|----|-------------|-----|
+| Linux | `cactusdb-linux-amd64` | `cactusdb-linux-arm64` |
+| macOS | `cactusdb-darwin-amd64` | `cactusdb-darwin-arm64` (Apple Silicon) |
+| Windows | `cactusdb-windows-amd64.exe` | `cactusdb-windows-arm64.exe` |
+
+On Linux and macOS, run `chmod +x` on the file. macOS may block an unsigned download
+the first time: run `xattr -d com.apple.quarantine cactusdb-darwin-arm64` or allow it in
+System Settings, then Privacy & Security.
+
 ## Features
 
 - Pick an engine, connect, and every table and view in the database is listed.
