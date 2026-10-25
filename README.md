@@ -74,7 +74,7 @@ cactusdb 1.0.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
-  saved connections: /home/me/cactusdb/cactus.conn.db
+  saved connections: /home/me/cactusdb/cactus.conn.db (credentials encrypted with key file /home/me/cactusdb/cactus.key)
   export folder:     /home/me/cactusdb/export
   open http://127.0.0.1:8080
   press Ctrl+C to stop
@@ -96,7 +96,8 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    | SQL Server | Host, port (default 1433), SQL Server login (e.g. `sa`) and password, database name (leave blank for the login's default database). For a named instance, enter the host as `server\INSTANCE` and clear the port. |
 
 3. *(Optional)* Tick **Save connection**, give it a name, and it will be remembered,
-   including the password. Or click **Save** to store it without connecting.
+   including the password, which is stored encrypted (see [Security](#6-security)).
+   Or click **Save** to store it without connecting.
 4. Click **Connect**. The Connection, Saved connections and Drivers sections fold away so
    the **Objects** list gets the whole sidebar. Click any section heading (▸/▾) to open or
    close it again. Objects are split into tabs (Tables, Views, Procedures, Functions,
@@ -114,7 +115,9 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 
 **Saved connections** appear in their own list. Click one to connect, use **Edit** to
 load it into the form (change it and save again under the same name to update it), or
-**✕** to delete it.
+**✕** to delete it. Saved passwords are never sent to the browser: after **Edit** the
+password box shows *saved – leave blank to keep*. Leave it empty to keep the stored
+password, or type a new one to replace it.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -192,6 +195,7 @@ cactusdb --port 8087 --exportto ./export
 | `--port` | `8080` | The port to open in your browser: `http://localhost:<port>` |
 | `--exportto` | folder `export` next to the cactusdb program | Where exported files are saved. Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
 | `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
+| `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
 | `--host` | `127.0.0.1` (this computer only) | Use `0.0.0.0` to let other computers on your network use cactusdb. See [Security](#6-security). |
 | `--version` | | Print the version and exit |
 | `--help` | | List the options |
@@ -202,7 +206,12 @@ cactusdb --port 9000                                  # different port
 cactusdb --port 8087 --exportto D:\Reports\exports    # exports to another drive (Windows)
 cactusdb --port 8087 --exportto ~/Desktop/exports     # exports to your Desktop (macOS/Linux)
 cactusdb --port 8080 --host 0.0.0.0                   # reachable from other machines
+CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a passphrase (macOS/Linux)
 ```
+
+| Environment variable | What it does |
+|----------------------|--------------|
+| `CACTUSDB_PASSPHRASE` | Derives the encryption key for saved usernames and passwords from this passphrase instead of using `cactus.key`. Nothing secret is then stored on disk, but you must set the same passphrase every time. On Windows: `set CACTUSDB_PASSPHRASE=…` (Command Prompt) or `$env:CACTUSDB_PASSPHRASE='…'` (PowerShell). |
 
 ## 5. Files cactusdb creates
 
@@ -212,35 +221,58 @@ Next to the program (unless you chose other locations with the options above):
 cactusdb/
 ├── cactusdb(.exe)       the program
 ├── cactus.conn.db       your saved connections (an SQLite database)
+├── cactus.key           the key that encrypts saved usernames and passwords
 └── export/              your exported files
 ```
 
 To move cactusdb to another computer and keep your connections, copy `cactus.conn.db`
-along with it. To forget all saved connections, delete that file.
+**and `cactus.key`** along with it. You don't need the key if you use `CACTUSDB_PASSPHRASE`;
+use the same passphrase on the new computer. To forget all saved connections, delete
+both files. If you lose the key or forget the passphrase, the saved connections can't be
+decrypted. Delete `cactus.conn.db` and save them again.
 
 **Moving the program into a system folder** such as `/usr/local/bin` or
 `C:\Program Files`? cactusdb may not be allowed to write next to itself there. In that
 case, point the files somewhere writable:
 ```sh
-cactusdb --port 8080 --conn-db ~/.cactus.conn.db --exportto ~/cactusdb-exports
+cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-exports
 ```
 
 ## 6. Security
 
-- **Passwords are saved in plain text** in `cactus.conn.db`. On macOS and Linux, cactusdb
-  makes the file readable only by your user account. Don't share it, and don't commit it
-  to git.
+- **Saved usernames and passwords are encrypted** in `cactus.conn.db` with AES-256-GCM.
+  Each value has its own random nonce and is tied to its column. The other connection
+  details (name, engine, host, port, database) are not secret and stay readable.
+- **The key** is a random 256-bit key in `cactus.key`, created on first start. You can
+  also set `CACTUSDB_PASSPHRASE`, and the key is then derived from your passphrase
+  (PBKDF2-SHA256, 600,000 rounds, random salt) and never written to disk.
+  - With the **key file**, someone who copies only `cactus.conn.db` can't read the
+    passwords. Anyone who gets *both* files can, so keep `cactus.key` private and store
+    or back it up separately.
+  - With a **passphrase**, the file on its own is never enough.
+
+  On macOS and Linux both files are readable only by your user account. Don't commit
+  either one to git.
+- **Upgrading from an older cactusdb** that stored passwords in plain text: on first start
+  the saved credentials are encrypted automatically, and the file is compacted so no
+  plain-text copy is left behind.
+- Saved passwords never leave the cactusdb process. The browser only sees whether a
+  connection has one.
+- By default cactusdb is only reachable **from your own computer**. If you start it with
+  `--host 0.0.0.0`, anyone who can reach that port can use your saved connections and
+  browse those databases. There is no login screen, so only do this on a trusted network.
 - By default cactusdb is only reachable **from your own computer**. If you start it with
   `--host 0.0.0.0`, anyone who can reach that port can use your saved connections and
   browse those databases. There is no login screen, so only do this on a trusted network.
 - cactusdb never writes to your databases (see [Read-only](#read-only)). The only files it
-  writes are `cactus.conn.db` and the files in the export folder.
+  writes are `cactus.conn.db`, `cactus.key` and the files in the export folder.
 
 ## 7. Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | `cannot listen on 127.0.0.1:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
+| `cannot decrypt the saved connections in … with …` | The key doesn't match the one the connections were saved with. Put the original `cactus.key` back, set the same `CACTUSDB_PASSPHRASE` as before (or unset it if you used the key file), or start fresh with `--conn-db new.conn.db`. |
 | `cannot create export folder …` | The folder isn't writable. Use `--exportto` with a folder you own. |
 | Browser shows *can't connect* | Is cactusdb still running in the terminal? Use the exact URL it printed. |
 | `sqlite file not found` | Check the path. It's the path on the computer running cactusdb. |
@@ -303,6 +335,7 @@ CACTUSDB_IT=1 go test ./...
 | `readonly.go` | The read-only query check |
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections (`cactus.conn.db`) |
+| `crypt.go` | Encryption of saved usernames and passwords |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 
 ## License
