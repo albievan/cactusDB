@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="cactusDB">
+  <title>cactusDB</title>
+  <!-- database cylinder pot -->
+  <path d="M30 88v22c0 6 15 11 34 11s34-5 34-11V88" fill="#2f6b8f"/>
+  <ellipse cx="64" cy="99" rx="34" ry="11" fill="none" stroke="#a9d3ea" stroke-width="3" opacity=".7"/>
+  <ellipse cx="64" cy="88" rx="34" ry="11" fill="#4a8db5"/>
+  <ellipse cx="64" cy="88" rx="26" ry="7.5" fill="#6b4a2f"/>
+  <!-- cactus -->
+  <g fill="#3f9d5d" stroke="#24643f" stroke-width="3" stroke-linejoin="round">
+    <path d="M55 89V30a9 9 0 0 1 18 0v59z"/>
+    <path d="M55 64H45a8 8 0 0 1-8-8V44a6 6 0 0 1 12 0v9h6"/>
+    <path d="M73 56h7v-14a6 6 0 0 1 12 0v14a10 10 0 0 1-10 10h-9"/>
+  </g>
+  <g stroke="#cdeccf" stroke-width="2.5" stroke-linecap="round">
+    <path d="M64 27v56M43 46v8M86 44v12"/>
+  </g>
+  <circle cx="64" cy="20" r="5" fill="#f2a1c4"/>
+</svg>
