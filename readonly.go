@@ -25,6 +25,17 @@ var forbiddenWords = map[string]bool{
 	"REINDEX": true, "CALL": true, "EXECUTE": true, "EXEC": true, "LOCK": true,
 	"HANDLER": true, "LOAD": true, "COMMIT": true, "ROLLBACK": true, "SAVEPOINT": true,
 	"PRAGMA": true, "INTO": true, "OUTFILE": true, "DUMPFILE": true,
+	// SQL Server
+	"BACKUP": true, "RESTORE": true, "DBCC": true, "SHUTDOWN": true, "KILL": true,
+	"BULK": true, "DENY": true, "WRITETEXT": true, "UPDATETEXT": true, "RECONFIGURE": true,
+	"OPENQUERY": true, "OPENROWSET": true, "OPENDATASOURCE": true,
+	// PostgreSQL
+	"COPY": true, "SET_CONFIG": true, "DBLINK": true, "DBLINK_EXEC": true,
+	"LO_IMPORT": true, "LO_EXPORT": true, "LO_UNLINK": true, "LO_CREATE": true, "LO_PUT": true,
+	"PG_TERMINATE_BACKEND": true, "PG_CANCEL_BACKEND": true, "PG_RELOAD_CONF": true,
+	// Sequence/generator advancers look like reads but change state, and are
+	// not undone by a rollback (NEXT VALUE FOR is checked separately).
+	"NEXTVAL": true, "SETVAL": true, "GEN_ID": true,
 }
 
 var wordRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_$]*`)
@@ -52,6 +63,9 @@ func checkReadOnly(engine, q string) error {
 		w := strings.ToUpper(code[loc[0]:loc[1]])
 		if forbiddenWords[w] {
 			return fmt.Errorf("%w (found %s)", errReadOnly, w)
+		}
+		if w == "NEXT" && strings.HasPrefix(strings.ToUpper(strings.TrimLeft(code[loc[1]:], " \t\r\n")), "VALUE") {
+			return fmt.Errorf("%w (found NEXT VALUE FOR)", errReadOnly)
 		}
 		// REPLACE(...) is a harmless string function; REPLACE INTO is not.
 		if w == "REPLACE" && !strings.HasPrefix(strings.TrimLeft(code[loc[1]:], " \t\r\n"), "(") {
@@ -104,7 +118,17 @@ func stripLiterals(engine, q string) string {
 				}
 			}
 			b.WriteString(" x ")
-		case c == '[' && engine == EngineSQLite: // [identifier]
+		case c == '$' && engine == EnginePostgres && (i == 0 || !isIdentChar(q[i-1])) && dollarTag.MatchString(q[i:]):
+			// PostgreSQL dollar quoting: $$ ... $$ or $tag$ ... $tag$
+			tag := dollarTag.FindString(q[i:])
+			end := strings.Index(q[i+len(tag):], tag)
+			if end < 0 {
+				i = n
+			} else {
+				i += len(tag) + end + len(tag) - 1
+			}
+			b.WriteString(" x ")
+		case c == '[' && (engine == EngineSQLite || engine == EngineMSSQL): // [identifier]
 			for i < n && q[i] != ']' {
 				i++
 			}
@@ -114,4 +138,10 @@ func stripLiterals(engine, q string) string {
 		}
 	}
 	return b.String()
+}
+
+var dollarTag = regexp.MustCompile(`^\$([A-Za-z_][A-Za-z0-9_]*)?\$`)
+
+func isIdentChar(c byte) bool {
+	return c == '_' || c == '$' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80
 }

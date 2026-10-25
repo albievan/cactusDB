@@ -89,7 +89,8 @@ func main() {
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("POST /api/connect", s.handleConnect)
 	mux.HandleFunc("POST /api/disconnect", s.handleDisconnect)
-	mux.HandleFunc("GET /api/tables", s.handleTables)
+	mux.HandleFunc("GET /api/objects", s.handleObjects)
+	mux.HandleFunc("GET /api/definition", s.handleDefinition)
 	mux.HandleFunc("GET /api/select", s.handleSelect)
 	mux.HandleFunc("POST /api/query", s.handleQuery)
 	mux.HandleFunc("POST /api/export", s.handleExport)
@@ -230,14 +231,14 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, fmt.Errorf("connection failed: %w", err))
 		return
 	}
-	tables, err := listTables(r.Context(), p.Engine, db)
+	objects, err := listObjects(r.Context(), p.Engine, db)
 	if err != nil {
 		db.Close()
 		writeErr(w, 400, fmt.Errorf("connected, but listing tables failed: %w", err))
 		return
 	}
 
-	resp := map[string]any{"tables": tables}
+	resp := map[string]any{"objects": objects}
 	if req.Save && req.SavedID == 0 {
 		if strings.TrimSpace(req.Name) == "" {
 			req.Name = defaultConnName(p)
@@ -285,18 +286,39 @@ func (s *server) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-func (s *server) handleTables(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleObjects(w http.ResponseWriter, r *http.Request) {
 	ss, err := s.session(r, "")
 	if err != nil {
 		writeErr(w, 401, err)
 		return
 	}
-	tables, err := listTables(r.Context(), ss.engine, ss.db)
+	objects, err := listObjects(r.Context(), ss.engine, ss.db)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"tables": tables})
+	writeJSON(w, 200, map[string]any{"objects": objects})
+}
+
+// handleDefinition returns the source / DDL of a table, view, procedure,
+// trigger, generator or other object.
+func (s *server) handleDefinition(w http.ResponseWriter, r *http.Request) {
+	ss, err := s.session(r, "")
+	if err != nil {
+		writeErr(w, 401, err)
+		return
+	}
+	typ, name := r.URL.Query().Get("type"), r.URL.Query().Get("name")
+	if typ == "" || name == "" {
+		writeErr(w, 400, errors.New("type and name are required"))
+		return
+	}
+	src, err := objectDefinition(r.Context(), ss.engine, ss.db, typ, name)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"type": typ, "name": name, "source": src})
 }
 
 // handleSelect builds the SELECT for a table and returns the first rows.
