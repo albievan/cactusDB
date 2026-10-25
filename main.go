@@ -49,6 +49,7 @@ func main() {
 	port := flag.Int("port", 8080, "HTTP port to serve the web UI on")
 	host := flag.String("host", "127.0.0.1", "address to listen on (use 0.0.0.0 to allow other machines)")
 	connDB := flag.String("conn-db", "", "SQLite file used to store saved connections (default: cactus.conn.db next to the binary)")
+	keyFile := flag.String("key-file", "", "key used to encrypt saved usernames/passwords (default: cactus.key next to the connection file; ignored when $"+passphraseEnv+" is set)")
 	exportTo := flag.String("exportto", "", "folder exports are written to (default: ./export next to the binary)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Usage = func() {
@@ -76,7 +77,10 @@ func main() {
 		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
 	}
 
-	store, err := openStore(*connDB)
+	if *keyFile == "" {
+		*keyFile = filepath.Join(filepath.Dir(*connDB), keyFileName)
+	}
+	store, err := openStore(*connDB, *keyFile)
 	if err != nil {
 		log.Fatalf("cannot open connection store %s: %v", *connDB, err)
 	}
@@ -114,8 +118,9 @@ func main() {
 	for _, d := range driverInfo() {
 		fmt.Printf("  driver %-15s %s %s (bundled)\n", d["engines"], d["module"], d["version"])
 	}
-	fmt.Printf("  saved connections: %s\n  export folder:     %s\n  open http://%s\n  press Ctrl+C to stop\n",
-		*connDB, exportDir, net.JoinHostPort(browseHost, strconv.Itoa(*port)))
+	fmt.Printf("  saved connections: %s (credentials encrypted with %s)\n", *connDB, store.keyDesc)
+	fmt.Printf("  export folder:     %s\n  open http://%s\n  press Ctrl+C to stop\n",
+		exportDir, net.JoinHostPort(browseHost, strconv.Itoa(*port)))
 
 	go func() {
 		stop := make(chan os.Signal, 1)
@@ -208,6 +213,9 @@ type connectReq struct {
 	SavedID int64  `json:"savedId"` // connect using a saved connection
 	Save    bool   `json:"save"`    // also save these parameters
 	Name    string `json:"name"`    // name to save under
+	// KeepPasswordOf uses the stored password of that saved connection when
+	// Password is empty, so the browser never needs to hold saved passwords.
+	KeepPasswordOf int64 `json:"keepPasswordOf"`
 }
 
 func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +233,13 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p, label = c.ConnParams, c.Name
+	} else if req.KeepPasswordOf != 0 && p.Password == "" {
+		c, err := s.store.Get(req.KeepPasswordOf)
+		if err != nil {
+			writeErr(w, 404, fmt.Errorf("saved connection not found"))
+			return
+		}
+		p.Password = c.Password
 	}
 	db, err := openDB(r.Context(), p)
 	if err != nil {
@@ -460,22 +475,50 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
+// savedConnInfo is what the browser sees of a saved connection: everything
+// except the password, which stays encrypted on the server.
+type savedConnInfo struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Engine      string `json:"engine"`
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	Username    string `json:"username"`
+	Database    string `json:"database"`
+	HasPassword bool   `json:"hasPassword"`
+	Created     string `json:"created"`
+}
+
 func (s *server) handleListConns(w http.ResponseWriter, r *http.Request) {
 	list, err := s.store.List()
 	if err != nil {
 		writeErr(w, 500, err)
 		return
 	}
-	writeJSON(w, 200, list)
+	out := make([]savedConnInfo, len(list))
+	for i, c := range list {
+		out[i] = savedConnInfo{ID: c.ID, Name: c.Name, Engine: c.Engine, Host: c.Host, Port: c.Port,
+			Username: c.Username, Database: c.Database, HasPassword: c.Password != "", Created: c.Created}
+	}
+	writeJSON(w, 200, out)
 }
 
 func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
-	var c SavedConn
-	if err := readJSON(r, &c); err != nil {
+	var req struct {
+		SavedConn
+		KeepPassword bool `json:"keepPassword"` // empty password = keep the stored one
+	}
+	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
+	c := req.SavedConn
 	c.Name = strings.TrimSpace(c.Name)
+	if req.KeepPassword && c.Password == "" {
+		if old, err := s.store.GetByName(c.Name); err == nil {
+			c.Password = old.Password
+		}
+	}
 	if c.Name == "" {
 		c.Name = defaultConnName(c.ConnParams)
 	}

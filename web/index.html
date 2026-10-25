@@ -349,13 +349,18 @@ function formParams() {
   };
 }
 
+// Saved passwords never reach the browser: the form leaves the password
+// empty and asks the server to reuse the stored one (state.formSavedId).
 function fillForm(c) {
   selectEngine(c.engine, true);
   if (c.engine === "sqlite") { $("dbFile").value = c.database; }
   else {
     $("host").value = c.host; $("port").value = c.port || "";
-    $("user").value = c.username; $("pass").value = c.password; $("dbName").value = c.database;
+    $("user").value = c.username; $("dbName").value = c.database;
   }
+  $("pass").value = "";
+  state.formSavedId = c.hasPassword ? c.id : null;
+  $("pass").placeholder = c.hasPassword ? "saved – leave blank to keep" : "";
   $("connName").value = c.name;
 }
 
@@ -395,7 +400,8 @@ $("saveConn").addEventListener("change", () => { $("saveNameWrap").hidden = !$("
 
 $("saveOnlyBtn").addEventListener("click", async () => {
   try {
-    await api("POST", "/api/connections", { name: $("connName").value, ...formParams() });
+    const p = formParams();
+    await api("POST", "/api/connections", { name: $("connName").value, ...p, keepPassword: !p.password && !!state.formSavedId });
     toast("Connection saved to cactus.conn.db");
     loadSaved();
   } catch (e) { toast(e.message, true); }
@@ -407,6 +413,7 @@ async function connect(extra = {}) {
   btn.disabled = true; btn.textContent = "Connecting…";
   try {
     const body = { ...formParams(), ...extra };
+    if (!extra.savedId && !body.password && state.formSavedId) body.keepPasswordOf = state.formSavedId;
     if (!extra.savedId && $("saveConn").checked) { body.save = true; body.name = $("connName").value; }
     const res = await api("POST", "/api/connect", body);
     if (state.session) api("POST", "/api/disconnect", { session: state.session }).catch(() => {});

@@ -1,5 +1,7 @@
 cactusdb
 cactusdb.exe
+cdb
 export/
 *.conn.db
+*.key
 run-claude

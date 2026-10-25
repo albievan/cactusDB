@@ -77,7 +77,7 @@ func TestSQLiteURI(t *testing.T) {
 // The SQLite connection must refuse writes even without checkReadOnly.
 func TestSQLiteConnectionIsReadOnly(t *testing.T) {
 	path := t.TempDir() + "/ro test.db"
-	st, err := openStore(path) // creates the file with a table in it
+	st, err := openStore(path, t.TempDir()+"/cactus.key") // creates the file with a table in it
 	if err != nil {
 		t.Fatal(err)
 	}
