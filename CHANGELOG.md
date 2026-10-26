@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.2 — 2026-10-26
+
+- A **Clear** button removes the export status once an export is finished (single
+  export, *Export all tables* and DDL export).
+- Fixed: a long connection name in the top bar (e.g. a long SQLite path) made the page
+  wider than the window, pushing the buttons on the right off-screen.
+
 ## 1.4.1 — 2026-10-26
 
 - **⏻ Shutdown** button in the web UI when cactusdb runs with `--runas background`: after
