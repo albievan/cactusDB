@@ -74,7 +74,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.4.1
+cactusdb 1.4.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -119,6 +119,7 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 7. **Export** with the **Excel**, **JSON**, **XML** or **CSV** buttons. The export
    always contains **all rows** of the query, not just the rows on screen. The file is
    saved in the export folder, and a bar shows the full path with a **Download** link.
+   **Clear** removes that bar again.
 
 **Saved connections** appear in their own list. Click one to connect, or **✕** to delete it.
 
@@ -136,7 +137,8 @@ password (testing uses it too), or type a new one to replace it.
 time. Each table gets a progress bar with its row count, and a download link when it's
 done. The list fills the whole data area (in several columns on wide screens), so you see
 as many tables as possible. Opening a table brings the grid back, and **✕** closes the
-list while the export carries on. Disconnecting stops an export that is still running.
+list while the export carries on. When the export is finished, **Clear** removes the
+export status. Disconnecting stops an export that is still running.
 
 **Export the DDL.** The **DDL** button next to the filter writes the `CREATE` statements of
 every object in the database to one `.sql` file (see [DDL export](#ddl-export)).
@@ -366,7 +368,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background --host 0.0.0.0
 ```
 ```
-cactusdb 1.4.1 is running in the background (process id 48211)
+cactusdb 1.4.2 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
