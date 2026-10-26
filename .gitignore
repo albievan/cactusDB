@@ -5,3 +5,5 @@ export/
 *.conn.db
 *.key
 run-claude
+*.log
+*.pid

@@ -93,6 +93,26 @@ func TestRunCLIExportsSQLite(t *testing.T) {
 		t.Errorf("customers export: %s", data)
 	}
 
+	// A comma-separated list, with spaces, other case and a duplicate.
+	out.Reset()
+	opts.ExportDir = filepath.Join(dir, "list")
+	opts.Tables = "customers, ORDERS,customers"
+	if err := runCLI(context.Background(), opts, &out); err != nil {
+		t.Fatal(err)
+	}
+	if files, _ := filepath.Glob(filepath.Join(dir, "list", "*.json")); len(files) != 2 {
+		t.Errorf("expected customers and orders once each, got %v\n%s", files, out.String())
+	}
+	// An unknown name fails before anything is exported.
+	opts.ExportDir = filepath.Join(dir, "bad")
+	opts.Tables = "customers,nope,orders"
+	if err := runCLI(context.Background(), opts, &out); err == nil || !strings.Contains(err.Error(), `"nope"`) {
+		t.Errorf("expected nope not found, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "bad")); !os.IsNotExist(err) {
+		t.Error("nothing should be exported when a table name is wrong")
+	}
+
 	out.Reset()
 	opts.Tables, opts.Show = "", "all"
 	if err := runCLI(context.Background(), opts, &out); err != nil || !strings.Contains(out.String(), "  orders\n") {

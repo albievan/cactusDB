@@ -10,7 +10,7 @@
     --bg: #f6f7f5; --panel: #ffffff; --panel-2: #f0f2ee; --border: #dde1da;
     --text: #1d2420; --muted: #66706a; --accent: #2f7d4f; --accent-2: #24643f;
     --accent-soft: #e3f1e8; --danger: #b3261e; --danger-soft: #fbe9e7;
-    --null: #9aa39d; --row-alt: #fafbf9; --row-hover: #eef6f0;
+    --null: #9aa39d; --row-alt: #fafbf9; --row-hover: #eef6f0; --flow-2: #0ea5b7;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   }
   @media (prefers-color-scheme: dark) {
@@ -18,7 +18,7 @@
       --bg: #141816; --panel: #1b201d; --panel-2: #222824; --border: #2f3732;
       --text: #e3e8e4; --muted: #95a099; --accent: #4fb57a; --accent-2: #63c78c;
       --accent-soft: #1f3328; --danger: #f2867c; --danger-soft: #3a1f1d;
-      --null: #66706a; --row-alt: #1e2420; --row-hover: #243229;
+      --null: #66706a; --row-alt: #1e2420; --row-hover: #243229; --flow-2: #3ee6d8;
     }
   }
   * { box-sizing: border-box; }
@@ -34,7 +34,25 @@
   }
   header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
   .badge { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; }
-  header .status { color: var(--muted); font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .status { color: var(--muted); font-size: 13px; flex: 0 1 auto; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Data-in-transit animation in the free space of the header. */
+  header .flow { flex: 1; min-width: 60px; height: 34px; align-self: center;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+  header .flow svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .flow .wave { fill: none; stroke: url(#flowGrad); vector-effect: non-scaling-stroke; }
+  .flow .wave.a { stroke-width: 1.5; opacity: .75; animation: flowA 6s linear infinite; }
+  .flow .wave.b { stroke-width: 1.1; opacity: .5; animation: flowA 4.2s linear infinite; }
+  .flow .wave.c { stroke-width: .9; opacity: .38; animation: flowA 9s linear infinite; }
+  .flow .pk { fill: none; stroke: var(--flow-2); stroke-width: 2.4; stroke-linecap: round; vector-effect: non-scaling-stroke;
+    stroke-dasharray: 3 97; animation: packets 3s linear infinite; }
+  .flow .pk.p2 { stroke: var(--accent); stroke-dasharray: 2 61; animation-duration: 4.4s; }
+  .flow .pk.p3 { stroke-dasharray: 5 143; animation-duration: 2.3s; opacity: .8; }
+  @keyframes flowA { from { transform: translateX(-100px); } to { transform: translateX(0); } }
+  @keyframes packets { to { stroke-dashoffset: -600; } }
+  body.busy .flow .wave, body.busy .flow .pk { animation-duration: .9s; }
+  body.busy .flow .pk { stroke-width: 3; }
+  @media (prefers-reduced-motion: reduce) { .flow .wave, .flow .pk { animation: none; } }
   header .status b { color: var(--accent); font-weight: 600; }
   .layout { display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
   aside {
@@ -100,6 +118,19 @@
   .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
   #objectsBox:not(.collapsed) { flex: 1; display: flex; flex-direction: column; min-height: 320px; }
   .filterrow { display: flex; gap: 6px; }
+  .exportall { display: flex; align-items: center; gap: 3px; margin: -4px 0 8px; }
+  .exportall span { font-size: 12px; color: var(--muted); margin-right: auto; }
+  .exportall button { padding: 2px 3px; line-height: 0; color: var(--muted); }
+  .exportall button:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
+  .ealist { list-style: none; margin: 6px 0 2px; padding: 0; max-height: 220px; overflow-y: auto; }
+  .ealist li { display: grid; grid-template-columns: minmax(80px, 220px) 140px 1fr; gap: 10px; align-items: center; padding: 2px 0; }
+  .ealist .n { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ealist .bar { height: 7px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; }
+  .ealist .bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  .ealist .bar.busy i { width: 30% !important; animation: eabusy 1.2s ease-in-out infinite alternate; }
+  @keyframes eabusy { from { margin-left: 0; } to { margin-left: 70%; } }
+  .ealist .s { color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ealist .err { color: var(--danger); }
   .objtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
   .objtabs:empty { display: none; }
   .objtabs button { padding: 3px 8px; font-size: 12px; border-radius: 999px; display: inline-flex; gap: 5px; align-items: center; }
@@ -157,6 +188,16 @@
   tbody tr:hover td:not(.n) { background: var(--row-hover); }
   .placeholder { display: grid; place-items: center; height: 100%; color: var(--muted); text-align: center; padding: 24px; }
   .placeholder .big { font-size: 46px; }
+  dialog#connDialog { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; width: min(440px, calc(100vw - 32px));
+    background: var(--panel); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  dialog#connDialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog#connDialog h3 { margin: 0 0 6px; font-size: 16px; }
+  .dresult { margin-top: 12px; padding: 8px 10px; border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .dresult.ok { background: var(--accent-soft); color: var(--accent); }
+  .dresult.bad { background: var(--danger-soft); color: var(--danger); }
+  .dresult.busy { background: var(--panel-2); color: var(--muted); }
+  .dactions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
+  .dactions .spacer { flex: 1; }
   .toast {
     position: fixed; right: 16px; bottom: 16px; padding: 10px 14px; border-radius: 8px;
     background: var(--text); color: var(--bg); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
@@ -177,6 +218,26 @@
   <h1><img src="cactusdb.svg" alt="" width="24" height="24" style="vertical-align:-5px"> cactusdb</h1>
   <span class="badge" title="INSERT, UPDATE, DELETE and schema changes are blocked">read-only</span>
   <div class="status" id="status">Not connected</div>
+  <div class="flow" aria-hidden="true">
+    <svg viewBox="0 0 400 36" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="flowGrad" x1="0" x2="1">
+          <stop offset="0" style="stop-color:var(--accent);stop-opacity:0"/>
+          <stop offset=".35" style="stop-color:var(--accent)"/>
+          <stop offset=".75" style="stop-color:var(--flow-2)"/>
+          <stop offset="1" style="stop-color:var(--flow-2);stop-opacity:0"/>
+        </linearGradient>
+        <filter id="flowGlow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="1.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <path id="w1" d="M -200 18 q 25 -9 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0"/><path id="w2" d="M -200 18 q 25 -5 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0"/><path id="w3" d="M -200 19 q 25 -12 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0"/>
+      </defs>
+      <g class="waves">
+        <use href="#w1" class="wave a"/><use href="#w2" class="wave b"/><use href="#w3" class="wave c"/>
+      </g>
+      <g class="packets" filter="url(#flowGlow)">
+        <use href="#w1" class="pk p1"/><use href="#w3" class="pk p2"/><use href="#w2" class="pk p3"/>
+      </g>
+    </svg>
+  </div>
   <button id="disconnectBtn" class="small" hidden>Disconnect</button>
 </header>
 
@@ -217,7 +278,7 @@
     </section>
 
     <section class="box" data-sec="saved">
-      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button></h2>
+      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button><button id="newConnBtn" class="small" title="Add a connection and test it before saving">+ New</button></h2>
       <ul class="list" id="savedList"><li class="empty">None yet</li></ul>
     </section>
 
@@ -228,9 +289,17 @@
 
     <section class="box" id="objectsBox" data-sec="objects">
       <h2><button class="toggle" aria-expanded="true">Objects</button><span id="objCount"></span></h2>
+      <div class="exportall">
+        <span>Export all tables</span>
+        <button data-allfmt="xlsx" title="Export all tables to Excel, one file per table" aria-label="Export all tables to Excel" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#217346"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XLS</text></svg></button>
+        <button data-allfmt="csv" title="Export all tables to CSV, one file per table" aria-label="Export all tables to CSV" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#0e7490"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">CSV</text></svg></button>
+        <button data-allfmt="json" title="Export all tables to JSON, one file per table" aria-label="Export all tables to JSON" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#b45309"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">JSON</text></svg></button>
+        <button data-allfmt="xml" title="Export all tables to XML, one file per table" aria-label="Export all tables to XML" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#7c3aed"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XML</text></svg></button>
+      </div>
       <div class="filterrow">
         <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
         <button id="refreshBtn" class="small" title="Reload the object list" disabled>⟳</button>
+        <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in the export folder" disabled>DDL</button>
       </div>
       <div class="objtabs" id="objTabs" role="tablist"></div>
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p></div>
@@ -283,6 +352,39 @@
     </div>
   </main>
 </div>
+<dialog id="connDialog" aria-labelledby="dTitle">
+  <form method="dialog" id="dForm">
+    <h3 id="dTitle">New connection</h3>
+    <label for="dName">Connection name</label>
+    <input id="dName" placeholder="e.g. Production MySQL" spellcheck="false">
+    <label for="dEngine">Database type</label>
+    <select id="dEngine"></select>
+    <div id="dFileFields">
+      <label for="dFile">SQLite database file</label>
+      <input id="dFile" placeholder="/path/to/database.db" spellcheck="false">
+    </div>
+    <div id="dServerFields">
+      <div class="row2">
+        <div><label for="dHost">Host</label><input id="dHost" value="localhost" spellcheck="false"></div>
+        <div><label for="dPort">Port</label><input id="dPort" type="number" min="0" max="65535"></div>
+      </div>
+      <label for="dUser">Username</label>
+      <input id="dUser" autocomplete="off" spellcheck="false">
+      <label for="dPass">Password</label>
+      <input id="dPass" type="password" autocomplete="new-password">
+      <label for="dDb" id="dDbLabel">Database</label>
+      <input id="dDb" spellcheck="false">
+    </div>
+    <div id="dResult" class="dresult" hidden></div>
+    <div class="dactions">
+      <button type="button" id="dTest">Test connection</button>
+      <span class="spacer"></span>
+      <button type="button" id="dCancel">Cancel</button>
+      <button type="button" class="primary" id="dSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -290,10 +392,12 @@ const $ = (id) => document.getElementById(id);
 const state = { engines: [], engine: "sqlite", session: null, label: "", objects: [], sel: null, table: null,
   result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
+let pending = 0; // API calls in flight: the header animation speeds up while busy
 async function api(method, url, body) {
   const opt = { method, headers: {} };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
-  const res = await fetch(url, opt);
+  document.body.classList.toggle("busy", ++pending > 0);
+  const res = await fetch(url, opt).finally(() => document.body.classList.toggle("busy", --pending > 0));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
@@ -374,7 +478,7 @@ async function loadSaved() {
       <li data-id="${c.id}" title="Click to connect">
         <span class="tag">${esc(c.engine)}</span>
         <span class="name">${esc(c.name)}</span>
-        <button class="small" data-act="edit" title="Load into form">Edit</button>
+        <button class="small" data-act="edit" title="Edit and test this connection">Edit</button>
         <button class="small" data-act="del" title="Delete">✕</button>
       </li>`).join("") : `<li class="empty">None yet</li>`;
   } catch (e) { toast(e.message, true); }
@@ -386,7 +490,7 @@ $("savedList").addEventListener("click", async (ev) => {
   const id = +li.dataset.id;
   const c = state.saved.find((x) => x.id === id);
   const act = ev.target.dataset.act;
-  if (act === "edit") { fillForm(c); return; }
+  if (act === "edit") { openConnDialog(c); return; }
   if (act === "del") {
     if (!confirm(`Delete saved connection "${c.name}"?`)) return;
     await api("DELETE", "/api/connections/" + id).catch((e) => toast(e.message, true));
@@ -407,6 +511,96 @@ $("saveOnlyBtn").addEventListener("click", async () => {
   } catch (e) { toast(e.message, true); }
 });
 
+// ---- new / edit connection dialog ------------------------------------------
+// Saved passwords stay on the server: when editing, a blank password keeps
+// the stored one (keepPassword / keepPasswordOf).
+const dlg = { editId: 0, hasPassword: false, tested: null };
+
+function dlgEngine(keepPort) {
+  const id = $("dEngine").value, isFile = id === "sqlite";
+  $("dFileFields").hidden = !isFile;
+  $("dServerFields").hidden = isFile;
+  const eng = state.engines.find((e) => e.id === id);
+  if (!keepPort && eng) $("dPort").value = eng.defaultPort || "";
+  $("dDbLabel").textContent = id === "firebird" ? "Database path or alias" : "Database";
+  $("dDb").placeholder = id === "firebird" ? "/var/lib/firebird/data/employee.fdb"
+    : id === "mssql" ? "database name (blank = login default)"
+    : id === "postgres" ? "database name (blank = same as username)" : "database name";
+  $("dHost").placeholder = id === "mssql" ? "server or server\\INSTANCE" : "";
+  if (!keepPort && id === "firebird" && !$("dUser").value) $("dUser").value = "SYSDBA";
+  if (!keepPort && id === "postgres" && !$("dUser").value) $("dUser").value = "postgres";
+  dlgResult();
+}
+
+function dlgParams() {
+  const engine = $("dEngine").value, isFile = engine === "sqlite";
+  return {
+    engine,
+    host: isFile ? "" : $("dHost").value.trim(),
+    port: isFile ? 0 : parseInt($("dPort").value, 10) || 0,
+    username: isFile ? "" : $("dUser").value,
+    password: isFile ? "" : $("dPass").value,
+    database: isFile ? $("dFile").value.trim() : $("dDb").value.trim(),
+  };
+}
+
+function dlgResult(cls, text) {
+  const r = $("dResult");
+  r.hidden = !cls; r.className = "dresult " + (cls || ""); r.textContent = text || "";
+}
+
+function openConnDialog(c) {
+  $("dEngine").innerHTML = state.engines.map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  dlg.editId = c ? c.id : 0;
+  dlg.hasPassword = !!(c && c.hasPassword);
+  $("dTitle").textContent = c ? "Edit connection" : "New connection";
+  $("dName").value = c ? c.name : "";
+  $("dEngine").value = c ? c.engine : state.engine;
+  $("dHost").value = c ? c.host : "localhost";
+  $("dUser").value = c ? c.username : "";
+  $("dPass").value = "";
+  $("dPass").placeholder = dlg.hasPassword ? "saved – leave blank to keep" : "";
+  $("dFile").value = c && c.engine === "sqlite" ? c.database : "";
+  $("dDb").value = c && c.engine !== "sqlite" ? c.database : "";
+  dlgEngine(!!c);
+  if (c) $("dPort").value = c.port || "";
+  $("connDialog").showModal();
+  (c ? $("dPass") : $("dName")).focus();
+}
+
+$("newConnBtn").addEventListener("click", (ev) => { ev.stopPropagation(); openConnDialog(null); });
+$("dEngine").addEventListener("change", () => dlgEngine(false));
+$("dForm").addEventListener("input", (ev) => { if (ev.target.id !== "dName") dlgResult(); });
+$("dCancel").addEventListener("click", () => $("connDialog").close());
+
+$("dTest").addEventListener("click", async () => {
+  const p = dlgParams();
+  const b = $("dTest");
+  b.disabled = true; dlgResult("busy", "Connecting…");
+  try {
+    const body = { ...p };
+    if (!p.password && dlg.hasPassword) body.keepPasswordOf = dlg.editId;
+    const res = await api("POST", "/api/testconn", body);
+    dlgResult("ok", `✔ Connection works${res.version ? " – " + res.version : ""}\n${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} · ${res.elapsedMs} ms`);
+  } catch (e) {
+    dlgResult("bad", "✘ " + e.message);
+  } finally { b.disabled = false; }
+});
+
+$("dSave").addEventListener("click", async () => {
+  const p = dlgParams();
+  if (p.engine === "sqlite" ? !p.database : !p.host) {
+    dlgResult("bad", p.engine === "sqlite" ? "Enter the database file." : "Enter the host.");
+    return;
+  }
+  try {
+    await api("POST", "/api/connections", { id: dlg.editId, name: $("dName").value, ...p, keepPassword: !p.password && dlg.hasPassword });
+    $("connDialog").close();
+    toast("Connection saved");
+    loadSaved();
+  } catch (e) { dlgResult("bad", "✘ " + e.message); }
+});
+
 // ---- connect -------------------------------------------------------------
 async function connect(extra = {}) {
   const btn = $("connectBtn");
@@ -422,7 +616,8 @@ async function connect(extra = {}) {
     const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
     $("disconnectBtn").hidden = false;
-    $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false;
+    $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
+    setExportAllEnabled(true);
     $("runBtn").disabled = false;
     state.objTab = "table";
     renderObjects();
@@ -448,7 +643,7 @@ $("disconnectBtn").addEventListener("click", async () => {
   state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null;
   $("status").textContent = "Not connected";
   $("disconnectBtn").hidden = true; $("runBtn").disabled = true;
-  $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("objCount").textContent = "";
+  $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
   $("objTree").innerHTML = `<p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p>`;
   $("objTabs").innerHTML = ""; $("connSub").textContent = "";
   setCollapsed("connection", false, false);
@@ -714,6 +909,69 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
   } catch (e) { toast("Export failed: " + e.message, true); }
   finally { b.disabled = false; b.textContent = label; }
 }));
+
+$("ddlBtn").addEventListener("click", async () => {
+  const b = $("ddlBtn");
+  b.disabled = true; b.textContent = "…";
+  try {
+    const res = await api("POST", "/api/exportddl", { session: state.session });
+    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(res.download)}" download>Download</a>`;
+    $("exportNote").hidden = false;
+    showTab("data");
+    toast("Saved " + res.file);
+  } catch (e) { toast("DDL export failed: " + e.message, true); }
+  finally { b.disabled = !state.session; b.textContent = "DDL"; }
+});
+
+// ---- export all tables ----------------------------------------------------
+function setExportAllEnabled(on) {
+  document.querySelectorAll("[data-allfmt]").forEach((b) => (b.disabled = !on));
+}
+
+document.querySelectorAll("[data-allfmt]").forEach((b) => b.addEventListener("click", () => exportAll(b.dataset.allfmt)));
+
+async function exportAll(fmt) {
+  setExportAllEnabled(false);
+  showTab("data");
+  const note = $("exportNote");
+  try {
+    const start = await api("POST", "/api/exportall", { session: state.session, format: fmt });
+    note.hidden = false;
+    note.textContent = `Exporting ${start.tables} tables…`;
+    for (;;) {
+      const st = await api("GET", "/api/exportall/" + start.job);
+      renderExportAll(st);
+      if (st.done) {
+        const failed = st.tables.filter((t) => t.state === "failed").length;
+        toast(failed ? `${failed} of ${st.tables.length} exports failed` : `Exported ${st.tables.length} tables`, failed > 0);
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  } catch (e) { toast("Export failed: " + e.message, true); }
+  finally { setExportAllEnabled(!!state.session); }
+}
+
+function renderExportAll(st) {
+  const done = st.tables.filter((t) => t.state === "done" || t.state === "failed").length;
+  const rows = st.tables.map((t) => {
+    const pct = t.total > 0 ? Math.min(100, Math.floor((t.rows * 100) / t.total)) : 0;
+    let bar = `<span class="bar"><i style="width:${t.state === "done" ? 100 : pct}%"></i></span>`;
+    let s;
+    switch (t.state) {
+      case "waiting": s = "waiting"; bar = `<span class="bar"><i style="width:0"></i></span>`; break;
+      case "counting": s = "counting rows…"; break;
+      case "running":
+        if (t.total > 0) s = `${pct}% · ${t.rows.toLocaleString()} / ${t.total.toLocaleString()} rows`;
+        else { s = `${t.rows.toLocaleString()} rows`; bar = `<span class="bar busy"><i></i></span>`; }
+        break;
+      case "done": s = `${t.rows.toLocaleString()} rows · <a href="${esc(t.download)}" download>${esc(t.file)}</a>`; break;
+      default: s = `<span class="err">failed: ${esc(t.error)}</span>`;
+    }
+    return `<li><span class="n" title="${esc(t.name)}">${esc(t.name)}</span>${bar}<span class="s">${s}</span></li>`;
+  }).join("");
+  $("exportNote").innerHTML = `${st.done ? "Exported" : "Exporting"} all tables as ${esc(st.format.toUpperCase())} to <code>${esc(st.folder)}</code> · ${done} / ${st.tables.length} done<ul class="ealist">${rows}</ul>`;
+}
 
 // ---- init ----------------------------------------------------------------
 $("engines").addEventListener("click", (ev) => {

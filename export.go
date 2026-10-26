@@ -26,7 +26,7 @@ var unsafeFileChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
 // exportToDir runs q and writes the full result into a new, timestamped file
 // in dir. The file only appears under its final name once it is complete.
-func exportToDir(ctx context.Context, dir, engine string, db *sql.DB, q, format, name string) (path string, rows int, err error) {
+func exportToDir(ctx context.Context, dir, engine string, db *sql.DB, q, format, name string, progress func(rows int)) (path string, rows int, err error) {
 	ext, ok := exportFormats[format]
 	if !ok {
 		return "", 0, fmt.Errorf("unknown export format %q", format)
@@ -34,6 +34,14 @@ func exportToDir(ctx context.Context, dir, engine string, db *sql.DB, q, format,
 	if name == "" {
 		name = "query"
 	}
+	return writeExportFile(dir, name, ext, func(w io.Writer) (int, error) {
+		return export(ctx, w, engine, db, q, format, name, progress)
+	})
+}
+
+// writeExportFile creates <name>_<date>-<time>.<ext> in dir with what write
+// produces, via a temporary file so a failed export leaves nothing behind.
+func writeExportFile(dir, name, ext string, write func(io.Writer) (int, error)) (path string, n int, err error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", 0, err
 	}
@@ -49,17 +57,17 @@ func exportToDir(ctx context.Context, dir, engine string, db *sql.DB, q, format,
 	}
 	defer os.Remove(tmp.Name()) // no-op once renamed
 	tmp.Chmod(0o644)            // CreateTemp uses 0600; exports are ordinary files
-	rows, err = export(ctx, tmp, engine, db, q, format, name)
+	n, err = write(tmp)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
-		return "", rows, err
+		return "", n, err
 	}
 	if err := os.Rename(tmp.Name(), path); err != nil {
-		return "", rows, err
+		return "", n, err
 	}
-	return path, rows, nil
+	return path, n, nil
 }
 
 func fileExists(p string) bool {
@@ -67,8 +75,12 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-// export runs q and writes every row to w in the requested format.
-func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, format, name string) (int, error) {
+// export runs q and writes every row to w in the requested format. progress,
+// if not nil, is called with the number of rows written so far.
+func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, format, name string, progress func(rows int)) (int, error) {
+	if progress == nil {
+		progress = func(int) {}
+	}
 	n := 0
 	switch format {
 	case "csv":
@@ -79,6 +91,7 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 			return cw.Write(cols)
 		}, func(row []any) (bool, error) {
 			n++
+			progress(n)
 			rec := make([]string, len(row))
 			for i, v := range row {
 				rec[i] = cellString(v)
@@ -112,6 +125,7 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 				bw.WriteString(",")
 			}
 			n++
+			progress(n)
 			bw.WriteString("\n  {")
 			for i, v := range row {
 				if i > 0 {
@@ -146,6 +160,7 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 			return nil
 		}, func(row []any) (bool, error) {
 			n++
+			progress(n)
 			bw.WriteString("  <row>\n")
 			for i, v := range row {
 				bw.WriteString("    <column name=\"")
@@ -168,12 +183,12 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 		return n, err
 
 	case "xlsx":
-		return exportXLSX(ctx, w, engine, db, q, name)
+		return exportXLSX(ctx, w, engine, db, q, name, progress)
 	}
 	return 0, fmt.Errorf("unknown export format %q", format)
 }
 
-func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, name string) (int, error) {
+func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, name string, progress func(rows int)) (int, error) {
 	xf := excelize.NewFile()
 	defer xf.Close()
 	sheet := sheetName(name)
@@ -211,6 +226,7 @@ func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, 
 			vals[i] = v
 		}
 		n++
+		progress(n)
 		cell, _ := excelize.CoordinatesToCellName(1, n+1)
 		return true, sw.SetRow(cell, vals)
 	})

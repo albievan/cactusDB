@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.4.0 — 2026-10-26
+
+### Command line
+- Several tables export **in parallel** (`--threads`, default 4), each with a live
+  **progress bar** showing percentage, rows and time. Plain output when not on a terminal.
+- A working command-line connection is **saved** as `cli-<host>` (password encrypted), so
+  it's ready in the web UI. `--saveconn no` turns this off.
+- `--exportddl all|table,…` writes the **DDL** to a `.sql` file.
+
+### Web UI
+- `--runas background` runs the web UI in the background, with a `cactusdb.pid` file;
+  `--logfile` sets the **action log**, which records connections, queries, exports and
+  every request (never passwords).
+- **+ New** connection form with **Test connection**, which checks a connection
+  (server version, number of tables) before it is saved. **Edit** uses the same form and
+  can rename a connection while keeping its password.
+- **Export all tables** icons (Excel, CSV, JSON, XML) under *Objects*, with a progress bar
+  per table and download links.
+- **DDL** button: the `CREATE` statements of every object in one `.sql` file.
+- Animated data stream in the top bar, which speeds up while cactusdb is busy.
+
+### DDL
+- Firebird and SQL Server table definitions now include unique and check constraints,
+  indexes and foreign keys; PostgreSQL table definitions now include indexes.
+- DDL scripts add foreign keys after all tables and use each engine's statement
+  separators, so they run unchanged in `isql`, `mysql`, `psql`, `sqlcmd` and `sqlite3`.
+
+## 1.3.1 — 2026-10-26
+
+- `--dbtable table1,table3,table88` exports several tables in one run, one file each.
+  Every name is checked before anything is exported, and a table listed twice is exported once.
+
 ## 1.3.0 — 2026-10-26
 
 ### Command-line export

@@ -74,7 +74,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.3.0
+cactusdb 1.4.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -120,11 +120,27 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    always contains **all rows** of the query, not just the rows on screen. The file is
    saved in the export folder, and a bar shows the full path with a **Download** link.
 
-**Saved connections** appear in their own list. Click one to connect, use **Edit** to
-load it into the form (change it and save again under the same name to update it), or
-**✕** to delete it. Saved passwords are never sent to the browser: after **Edit** the
-password box shows *saved – leave blank to keep*. Leave it empty to keep the stored
-password, or type a new one to replace it.
+**Saved connections** appear in their own list. Click one to connect, or **✕** to delete it.
+
+**Adding and editing connections.** Click **+ New** next to *Saved connections* to open the
+connection form: a name, the database type and the connection details. Click
+**Test connection** to check them before saving. cactusdb connects, reports the server
+version and the number of tables (or the exact error), and disconnects again. Nothing is
+saved until you click **Save**. **Edit** on a saved connection opens the same form, where
+you can test it, change it or rename it. Saved passwords are never sent to the browser:
+the password box shows *saved – leave blank to keep*. Leave it empty to keep the stored
+password (testing uses it too), or type a new one to replace it.
+
+**Export all tables.** Under the *Objects* heading, the four file icons (**XLS**, **CSV**,
+**JSON**, **XML**) export every table of the database, one file per table, four tables at a
+time. Each table gets a progress bar with its row count, and a download link when it's
+done. Disconnecting stops an export that is still running.
+
+**Export the DDL.** The **DDL** button next to the filter writes the `CREATE` statements of
+every object in the database to one `.sql` file (see [DDL export](#ddl-export)).
+
+While cactusdb is working (connecting, running a query, exporting), the animated data
+stream in the top bar speeds up.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -170,6 +186,28 @@ those objects.
 
 Files are named `<table>_<date>-<time>.<ext>`, e.g. `customers_20261025-142233.xlsx`.
 Free-form queries are named `query_…`. Existing files are never overwritten.
+
+<a id="ddl-export"></a>
+### DDL export
+
+**DDL** in the web UI, or `--exportddl all` on the command line, writes a script that
+recreates the database structure, without data: `<database>_ddl_<date>-<time>.sql`.
+
+- **Order:** domains, sequences/generators and exceptions come first, then tables with
+  their indexes, then views, functions, procedures, packages, triggers and events.
+  Foreign keys are added with `ALTER TABLE` after the last table, so tables can reference
+  each other in any order. On MySQL/MariaDB the script switches foreign key checks off
+  while it runs, as `mysqldump` does.
+- **Tables** include their primary key, unique and check constraints, plain indexes
+  and foreign keys (with `ON DELETE`/`ON UPDATE` rules).
+- **Ready to run** in each database's own tool: Firebird routines are wrapped in
+  `SET TERM ^ ;` for `isql`, MySQL/MariaDB routines in `DELIMITER $$` for the `mysql` client,
+  and SQL Server objects are separated by `GO` for `sqlcmd` and SSMS.
+- If an object's source can't be read (an encrypted SQL Server module, missing
+  privileges), the script says so in a comment and continues.
+
+The SQLite, MariaDB, PostgreSQL and Firebird scripts were tested by running them into an
+empty database and exporting again: the second script is identical to the first.
 
 <a id="read-only"></a>
 ### Read-only: your data is safe
@@ -222,9 +260,37 @@ The password is **asked for** and not shown while you type. For scripts, pass it
 | `--showtable` | `all` lists the tables and views; a table name prints its definition (`CREATE TABLE …`). |
 | `--exportas` | `csv` (default), `json`, `xml` or `excel`. |
 | `--exportto` | Where the files go. Default: the `export` folder next to cactusdb. |
+| `--threads` | How many tables to export at the same time. Default `4`. |
+| `--exportddl` | `all` writes the DDL of every object to one `.sql` file; table names (comma-separated) write just those tables. See [DDL export](#ddl-export). |
+| `--saveconn` | `yes` (default) saves the connection; `no` doesn't. See below. |
 
 Each table is saved as its own file named `<table>_<date>-<time>.<ext>`, with every
 row and every column, exactly as the **Export** button in the browser does it.
+
+**Parallel export with progress bars.** When you export several tables, cactusdb exports
+up to four at the same time (change it with `--threads`), each over its own database
+connection, and shows a live progress bar per table:
+```
+Exporting 5 table(s) as xlsx to /home/me/cactusdb/export (4 at a time)
+  big1       [████████████████░░░░░░░░]  67%  202,900/300,000 rows  1.3s
+  big2       [██████████░░░░░░░░░░░░░░]  41%  82,100/200,000 rows  1.1s
+  big3       [████████████████████████] ✔ 100,000 rows  0.6s
+  customer   [████████████████████████] ✔ 1,204 rows  0.1s
+  orders     [                        ]  waiting
+```
+When the output isn't a terminal (a cron job, or `> log.txt`), cactusdb prints one plain
+line per finished table instead.
+
+**The connection is saved** in `cactus.conn.db` once it works, named `cli-<host>` (for
+SQLite `cli-<file name>`), e.g. `cli-10.66.1.136`, with the password encrypted like any
+other saved connection. Open the web UI and it's in *Saved connections*, ready to click.
+A later export to the same host replaces it. Use `--saveconn no` to not save it, and
+`--conn-db`/`--key-file` to use another connection file.
+
+**Several tables at once:** separate the names with commas, e.g.
+`--dbtable table1,table3,table88`. If you put spaces after the commas, put quotes around the
+list: `--dbtable "table1, table3, table88"`. All names are checked first, so a misspelt
+table stops the run before any file is written. A table named twice is exported once.
 
 Table names are matched exactly, then ignoring upper/lower case, then without the schema:
 on PostgreSQL and SQL Server, `--dbtable orders` finds `public.orders` or `dbo.orders`. If
@@ -238,6 +304,12 @@ cactusdb --dbtype postgres --host db.local --user report --dbname shop --showtab
 
 # the definition of one table
 cactusdb --dbtype firebird --host fbserver --user SYSDBA --dbname /data/shop.fdb --showtable CUSTOMER
+
+# three tables as CSV, one file each
+cactusdb --dbtype mariadb --host 10.66.1.136 --user root --dbname optima --dbtable table1,table3,table88
+
+# the DDL of the whole database, ready to run in isql
+cactusdb --dbtype firebird --host fbserver --user SYSDBA --dbname /data/shop.fdb --exportddl all
 
 # every table of an SQLite file, as JSON
 cactusdb --dbtype sqlite --dbname ./shop.db --dbtable all --exportas json
@@ -272,6 +344,8 @@ cactusdb --port 8087 --web yes --exportto ./export
 | `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
 | `--host` | `127.0.0.1` (this computer only) | Use `0.0.0.0` to let other computers on your network use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. See [Security](#7-security). |
+| `--runas` | `foreground` | `background` starts the web UI in the background: it keeps running after you close the terminal and logs to `--logfile`. See below. |
+| `--logfile` | `cactusdb.log` next to the program, with `--runas background` | Every action is logged here: connections (never passwords), tables opened, queries, exports, saved connections, and every request with its result. In the foreground, the log goes to the terminal and, if you give `--logfile`, to that file too. |
 | `--version` | | Print the version and exit |
 | `--help` | | List the options |
 
@@ -282,6 +356,37 @@ cactusdb --port 8087 --exportto D:\Reports\exports    # exports to another drive
 cactusdb --port 8087 --exportto ~/Desktop/exports     # exports to your Desktop (macOS/Linux)
 cactusdb --port 8087 --web yes --host 0.0.0.0         # open from other machines: http://<ip address>:8087
 CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a passphrase (macOS/Linux)
+```
+
+### Running in the background
+
+```sh
+cactusdb --port 8087 --runas background --host 0.0.0.0
+```
+```
+cactusdb 1.4.0 is running in the background (process id 48211)
+  open http://localhost:8087
+  open http://192.168.1.20:8087
+  log file: /home/me/cactusdb/cactusdb.log
+  stop it with: kill 48211
+```
+cactusdb starts a copy of itself without a terminal, waits until it answers, and tells
+you where to open it. If it can't start (the port is in use, the connection file can't be
+opened…), you get the error straight away. The process id is also written to
+`cactusdb.pid` next to the log file, so you can stop it later:
+
+- macOS/Linux: `kill $(cat cactusdb.pid)`
+- Windows: `taskkill /PID <id> /F` (the id is in `cactusdb.pid`)
+
+The log looks like this:
+```
+2026/10/26 17:26:30 started in the background, process id 70769, listening on 127.0.0.1:8087
+2026/10/26 17:26:30 127.0.0.1 connect mariadb: root@10.66.1.136:3306/optima as "cli-10.66.1.136", session f1fc0d2d
+2026/10/26 17:26:30 127.0.0.1 [cli-10.66.1.136] open table orders
+2026/10/26 17:26:30 127.0.0.1 [cli-10.66.1.136] 1000 row(s) (more not shown) in 41ms
+2026/10/26 17:26:31 127.0.0.1 [cli-10.66.1.136] query: delete from orders
+2026/10/26 17:26:31 127.0.0.1 [cli-10.66.1.136] query FAILED: cactusdb is read-only: only SELECT queries are allowed …
+2026/10/26 17:26:35 127.0.0.1 [cli-10.66.1.136] export xlsx: 15234 row(s) to /home/me/cactusdb/export/orders_20261026-172635.xlsx
 ```
 
 | Environment variable | What it does |
@@ -298,6 +403,8 @@ cactusdb/
 ├── cactusdb(.exe)       the program
 ├── cactus.conn.db       your saved connections (an SQLite database)
 ├── cactus.key           the key that encrypts saved usernames and passwords
+├── cactusdb.log         the action log (with --runas background or --logfile)
+├── cactusdb.pid         the process id of a background cactusdb, while it runs
 └── export/              your exported files
 ```
 
@@ -348,6 +455,8 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 | Problem | Fix |
 |---------|-----|
 | `cannot listen on 127.0.0.1:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
+| `the background server stopped:` followed by log lines | The background copy couldn't start; the lines say why (often the port or the connection file). |
+| `warning: the connection won't be saved` | A command-line export couldn't open `cactus.conn.db` (e.g. a different `cactus.key`). The export still runs. |
 | `cannot decrypt the saved connections in … with …` | The key doesn't match the one the connections were saved with. Put the original `cactus.key` back, set the same `CACTUSDB_PASSPHRASE` as before (or unset it if you used the key file), or start fresh with `--conn-db new.conn.db`. |
 | `cannot read password: no password given` | A command-line export needs a password but isn't running in a terminal (e.g. from cron). Use `CACTUSDB_DBPASSWORD` or `--dbpassword`. |
 | `table "orders" is ambiguous: public.orders, sales.orders` | Name the table with its schema: `--dbtable sales.orders`. |
@@ -408,8 +517,13 @@ CACTUSDB_IT=1 go test ./...
 
 | File | Contents |
 |------|----------|
-| `main.go` | Command-line options, web server, API |
+| `main.go` | Command-line options, web server, API, action log |
 | `cli.go` | Exporting from the command line (`--dbtype`, `--dbtable`, `--showtable`, password prompt) |
+| `progress.go` | Parallel export of several tables, and the terminal progress bars |
+| `webexport.go` | *Export all tables* in the web UI |
+| `ddl.go`, `tables.go` | DDL export; constraints, indexes and foreign keys of tables |
+| `background.go` | `--runas background` |
+| `sys_windows.go`, `sys_other.go` | Platform specifics: detaching from the terminal, console colours |
 | `db.go` | Connecting, listing columns, running queries |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `readonly.go` | The read-only query check |
