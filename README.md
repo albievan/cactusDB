@@ -2,13 +2,14 @@
 
 <h1 align="center">cactusdb</h1>
 
-**One small program. No installation. Browse your databases in a web browser.**
+**One small program. No installation. Browse your databases in a web browser, or export them straight from the command line.**
 
 cactusdb is a standalone app for **Linux, macOS and Windows** that lets you look at
 **SQLite**, **MySQL**, **MariaDB**, **PostgreSQL**, **Firebird** and **Microsoft SQL Server** databases,
 including their views, stored procedures, functions, triggers and generators/sequences. It
 also exports their data to
-**Excel**, **JSON**, **XML** or **CSV**. You start it from a terminal and use it in your browser.
+**Excel**, **JSON**, **XML** or **CSV**. You start it from a terminal and use it in your browser,
+or export tables with a single command without opening a browser at all.
 
 - No installer, no runtime, no database drivers or client libraries to install:
   everything is inside the one file.
@@ -16,9 +17,12 @@ also exports their data to
 - Remembers your connections, so you only type them once.
 
 ```sh
-cactusdb --port 8080
+cactusdb --port 8080 --web yes
 ```
-then open **http://localhost:8080** in your browser.
+then open **http://localhost:8080** in your browser. Or export without the browser:
+```sh
+cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname optima --dbtable all --exportas excel
+```
 
 ---
 
@@ -36,7 +40,7 @@ Pick the file for your computer from the [`dist/`](dist) folder:
 | Linux on ARM (e.g. Raspberry Pi 4/5 64-bit, AWS Graviton) | [cactusdb-linux-arm64](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-linux-arm64) |
 
 Put it in its own folder, e.g. `C:\cactusdb\` or `~/cactusdb/`. cactusdb keeps its saved
-connections and exports next to itself (see [Files cactusdb creates](#5-files-cactusdb-creates)).
+connections and exports next to itself (see [Files cactusdb creates](#6-files-cactusdb-creates)).
 You can rename the file to just `cactusdb` (or `cactusdb.exe`).
 
 ## 2. Run it
@@ -70,7 +74,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.2.0
+cactusdb 1.3.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -79,6 +83,7 @@ cactusdb 1.2.0
   saved connections: /home/me/cactusdb/cactus.conn.db (credentials encrypted with key file /home/me/cactusdb/cactus.key)
   export folder:     /home/me/cactusdb/export
   open http://127.0.0.1:8080
+  (only this computer can connect; start with --host 0.0.0.0 to allow others)
   press Ctrl+C to stop
 ```
 Open the URL shown in your browser. Leave the terminal window open while you use
@@ -98,7 +103,7 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    | SQL Server | Host, port (default 1433), SQL Server login (e.g. `sa`) and password, database name (leave blank for the login's default database). For a named instance, enter the host as `server\INSTANCE` and clear the port. |
 
 3. *(Optional)* Tick **Save connection**, give it a name, and it will be remembered,
-   including the password, which is stored encrypted (see [Security](#6-security)).
+   including the password, which is stored encrypted (see [Security](#7-security)).
    Or click **Save** to store it without connecting.
 4. Click **Connect**. The Connection, Saved connections and Drivers sections fold away so
    the **Objects** list gets the whole sidebar. Click any section heading (▸/▾) to open or
@@ -186,19 +191,87 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
      can undo both data and table changes this way, and commands that can't run in
      a transaction (`BACKUP`, `RESTORE`, `DBCC`, …) are refused.
 
-## 4. Startup options
+## 4. Exporting from the command line (no browser)
+
+Give cactusdb the database details and the table, and it exports straight to a file and
+exits. No web server is started, and nothing is saved to `cactus.conn.db`.
 
 ```sh
-cactusdb --port 8087 --exportto ./export
+cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname optima \
+         --dbtable orders --exportas excel --exportto ./export
+```
+```
+Password for root@10.66.1.136:3306:
+Exporting 1 table(s) as xlsx to /home/me/cactusdb/export
+  orders                             15234 rows  /home/me/cactusdb/export/orders_20261026-141502.xlsx
+```
+
+The password is **asked for** and not shown while you type. For scripts, pass it with
+`--dbpassword xyz` or, better, the `CACTUSDB_DBPASSWORD` environment variable (see
+[Security](#7-security)). SQLite needs no password.
+
+| Option | What it does |
+|--------|--------------|
+| `--dbtype` | `sqlite`, `mysql`, `mariadb`, `firebird`, `mssql` (or `sqlserver`) or `postgres` (or `postgresql`). Required. |
+| `--host` | The database server. Default `localhost`. For a SQL Server named instance use `server\INSTANCE`. |
+| `--dbport` | The database port. Default: the standard port (3306, 3050, 1433 or 5432). |
+| `--user` | The database user. Required, except for SQLite. |
+| `--dbpassword` | The password. Leave it out to be prompted. |
+| `--dbname` | The database. For SQLite the database file; for Firebird the database path or alias on the server. Required. |
+| `--dbtable` | The table or view to export; several separated by commas (`--dbtable orders,customers`); or `all` for every table. |
+| `--showtable` | `all` lists the tables and views; a table name prints its definition (`CREATE TABLE …`). |
+| `--exportas` | `csv` (default), `json`, `xml` or `excel`. |
+| `--exportto` | Where the files go. Default: the `export` folder next to cactusdb. |
+
+Each table is saved as its own file named `<table>_<date>-<time>.<ext>`, with every
+row and every column, exactly as the **Export** button in the browser does it.
+
+Table names are matched exactly, then ignoring upper/lower case, then without the schema:
+on PostgreSQL and SQL Server, `--dbtable orders` finds `public.orders` or `dbo.orders`. If
+two schemas both have an `orders` table, cactusdb asks you to name it in full
+(`sales.orders`).
+
+More examples:
+```sh
+# what's in the database?
+cactusdb --dbtype postgres --host db.local --user report --dbname shop --showtable all
+
+# the definition of one table
+cactusdb --dbtype firebird --host fbserver --user SYSDBA --dbname /data/shop.fdb --showtable CUSTOMER
+
+# every table of an SQLite file, as JSON
+cactusdb --dbtype sqlite --dbname ./shop.db --dbtable all --exportas json
+
+# a scheduled export (Linux cron / macOS): no prompt, password from the environment
+CACTUSDB_DBPASSWORD='s3cret' cactusdb --dbtype mssql --host sql01 --user reader --dbname Sales \
+    --dbtable dbo.Invoices --exportas csv --exportto /srv/exports
+```
+On Windows put the whole command on one line (the `\` line breaks are for macOS and
+Linux), and set the password with `set CACTUSDB_DBPASSWORD=s3cret` (Command Prompt) or
+`$env:CACTUSDB_DBPASSWORD='s3cret'` (PowerShell).
+
+cactusdb exits with status **0** when everything was exported, **1** when connecting or
+an export failed (the other tables are still exported), and **2** for a mistake in the
+options, so scripts can check the result. The same [read-only](#read-only) protection
+applies as in the browser.
+
+## 5. Startup options
+
+These options are for the web UI. The options for exporting without a browser are in
+[section 4](#4-exporting-from-the-command-line-no-browser).
+
+```sh
+cactusdb --port 8087 --web yes --exportto ./export
 ```
 
 | Option | Default | What it does |
 |--------|---------|--------------|
+| `--web` | `yes` when no `--dbtype` is given | `--web yes` starts the web UI. It's the default, so `cactusdb --port 8087` does the same. |
 | `--port` | `8080` | The port to open in your browser: `http://localhost:<port>` |
 | `--exportto` | folder `export` next to the cactusdb program | Where exported files are saved. Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
 | `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
-| `--host` | `127.0.0.1` (this computer only) | Use `0.0.0.0` to let other computers on your network use cactusdb. See [Security](#6-security). |
+| `--host` | `127.0.0.1` (this computer only) | Use `0.0.0.0` to let other computers on your network use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. See [Security](#7-security). |
 | `--version` | | Print the version and exit |
 | `--help` | | List the options |
 
@@ -207,15 +280,16 @@ Examples:
 cactusdb --port 9000                                  # different port
 cactusdb --port 8087 --exportto D:\Reports\exports    # exports to another drive (Windows)
 cactusdb --port 8087 --exportto ~/Desktop/exports     # exports to your Desktop (macOS/Linux)
-cactusdb --port 8080 --host 0.0.0.0                   # reachable from other machines
+cactusdb --port 8087 --web yes --host 0.0.0.0         # open from other machines: http://<ip address>:8087
 CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a passphrase (macOS/Linux)
 ```
 
 | Environment variable | What it does |
 |----------------------|--------------|
+| `CACTUSDB_DBPASSWORD` | The database password for [command-line exports](#4-exporting-from-the-command-line-no-browser), so you aren't prompted for it. |
 | `CACTUSDB_PASSPHRASE` | Derives the encryption key for saved usernames and passwords from this passphrase instead of using `cactus.key`. Nothing secret is then stored on disk, but you must set the same passphrase every time. On Windows: `set CACTUSDB_PASSPHRASE=…` (Command Prompt) or `$env:CACTUSDB_PASSPHRASE='…'` (PowerShell). |
 
-## 5. Files cactusdb creates
+## 6. Files cactusdb creates
 
 Next to the program (unless you chose other locations with the options above):
 
@@ -240,7 +314,7 @@ case, point the files somewhere writable:
 cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-exports
 ```
 
-## 6. Security
+## 7. Security
 
 - **Saved usernames and passwords are encrypted** in `cactus.conn.db` with AES-256-GCM.
   Each value has its own random nonce and is tied to its column. The other connection
@@ -263,18 +337,21 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 - By default cactusdb is only reachable **from your own computer**. If you start it with
   `--host 0.0.0.0`, anyone who can reach that port can use your saved connections and
   browse those databases. There is no login screen, so only do this on a trusted network.
-- By default cactusdb is only reachable **from your own computer**. If you start it with
-  `--host 0.0.0.0`, anyone who can reach that port can use your saved connections and
-  browse those databases. There is no login screen, so only do this on a trusted network.
+- **Command-line passwords:** a password given with `--dbpassword` can be seen by other
+  users of the computer (in the process list) and is kept in your shell history. Leave it
+  out to be prompted (nothing is shown as you type), or set `CACTUSDB_DBPASSWORD` in scripts.
 - cactusdb never writes to your databases (see [Read-only](#read-only)). The only files it
   writes are `cactus.conn.db`, `cactus.key` and the files in the export folder.
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | `cannot listen on 127.0.0.1:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
 | `cannot decrypt the saved connections in … with …` | The key doesn't match the one the connections were saved with. Put the original `cactus.key` back, set the same `CACTUSDB_PASSPHRASE` as before (or unset it if you used the key file), or start fresh with `--conn-db new.conn.db`. |
+| `cannot read password: no password given` | A command-line export needs a password but isn't running in a terminal (e.g. from cron). Use `CACTUSDB_DBPASSWORD` or `--dbpassword`. |
+| `table "orders" is ambiguous: public.orders, sales.orders` | Name the table with its schema: `--dbtable sales.orders`. |
+| `--port only applies to the web UI` | In a command-line export the database port is `--dbport`. |
 | `cannot create export folder …` | The folder isn't writable. Use `--exportto` with a folder you own. |
 | Browser shows *can't connect* | Is cactusdb still running in the terminal? Use the exact URL it printed. |
 | `sqlite file not found` | Check the path. It's the path on the computer running cactusdb. |
@@ -289,7 +366,7 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 | `result has more rows than Excel allows` | Excel holds at most 1,048,575 data rows. Add a `WHERE` clause, or export to CSV or JSON instead. |
 | `not connected (session expired)` | cactusdb was restarted. Connect again. |
 
-## 8. Supported databases
+## 9. Supported databases
 
 | Database | Versions |
 |----------|----------|
@@ -332,6 +409,7 @@ CACTUSDB_IT=1 go test ./...
 | File | Contents |
 |------|----------|
 | `main.go` | Command-line options, web server, API |
+| `cli.go` | Exporting from the command line (`--dbtype`, `--dbtable`, `--showtable`, password prompt) |
 | `db.go` | Connecting, listing columns, running queries |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `readonly.go` | The read-only query check |

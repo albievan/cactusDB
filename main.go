@@ -1,5 +1,7 @@
-// cactusdb is a small browser-based database viewer for SQLite, MySQL,
-// MariaDB and Firebird, packaged as a single self-contained binary.
+// cactusdb is a small read-only database viewer and exporter for SQLite,
+// MySQL, MariaDB, Firebird, SQL Server and PostgreSQL, packaged as a single
+// self-contained binary. It serves a web UI, or exports tables straight from
+// the command line.
 package main
 
 import (
@@ -26,7 +28,7 @@ import (
 	"time"
 )
 
-var version = "1.2.0"
+var version = "1.3.0"
 
 //go:embed web
 var webFS embed.FS
@@ -47,14 +49,30 @@ type server struct {
 
 func main() {
 	port := flag.Int("port", 8080, "HTTP port to serve the web UI on")
-	host := flag.String("host", "127.0.0.1", "address to listen on (use 0.0.0.0 to allow other machines)")
+	host := flag.String("host", "", "web UI: address to listen on (default 127.0.0.1; 0.0.0.0 allows other machines)\ncommand-line export: database server host (default localhost)")
+	web := flag.String("web", "", "yes: start the web UI (the default when no --dbtype is given)")
 	connDB := flag.String("conn-db", "", "SQLite file used to store saved connections (default: cactus.conn.db next to the binary)")
 	keyFile := flag.String("key-file", "", "key used to encrypt saved usernames/passwords (default: cactus.key next to the connection file; ignored when $"+passphraseEnv+" is set)")
 	exportTo := flag.String("exportto", "", "folder exports are written to (default: ./export next to the binary)")
+	dbType := flag.String("dbtype", "", "command-line export: sqlite, mysql, mariadb, firebird, mssql or postgres")
+	dbUser := flag.String("user", "", "command-line export: database user name")
+	dbPassword := flag.String("dbpassword", "", "command-line export: database password (prompted for when omitted, or set $"+dbPasswordEnv+")")
+	dbName := flag.String("dbname", "", "command-line export: database name (SQLite/Firebird: the database file)")
+	dbPort := flag.Int("dbport", 0, "command-line export: database server port (default: the engine's standard port)")
+	dbTable := flag.String("dbtable", "", "command-line export: table to export, several separated by commas, or all")
+	showTable := flag.String("showtable", "", "command-line: all lists the tables and views; a table name prints its definition")
+	exportAs := flag.String("exportas", "csv", "command-line export: csv, json, xml or excel")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "cactusdb %s - browse SQLite, MySQL, MariaDB and Firebird databases in your browser\n\n", version)
-		fmt.Fprintf(os.Stderr, "Usage:\n  cactusdb --port 8080\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, "cactusdb %s - browse and export SQLite, MySQL, MariaDB, Firebird, SQL Server and PostgreSQL databases\n\n", version)
+		fmt.Fprintf(os.Stderr, "Usage:\n"+
+			"  cactusdb --port 8080 [--web yes]                    start the web UI\n"+
+			"  cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname optima \\\n"+
+			"           --dbtable orders|t1,t2|all --exportas csv|json|xml|excel [--exportto ./export]\n"+
+			"                                                      export tables without the web UI\n"+
+			"  cactusdb --dbtype sqlite --dbname ./shop.db --showtable all|tablename\n"+
+			"                                                      list tables, or show a table's definition\n"+
+			"\nThe password is prompted for unless --dbpassword or $%s is given.\n\nOptions:\n", dbPasswordEnv)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -62,16 +80,85 @@ func main() {
 		fmt.Println("cactusdb", version)
 		return
 	}
-
-	if *connDB == "" {
-		*connDB = filepath.Join(exeDir(), "cactus.conn.db")
+	if flag.NArg() > 0 {
+		fatalUsage(fmt.Sprintf("unexpected argument %q (options start with --)", flag.Arg(0)))
 	}
+	set := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
+
+	webOn, webGiven, err := parseYesNo(*web)
+	if err != nil {
+		fatalUsage(err.Error())
+	}
+	cliMode := set["dbtype"] || set["dbtable"] || set["showtable"]
+	switch {
+	case cliMode && webOn:
+		fatalUsage("--web yes cannot be combined with --dbtype/--dbtable/--showtable")
+	case !cliMode && webGiven && !webOn:
+		fatalUsage("--web no: nothing to do; give --dbtype and --dbtable or --showtable to export without the web UI")
+	}
+
 	if *exportTo == "" {
 		*exportTo = filepath.Join(exeDir(), "export")
 	}
 	exportDir, err := filepath.Abs(*exportTo)
 	if err != nil {
 		log.Fatalf("bad export folder %s: %v", *exportTo, err)
+	}
+
+	if cliMode {
+		for _, f := range []string{"port", "conn-db", "key-file"} {
+			if set[f] {
+				fatalUsage("--" + f + " only applies to the web UI (the database port is --dbport)")
+			}
+		}
+		if !set["dbtype"] {
+			fatalUsage("--dbtype is required")
+		}
+		if *dbTable == "" && *showTable == "" {
+			fatalUsage("give --dbtable to export, or --showtable to list tables")
+		}
+		engine, err := parseEngine(*dbType)
+		if err != nil {
+			fatalUsage(err.Error())
+		}
+		format, err := parseExportFormat(*exportAs)
+		if err != nil {
+			fatalUsage(err.Error())
+		}
+		if *dbName == "" {
+			fatalUsage("--dbname is required")
+		}
+		if engine != EngineSQLite && *dbUser == "" {
+			fatalUsage("--user is required")
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		err = runCLI(ctx, cliOptions{
+			ConnParams:  ConnParams{Engine: engine, Host: *host, Port: *dbPort, Username: *dbUser, Password: *dbPassword, Database: *dbName},
+			PasswordSet: set["dbpassword"],
+			Tables:      *dbTable,
+			Show:        *showTable,
+			Format:      format,
+			ExportDir:   exportDir,
+		}, os.Stdout)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "cactusdb:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	for _, f := range []string{"user", "dbpassword", "dbname", "dbport", "exportas"} {
+		if set[f] {
+			fatalUsage("--" + f + " is for command-line export and needs --dbtype")
+		}
+	}
+	if *host == "" {
+		*host = "127.0.0.1"
+	}
+	if *connDB == "" {
+		*connDB = filepath.Join(exeDir(), "cactus.conn.db")
 	}
 	if err := os.MkdirAll(exportDir, 0o755); err != nil {
 		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
@@ -110,17 +197,19 @@ func main() {
 	}
 	srv := &http.Server{Handler: logRequests(mux), ReadHeaderTimeout: 10 * time.Second}
 
-	browseHost := *host
-	if browseHost == "0.0.0.0" || browseHost == "::" || browseHost == "" {
-		browseHost = "localhost"
-	}
 	fmt.Printf("cactusdb %s\n", version)
 	for _, d := range driverInfo() {
 		fmt.Printf("  driver %-15s %s %s (bundled)\n", d["engines"], d["module"], d["version"])
 	}
 	fmt.Printf("  saved connections: %s (credentials encrypted with %s)\n", *connDB, store.keyDesc)
-	fmt.Printf("  export folder:     %s\n  open http://%s\n  press Ctrl+C to stop\n",
-		exportDir, net.JoinHostPort(browseHost, strconv.Itoa(*port)))
+	fmt.Printf("  export folder:     %s\n", exportDir)
+	for _, u := range browseURLs(*host, *port) {
+		fmt.Printf("  open %s\n", u)
+	}
+	if ip := net.ParseIP(*host); ip != nil && ip.IsLoopback() {
+		fmt.Println("  (only this computer can connect; start with --host 0.0.0.0 to allow others)")
+	}
+	fmt.Println("  press Ctrl+C to stop")
 
 	go func() {
 		stop := make(chan os.Signal, 1)
@@ -139,6 +228,32 @@ func main() {
 	}
 	s.mu.Unlock()
 	store.db.Close()
+}
+
+func fatalUsage(msg string) {
+	fmt.Fprintf(os.Stderr, "cactusdb: %s\nRun cactusdb --help for usage.\n", msg)
+	os.Exit(2)
+}
+
+// browseURLs lists the addresses to open the web UI at. When listening on
+// all interfaces that is every IPv4 address of this machine.
+func browseURLs(host string, port int) []string {
+	hosts := []string{host}
+	if host == "0.0.0.0" || host == "::" {
+		hosts = []string{"localhost"}
+		if addrs, err := net.InterfaceAddrs(); err == nil {
+			for _, a := range addrs {
+				if ipn, ok := a.(*net.IPNet); ok && ipn.IP.To4() != nil && !ipn.IP.IsLoopback() && !ipn.IP.IsLinkLocalUnicast() {
+					hosts = append(hosts, ipn.IP.String())
+				}
+			}
+		}
+	}
+	urls := make([]string, len(hosts))
+	for i, h := range hosts {
+		urls[i] = "http://" + net.JoinHostPort(h, strconv.Itoa(port))
+	}
+	return urls
 }
 
 // exeDir is the folder containing the running binary (symlinks resolved).

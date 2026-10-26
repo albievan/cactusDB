@@ -8,6 +8,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/nakagami/firebirdsql v0.9.23
 	github.com/xuri/excelize/v2 v2.11.0
+	golang.org/x/term v0.47.0
 	modernc.org/sqlite v1.61.0
 )
 
