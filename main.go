@@ -32,7 +32,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.4.0"
+var version = "1.4.1"
 
 //go:embed web
 var webFS embed.FS
@@ -51,6 +51,10 @@ type server struct {
 	mu       sync.Mutex
 	sessions map[string]*session
 	batches  map[string]*webBatch // "export all tables" jobs, by id
+
+	background bool          // started with --runas background: the UI may shut it down
+	shutdown   chan struct{} // closed by /api/shutdown
+	stopOnce   sync.Once
 }
 
 func main() {
@@ -266,13 +270,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot open connection store %s: %v", *connDB, err)
 	}
-	s := &server{store: store, exportDir: exportDir, sessions: map[string]*session{}}
+	s := &server{store: store, exportDir: exportDir, sessions: map[string]*session{},
+		background: childLog != "", shutdown: make(chan struct{})}
 
 	static, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
 	mux.Handle("GET /", http.FileServerFS(static))
 	mux.HandleFunc("GET /api/engines", s.handleEngines)
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
+	mux.HandleFunc("GET /api/info", s.handleInfo)
+	mux.HandleFunc("POST /api/shutdown", s.handleShutdown)
 	mux.HandleFunc("POST /api/connect", s.handleConnect)
 	mux.HandleFunc("POST /api/disconnect", s.handleDisconnect)
 	mux.HandleFunc("POST /api/testconn", s.handleTestConn)
@@ -319,11 +326,18 @@ func main() {
 		fmt.Println("  press Ctrl+C to stop")
 	}
 
+	// Ctrl+C, kill, or the web UI's Shutdown button all stop the server the
+	// same way: no new requests, running ones finish, then everything is
+	// released.
 	go func() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-		sig := <-stop
-		log.Printf("stopping (%v)", sig)
+		select {
+		case sig := <-stop:
+			log.Printf("stopping (%v)", sig)
+		case <-s.shutdown:
+			log.Printf("stopping (shutdown requested from the web UI)")
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		srv.Shutdown(ctx)
@@ -331,13 +345,57 @@ func main() {
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
-	s.mu.Lock()
-	for _, ss := range s.sessions {
-		ss.db.Close()
-	}
-	s.mu.Unlock()
+	s.release()
 	store.db.Close()
 	log.Printf("stopped")
+}
+
+// release cancels running exports, waits briefly for them to clean up their
+// temporary files, and closes every database connection.
+func (s *server) release() {
+	s.mu.Lock()
+	var running []*webBatch
+	for _, b := range s.batches {
+		b.cancel()
+		running = append(running, b)
+	}
+	s.mu.Unlock()
+	deadline := time.After(5 * time.Second)
+	for _, b := range running {
+		select {
+		case <-b.done:
+		case <-deadline:
+		}
+	}
+	s.mu.Lock()
+	for id, ss := range s.sessions {
+		ss.db.Close()
+		delete(s.sessions, id)
+	}
+	s.mu.Unlock()
+}
+
+// handleInfo tells the page how this cactusdb runs, e.g. whether it offers
+// the Shutdown button.
+func (s *server) handleInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"version": version, "background": s.background, "pid": os.Getpid()})
+}
+
+// handleShutdown stops a background cactusdb. It must be a JSON request, which
+// a browser only sends cross-site after a CORS preflight that cactusdb never
+// allows, so other websites can't shut it down.
+func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if !s.background {
+		writeErr(w, 403, errors.New("only a cactusdb started with --runas background can be shut down from the browser; press Ctrl+C in its terminal"))
+		return
+	}
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		writeErr(w, 415, errors.New("expected a JSON request"))
+		return
+	}
+	logAction(r, "shutdown requested")
+	writeJSON(w, 200, map[string]bool{"ok": true})
+	s.stopOnce.Do(func() { close(s.shutdown) })
 }
 
 func fatalUsage(msg string) {
