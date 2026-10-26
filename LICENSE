@@ -20,3 +20,4 @@ licenses:
   github.com/microsoft/go-mssqldb  BSD-3-Clause
   github.com/jackc/pgx/v5          MIT
   github.com/xuri/excelize/v2      BSD-3-Clause
+  golang.org/x/term                BSD-3-Clause

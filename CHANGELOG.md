@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0 — 2026-10-26
+
+### Command-line export
+- Export tables without the browser:
+  `cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname optima --dbtable orders --exportas excel --exportto ./export`.
+- `--dbtable` takes one table, a comma-separated list, or `all`; `--exportas` is `csv`,
+  `json`, `xml` or `excel`.
+- `--showtable all` lists the tables and views; `--showtable <table>` prints its definition.
+- The password is prompted for without echo, or taken from `--dbpassword` or the
+  `CACTUSDB_DBPASSWORD` environment variable.
+- Exit status 0/1/2 (success / failure / bad options) for scripts.
+
+### Web UI
+- `--web yes` starts the web UI explicitly (still the default without `--dbtype`).
+- With `--host 0.0.0.0` the startup banner lists this computer's IP addresses to browse to.
+
 ## 1.2.0 — 2026-10-26
 
 ### Security
