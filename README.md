@@ -74,7 +74,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.4.0
+cactusdb 1.4.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -134,7 +134,9 @@ password (testing uses it too), or type a new one to replace it.
 **Export all tables.** Under the *Objects* heading, the four file icons (**XLS**, **CSV**,
 **JSON**, **XML**) export every table of the database, one file per table, four tables at a
 time. Each table gets a progress bar with its row count, and a download link when it's
-done. Disconnecting stops an export that is still running.
+done. The list fills the whole data area (in several columns on wide screens), so you see
+as many tables as possible. Opening a table brings the grid back, and **✕** closes the
+list while the export carries on. Disconnecting stops an export that is still running.
 
 **Export the DDL.** The **DDL** button next to the filter writes the `CREATE` statements of
 every object in the database to one `.sql` file (see [DDL export](#ddl-export)).
@@ -364,7 +366,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background --host 0.0.0.0
 ```
 ```
-cactusdb 1.4.0 is running in the background (process id 48211)
+cactusdb 1.4.1 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -375,6 +377,12 @@ you where to open it. If it can't start (the port is in use, the connection file
 opened…), you get the error straight away. The process id is also written to
 `cactusdb.pid` next to the log file, so you can stop it later:
 
+- **From the browser:** a background cactusdb shows a **⏻ Shutdown** button at the top
+  right, next to *Disconnect*. Click it and confirm. cactusdb cancels running exports,
+  closes every database connection and the connection file, removes `cactusdb.pid`,
+  logs `stopped` and exits. The page then says it has shut down, with the command to
+  start it again. (The button only appears in background mode; in a terminal, press
+  Ctrl+C.)
 - macOS/Linux: `kill $(cat cactusdb.pid)`
 - Windows: `taskkill /PID <id> /F` (the id is in `cactusdb.pid`)
 

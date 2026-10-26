@@ -267,3 +267,36 @@ func TestAPIExportAll(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIShutdown(t *testing.T) {
+	s := newTestServer(t)
+	s.shutdown = make(chan struct{})
+	post := func(contentType string) int {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/shutdown", strings.NewReader("{}"))
+		req.Header.Set("Content-Type", contentType)
+		s.handleShutdown(rec, req)
+		return rec.Code
+	}
+	if code := post("application/json"); code != 403 {
+		t.Errorf("a foreground cactusdb must refuse: %d", code)
+	}
+	s.background = true
+	if code := post("text/plain"); code != 415 {
+		t.Errorf("a non-JSON (cross-site form) request must be refused: %d", code)
+	}
+	select {
+	case <-s.shutdown:
+		t.Fatal("refused requests must not shut down")
+	default:
+	}
+	if code := post("application/json"); code != 200 {
+		t.Errorf("shutdown: %d", code)
+	}
+	post("application/json") // a second click must not panic on the closed channel
+	select {
+	case <-s.shutdown:
+	default:
+		t.Error("shutdown was not signalled")
+	}
+}

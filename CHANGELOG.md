@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.1 — 2026-10-26
+
+- **⏻ Shutdown** button in the web UI when cactusdb runs with `--runas background`: after
+  confirming, cactusdb cancels running exports, closes all database connections and
+  exits cleanly. Only JSON requests are accepted, so other websites can't trigger it.
+- The *Export all tables* progress list uses the full height of the window, in several
+  columns on wide screens, with a ✕ to close it.
+
 ## 1.4.0 — 2026-10-26
 
 ### Command line

@@ -123,6 +123,16 @@
   .exportall button { padding: 2px 3px; line-height: 0; color: var(--muted); }
   .exportall button:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
   .ealist { list-style: none; margin: 6px 0 2px; padding: 0; max-height: 220px; overflow-y: auto; }
+  .eahead { display: flex; gap: 8px; align-items: baseline; }
+  .eahead .t { flex: 1; min-width: 0; }
+  .eahead button { padding: 0 6px; font-size: 12px; line-height: 18px; }
+  /* While "export all tables" is shown it takes the grid's place, using the
+     full height, and on wide screens the tables flow into several columns. */
+  #dataPane.allexport { grid-template-rows: auto auto 1fr; }
+  #dataPane.allexport .grid { display: none; }
+  #dataPane.allexport #exportNote:not([hidden]) { display: flex; flex-direction: column; min-height: 0; padding-bottom: 10px; }
+  #dataPane.allexport .ealist { max-height: none; flex: 1; min-height: 0; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(620px, 1fr)); grid-auto-rows: min-content; align-content: start; column-gap: 32px; }
   .ealist li { display: grid; grid-template-columns: minmax(80px, 220px) 140px 1fr; gap: 10px; align-items: center; padding: 2px 0; }
   .ealist .n { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ealist .bar { height: 7px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; }
@@ -188,14 +198,25 @@
   tbody tr:hover td:not(.n) { background: var(--row-hover); }
   .placeholder { display: grid; place-items: center; height: 100%; color: var(--muted); text-align: center; padding: 24px; }
   .placeholder .big { font-size: 46px; }
-  dialog#connDialog { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; width: min(440px, calc(100vw - 32px));
+  dialog.modal { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; width: min(440px, calc(100vw - 32px));
     background: var(--panel); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
-  dialog#connDialog::backdrop { background: rgba(0,0,0,.35); }
-  dialog#connDialog h3 { margin: 0 0 6px; font-size: 16px; }
+  dialog.modal::backdrop { background: rgba(0,0,0,.35); }
+  dialog.modal h3 { margin: 0 0 6px; font-size: 16px; }
   .dresult { margin-top: 12px; padding: 8px 10px; border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
   .dresult.ok { background: var(--accent-soft); color: var(--accent); }
   .dresult.bad { background: var(--danger-soft); color: var(--danger); }
   .dresult.busy { background: var(--panel-2); color: var(--muted); }
+  button.danger { color: var(--danger); }
+  button.danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-soft); }
+  button.dangerfill { background: var(--danger); border-color: var(--danger); color: #fff; }
+  button.dangerfill:hover:not(:disabled) { filter: brightness(1.1); }
+  .sdtext { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 6px 0 0; }
+  #stopped { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; text-align: center;
+    background: var(--bg); padding: 16px; }
+  #stopped[hidden] { display: none; }
+  #stopped h2 { margin: 12px 0 6px; font-size: 20px; }
+  #stopped p { color: var(--muted); margin: 6px 0; }
+  #stopped code { font-family: var(--mono); background: var(--panel-2); padding: 2px 6px; border-radius: 4px; color: var(--text); }
   .dactions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
   .dactions .spacer { flex: 1; }
   .toast {
@@ -239,6 +260,7 @@
     </svg>
   </div>
   <button id="disconnectBtn" class="small" hidden>Disconnect</button>
+  <button id="shutdownBtn" class="small danger" hidden title="Stop this background cactusdb">⏻ Shutdown</button>
 </header>
 
 <div class="layout">
@@ -352,7 +374,7 @@
     </div>
   </main>
 </div>
-<dialog id="connDialog" aria-labelledby="dTitle">
+<dialog id="connDialog" class="modal" aria-labelledby="dTitle">
   <form method="dialog" id="dForm">
     <h3 id="dTitle">New connection</h3>
     <label for="dName">Connection name</label>
@@ -384,6 +406,26 @@
     </div>
   </form>
 </dialog>
+
+<dialog id="shutdownDialog" class="modal" aria-labelledby="sdTitle">
+  <h3 id="sdTitle">Shut down cactusdb?</h3>
+  <p class="sdtext">This stops the cactusdb running in the background<span id="sdPid"></span>. Running exports are
+    cancelled, all database connections are closed, and this page stops working until cactusdb is started again.</p>
+  <div class="dactions">
+    <span class="spacer"></span>
+    <button type="button" id="sdCancel">Cancel</button>
+    <button type="button" class="dangerfill" id="sdConfirm">Shut down</button>
+  </div>
+</dialog>
+
+<div id="stopped" hidden>
+  <div>
+    <img src="cactusdb.svg" alt="" width="64" height="64">
+    <h2>cactusdb has shut down</h2>
+    <p>All database connections were closed. You can close this tab.</p>
+    <p>To start it again: <code id="restartCmd">cactusdb --runas background</code></p>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -839,7 +881,15 @@ $("sql").addEventListener("keydown", (e) => {
 });
 $("limit").addEventListener("change", () => { if (state.result) run(); });
 
+// The grid comes back (and the export panel shrinks) once there is
+// something to show in it.
+function closeExportPanel(hide) {
+  $("dataPane").classList.remove("allexport");
+  if (hide) $("exportNote").hidden = true;
+}
+
 function showResult(res) {
+  closeExportPanel(false);
   state.result = res; state.sort = null;
   const n = res.rows.length;
   setInfo(`${n.toLocaleString()} row${n === 1 ? "" : "s"}` +
@@ -850,6 +900,7 @@ function showResult(res) {
 }
 
 function clearGrid(msg) {
+  closeExportPanel(false);
   state.result = null;
   $("grid").innerHTML = `<div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>${esc(msg)}</p></div></div>`;
 }
@@ -915,6 +966,7 @@ $("ddlBtn").addEventListener("click", async () => {
   b.disabled = true; b.textContent = "…";
   try {
     const res = await api("POST", "/api/exportddl", { session: state.session });
+    closeExportPanel(false);
     $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(res.download)}" download>Download</a>`;
     $("exportNote").hidden = false;
     showTab("data");
@@ -938,9 +990,11 @@ async function exportAll(fmt) {
     const start = await api("POST", "/api/exportall", { session: state.session, format: fmt });
     note.hidden = false;
     note.textContent = `Exporting ${start.tables} tables…`;
+    $("dataPane").classList.add("allexport");
     for (;;) {
       const st = await api("GET", "/api/exportall/" + start.job);
       renderExportAll(st);
+      if (state.stopped) return; // cactusdb was shut down from this page
       if (st.done) {
         const failed = st.tables.filter((t) => t.state === "failed").length;
         toast(failed ? `${failed} of ${st.tables.length} exports failed` : `Exported ${st.tables.length} tables`, failed > 0);
@@ -948,7 +1002,7 @@ async function exportAll(fmt) {
       }
       await new Promise((r) => setTimeout(r, 500));
     }
-  } catch (e) { toast("Export failed: " + e.message, true); }
+  } catch (e) { if (!state.stopped) toast("Export failed: " + e.message, true); }
   finally { setExportAllEnabled(!!state.session); }
 }
 
@@ -970,8 +1024,38 @@ function renderExportAll(st) {
     }
     return `<li><span class="n" title="${esc(t.name)}">${esc(t.name)}</span>${bar}<span class="s">${s}</span></li>`;
   }).join("");
-  $("exportNote").innerHTML = `${st.done ? "Exported" : "Exporting"} all tables as ${esc(st.format.toUpperCase())} to <code>${esc(st.folder)}</code> · ${done} / ${st.tables.length} done<ul class="ealist">${rows}</ul>`;
+  $("exportNote").innerHTML = `<div class="eahead"><span class="t">${st.done ? "Exported" : "Exporting"} all tables as ${esc(st.format.toUpperCase())} to <code>${esc(st.folder)}</code> · ${done} / ${st.tables.length} done</span><button data-act="close-export" title="Close (the export keeps running)">✕</button></div><ul class="ealist">${rows}</ul>`;
 }
+
+$("exportNote").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-act=close-export]")) closeExportPanel(true);
+});
+
+// ---- shutdown (background mode only) ----------------------------------------
+async function loadInfo() {
+  try {
+    const info = await api("GET", "/api/info");
+    $("shutdownBtn").hidden = !info.background;
+    $("sdPid").textContent = info.pid ? ` (process id ${info.pid})` : "";
+    $("restartCmd").textContent = `cactusdb --port ${location.port || 80} --runas background`;
+  } catch (e) { /* an older server without /api/info: no Shutdown button */ }
+}
+
+$("shutdownBtn").addEventListener("click", () => $("shutdownDialog").showModal());
+$("sdCancel").addEventListener("click", () => $("shutdownDialog").close());
+$("sdConfirm").addEventListener("click", async () => {
+  const b = $("sdConfirm");
+  b.disabled = true; b.textContent = "Shutting down…";
+  try {
+    await api("POST", "/api/shutdown", {});
+    $("shutdownDialog").close();
+    state.session = null; state.stopped = true;
+    $("stopped").hidden = false;
+  } catch (e) {
+    toast("Shutdown failed: " + e.message, true);
+    b.disabled = false; b.textContent = "Shut down";
+  }
+});
 
 // ---- init ----------------------------------------------------------------
 $("engines").addEventListener("click", (ev) => {
@@ -983,6 +1067,7 @@ $("engines").addEventListener("click", (ev) => {
   try { state.engines = await api("GET", "/api/engines"); } catch (e) { toast(e.message, true); }
   selectEngine("sqlite");
   loadSaved();
+  loadInfo();
   api("GET", "/api/drivers").then((list) => {
     $("driversSub").textContent = "· " + list.length + " built in";
     $("driverList").innerHTML = list.map((d) =>
