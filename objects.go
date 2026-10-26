@@ -316,7 +316,7 @@ func firebirdDefinition(ctx context.Context, db *sql.DB, typ, name string) (stri
 	q := func(s string) string { return quoteIdent(EngineFirebird, s) }
 	switch typ {
 	case ObjTable:
-		return firebirdTableDDL(ctx, db, name)
+		return tableDefinition(ctx, EngineFirebird, db, name, true)
 
 	case ObjView:
 		src, err := fbString(ctx, db, `SELECT RDB$VIEW_SOURCE FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = ?`, name)
@@ -541,6 +541,11 @@ func firebirdTableDDL(ctx context.Context, db *sql.DB, table string) (string, er
 		}
 		lines = append(lines, "  PRIMARY KEY ("+strings.Join(pk, ", ")+")")
 	}
+	cons, err := firebirdConstraints(ctx, db, table)
+	if err != nil {
+		return "", err
+	}
+	lines = append(lines, cons...)
 	return "CREATE TABLE " + q(table) + " (\n" + strings.Join(lines, ",\n") + "\n);\n", nil
 }
 
@@ -586,7 +591,7 @@ func mssqlDefinition(ctx context.Context, db *sql.DB, typ, name string) (string,
 	const byName = `JOIN sys.schemas s ON s.schema_id = o.schema_id WHERE s.name + '.' + o.name = @p1`
 	switch typ {
 	case ObjTable:
-		return mssqlTableDDL(ctx, db, name)
+		return tableDefinition(ctx, EngineMSSQL, db, name, true)
 	case ObjView, ObjProcedure, ObjFunction:
 		var def sql.NullString
 		err := db.QueryRowContext(ctx, `SELECT m.definition FROM sys.objects o JOIN sys.sql_modules m ON m.object_id = o.object_id `+byName, name).Scan(&def)
@@ -697,6 +702,11 @@ func mssqlTableDDL(ctx context.Context, db *sql.DB, table string) (string, error
 		}
 		lines = append(lines, "  PRIMARY KEY ("+strings.Join(pk, ", ")+")")
 	}
+	cons, err := mssqlConstraints(ctx, db, table)
+	if err != nil {
+		return "", err
+	}
+	lines = append(lines, cons...)
 	return "CREATE TABLE " + quoteObject(EngineMSSQL, table) + " (\n" + strings.Join(lines, ",\n") + "\n);\n", nil
 }
 
@@ -745,7 +755,7 @@ func postgresDefinition(ctx context.Context, db *sql.DB, typ, name string) (stri
 	}
 	switch typ {
 	case ObjTable:
-		return postgresTableDDL(ctx, db, name)
+		return tableDefinition(ctx, EnginePostgres, db, name, true)
 	case ObjView:
 		def, err := one(`SELECT pg_get_viewdef(c.oid, true) ` + pgRel)
 		return "CREATE OR REPLACE VIEW " + q(name) + " AS\n" + strings.TrimSpace(def) + "\n", err
@@ -811,7 +821,9 @@ func postgresDefinition(ctx context.Context, db *sql.DB, typ, name string) (stri
 	return "", fmt.Errorf("unsupported object type %q", typ)
 }
 
-func postgresTableDDL(ctx context.Context, db *sql.DB, table string) (string, error) {
+// postgresTableDDL builds CREATE TABLE with its constraints; foreign keys
+// only when fks is set.
+func postgresTableDDL(ctx context.Context, db *sql.DB, table string, fks bool) (string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull,
 			pg_get_expr(d.adbin, d.adrelid), a.attidentity, a.attgenerated
 		FROM pg_attribute a
@@ -855,8 +867,8 @@ func postgresTableDDL(ctx context.Context, db *sql.DB, table string) (string, er
 	}
 	cons, _ := queryStringsArgs(ctx, db, `SELECT 'CONSTRAINT ' || quote_ident(con.conname) || ' ' || pg_get_constraintdef(con.oid)
 		FROM pg_constraint con JOIN pg_class c ON c.oid = con.conrelid JOIN pg_namespace n ON n.oid = c.relnamespace
-		WHERE n.nspname || '.' || c.relname = $1 AND con.contype IN ('p', 'u', 'f', 'c')
-		ORDER BY CASE con.contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 WHEN 'f' THEN 2 ELSE 3 END, con.conname`, table)
+		WHERE n.nspname || '.' || c.relname = $1 AND (con.contype IN ('p', 'u', 'c') OR (con.contype = 'f' AND $2))
+		ORDER BY CASE con.contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 WHEN 'f' THEN 2 ELSE 3 END, con.conname`, table, fks)
 	for _, c := range cons {
 		lines = append(lines, "  "+c)
 	}

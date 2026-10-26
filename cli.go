@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/term"
@@ -27,8 +28,12 @@ type cliOptions struct {
 	PasswordSet bool   // --dbpassword was given (an empty password is allowed)
 	Tables      string // --dbtable: name, comma-separated names, or "all"
 	Show        string // --showtable: "all" or a table name
+	DDL         string // --exportddl: "all" or comma-separated table names
 	Format      string // --exportas
 	ExportDir   string
+	Threads     int    // --threads: tables exported at the same time
+	Progress    bool   // draw live progress bars (out is a terminal)
+	Store       *Store // where the connection is saved as cli-<host>; nil = don't save
 }
 
 // engineAliases maps the names accepted by --dbtype to engine ids.
@@ -93,6 +98,14 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 		return fmt.Errorf("connection failed: %w", err)
 	}
 	defer db.Close()
+	if o.Store != nil {
+		name := cliConnName(o.ConnParams)
+		if _, err := o.Store.Save(SavedConn{Name: name, ConnParams: o.ConnParams}); err != nil {
+			fmt.Fprintf(os.Stderr, "cactusdb: warning: could not save the connection: %v\n", err)
+		} else {
+			fmt.Fprintf(out, "Connection saved as %q\n", name)
+		}
+	}
 	groups, err := listObjects(ctx, o.Engine, db)
 	if err != nil {
 		return fmt.Errorf("connected, but listing tables failed: %w", err)
@@ -100,6 +113,11 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 
 	if o.Show != "" {
 		if err := showTables(ctx, o, db, groups, out); err != nil {
+			return err
+		}
+	}
+	if o.DDL != "" {
+		if err := exportDDL(ctx, o, db, groups, out); err != nil {
 			return err
 		}
 	}
@@ -120,6 +138,9 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 			return errors.New("the database has no tables")
 		}
 	} else {
+		// Every name is checked before anything is exported; a table named
+		// twice (even spelt differently) is exported once.
+		seen := map[tableRef]bool{}
 		for _, name := range strings.Split(o.Tables, ",") {
 			if name = strings.TrimSpace(name); name == "" {
 				continue
@@ -128,36 +149,78 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 			if err != nil {
 				return err
 			}
-			targets = append(targets, t)
+			if !seen[t] {
+				seen[t] = true
+				targets = append(targets, t)
+			}
+		}
+		if len(targets) == 0 {
+			return errors.New("--dbtable has no table names")
 		}
 	}
 
-	fmt.Fprintf(out, "Exporting %d table(s) as %s to %s\n", len(targets), o.Format, o.ExportDir)
-	failed := 0
-	for _, t := range targets {
-		q, err := buildSelect(ctx, o.Engine, db, t.name)
-		if err == nil {
-			var path string
-			var n int
-			path, n, err = exportToDir(ctx, o.ExportDir, o.Engine, db, q, o.Format, t.name)
-			if err == nil {
-				fmt.Fprintf(out, "  %-30s %9d rows  %s\n", t.name, n, path)
+	return runExports(ctx, o, db, targets, out)
+}
+
+type tableRef struct{ typ, name string }
+
+// exportDDL writes the definitions of every object (--exportddl all) or of
+// the named tables to one .sql file.
+func exportDDL(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGroup, out io.Writer) error {
+	var targets []ddlTarget
+	if strings.EqualFold(strings.TrimSpace(o.DDL), "all") {
+		targets = ddlTargets(groups)
+	} else {
+		seen := map[tableRef]bool{}
+		for _, name := range strings.Split(o.DDL, ",") {
+			if name = strings.TrimSpace(name); name == "" {
 				continue
 			}
+			t, err := resolveTable(groups, name)
+			if err != nil {
+				return err
+			}
+			if !seen[t] {
+				seen[t] = true
+				targets = append(targets, t)
+			}
 		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		failed++
-		fmt.Fprintf(out, "  %-30s FAILED: %v\n", t.name, err)
 	}
-	if failed > 0 {
-		return fmt.Errorf("%d of %d export(s) failed", failed, len(targets))
+	if len(targets) == 0 {
+		return errors.New("--exportddl: nothing to export")
+	}
+	progress := func(int) {}
+	if o.Progress {
+		progress = func(done int) {
+			fmt.Fprintf(out, "\r\x1b[2KWriting DDL: %d/%d objects", done, len(targets))
+		}
+	}
+	path, n, err := exportDDLToDir(ctx, o.ExportDir, o.Engine, db, defaultConnName(o.ConnParams), ddlFileName(o.ConnParams), targets, progress)
+	if o.Progress {
+		fmt.Fprint(out, "\r\x1b[2K")
+	}
+	if err != nil {
+		return fmt.Errorf("DDL export failed: %w", err)
+	}
+	fmt.Fprintf(out, "DDL of %d object(s) written to %s\n", n, path)
+	if skipped := len(targets) - n; skipped > 0 {
+		fmt.Fprintf(out, "  (%d object(s) had no readable definition; see the comments in the file)\n", skipped)
 	}
 	return nil
 }
 
-type tableRef struct{ typ, name string }
+// ddlFileName names a DDL file after the database: the file name without
+// extension for SQLite and Firebird paths.
+func ddlFileName(p ConnParams) string {
+	name := p.Database
+	if p.Engine == EngineSQLite || p.Engine == EngineFirebird {
+		name = strings.TrimSuffix(filepath.Base(strings.ReplaceAll(name, "\\", "/")), filepath.Ext(name))
+	}
+	if name == "" {
+		name = p.Engine
+	}
+	return name
+}
 
 // resolveTable finds a table or view by name: exactly, then ignoring case,
 // then without the schema prefix (so "orders" finds "public.orders").
@@ -226,6 +289,19 @@ func showTables(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGr
 	}
 	fmt.Fprintf(out, "-- %s %s\n%s\n", t.typ, t.name, strings.TrimRight(src, "\n"))
 	return nil
+}
+
+// cliConnName is the name a command-line connection is saved under:
+// cli-<host>, or cli-<file name> for SQLite.
+func cliConnName(p ConnParams) string {
+	if p.Engine == EngineSQLite {
+		return "cli-" + filepath.Base(p.Database)
+	}
+	host := p.Host
+	if host == "" {
+		host = "localhost"
+	}
+	return "cli-" + host
 }
 
 func defaultPort(engine string) int {
