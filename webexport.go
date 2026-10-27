@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"time"
 )
@@ -18,6 +17,7 @@ type webBatch struct {
 	*exportBatch
 	session string
 	label   string
+	dir     string // the export folder when the export started
 	cancel  context.CancelFunc
 }
 
@@ -66,7 +66,8 @@ func (s *server) handleExportAll(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	label := ss.label
 	logAction(r, "[%s] export all %d table(s) as %s, job %.8s", label, len(targets), format, id)
-	b := startExportBatch(ctx, ss.engine, ss.db, s.exportDir, format, targets, webExportThreads, func(j *exportJob) {
+	dir := s.exportFolder()
+	b := startExportBatch(ctx, ss.engine, ss.db, dir, format, targets, webExportThreads, func(j *exportJob) {
 		if j.err != nil {
 			logAction(r, "[%s] export %s FAILED: %v", label, j.table.name, j.err)
 		} else {
@@ -77,7 +78,7 @@ func (s *server) handleExportAll(w http.ResponseWriter, r *http.Request) {
 	if s.batches == nil {
 		s.batches = map[string]*webBatch{}
 	}
-	s.batches[id] = &webBatch{exportBatch: b, session: req.Session, label: label, cancel: cancel}
+	s.batches[id] = &webBatch{exportBatch: b, session: req.Session, label: label, dir: dir, cancel: cancel}
 	s.mu.Unlock()
 	go func() {
 		<-b.done
@@ -112,14 +113,13 @@ func (s *server) handleExportAllStatus(w http.ResponseWriter, r *http.Request) {
 		t := map[string]any{"name": j.table.name, "state": jobStateNames[state], "rows": j.rows.Load(), "total": j.total.Load()}
 		switch state {
 		case jobDone:
-			file := filepath.Base(j.path)
-			t["file"], t["path"], t["download"] = file, j.path, "/api/exports/"+url.PathEscape(file)
+			t["file"], t["path"], t["download"] = filepath.Base(j.path), j.path, downloadURL(j.path)
 		case jobFailed:
 			t["error"] = j.err.Error()
 		}
 		tables[i] = t
 	}
-	writeJSON(w, 200, map[string]any{"done": done, "format": b.format, "folder": s.exportDir, "tables": tables})
+	writeJSON(w, 200, map[string]any{"done": done, "format": b.format, "folder": exportSubdir(b.dir, exportFormats[b.format]), "tables": tables})
 }
 
 // cancelBatches stops the exports of a session that is disconnecting.

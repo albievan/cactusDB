@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.5.0
+cactusdb 1.6.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -123,7 +123,8 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    **Ctrl+Enter**. Only read queries are accepted (see [Read-only](#read-only)).
 7. **Export** with the **Excel**, **JSON**, **XML** or **CSV** buttons. The export
    always contains **all rows** of the query, not just the rows on screen. The file is
-   saved in the export folder, and a bar shows the full path with a **Download** link.
+   saved in a subfolder of the export folder named after its type (`json`, `csv`,
+   `xlsx` or `xml`), and a bar shows the full path with a **Download** link.
    **Clear** removes that bar again.
 
 **Saved connections** appear in their own list. Click one to connect, or **✕** to delete it.
@@ -132,7 +133,10 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 connection form: a name, the database type and the connection details. Click
 **Test connection** to check them before saving. cactusdb connects, reports the server
 version and the number of tables (or the exact error), and disconnects again. Nothing is
-saved until you click **Save**. **Edit** on a saved connection opens the same form, where
+saved until you click **Save**. While you type a **new** connection, the eye button in
+the password field shows what you typed. When you edit or open a saved connection the
+password can't be shown: the button isn't there, and the saved password never reaches
+the browser anyway (leave the field blank to keep it). **Edit** on a saved connection opens the same form, where
 you can test it, change it or rename it. Saved passwords are never sent to the browser:
 the password box shows *saved – leave blank to keep*. Leave it empty to keep the stored
 password (testing uses it too), or type a new one to replace it.
@@ -144,6 +148,14 @@ done. The list fills the whole data area (in several columns on wide screens), s
 as many tables as possible. Opening a table brings the grid back, and **✕** closes the
 list while the export carries on. When the export is finished, **Clear** removes the
 export status. Disconnecting stops an export that is still running.
+
+**Export folder.** The *Export folder* section in the sidebar shows where exports are saved.
+**Change** lets you type another folder: a full path on the computer cactusdb runs on (a
+leading `~` means your home folder). cactusdb creates it if needed, checks it can write
+there, and saves the choice in `cactus.conn.db`, so it's used again after a restart, by the
+web UI and by command-line exports. **Use default** goes back to the `export` folder next to
+the program. Files exported before the change can still be downloaded until cactusdb stops.
+`--exportto` on the command line always wins over the saved folder.
 
 **Export the DDL.** The **DDL** button next to the filter writes the `CREATE` statements of
 every object in the database to one `.sql` file (see [DDL export](#ddl-export)).
@@ -200,7 +212,8 @@ Free-form queries are named `query_…`. Existing files are never overwritten.
 ### DDL export
 
 **DDL** in the web UI, or `--exportddl all` on the command line, writes a script that
-recreates the database structure, without data: `<database>_ddl_<date>-<time>.sql`.
+recreates the database structure, without data: `<database>_ddl_<date>-<time>.sql`, in the
+`sql` subfolder of the export folder.
 
 - **Order:** domains, sequences/generators and exceptions come first, then tables with
   their indexes, then views, functions, procedures, packages, triggers and events.
@@ -217,6 +230,45 @@ recreates the database structure, without data: `<database>_ddl_<date>-<time>.sq
 
 The SQLite, MariaDB, PostgreSQL and Firebird scripts were tested by running them into an
 empty database and exporting again: the second script is identical to the first.
+
+<a id="backup"></a>
+### Database backup
+
+**Backup** (next to **DDL** under *Objects*), or `--backup yes` on the command line, backs
+up the whole connected database to `<database>_backup_<date>-<time>.zip` in the `backup`
+subfolder of the export folder. The web UI shows a **Download** link when it's done.
+
+The `.zip` is compressed at the maximum Deflate level and holds:
+
+- **`<database>.sql`**, a script that restores everything: the [DDL](#ddl-export) of every
+  object with **every row of every table** as `INSERT` statements. The rows are inserted after
+  the tables are created, but before foreign keys, indexes, views and triggers, so loading
+  them never fires a trigger or trips over a foreign key. Afterwards sequences, generators
+  and identity columns are set to where they were, so new rows don't reuse existing keys.
+  Computed/generated columns are left out (the database computes them again).
+- **SQLite only:** `<database>.db`, an exact copy of the database file, made with
+  `VACUUM INTO` (consistent even while others use the database).
+
+Restore into an **empty** database with the database's own tool:
+
+| Database | Restore |
+|----------|---------|
+| SQLite | use the `.db` file as it is, or `sqlite3 new.db < shop.sql` |
+| MySQL / MariaDB | `mysql -u root -p newdb < shop.sql` |
+| PostgreSQL | `psql -v ON_ERROR_STOP=1 -U postgres newdb < shop.sql` |
+| Firebird | create the database, then `isql -ch UTF8 -user SYSDBA -password … host:/path/new.fdb < shop.sql` |
+| SQL Server | `sqlcmd -S host -d newdb -i shop.sql` (the script uses `GO` and `SET IDENTITY_INSERT`) |
+
+Backing up only reads the database; like everything else in cactusdb, nothing is written to
+it. A table whose rows can't be read is noted in the script and named in the result, and
+the rest is still backed up. The backup runs while the page waits; for very large
+databases the command line (`--backup yes`) shows the progress per table.
+
+Backups of SQLite, MariaDB, PostgreSQL and Firebird databases (with quotes, backslashes,
+Unicode, binary data, decimals, dates, NULLs, identity, generated columns, foreign keys and
+triggers) were tested by restoring them into an empty database: the data, the next
+identity/sequence value and the triggers matched the original. SQL Server backups are
+built the same way but weren't tested against a live server.
 
 <a id="read-only"></a>
 ### Read-only: your data is safe
@@ -249,8 +301,8 @@ cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname 
 ```
 ```
 Password for root@10.66.1.136:3306:
-Exporting 1 table(s) as xlsx to /home/me/cactusdb/export
-  orders                             15234 rows  /home/me/cactusdb/export/orders_20261026-141502.xlsx
+Exporting 1 table(s) as xlsx to /home/me/cactusdb/export/xlsx
+  orders                             15234 rows  /home/me/cactusdb/export/xlsx/orders_20261026-141502.xlsx
 ```
 
 The password is **asked for** and not shown while you type. For scripts, pass it with
@@ -268,9 +320,10 @@ The password is **asked for** and not shown while you type. For scripts, pass it
 | `--dbtable` | The table or view to export; several separated by commas (`--dbtable orders,customers`); or `all` for every table. |
 | `--showtable` | `all` lists the tables and views; a table name prints its definition (`CREATE TABLE …`). |
 | `--exportas` | `csv` (default), `json`, `xml` or `excel`. |
-| `--exportto` | Where the files go. Default: the `export` folder next to cactusdb. |
+| `--exportto` | The base folder for exports. Default: the `export` folder next to cactusdb. Each type goes to its own subfolder: `json`, `csv`, `xlsx` (Excel), `xml`, `sql` for DDL and `backup` for backups. |
 | `--threads` | How many tables to export at the same time. Default `4`. |
 | `--exportddl` | `all` writes the DDL of every object to one `.sql` file; table names (comma-separated) write just those tables. See [DDL export](#ddl-export). |
+| `--backup` | `yes` backs up the whole database (DDL and every row) to a compressed `.zip` in the `backup` subfolder. See [Database backup](#backup). |
 | `--saveconn` | `yes` (default) saves the connection; `no` doesn't. See below. |
 
 Each table is saved as its own file named `<table>_<date>-<time>.<ext>`, with every
@@ -349,7 +402,7 @@ cactusdb --port 8087 --web yes --exportto ./export
 |--------|---------|--------------|
 | `--web` | `yes` when no `--dbtype` is given | `--web yes` starts the web UI. It's the default, so `cactusdb --port 8087` does the same. |
 | `--port` | `8080` | The port to open in your browser: `http://localhost:<port>` |
-| `--exportto` | folder `export` next to the cactusdb program | Where exported files are saved. Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
+| `--exportto` | folder `export` next to the cactusdb program | The base folder for exported files. Each type is saved in its own subfolder (`json`, `csv`, `xlsx`, `xml`, `sql` for DDL and `backup` for backups). Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
 | `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
 | `--host` | `0.0.0.0` (every network interface) | The address to listen on. By default other computers on your network can use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. Use `127.0.0.1` to allow only this computer, `::` to listen on IPv6 too, or one of this computer's IP addresses to listen on that network only. See [Security](#7-security). |
@@ -374,7 +427,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.5.0 is running in the background (process id 48211)
+cactusdb 1.6.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -402,13 +455,61 @@ The log looks like this:
 2026/10/26 17:26:30 127.0.0.1 [cli-10.66.1.136] 1000 row(s) (more not shown) in 41ms
 2026/10/26 17:26:31 127.0.0.1 [cli-10.66.1.136] query: delete from orders
 2026/10/26 17:26:31 127.0.0.1 [cli-10.66.1.136] query FAILED: cactusdb is read-only: only SELECT queries are allowed …
-2026/10/26 17:26:35 127.0.0.1 [cli-10.66.1.136] export xlsx: 15234 row(s) to /home/me/cactusdb/export/orders_20261026-172635.xlsx
+2026/10/26 17:26:35 127.0.0.1 [cli-10.66.1.136] export xlsx: 15234 row(s) to /home/me/cactusdb/export/xlsx/orders_20261026-172635.xlsx
 ```
 
 | Environment variable | What it does |
 |----------------------|--------------|
 | `CACTUSDB_DBPASSWORD` | The database password for [command-line exports](#4-exporting-from-the-command-line-no-browser), so you aren't prompted for it. |
 | `CACTUSDB_PASSPHRASE` | Derives the encryption key for saved usernames and passwords from this passphrase instead of using `cactus.key`. Nothing secret is then stored on disk, but you must set the same passphrase every time. On Windows: `set CACTUSDB_PASSPHRASE=…` (Command Prompt) or `$env:CACTUSDB_PASSPHRASE='…'` (PowerShell). |
+
+### Running in a container
+
+`deploy-container.sh` builds a small Docker (or Podman) image from the Linux binary in
+`dist/` and runs cactusdb in it, listening on every address. The port is published on the
+host, and the export folder and the saved-connections folder are stored on the host, so
+they survive upgrades and re-creating the container.
+
+```sh
+./deploy-container.sh                                   # port 8080, data in ~/cactusdb
+./deploy-container.sh up --port 8087 --export-dir /srv/cactusdb/export --conn-dir /srv/cactusdb/conn
+./deploy-container.sh up --port 8087 --sqlite-dir /srv/sqlite   # also browse SQLite files
+./deploy-container.sh status | logs | restart | down
+```
+```
+cactusdb 1.6.0 is running in container cactusdb
+  open http://localhost:8087
+  open http://192.168.1.20:8087
+  saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
+  exports:           /srv/cactusdb/export/{json,csv,xlsx,xml,sql,backup}
+```
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `--port` | `8080` | Port to publish on the host (cactusdb listens on the same port in the container) |
+| `--bind` | `0.0.0.0` | Host address to publish on; `127.0.0.1` keeps it to the host itself |
+| `--data-dir` | `~/cactusdb` | Base folder on the host for `export/` and `conn/` |
+| `--export-dir` | `<data-dir>/export` | Host folder for exports (`/opt/cactusdb/export` in the container) |
+| `--conn-dir` | `<data-dir>/conn` | Host folder for `cactus.conn.db` and `cactus.key` (`/opt/cactusdb/conn`); readable only by you |
+| `--sqlite-dir` | | Host folder of SQLite databases, mounted read-only at `/sqlite`: connect to `/sqlite/<file>` |
+| `--tz` | `$TZ` | Time zone for log and file-name times, e.g. `Europe/Amsterdam` |
+| `--name`, `--image` | `cactusdb` | Container and image name |
+| `--runtime` | docker, else podman | Container engine to use |
+| `--from-source` | | Compile the binary with Go first instead of using `dist/` |
+
+- `up` replaces a running container with the new image; your data folders are untouched.
+  `down` removes the container and keeps the data.
+- The container runs as your user, so exports and connection files on the host belong to
+  you. It restarts automatically (`--restart unless-stopped`) and has a health check.
+- The log goes to `./deploy-container.sh logs` (`docker logs`). The ⏻ Shutdown button isn't
+  shown; stop it with `./deploy-container.sh down`.
+- Set `CACTUSDB_PASSPHRASE` before running the script to use a passphrase instead of
+  `cactus.key` (see the table above).
+- **Export folder in a container:** a folder chosen in the web UI is a path *inside* the
+  container. Only `/opt/cactusdb/export` (and folders under it, such as
+  `/opt/cactusdb/export/team`) is stored on the host; anything else is lost when the
+  container is re-created.
+- The firewall and [Security](#7-security) notes apply as for the program itself.
 
 ## 6. Files cactusdb creates
 
@@ -417,11 +518,17 @@ Next to the program (unless you chose other locations with the options above):
 ```
 cactusdb/
 ├── cactusdb(.exe)       the program
-├── cactus.conn.db       your saved connections (an SQLite database)
+├── cactus.conn.db       your saved connections and the chosen export folder (an SQLite database)
 ├── cactus.key           the key that encrypts saved usernames and passwords
 ├── cactusdb.log         the action log (with --runas background or --logfile)
 ├── cactusdb.pid         the process id of a background cactusdb, while it runs
-└── export/              your exported files
+└── export/              your exported files, one subfolder per type
+    ├── backup/          database backups (.zip)
+    ├── csv/
+    ├── json/
+    ├── sql/             DDL scripts
+    ├── xlsx/            Excel
+    └── xml/
 ```
 
 To move cactusdb to another computer and keep your connections, copy `cactus.conn.db`
@@ -542,13 +649,16 @@ CACTUSDB_IT=1 go test ./...
 | `progress.go` | Parallel export of several tables, and the terminal progress bars |
 | `webexport.go` | *Export all tables* in the web UI |
 | `ddl.go`, `tables.go` | DDL export; constraints, indexes and foreign keys of tables |
+| `backup.go` | Database backup: DDL plus every row as `INSERT`s, in a maximum-compression `.zip` |
 | `background.go` | `--runas background` |
 | `sys_windows.go`, `sys_other.go` | Platform specifics: detaching from the terminal, console colours |
 | `db.go` | Connecting, listing columns, running queries |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `readonly.go` | The read-only query check |
 | `export.go` | Excel / JSON / XML / CSV export |
-| `store.go` | Saved connections (`cactus.conn.db`) |
+| `store.go` | Saved connections and settings (`cactus.conn.db`) |
+| `settings.go` | Changing the export folder from the web UI |
+| `Dockerfile`, `deploy-container.sh` | Container image and deployment script |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 

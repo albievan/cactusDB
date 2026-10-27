@@ -495,6 +495,23 @@ func firebirdParams(ctx context.Context, db *sql.DB, query, name string) ([]fbFi
 
 func firebirdTableDDL(ctx context.Context, db *sql.DB, table string) (string, error) {
 	q := func(s string) string { return quoteIdent(EngineFirebird, s) }
+	// Identity columns (Firebird 3+; 0 = ALWAYS, 1 = BY DEFAULT). Older
+	// versions lack the column, so an error just means there are none.
+	identity := map[string]string{}
+	if rows, err := db.QueryContext(ctx, `SELECT TRIM(RDB$FIELD_NAME), RDB$IDENTITY_TYPE FROM RDB$RELATION_FIELDS
+		WHERE RDB$RELATION_NAME = ? AND RDB$IDENTITY_TYPE IS NOT NULL`, table); err == nil {
+		for rows.Next() {
+			var name string
+			var typ int64
+			if rows.Scan(&name, &typ) == nil {
+				identity[name] = map[int64]string{0: "ALWAYS"}[typ]
+				if identity[name] == "" {
+					identity[name] = "BY DEFAULT"
+				}
+			}
+		}
+		rows.Close()
+	}
 	rows, err := db.QueryContext(ctx, `SELECT TRIM(rf.RDB$FIELD_NAME), TRIM(rf.RDB$FIELD_SOURCE), `+fbFieldCols+`,
 			rf.RDB$NULL_FLAG, rf.RDB$DEFAULT_SOURCE, f.RDB$COMPUTED_SOURCE
 		FROM RDB$RELATION_FIELDS rf JOIN RDB$FIELDS f ON f.RDB$FIELD_NAME = rf.RDB$FIELD_SOURCE
@@ -516,7 +533,9 @@ func firebirdTableDDL(ctx context.Context, db *sql.DB, table string) (string, er
 			line += "COMPUTED BY " + strings.TrimSpace(f.computedSrc.String)
 		} else {
 			line += f.typeName(true)
-			if f.defaultSrc.Valid {
+			if kind, ok := identity[cname.String]; ok {
+				line += " GENERATED " + kind + " AS IDENTITY"
+			} else if f.defaultSrc.Valid {
 				line += " " + strings.TrimSpace(f.defaultSrc.String)
 			}
 			if f.nullFlag.Int64 == 1 {

@@ -84,7 +84,7 @@ func TestRunCLIExportsSQLite(t *testing.T) {
 	if err := runCLI(context.Background(), opts, &out); err != nil {
 		t.Fatal(err)
 	}
-	files, _ := filepath.Glob(filepath.Join(dir, "export", "*.json"))
+	files, _ := filepath.Glob(filepath.Join(dir, "export", "json", "*.json"))
 	if len(files) != 2 || !strings.Contains(out.String(), "2 rows") {
 		t.Fatalf("expected 2 exports, got %v\n%s", files, out.String())
 	}
@@ -100,7 +100,7 @@ func TestRunCLIExportsSQLite(t *testing.T) {
 	if err := runCLI(context.Background(), opts, &out); err != nil {
 		t.Fatal(err)
 	}
-	if files, _ := filepath.Glob(filepath.Join(dir, "list", "*.json")); len(files) != 2 {
+	if files, _ := filepath.Glob(filepath.Join(dir, "list", "json", "*.json")); len(files) != 2 {
 		t.Errorf("expected customers and orders once each, got %v\n%s", files, out.String())
 	}
 	// An unknown name fails before anything is exported.

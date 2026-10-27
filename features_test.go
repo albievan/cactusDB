@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -191,7 +192,9 @@ func newTestServer(t *testing.T) *server {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.db.Close() })
-	return &server{store: st, exportDir: filepath.Join(dir, "export"), sessions: map[string]*session{}}
+	s := &server{store: st, defaultExportDir: filepath.Join(dir, "export"), sessions: map[string]*session{}}
+	s.setExportFolder(s.defaultExportDir)
+	return s
 }
 
 // Editing a saved connection with an id can rename it and keep its password.
@@ -249,7 +252,8 @@ func TestAPIExportAll(t *testing.T) {
 	}
 	var st struct {
 		Done   bool
-		Tables []struct{ Name, State, File string }
+		Folder string
+		Tables []struct{ Name, State, File, Path, Download string }
 	}
 	for deadline := time.Now().Add(30 * time.Second); !st.Done; time.Sleep(50 * time.Millisecond) {
 		if time.Now().After(deadline) {
@@ -261,10 +265,58 @@ func TestAPIExportAll(t *testing.T) {
 		s.handleExportAllStatus(rec, req)
 		json.Unmarshal(rec.Body.Bytes(), &st)
 	}
+	if st.Folder != filepath.Join(s.exportFolder(), "xlsx") {
+		t.Errorf("folder = %s, want the xlsx subfolder", st.Folder)
+	}
 	for _, tb := range st.Tables {
-		if tb.State != "done" || !strings.HasSuffix(tb.File, ".xlsx") {
+		if tb.State != "done" || !strings.HasSuffix(tb.File, ".xlsx") || tb.Path != filepath.Join(s.exportFolder(), "xlsx", tb.File) {
 			t.Errorf("%+v", tb)
 		}
+		// The download link finds the file in its subfolder.
+		if tb.Download != "/api/exports/xlsx/"+tb.File {
+			t.Errorf("download = %s", tb.Download)
+		}
+		rec = httptest.NewRecorder()
+		req := httptest.NewRequest("GET", tb.Download, nil)
+		req.SetPathValue("kind", "xlsx")
+		req.SetPathValue("file", tb.File)
+		s.handleDownload(rec, req)
+		if rec.Code != 200 || rec.Body.Len() == 0 {
+			t.Errorf("download %s: %d", tb.File, rec.Code)
+		}
+	}
+	// Only the type subfolders can be downloaded from.
+	for _, kind := range []string{"", "..", "other"} {
+		rec = httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/api/exports/x/y", nil)
+		req.SetPathValue("kind", kind)
+		req.SetPathValue("file", st.Tables[0].File)
+		s.handleDownload(rec, req)
+		if rec.Code != 400 {
+			t.Errorf("subfolder %q: %d", kind, rec.Code)
+		}
+	}
+}
+
+// Every export type, DDL included, goes to its own subfolder of the export folder.
+func TestExportSubfolders(t *testing.T) {
+	dbPath := newShopDB(t)
+	db, err := openDB(context.Background(), ConnParams{Engine: EngineSQLite, Database: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	dir := t.TempDir()
+	for format, ext := range exportFormats {
+		path, _, err := exportToDir(context.Background(), dir, EngineSQLite, db, "SELECT 1 AS x", format, "q", nil)
+		if err != nil || filepath.Dir(path) != filepath.Join(dir, ext) {
+			t.Errorf("%s: %s, %v", format, path, err)
+		}
+	}
+	groups, _ := listObjects(context.Background(), EngineSQLite, db)
+	path, _, err := exportDDLToDir(context.Background(), dir, EngineSQLite, db, "shop", "shop", ddlTargets(groups), nil)
+	if err != nil || filepath.Dir(path) != filepath.Join(dir, "sql") {
+		t.Errorf("ddl: %s, %v", path, err)
 	}
 }
 
@@ -300,3 +352,68 @@ func TestAPIShutdown(t *testing.T) {
 		t.Error("shutdown was not signalled")
 	}
 }
+
+// The export folder chosen in the web UI is checked, saved in the connection
+// database, used for new exports, and files in the old folder stay downloadable.
+func TestAPIExportFolderSetting(t *testing.T) {
+	s := newTestServer(t)
+	post := func(contentType, body string) (int, map[string]any) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/settings", strings.NewReader(body))
+		req.Header.Set("Content-Type", contentType)
+		s.handleSaveSettings(rec, req)
+		var out map[string]any
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	if code, _ := post("text/plain", `{"exportDir":"/tmp"}`); code != 415 {
+		t.Errorf("a non-JSON (cross-site form) request must be refused: %d", code)
+	}
+	if code, out := post("application/json", `{"exportDir":"relative/dir"}`); code != 400 || !strings.Contains(fmt.Sprint(out["error"]), "full path") {
+		t.Errorf("relative path: %d %v", code, out)
+	}
+
+	db, err := openDB(context.Background(), ConnParams{Engine: EngineSQLite, Database: newShopDB(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s.sessions["s1"] = &session{engine: EngineSQLite, label: "shop", db: db}
+	export := func() map[string]any {
+		rec := httptest.NewRecorder()
+		s.handleExport(rec, httptest.NewRequest("POST", "/api/export", strings.NewReader(`{"session":"s1","sql":"SELECT 1 AS x","format":"json","name":"q"}`)))
+		var out map[string]any
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &out) != nil {
+			t.Fatalf("export: %d %s", rec.Code, rec.Body)
+		}
+		return out
+	}
+	old := export()
+
+	newDir := filepath.Join(t.TempDir(), "new", "exports") // created when chosen
+	if code, out := post("application/json", `{"exportDir":`+strconvQuote(newDir)+`}`); code != 200 || out["exportDir"] != newDir {
+		t.Fatalf("set: %d %v", code, out)
+	}
+	if got := savedExportDir(s.store); got != newDir {
+		t.Errorf("saved setting = %q, want %q", got, newDir)
+	}
+	if got := export()["folder"]; got != filepath.Join(newDir, "json") {
+		t.Errorf("new export went to %v", got)
+	}
+	// The file exported before the change can still be downloaded.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", old["download"].(string), nil)
+	req.SetPathValue("kind", "json")
+	req.SetPathValue("file", old["file"].(string))
+	s.handleDownload(rec, req)
+	if rec.Code != 200 {
+		t.Errorf("download from the old folder: %d", rec.Code)
+	}
+
+	// Empty means the default folder again, which is saved as "".
+	if code, out := post("application/json", `{"exportDir":""}`); code != 200 || out["exportDir"] != s.defaultExportDir || savedExportDir(s.store) != "" {
+		t.Errorf("reset: %d %v saved=%q", code, out, savedExportDir(s.store))
+	}
+}
+
+func strconvQuote(s string) string { b, _ := json.Marshal(s); return string(b) }

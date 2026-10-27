@@ -29,6 +29,7 @@ type cliOptions struct {
 	Tables      string // --dbtable: name, comma-separated names, or "all"
 	Show        string // --showtable: "all" or a table name
 	DDL         string // --exportddl: "all" or comma-separated table names
+	Backup      bool   // --backup yes
 	Format      string // --exportas
 	ExportDir   string
 	Threads     int    // --threads: tables exported at the same time
@@ -118,6 +119,11 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 	}
 	if o.DDL != "" {
 		if err := exportDDL(ctx, o, db, groups, out); err != nil {
+			return err
+		}
+	}
+	if o.Backup {
+		if err := backupCLI(ctx, o, db, groups, out); err != nil {
 			return err
 		}
 	}

@@ -350,6 +350,22 @@ type RowFunc func(row []any) (bool, error)
 // The query is checked by checkReadOnly and, for server engines, executed in a
 // READ ONLY transaction that is rolled back afterwards, so it cannot change data.
 func streamQuery(ctx context.Context, engine string, db *sql.DB, q string, header func(cols []string) error, fn RowFunc) error {
+	var types []string
+	return streamRows(ctx, engine, db, q, func(cols, t []string) error {
+		types = t
+		return header(cols)
+	}, func(raw []any) (bool, error) {
+		row := make([]any, len(raw))
+		for i, v := range raw {
+			row[i] = normalize(v, types[i])
+		}
+		return fn(row)
+	})
+}
+
+// streamRows is streamQuery with the values as the driver returns them, and
+// the upper-case database type name of each column. raw is reused per row.
+func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header func(cols, types []string) error, fn func(raw []any) (bool, error)) error {
 	if err := checkReadOnly(engine, q); err != nil {
 		return err
 	}
@@ -388,7 +404,7 @@ func streamQuery(ctx context.Context, engine string, db *sql.DB, q string, heade
 			}
 		}
 	}
-	if err := header(cols); err != nil {
+	if err := header(cols, types); err != nil {
 		return err
 	}
 	raw := make([]any, len(cols))
@@ -400,11 +416,7 @@ func streamQuery(ctx context.Context, engine string, db *sql.DB, q string, heade
 		if err := rows.Scan(ptrs...); err != nil {
 			return err
 		}
-		row := make([]any, len(cols))
-		for i, v := range raw {
-			row[i] = normalize(v, types[i])
-		}
-		more, err := fn(row)
+		more, err := fn(raw)
 		if err != nil {
 			return err
 		}

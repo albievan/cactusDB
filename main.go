@@ -32,7 +32,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.5.0"
+var version = "1.6.0"
 
 //go:embed web
 var webFS embed.FS
@@ -45,8 +45,13 @@ type session struct {
 }
 
 type server struct {
-	store     *Store
-	exportDir string
+	store *Store
+
+	exportMu         sync.RWMutex
+	exportDir        string   // where exports go now; see exportFolder
+	exportDirs       []string // every export folder of this run, for downloads
+	defaultExportDir string   // export/ next to the program
+	exportToFlag     string   // --exportto, which overrides the saved folder
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -71,6 +76,7 @@ func main() {
 	dbPort := flag.Int("dbport", 0, "command-line export: database server port (default: the engine's standard port)")
 	dbTable := flag.String("dbtable", "", "command-line export: table to export, several separated by commas, or all")
 	showTable := flag.String("showtable", "", "command-line: all lists the tables and views; a table name prints its definition")
+	backupDB := flag.String("backup", "", "command-line: yes = back up the whole database (DDL and all rows) to a compressed .zip in the backup subfolder")
 	exportDDL := flag.String("exportddl", "", "command-line: write the DDL (CREATE statements) of all objects, or of the named tables, to a .sql file")
 	exportAs := flag.String("exportas", "csv", "command-line export: csv, json, xml or excel")
 	threads := flag.Int("threads", 4, "command-line export: how many tables to export at the same time")
@@ -88,6 +94,8 @@ func main() {
 			"                                                      export tables without the web UI\n"+
 			"  cactusdb --dbtype firebird --host fb1 --user SYSDBA --dbname /data/shop.fdb --exportddl all|t1,t2\n"+
 			"                                                      export the DDL to a .sql file\n"+
+			"  cactusdb --dbtype postgres --host pg1 --user me --dbname shop --backup yes\n"+
+			"                                                      back up the database to a compressed .zip\n"+
 			"  cactusdb --dbtype sqlite --dbname ./shop.db --showtable all|tablename\n"+
 			"                                                      list tables, or show a table's definition\n"+
 			"\nThe password is prompted for unless --dbpassword or $%s is given.\n\nOptions:\n", dbPasswordEnv)
@@ -108,7 +116,7 @@ func main() {
 	if err != nil {
 		fatalUsage(err.Error())
 	}
-	cliMode := set["dbtype"] || set["dbtable"] || set["showtable"] || set["exportddl"]
+	cliMode := set["dbtype"] || set["dbtable"] || set["showtable"] || set["exportddl"] || set["backup"]
 	background := false
 	switch strings.ToLower(*runAs) {
 	case "foreground", "":
@@ -121,13 +129,17 @@ func main() {
 	case cliMode && background:
 		fatalUsage(errBackgroundCLI.Error())
 	case cliMode && webOn:
-		fatalUsage("--web yes cannot be combined with --dbtype/--dbtable/--showtable/--exportddl")
+		fatalUsage("--web yes cannot be combined with --dbtype/--dbtable/--showtable/--exportddl/--backup")
 	case !cliMode && webGiven && !webOn:
 		fatalUsage("--web no: nothing to do; give --dbtype and --dbtable or --showtable to export without the web UI")
 	}
 
+	// The export folder: --exportto, else the one saved from the web UI
+	// (read once the connection database is open), else export/ next to
+	// the program.
+	defaultExportDir := filepath.Join(exeDir(), "export")
 	if *exportTo == "" {
-		*exportTo = filepath.Join(exeDir(), "export")
+		*exportTo = defaultExportDir
 	}
 	exportDir, err := filepath.Abs(*exportTo)
 	if err != nil {
@@ -157,8 +169,12 @@ func main() {
 		if !set["dbtype"] {
 			fatalUsage("--dbtype is required")
 		}
-		if *dbTable == "" && *showTable == "" && *exportDDL == "" {
-			fatalUsage("give --dbtable to export data, --exportddl to export DDL, or --showtable to list tables")
+		backup, _, err := parseYesNo(*backupDB)
+		if err != nil {
+			fatalUsage(strings.Replace(err.Error(), "--web", "--backup", 1))
+		}
+		if *dbTable == "" && *showTable == "" && *exportDDL == "" && !backup {
+			fatalUsage("give --dbtable to export data, --exportddl to export DDL, --backup yes to back up, or --showtable to list tables")
 		}
 		engine, err := parseEngine(*dbType)
 		if err != nil {
@@ -188,6 +204,17 @@ func main() {
 				defer store.db.Close()
 			}
 		}
+		if !set["exportto"] {
+			st := store
+			if st == nil && fileExists(*connDB) { // --saveconn no: only read the setting
+				if st, err = openStore(*connDB, *keyFile); err == nil {
+					defer st.db.Close()
+				}
+			}
+			if dir := savedExportDir(st); dir != "" {
+				exportDir = dir
+			}
+		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		err = runCLI(ctx, cliOptions{
 			ConnParams:  ConnParams{Engine: engine, Host: *host, Port: *dbPort, Username: *dbUser, Password: *dbPassword, Database: *dbName},
@@ -195,6 +222,7 @@ func main() {
 			Tables:      *dbTable,
 			Show:        *showTable,
 			DDL:         *exportDDL,
+			Backup:      backup,
 			Format:      format,
 			ExportDir:   exportDir,
 			Threads:     *threads,
@@ -262,16 +290,26 @@ func main() {
 		defer f.Close()
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
 	}
-	if err := os.MkdirAll(exportDir, 0o755); err != nil {
-		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
-	}
-
 	store, err := openStore(*connDB, *keyFile)
 	if err != nil {
 		log.Fatalf("cannot open connection store %s: %v", *connDB, err)
 	}
-	s := &server{store: store, exportDir: exportDir, sessions: map[string]*session{},
-		background: childLog != "", shutdown: make(chan struct{})}
+	exportToFlag := ""
+	if set["exportto"] {
+		exportToFlag = exportDir
+	} else if dir := savedExportDir(store); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			log.Printf("warning: cannot use the saved export folder %s (%v); using %s", dir, err, exportDir)
+		} else {
+			exportDir = dir
+		}
+	}
+	if err := os.MkdirAll(exportDir, 0o755); err != nil {
+		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
+	}
+	s := &server{store: store, sessions: map[string]*session{}, defaultExportDir: defaultExportDir,
+		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{})}
+	s.setExportFolder(exportDir)
 
 	static, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
@@ -279,6 +317,8 @@ func main() {
 	mux.HandleFunc("GET /api/engines", s.handleEngines)
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("GET /api/info", s.handleInfo)
+	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
+	mux.HandleFunc("POST /api/settings", s.handleSaveSettings)
 	mux.HandleFunc("POST /api/shutdown", s.handleShutdown)
 	mux.HandleFunc("POST /api/connect", s.handleConnect)
 	mux.HandleFunc("POST /api/disconnect", s.handleDisconnect)
@@ -289,9 +329,10 @@ func main() {
 	mux.HandleFunc("POST /api/query", s.handleQuery)
 	mux.HandleFunc("POST /api/export", s.handleExport)
 	mux.HandleFunc("POST /api/exportddl", s.handleExportDDL)
+	mux.HandleFunc("POST /api/backup", s.handleBackup)
 	mux.HandleFunc("POST /api/exportall", s.handleExportAll)
 	mux.HandleFunc("GET /api/exportall/{job}", s.handleExportAllStatus)
-	mux.HandleFunc("GET /api/exports/{file}", s.handleDownload)
+	mux.HandleFunc("GET /api/exports/{kind}/{file}", s.handleDownload)
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)
@@ -854,19 +895,19 @@ func (s *server) handleExport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("SQL is empty"))
 		return
 	}
-	path, rows, err := exportToDir(r.Context(), s.exportDir, ss.engine, ss.db, q, req.Format, req.Name, nil)
+	path, rows, err := exportToDir(r.Context(), s.exportFolder(), ss.engine, ss.db, q, req.Format, req.Name, nil)
 	if err != nil {
 		logAction(r, "[%s] export %s FAILED: %v (sql: %s)", ss.label, req.Format, err, oneLine(q))
 		writeErr(w, 400, err)
 		return
 	}
 	logAction(r, "[%s] export %s: %d row(s) to %s (sql: %s)", ss.label, req.Format, rows, path, oneLine(q))
-	file := filepath.Base(path)
 	writeJSON(w, 200, map[string]any{
 		"path":     path,
-		"file":     file,
+		"file":     filepath.Base(path),
+		"folder":   filepath.Dir(path),
 		"rows":     rows,
-		"download": "/api/exports/" + url.PathEscape(file),
+		"download": downloadURL(path),
 	})
 }
 
@@ -890,31 +931,44 @@ func (s *server) handleExportDDL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	path, n, err := exportDDLToDir(r.Context(), s.exportDir, ss.engine, ss.db, ss.label, ss.dbName, ddlTargets(groups), nil)
+	path, n, err := exportDDLToDir(r.Context(), s.exportFolder(), ss.engine, ss.db, ss.label, ss.dbName, ddlTargets(groups), nil)
 	if err != nil {
 		logAction(r, "[%s] DDL export FAILED: %v", ss.label, err)
 		writeErr(w, 400, err)
 		return
 	}
 	logAction(r, "[%s] DDL export: %d object(s) to %s", ss.label, n, path)
-	file := filepath.Base(path)
 	writeJSON(w, 200, map[string]any{
 		"path":     path,
-		"file":     file,
+		"file":     filepath.Base(path),
+		"folder":   filepath.Dir(path),
 		"objects":  n,
-		"download": "/api/exports/" + url.PathEscape(file),
+		"download": downloadURL(path),
 	})
 }
 
-// handleDownload serves a file from the export folder.
+// downloadURL is the web UI link to an exported file: its type subfolder and
+// file name.
+func downloadURL(path string) string {
+	return "/api/exports/" + url.PathEscape(filepath.Base(filepath.Dir(path))) + "/" + url.PathEscape(filepath.Base(path))
+}
+
+// handleDownload serves a file from a type subfolder of the export folder.
 func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
-	file := r.PathValue("file")
-	if file == "" || file != filepath.Base(file) || strings.HasPrefix(file, ".") {
+	kind, file := r.PathValue("kind"), r.PathValue("file")
+	if file == "" || file != filepath.Base(file) || strings.HasPrefix(file, ".") || !exportSubdirs[kind] {
 		writeErr(w, 400, errors.New("bad file name"))
 		return
 	}
-	path := filepath.Join(s.exportDir, file)
-	if !fileExists(path) {
+	// The newest folder first: the export folder may have been changed since.
+	var path string
+	for _, dir := range s.exportFolders() {
+		if p := filepath.Join(exportSubdir(dir, kind), file); fileExists(p) {
+			path = p
+			break
+		}
+	}
+	if path == "" {
 		writeErr(w, 404, errors.New("export not found"))
 		return
 	}
