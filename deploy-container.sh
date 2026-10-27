@@ -6,8 +6,11 @@
 #   ./deploy-container.sh                       # build the image and start on port 8080
 #   ./deploy-container.sh up --port 8087 --export-dir /srv/cactusdb/export --conn-dir /srv/cactusdb/conn
 #   ./deploy-container.sh logs | status | restart | down
+#   ./deploy-container.sh up --remote admin@server [--install-docker]   # Docker CE on a Linux server
 #
-# Works with docker or podman. Run ./deploy-container.sh --help for every option.
+# Works with docker or podman, and with Docker CE on another Linux server over
+# SSH (--remote; that part is done by deploy.sh --docker ce). Run
+# ./deploy-container.sh --help for every option.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -25,6 +28,9 @@ IMAGE=${CACTUSDB_IMAGE:-cactusdb}
 TZ_NAME=${TZ:-}
 RUNTIME=${CONTAINER_RUNTIME:-}
 FROM_SOURCE=no
+REMOTE=${CACTUSDB_REMOTE:-}
+INSTALL_DOCKER=no
+DATA_DIR_SET=no
 
 usage() {
   cat <<EOF
@@ -52,6 +58,13 @@ Options:
   --image NAME       image name (default $IMAGE)
   --tz ZONE          time zone for log times, e.g. Europe/Amsterdam
   --runtime CMD      docker or podman (default: whichever is installed)
+  --remote USER@HOST deploy to Docker CE on that Linux server over SSH
+                     (ssh://user@host:port for another SSH port). The data
+                     folders are on the server: --data-dir defaults to
+                     /srv/cactusdb there. Needs the docker command here.
+  --install-docker   with --remote (or on this Linux machine with --remote
+                     localhost): install Docker CE first if it's missing
+                     (Docker's get.docker.com script; needs sudo)
   --from-source      compile the binary with Go first instead of using dist/
   -h, --help         show this help
 
@@ -71,7 +84,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --port)        PORT=${2:?--port needs a value}; shift 2 ;;
     --bind)        BIND=${2:?--bind needs a value}; shift 2 ;;
-    --data-dir)    DATA_DIR=${2:?--data-dir needs a value}; shift 2 ;;
+    --data-dir)    DATA_DIR=${2:?--data-dir needs a value}; DATA_DIR_SET=yes; shift 2 ;;
     --export-dir)  EXPORT_DIR=${2:?--export-dir needs a value}; shift 2 ;;
     --conn-dir)    CONN_DIR=${2:?--conn-dir needs a value}; shift 2 ;;
     --sqlite-dir)  SQLITE_DIR=${2:?--sqlite-dir needs a value}; shift 2 ;;
@@ -80,12 +93,40 @@ while [[ $# -gt 0 ]]; do
     --tz)          TZ_NAME=${2:?--tz needs a value}; shift 2 ;;
     --runtime)     RUNTIME=${2:?--runtime needs a value}; shift 2 ;;
     --from-source) FROM_SOURCE=yes; shift ;;
+    --remote)      REMOTE=${2:?--remote needs user@host}; shift 2 ;;
+    --install-docker) INSTALL_DOCKER=yes; shift ;;
     -h|--help)     usage; exit 0 ;;
     *)             usage >&2; die "unknown option: $1" ;;
   esac
 done
 
 if ! [[ $PORT =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then die "bad --port: $PORT"; fi
+
+# Docker CE (here with --remote localhost, or on a server over SSH): deploy.sh
+# --docker ce does it, with these options as its settings.
+if [[ -n $REMOTE ]]; then
+  [[ $RUNTIME == "" || $RUNTIME == docker ]] || die "--remote uses Docker CE, not $RUNTIME"
+  [[ $DATA_DIR_SET == yes ]] || DATA_DIR=/srv/cactusdb
+  ce_host=$REMOTE
+  [[ $REMOTE == localhost || $REMOTE == 127.0.0.1 ]] && ce_host=
+  ce_env=(DEPLOY_TARGET=ce "CE_HOST=$ce_host" "CE_INSTALL_DOCKER=$INSTALL_DOCKER" "CACTUSDB_NAME=$NAME"
+    "CACTUSDB_IMAGE=$IMAGE" "CACTUSDB_PORT=$PORT" "CACTUSDB_TZ=$TZ_NAME" "CE_BIND=$BIND"
+    "CE_DATA_DIR=$DATA_DIR" "CE_EXPORT_DIR=${EXPORT_DIR:-$DATA_DIR/export}"
+    "CE_CONN_DIR=${CONN_DIR:-$DATA_DIR/conn}" "CE_SQLITE_DIR=$SQLITE_DIR")
+  extra=()
+  [[ $FROM_SOURCE == yes ]] && extra+=(--from-source)
+  case $CMD in
+    up)     exec env "${ce_env[@]}" "$SCRIPT_DIR/deploy.sh" --docker ce --env none --install ${extra[@]+"${extra[@]}"} ;;
+    down)   exec env "${ce_env[@]}" "$SCRIPT_DIR/deploy.sh" --docker ce --env none --uninstall ;;
+    status) exec env "${ce_env[@]}" "$SCRIPT_DIR/deploy.sh" --docker ce --env none --status ;;
+    logs|restart)
+      [[ -n $ce_host ]] && export DOCKER_HOST="ssh://${ce_host#ssh://}"
+      if [[ $CMD == logs ]]; then exec docker logs -f "$NAME"; fi
+      docker restart "$NAME" >/dev/null && echo "Restarted $NAME"
+      exit 0 ;;
+  esac
+fi
+[[ $INSTALL_DOCKER == no ]] || die "--install-docker goes with --remote (use --remote localhost for this machine)"
 EXPORT_DIR=${EXPORT_DIR:-$DATA_DIR/export}
 CONN_DIR=${CONN_DIR:-$DATA_DIR/conn}
 
