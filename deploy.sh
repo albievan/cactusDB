@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Deploy cactusdb as a container: on Docker (dd), k3s or Kubernetes (k8s).
+# Deploy cactusdb as a container: on Docker (dd), Docker CE on a Linux server
+# (ce), k3s or Kubernetes (k8s).
 #
-#   ./deploy.sh --docker dd  --env .env --install     # Docker / Docker Desktop / Podman
+#   ./deploy.sh --docker dd  --env .env --install     # Docker Desktop / Docker / Podman here
+#   ./deploy.sh --docker ce  --env .env --install     # Docker CE, here or on CE_HOST over SSH
 #   ./deploy.sh --docker k3s --env .env --install     # k3s
 #   ./deploy.sh --docker k8s --env .env --install     # any Kubernetes cluster
 #   ./deploy.sh --env .env --status
@@ -18,7 +20,7 @@ APP=/opt/cactusdb # where the image keeps the program, conn/ and export/
 
 usage() {
   cat <<'EOF'
-Usage: deploy.sh [--docker dd|k3s|k8s] [--env FILE] --install | --uninstall | --status
+Usage: deploy.sh [--docker dd|ce|k3s|k8s] [--env FILE] --install | --uninstall | --status
 
 Actions:
   --install      build the image and deploy (again): an existing deployment is
@@ -27,11 +29,12 @@ Actions:
   --status       show what is running and the URLs to open
 
 Options:
-  --docker T     where to deploy: dd (Docker / Docker Desktop / Podman), k3s or
-                 k8s. Default: DEPLOY_TARGET from the env file, else dd; for
+  --docker T     where to deploy: dd (Docker Desktop / Docker / Podman on this
+                 machine), ce (Docker CE on a Linux server, this one or another
+                 one over SSH: CE_HOST), k3s or k8s. Default: DEPLOY_TARGET from the env file, else dd; for
                  --uninstall and --status, what is found running.
-  --env FILE     settings file (default: .env next to this script, if present);
-                 see .env.example
+  --env FILE     settings file (default: .env next to this script, if present;
+                 none = only the environment); see .env.example
   --purge        with --uninstall: also delete the image (dd) or the data
                  volumes (k3s/k8s PVCs). Asks first unless --yes is given.
                  Host folders are never deleted.
@@ -68,11 +71,15 @@ done
 
 # ---- settings -------------------------------------------------------------
 # The env file is read as KEY=VALUE lines (not executed): # comments, blank
-# lines, optional "export " and quotes are allowed. A variable already set in
-# the environment wins over the file.
+# lines, optional "export " and quotes are allowed. A later line wins over an
+# earlier one, and a variable already set in the environment wins over both.
+# --env none: no file at all.
 if [[ -z $ENV_FILE && -f $SCRIPT_DIR/.env ]]; then ENV_FILE=$SCRIPT_DIR/.env; fi
-if [[ -n $ENV_FILE ]]; then
+if [[ $ENV_FILE == none ]]; then
+  ENV_FILE='' # settings from the environment only
+elif [[ -n $ENV_FILE ]]; then
   [[ -f $ENV_FILE ]] || die "env file $ENV_FILE not found (copy .env.example to start one)"
+  from_file='|'
   while IFS= read -r line || [[ -n $line ]]; do
     line=${line%$'\r'}
     [[ $line =~ ^[[:space:]]*(#|$) ]] && continue
@@ -86,7 +93,10 @@ if [[ -n $ENV_FILE ]]; then
     else
       val=${val%%[[:space:]]#*} # an unquoted value ends at " #"
     fi
-    [[ -n ${!key+x} ]] || printf -v "$key" '%s' "$val"
+    if [[ $from_file == *"|$key|"* || -z ${!key+x} ]]; then
+      printf -v "$key" '%s' "$val"
+      from_file+="$key|"
+    fi
   done < "$ENV_FILE"
 fi
 # expand_home turns a leading ~ (as in the env file) into $HOME.
@@ -107,6 +117,15 @@ DD_DATA_DIR=$(expand_home "${DD_DATA_DIR:-~/cactusdb}")
 DD_EXPORT_DIR=$(expand_home "${DD_EXPORT_DIR:-$DD_DATA_DIR/export}")
 DD_CONN_DIR=$(expand_home "${DD_CONN_DIR:-$DD_DATA_DIR/conn}")
 DD_SQLITE_DIR=$(expand_home "${DD_SQLITE_DIR:-}")
+# ce
+CE_HOST=${CE_HOST:-}
+CE_BIND=${CE_BIND:-0.0.0.0}
+CE_DATA_DIR=$(expand_home "${CE_DATA_DIR:-/srv/cactusdb}")
+CE_EXPORT_DIR=$(expand_home "${CE_EXPORT_DIR:-$CE_DATA_DIR/export}")
+CE_CONN_DIR=$(expand_home "${CE_CONN_DIR:-$CE_DATA_DIR/conn}")
+CE_SQLITE_DIR=$(expand_home "${CE_SQLITE_DIR:-}")
+CE_RUN_AS=${CE_RUN_AS:-}
+CE_INSTALL_DOCKER=${CE_INSTALL_DOCKER:-no}
 # k3s / k8s
 NAMESPACE=${K8S_NAMESPACE:-cactusdb}
 KCONTEXT=${K8S_CONTEXT:-}
@@ -178,7 +197,9 @@ if [[ -z $TARGET ]]; then
 fi
 if [[ -z $TARGET && $ACTION != install ]]; then
   # Find what is deployed: a container named $NAME, else a Deployment.
-  if { command -v docker >/dev/null 2>&1 && docker container inspect "$NAME" >/dev/null 2>&1; } ||
+  if [[ -n $CE_HOST ]]; then
+    TARGET=ce
+  elif { command -v docker >/dev/null 2>&1 && docker container inspect "$NAME" >/dev/null 2>&1; } ||
      { command -v podman >/dev/null 2>&1 && podman container inspect "$NAME" >/dev/null 2>&1; }; then
     TARGET="dd"
   elif command -v kubectl >/dev/null 2>&1 && kubectl ${KCONTEXT:+--context "$KCONTEXT"} -n "$NAMESPACE" get deployment "$NAME" >/dev/null 2>&1; then
@@ -186,11 +207,12 @@ if [[ -z $TARGET && $ACTION != install ]]; then
   elif command -v k3s >/dev/null 2>&1; then
     TARGET=k3s
   else
-    die "nothing named $NAME found; say where with --docker dd|k3s|k8s"
+    die "nothing named $NAME found; say where with --docker dd|ce|k3s|k8s"
   fi
 fi
 TARGET=${TARGET:-dd}
-case $TARGET in dd|k3s|k8s) ;; docker) TARGET="dd" ;; *) die "--docker must be dd, k3s or k8s, not $TARGET" ;; esac
+case $TARGET in dd|ce|k3s|k8s) ;; docker) TARGET="dd" ;; docker-ce) TARGET=ce ;; *) die "--docker must be dd, ce, k3s or k8s, not $TARGET" ;; esac
+case $CE_INSTALL_DOCKER in yes|no) ;; *) die "CE_INSTALL_DOCKER must be yes or no" ;; esac
 
 VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$SCRIPT_DIR/main.go" 2>/dev/null || true)
 VERSION=${VERSION:-latest}
@@ -242,69 +264,174 @@ norm_arch() {
 }
 
 # ========================================================================
-# dd: Docker / Docker Desktop / Podman
+# dd: Docker Desktop / Docker / Podman on this machine
+# ce: Docker CE (Docker Engine) on a Linux server: this one, or another one
+#     over SSH (CE_HOST=user@server), optionally installing Docker CE first
 # ========================================================================
-dd_exists() { "$RUNTIME" container inspect "$NAME" >/dev/null 2>&1; }
+eng_exists() { "$RUNTIME" container inspect "$NAME" >/dev/null 2>&1; }
 
-dd_urls() {
+# ce_ssh runs a command on CE_HOST (user@host, ssh://user@host[:port]).
+ce_ssh() {
+  local h=${CE_HOST#ssh://} port=
+  if [[ $h =~ ^(.*):([0-9]+)$ ]]; then h=${BASH_REMATCH[1]} port=${BASH_REMATCH[2]}; fi
+  # shellcheck disable=SC2029 # the command is meant to run on the host
+  ssh ${port:+-p "$port"} "$h" "$@"
+}
+ce_hostname() { local h=${CE_HOST#ssh://}; h=${h#*@}; echo "${h%:*}"; }
+# ce_target is user@host for messages.
+ce_target() { local h=${CE_HOST#ssh://}; echo "${h%:[0-9]*}"; }
+
+# eng_setup picks the settings of the dd or ce target and makes sure the
+# Docker engine answers (installing Docker CE when asked to).
+eng_setup() {
+  if [[ $TARGET == dd ]]; then
+    runtime
+    E_BIND=$DD_BIND E_EXPORT=$DD_EXPORT_DIR E_CONN=$DD_CONN_DIR E_SQLITE=$DD_SQLITE_DIR
+    return 0
+  fi
+  RUNTIME=docker
+  E_BIND=$CE_BIND E_EXPORT=$CE_EXPORT_DIR E_CONN=$CE_CONN_DIR E_SQLITE=$CE_SQLITE_DIR
+  local d
+  for d in "$E_EXPORT" "$E_CONN" ${E_SQLITE:+"$E_SQLITE"}; do
+    [[ $d == /* ]] || die "the CE_ folders must be full paths on the Docker host: $d"
+  done
+  if [[ -n $CE_HOST ]]; then
+    command -v ssh >/dev/null 2>&1 || die "ssh is needed to reach $CE_HOST"
+    command -v docker >/dev/null 2>&1 || die "the docker command is needed here to drive Docker on $CE_HOST (install Docker CE or Docker Desktop, or just the docker CLI)"
+    export DOCKER_HOST="ssh://${CE_HOST#ssh://}"
+    if ! docker info >/dev/null 2>&1; then
+      if [[ $CE_INSTALL_DOCKER == yes && $ACTION == install ]]; then
+        ce_install_docker
+        docker info >/dev/null 2>&1 || die "Docker CE was installed on $CE_HOST, but this user can't use it yet: check that $CE_HOST's user is in the docker group"
+      else
+        die "can't use Docker on $CE_HOST ($(docker info 2>&1 | grep -m1 -i error || echo 'no answer')). Install Docker CE there, or set CE_INSTALL_DOCKER=yes"
+      fi
+    fi
+  else
+    if ! docker info >/dev/null 2>&1; then
+      if [[ $CE_INSTALL_DOCKER == yes && $ACTION == install ]]; then
+        ce_install_docker
+        docker info >/dev/null 2>&1 || die "Docker CE is installed; log out and in again (or run: newgrp docker) so you're in the docker group, then rerun"
+      else
+        die "Docker isn't installed or running here. Install Docker CE, or set CE_INSTALL_DOCKER=yes"
+      fi
+    fi
+  fi
+}
+
+# ce_install_docker installs Docker CE with Docker's own script
+# (https://get.docker.com), starts it at boot and lets the user use it.
+# Linux only; it needs sudo.
+ce_install_docker() {
+  # Runs on the Docker host. sudo may ask for a password.
+  # shellcheck disable=SC2016 # expands on the Docker host
+  local script='set -e
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Installing Docker CE…"
+  if command -v curl >/dev/null 2>&1; then curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  else wget -qO /tmp/get-docker.sh https://get.docker.com; fi
+  sudo sh /tmp/get-docker.sh
+  rm -f /tmp/get-docker.sh
+fi
+sudo systemctl enable --now docker 2>/dev/null || sudo service docker start
+if ! id -nG | tr " " "\n" | grep -qx docker; then sudo usermod -aG docker "$(id -un)"; fi'
+  if [[ -n $CE_HOST ]]; then
+    say "Making sure Docker CE is installed and running on ${CE_HOST}…"
+    ce_ssh -t "$script"
+  else
+    [[ $(uname -s) == Linux ]] || die "CE_INSTALL_DOCKER installs Docker CE on Linux; on macOS and Windows install Docker Desktop and use --docker dd"
+    say "Making sure Docker CE is installed and running…"
+    sh -c "$script"
+  fi
+}
+
+# eng_user is the uid:gid cactusdb runs as, so the files in the data folders
+# belong to a real user rather than root.
+eng_user() {
+  # shellcheck disable=SC2016 # expands on the Docker host
+  if [[ $TARGET == ce && -n $CE_RUN_AS ]]; then echo "$CE_RUN_AS"
+  elif [[ $TARGET == ce && -n $CE_HOST ]]; then ce_ssh 'echo "$(id -u):$(id -g)"' 2>/dev/null || echo 1000:1000
+  else echo "$(id -u):$(id -g)"; fi
+}
+
+eng_urls() {
   local ips ip
-  if [[ $DD_BIND == 0.0.0.0 ]]; then
+  if [[ $E_BIND != 0.0.0.0 ]]; then
+    ips=$E_BIND
+  elif [[ $TARGET == ce && -n $CE_HOST ]]; then
+    echo "  open http://$(ce_hostname):$PORT"
+    ips=$(ce_ssh 'hostname -I 2>/dev/null' 2>/dev/null || true)
+  else
     echo "  open http://localhost:$PORT"
     if command -v ip >/dev/null 2>&1; then
       ips=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1)
     elif command -v ifconfig >/dev/null 2>&1; then
       ips=$(ifconfig | awk '/inet / && $2 != "127.0.0.1" {print $2}')
     fi
-  else
-    ips=$DD_BIND
   fi
-  for ip in ${ips:-}; do # leave out container bridge networks
-    case $ip in 172.1[7-9].*|172.2[0-9].*|172.3[01].*|10.88.*) ;; *) echo "  open http://$ip:$PORT" ;; esac
+  for ip in ${ips:-}; do # IPv4 only, without container bridge networks
+    case $ip in *:*|172.1[7-9].*|172.2[0-9].*|172.3[01].*|10.88.*|10.42.*) ;; *) echo "  open http://$ip:$PORT" ;; esac
   done
 }
 
-dd_install() {
-  runtime
-  local arch
+eng_where() { if [[ $TARGET == ce && -n $CE_HOST ]]; then echo "$(ce_hostname):"; fi; }
+
+eng_install() {
+  eng_setup
+  local arch user
   arch=$(norm_arch "$("$RUNTIME" info --format '{{.Architecture}}' 2>/dev/null || uname -m)")
   IMAGE_REF=$IMAGE:$VERSION
   build_image "$arch"
   "$RUNTIME" tag "$IMAGE_REF" "$IMAGE:latest"
+  user=$(eng_user)
 
-  mkdir -p "$DD_EXPORT_DIR" "$DD_CONN_DIR"
-  DD_EXPORT_DIR=$(cd "$DD_EXPORT_DIR" && pwd)
-  DD_CONN_DIR=$(cd "$DD_CONN_DIR" && pwd)
-  chmod 0700 "$DD_CONN_DIR" # credentials and their key live here
   local z=
-  if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then z=,Z; fi # label for SELinux
-  local args=(-v "$DD_CONN_DIR:$APP/conn:rw$z" -v "$DD_EXPORT_DIR:$APP/export:rw$z" -e "CACTUSDB_PORT=$PORT")
-  if [[ -n $DD_SQLITE_DIR ]]; then
-    [[ -d $DD_SQLITE_DIR ]] || die "DD_SQLITE_DIR $DD_SQLITE_DIR is not a folder"
-    args+=(-v "$(cd "$DD_SQLITE_DIR" && pwd):/sqlite:ro$z")
+  if [[ $TARGET == dd ]]; then
+    mkdir -p "$E_EXPORT" "$E_CONN"
+    E_EXPORT=$(cd "$E_EXPORT" && pwd)
+    E_CONN=$(cd "$E_CONN" && pwd)
+    chmod 0700 "$E_CONN" # credentials and their key live here
+    if [[ -n $E_SQLITE ]]; then
+      [[ -d $E_SQLITE ]] || die "DD_SQLITE_DIR $E_SQLITE is not a folder"
+      E_SQLITE=$(cd "$E_SQLITE" && pwd)
+    fi
+    if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then z=,Z; fi # label for SELinux
+  else
+    # The folders are on the Docker host: a short-lived root container
+    # creates them and hands them to the user cactusdb runs as.
+    if [[ -n $CE_HOST ]] && ce_ssh 'command -v selinuxenabled >/dev/null && selinuxenabled' 2>/dev/null; then z=,Z
+    elif [[ -z $CE_HOST ]] && command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then z=,Z; fi
+    "$RUNTIME" run --rm --user 0 --entrypoint sh -v "$E_CONN:/c$z" -v "$E_EXPORT:/e$z" "$IMAGE_REF" \
+      -c "chown $user /c /e && chmod 0700 /c" >/dev/null || die "can't prepare $E_CONN and $E_EXPORT on the Docker host"
   fi
+  local args=(-v "$E_CONN:$APP/conn:rw$z" -v "$E_EXPORT:$APP/export:rw$z" -e "CACTUSDB_PORT=$PORT")
+  [[ -n $E_SQLITE ]] && args+=(-v "$E_SQLITE:/sqlite:ro$z")
   [[ -n $TZ_NAME ]] && args+=(-e "TZ=$TZ_NAME")
   [[ -n $PASSPHRASE ]] && args+=(-e "CACTUSDB_PASSPHRASE=$PASSPHRASE")
-  # As the calling user, so the files on the host are yours (rootless podman
-  # maps root to you already).
-  [[ $RUNTIME == podman ]] || args+=(--user "$(id -u):$(id -g)")
+  # Not as root, so the files in the data folders belong to a real user
+  # (rootless podman maps root to you already).
+  [[ $RUNTIME == podman ]] || args+=(--user "$user")
 
-  if dd_exists; then
+  if eng_exists; then
     say "Replacing the existing container ${NAME}…"
     "$RUNTIME" rm -f "$NAME" >/dev/null
   fi
   "$RUNTIME" run -d --name "$NAME" --restart unless-stopped --label app=cactusdb \
-    "${args[@]}" -p "$DD_BIND:$PORT:$PORT" "$IMAGE_REF" >/dev/null
+    "${args[@]}" -p "$E_BIND:$PORT:$PORT" "$IMAGE_REF" >/dev/null
 
-  local i
+  local i where
+  where=$(eng_where)
   for i in $(seq 1 30); do
     [[ $("$RUNTIME" inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null) == true ]] ||
       { "$RUNTIME" logs "$NAME" >&2 || true; die "the container stopped; its log is above"; }
     if "$RUNTIME" exec "$NAME" wget -q -O /dev/null "http://127.0.0.1:$PORT/api/info" 2>/dev/null; then
-      say "$("$RUNTIME" exec "$NAME" cactusdb --version) is running in container $NAME ($RUNTIME)"
-      dd_urls
-      say "  saved connections: $DD_CONN_DIR/cactus.conn.db (key: $DD_CONN_DIR/cactus.key)"
-      say "  exports:           $DD_EXPORT_DIR/{json,csv,xlsx,xml,sql,backup}"
-      [[ -n $DD_SQLITE_DIR ]] && say "  SQLite files:      $DD_SQLITE_DIR, open them as /sqlite/<file>"
+      local engine=$RUNTIME
+      [[ $TARGET == ce ]] && engine="Docker CE${CE_HOST:+ on $(ce_target)}"
+      say "$("$RUNTIME" exec "$NAME" cactusdb --version 2>/dev/null) is running in container $NAME ($engine)"
+      eng_urls
+      say "  saved connections: $where$E_CONN/cactus.conn.db (key: cactus.key next to it)"
+      say "  exports:           $where$E_EXPORT/{json,csv,xlsx,xml,sql,backup}"
+      [[ -n $E_SQLITE ]] && say "  SQLite files:      $where$E_SQLITE, open them as /sqlite/<file>"
       return 0
     fi
     [[ $i -lt 30 ]] && sleep 1
@@ -313,13 +440,16 @@ dd_install() {
   die "cactusdb did not answer within 30 seconds; its log is above"
 }
 
-dd_uninstall() {
-  runtime
-  if dd_exists; then
+eng_uninstall() {
+  eng_setup
+  if eng_exists; then
     local kept
     kept=$("$RUNTIME" inspect -f '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}} {{end}}{{end}}' "$NAME")
     "$RUNTIME" rm -f "$NAME" >/dev/null
-    say "Removed container $NAME. Your data is kept in: ${kept% }"
+    local where m list=
+    where=$(eng_where)
+    for m in $kept; do list+="$where$m "; done
+    say "Removed container $NAME. Your data is kept in: ${list% }"
   else
     say "No container named $NAME"
   fi
@@ -334,12 +464,12 @@ dd_uninstall() {
   fi
 }
 
-dd_status() {
-  runtime
-  dd_exists || die "no container named $NAME"
+eng_status() {
+  eng_setup
+  eng_exists || die "no container named $NAME"
   "$RUNTIME" ps -a --filter "name=^${NAME}$" --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
   PORT=$("$RUNTIME" inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$NAME" | sed -n 's/^CACTUSDB_PORT=//p')
-  dd_urls
+  eng_urls
 }
 
 # ========================================================================
@@ -538,7 +668,7 @@ load_image() {
     push)
       [[ -n $REGISTRY ]] || die "K8S_IMAGE_LOAD=push needs K8S_REGISTRY"
       [[ ${#ARCHES[@]} -gt 1 ]] && return 0 # buildx pushed it already
-      say "Pushing $IMAGE_REF…"
+      say "Pushing ${IMAGE_REF}…"
       "$RUNTIME" push -q "$IMAGE_REF" >/dev/null ;;
     k3s)
       # k3s runs its own containerd: import the image into it.
@@ -546,7 +676,7 @@ load_image() {
         say "Importing $IMAGE_REF into k3s ($K3S_IMPORT)…"
         "$RUNTIME" save "$IMAGE_REF" | sh -c "$K3S_IMPORT" >/dev/null
       elif [[ -n $K3S_SSH ]]; then
-        say "Importing $IMAGE_REF into k3s on $K3S_SSH…"
+        say "Importing $IMAGE_REF into k3s on ${K3S_SSH}…"
         "$RUNTIME" save "$IMAGE_REF" | ssh "$K3S_SSH" 'sudo k3s ctr images import -' >/dev/null
       elif command -v k3s >/dev/null 2>&1; then
         say "Importing $IMAGE_REF into k3s…"
@@ -691,9 +821,9 @@ k8s_status() {
 
 # ---- go -------------------------------------------------------------------
 case $TARGET:$ACTION in
-  dd:install)    dd_install ;;
-  dd:uninstall)  dd_uninstall ;;
-  dd:status)     dd_status ;;
+  dd:install|ce:install)      eng_install ;;
+  dd:uninstall|ce:uninstall)  eng_uninstall ;;
+  dd:status|ce:status)        eng_status ;;
   *:install)     k8s_install ;;
   *:uninstall)   k8s_uninstall ;;
   *:status)      k8s_status ;;

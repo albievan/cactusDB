@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.0 — 2026-10-27
+
+- **Docker CE** in the deployment scripts: `deploy.sh --docker ce` deploys to Docker CE
+  (Docker Engine) on a Linux server, either this machine or another one over SSH
+  (`CE_HOST=user@server`). The image is built on the server for its CPU, the data
+  folders are created there and owned by the SSH user, and `CE_INSTALL_DOCKER=yes`
+  installs Docker CE first if it's missing (get.docker.com, systemd, docker group).
+  `deploy-container.sh` gets the same with `--remote user@server` and `--install-docker`.
+- `deploy.sh`: in the env file a later line now wins over an earlier one (the
+  environment still wins over both); `--env none` ignores any `.env`.
+
 ## 1.7.0 — 2026-10-27
 
 - **`deploy.sh`**: deploy cactusdb as a container on Docker (`--docker dd`), k3s

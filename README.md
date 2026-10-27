@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.7.0
+cactusdb 1.8.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -427,7 +427,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.7.0 is running in the background (process id 48211)
+cactusdb 1.8.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -466,11 +466,13 @@ The log looks like this:
 ### Deploying to Docker, k3s or Kubernetes — `deploy.sh`
 
 `deploy.sh` installs cactusdb as a container on **Docker** (Docker Desktop, Docker Engine or
-Podman), **k3s** or any **Kubernetes** cluster, with all settings in an env file:
+Podman), **Docker CE** on a Linux server (this one, or another one over SSH), **k3s** or any
+**Kubernetes** cluster, with all settings in an env file:
 
 ```sh
 cp .env.example .env             # then edit .env
 ./deploy.sh --docker dd  --env .env --install
+./deploy.sh --docker ce  --env .env --install     # CE_HOST=admin@server in .env, or empty for this machine
 ./deploy.sh --docker k3s --env .env --install
 ./deploy.sh --docker k8s --env .env --install
 ./deploy.sh --env .env --status
@@ -487,6 +489,7 @@ over the running one and keeps the data. Without `--docker`, the target comes fr
 | Target | What `--install` does | Data |
 |--------|-----------------------|------|
 | `dd` | Builds the image and runs a container (restart `unless-stopped`, health check) as your user, publishing `CACTUSDB_PORT` on `DD_BIND` (every address by default) | Host folders `DD_CONN_DIR` and `DD_EXPORT_DIR` (default `~/cactusdb/conn` and `~/cactusdb/export`) |
+| `ce` | Docker CE (Docker Engine) on a Linux server. With `CE_HOST=user@server` every docker command runs on the server over SSH: the image is built there for its CPU, and the container runs as the SSH user. `CE_INSTALL_DOCKER=yes` first installs Docker CE if it's missing (Docker's `get.docker.com` script, needs sudo), starts it at boot and adds the user to the `docker` group | Folders on the server, `CE_CONN_DIR` and `CE_EXPORT_DIR` (default `/srv/cactusdb/conn` and `/srv/cactusdb/export`), created and handed to the run user automatically |
 | `k3s` | Builds the image for the nodes' architecture and imports it into k3s (on this machine, over SSH with `K3S_SSH`, or your own `K3S_IMPORT` command), then applies a Namespace, Deployment, Service and volumes | PersistentVolumeClaims (k3s's `local-path`), or folders on the node with `K8S_STORAGE=hostpath` |
 | `k8s` | The same, pushing the image to `K8S_REGISTRY` (Docker Desktop's Kubernetes uses the local image directly) | PersistentVolumeClaims (default StorageClass), or `hostpath` |
 
@@ -512,14 +515,26 @@ On k3s and Kubernetes:
 - `kubectl` must be able to reach the cluster (`K8S_CONTEXT` picks a context; `KUBECTL`
   can be e.g. `sudo k3s kubectl` on a k3s server). Building needs Docker or Podman.
 
-Tested on Docker Desktop (Docker and its Kubernetes) and on k3s v1.31: install, reinstall
+For `ce` over SSH you need SSH key access to the server and the `docker` command on your
+own machine (Docker Desktop, or just the Docker CLI). The data folders are created by a
+short-lived container, so no `sudo` is needed after Docker CE is installed.
+
+Tested on Docker Desktop (Docker and its Kubernetes), on k3s v1.31, and with `ce` against a
+fresh Ubuntu 24.04 server over SSH (Docker CE 29 installed by `CE_INSTALL_DOCKER=yes`): install, reinstall
 with the data kept, NodePort, LoadBalancer, PVC and hostPath storage, the passphrase
 Secret, and uninstall with and without `--purge`.
 
 ### Running in a container (Docker only) — `deploy-container.sh`
 
-The older, Docker-only script. Everything it does, `deploy.sh --docker dd` does too, with
-the options in an env file instead of on the command line.
+The older script, with options on the command line instead of an env file. Everything it
+does, `deploy.sh --docker dd` (or `ce`) does too. For Docker CE on a Linux server, add
+`--remote user@server` (and `--install-docker` to install Docker CE there first); the data
+folders are then on the server, `/srv/cactusdb` by default:
+
+```sh
+./deploy-container.sh up --remote admin@server --install-docker --port 8087
+./deploy-container.sh status --remote admin@server       # also logs, restart, down
+```
 
 `deploy-container.sh` builds a small Docker (or Podman) image from the Linux binary in
 `dist/` and runs cactusdb in it, listening on every address. The port is published on the
@@ -533,7 +548,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.7.0 is running in container cactusdb
+cactusdb 1.8.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -552,6 +567,8 @@ cactusdb 1.7.0 is running in container cactusdb
 | `--name`, `--image` | `cactusdb` | Container and image name |
 | `--runtime` | docker, else podman | Container engine to use |
 | `--from-source` | | Compile the binary with Go first instead of using `dist/` |
+| `--remote` | | `user@server`: deploy to Docker CE on that Linux server over SSH (via `deploy.sh --docker ce`) |
+| `--install-docker` | | With `--remote`: install Docker CE on the server first if it's missing |
 
 - `up` replaces a running container with the new image; your data folders are untouched.
   `down` removes the container and keeps the data.
