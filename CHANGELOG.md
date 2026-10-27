@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.6.0 — 2026-10-27
+
+- Exports are sorted into a subfolder of the export folder per type: `json`, `csv`,
+  `xlsx` (Excel), `xml`, `sql` for DDL scripts and `backup` for backups, e.g. `--exportto ./export --exportas json`
+  writes to `./export/json/`. Applies to the command line and the web UI (single exports,
+  *Export all tables* and DDL). Download links include the subfolder.
+- Eye button to show the password while entering a **new** connection (the *+ New*
+  form and the connection panel). It's not offered when editing or opening a saved
+  connection, and the field is masked again whenever the form is closed or reused.
+- **Export folder** section in the web UI: change where exports are saved. The folder is
+  checked (full path, created if missing, writable) and saved in `cactus.conn.db`, so the
+  web UI and command-line exports use it after a restart. `--exportto` still wins.
+  Files exported to the previous folder stay downloadable.
+- **`deploy-container.sh`** and a `Dockerfile`: run cactusdb in a Docker/Podman container
+  on every address, with the port published and the export and saved-connections
+  folders stored on the host (`up`, `down`, `restart`, `logs`, `status`).
+- **Database backup**: the **Backup** button (and `--backup yes` on the command line)
+  writes the whole database, every object and every row, as a restorable SQL script in a
+  `.zip` compressed at the maximum level, with a Download link. SQLite backups also hold
+  an exact copy of the database file. Sequences and identity columns continue where they
+  were after a restore. Saved in the `backup` subfolder of the export folder.
+- Fixed: the Firebird DDL export left out `GENERATED … AS IDENTITY` on identity columns.
+
 ## 1.5.0 — 2026-10-27
 
 - The web UI now listens on **every network interface** (`0.0.0.0`) by default, so it

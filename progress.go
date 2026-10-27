@@ -90,7 +90,7 @@ func startExportBatch(ctx context.Context, engine string, db *sql.DB, dir, forma
 // otherwise one line per finished table.
 func runExports(ctx context.Context, o cliOptions, db *sql.DB, targets []tableRef, out io.Writer) error {
 	threads := max(1, min(o.Threads, len(targets)))
-	fmt.Fprintf(out, "Exporting %d table(s) as %s to %s (%d at a time)\n", len(targets), o.Format, o.ExportDir, threads)
+	fmt.Fprintf(out, "Exporting %d table(s) as %s to %s (%d at a time)\n", len(targets), o.Format, exportSubdir(o.ExportDir, exportFormats[o.Format]), threads)
 
 	var outMu sync.Mutex
 	finished := func(j *exportJob) {

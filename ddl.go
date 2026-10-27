@@ -47,12 +47,20 @@ func routineType(typ string) bool {
 // returns how many objects it wrote. An object whose definition can't be
 // read is noted in a comment, so one bad object doesn't lose the rest.
 func writeDDL(ctx context.Context, w io.Writer, engine string, db *sql.DB, label string, targets []ddlTarget, progress func(done int)) (int, error) {
+	return writeScript(ctx, w, engine, db, "DDL", label, targets, progress, nil)
+}
+
+// writeScript is writeDDL with a title for the first line and, if data is
+// not nil, the table rows: data writes them once every table exists, before
+// foreign keys, indexes, views and triggers, so loading the rows neither
+// fires triggers nor trips over foreign keys.
+func writeScript(ctx context.Context, w io.Writer, engine string, db *sql.DB, title, label string, targets []ddlTarget, progress func(done int), data func(*bufio.Writer) error) (int, error) {
 	if progress == nil {
 		progress = func(int) {}
 	}
 	bw := bufio.NewWriter(w)
-	fmt.Fprintf(bw, "-- DDL of %s (%s)\n-- exported by cactusdb %s on %s, %d object(s)\n",
-		label, engine, version, time.Now().Format("2006-01-02 15:04:05"), len(targets))
+	fmt.Fprintf(bw, "-- %s of %s (%s)\n-- exported by cactusdb %s on %s, %d object(s)\n",
+		title, label, engine, version, time.Now().Format("2006-01-02 15:04:05"), len(targets))
 	switch engine {
 	case EngineFirebird:
 		bw.WriteString("-- Routines and triggers use SET TERM ^ ; as isql requires.\n")
@@ -66,6 +74,15 @@ func writeDDL(ctx context.Context, w io.Writer, engine string, db *sql.DB, label
 		// Tables are in name order, so a foreign key may name a table that
 		// comes later; mysqldump does the same.
 		bw.WriteString("\nSET FOREIGN_KEY_CHECKS = 0;\n")
+	}
+
+	writeData := func() error {
+		if data == nil {
+			return nil
+		}
+		d := data
+		data = nil
+		return d(bw)
 	}
 
 	// Foreign keys are added after the last table, when every table they
@@ -91,6 +108,9 @@ func writeDDL(ctx context.Context, w io.Writer, engine string, db *sql.DB, label
 			return n, err
 		}
 		if t.typ != ObjTable && t.typ != ObjDomain && t.typ != ObjSequence && t.typ != ObjException {
+			if err := writeData(); err != nil {
+				return n, err
+			}
 			flushFKs()
 		}
 		var src string
@@ -120,6 +140,9 @@ func writeDDL(ctx context.Context, w io.Writer, engine string, db *sql.DB, label
 		n++
 		progress(i + 1)
 	}
+	if err := writeData(); err != nil {
+		return n, err
+	}
 	flushFKs()
 	if engine == EngineMySQL || engine == EngineMariaDB {
 		bw.WriteString("\nSET FOREIGN_KEY_CHECKS = 1;\n")
@@ -148,7 +171,8 @@ func terminate(engine, typ, src string) string {
 	return body + ";" + trailer + "\n"
 }
 
-// exportDDLToDir writes the DDL of targets to <name>_ddl_<date>-<time>.sql in dir.
+// exportDDLToDir writes the DDL of targets to <name>_ddl_<date>-<time>.sql in
+// the sql subfolder of dir.
 func exportDDLToDir(ctx context.Context, dir, engine string, db *sql.DB, label, name string, targets []ddlTarget, progress func(done int)) (string, int, error) {
 	return writeExportFile(dir, name+"_ddl", "sql", func(w io.Writer) (int, error) {
 		return writeDDL(ctx, w, engine, db, label, targets, progress)

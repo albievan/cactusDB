@@ -22,6 +22,10 @@ import (
 // exportFormats maps each export format to its file extension.
 var exportFormats = map[string]string{"csv": "csv", "json": "json", "xml": "xml", "xlsx": "xlsx"}
 
+// exportSubdirs are the subfolders of the export folder: one per file type,
+// sql holding DDL scripts and backup the database backups.
+var exportSubdirs = map[string]bool{"csv": true, "json": true, "xml": true, "xlsx": true, "sql": true, "backup": true}
+
 var unsafeFileChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
 // exportToDir runs q and writes the full result into a new, timestamped file
@@ -39,9 +43,21 @@ func exportToDir(ctx context.Context, dir, engine string, db *sql.DB, q, format,
 	})
 }
 
-// writeExportFile creates <name>_<date>-<time>.<ext> in dir with what write
-// produces, via a temporary file so a failed export leaves nothing behind.
+// exportSubdir is the folder in the export folder that files of type ext go
+// to: <exportto>/json, <exportto>/xlsx, <exportto>/sql and so on; backups
+// (.zip) go to <exportto>/backup.
+func exportSubdir(dir, ext string) string {
+	if ext == "zip" {
+		ext = "backup"
+	}
+	return filepath.Join(dir, ext)
+}
+
+// writeExportFile creates <name>_<date>-<time>.<ext> in the ext subfolder of
+// dir with what write produces, via a temporary file so a failed export
+// leaves nothing behind.
 func writeExportFile(dir, name, ext string, write func(io.Writer) (int, error)) (path string, n int, err error) {
+	dir = exportSubdir(dir, ext)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", 0, err
 	}
