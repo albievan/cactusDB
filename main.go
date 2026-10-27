@@ -28,11 +28,12 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	_ "time/tzdata" // TZ works in minimal containers and on Windows
 
 	"golang.org/x/term"
 )
 
-var version = "1.6.0"
+var version = "1.7.0"
 
 //go:embed web
 var webFS embed.FS

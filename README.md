@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.6.0
+cactusdb 1.7.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -427,7 +427,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.6.0 is running in the background (process id 48211)
+cactusdb 1.7.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -463,7 +463,63 @@ The log looks like this:
 | `CACTUSDB_DBPASSWORD` | The database password for [command-line exports](#4-exporting-from-the-command-line-no-browser), so you aren't prompted for it. |
 | `CACTUSDB_PASSPHRASE` | Derives the encryption key for saved usernames and passwords from this passphrase instead of using `cactus.key`. Nothing secret is then stored on disk, but you must set the same passphrase every time. On Windows: `set CACTUSDB_PASSPHRASE=…` (Command Prompt) or `$env:CACTUSDB_PASSPHRASE='…'` (PowerShell). |
 
-### Running in a container
+### Deploying to Docker, k3s or Kubernetes — `deploy.sh`
+
+`deploy.sh` installs cactusdb as a container on **Docker** (Docker Desktop, Docker Engine or
+Podman), **k3s** or any **Kubernetes** cluster, with all settings in an env file:
+
+```sh
+cp .env.example .env             # then edit .env
+./deploy.sh --docker dd  --env .env --install
+./deploy.sh --docker k3s --env .env --install
+./deploy.sh --docker k8s --env .env --install
+./deploy.sh --env .env --status
+./deploy.sh --env .env --uninstall            # keeps the data
+./deploy.sh --env .env --uninstall --purge    # also deletes the data volumes (asks first)
+```
+
+`.env.example` lists every setting with its default and an explanation. Lines are read as
+`KEY=VALUE` (the file isn't run), so it's safe to keep secrets such as
+`CACTUSDB_PASSPHRASE` in `.env`, which git ignores. `--install` again deploys a new build
+over the running one and keeps the data. Without `--docker`, the target comes from
+`DEPLOY_TARGET` in the env file, or for `--uninstall`/`--status` from what's running.
+
+| Target | What `--install` does | Data |
+|--------|-----------------------|------|
+| `dd` | Builds the image and runs a container (restart `unless-stopped`, health check) as your user, publishing `CACTUSDB_PORT` on `DD_BIND` (every address by default) | Host folders `DD_CONN_DIR` and `DD_EXPORT_DIR` (default `~/cactusdb/conn` and `~/cactusdb/export`) |
+| `k3s` | Builds the image for the nodes' architecture and imports it into k3s (on this machine, over SSH with `K3S_SSH`, or your own `K3S_IMPORT` command), then applies a Namespace, Deployment, Service and volumes | PersistentVolumeClaims (k3s's `local-path`), or folders on the node with `K8S_STORAGE=hostpath` |
+| `k8s` | The same, pushing the image to `K8S_REGISTRY` (Docker Desktop's Kubernetes uses the local image directly) | PersistentVolumeClaims (default StorageClass), or `hostpath` |
+
+On k3s and Kubernetes:
+
+- **Reaching it:** `K8S_SERVICE_TYPE=NodePort` (default; `K8S_NODE_PORT` fixes the port),
+  `LoadBalancer` (k3s has a built-in one), or `ClusterIP` for use behind your own Ingress.
+  The script lists the addresses, tries each one, and when none answers from your machine
+  (e.g. Docker Desktop's Kubernetes or a firewall) prints the `kubectl port-forward`
+  command to use instead.
+- **Architecture:** the image is built for the nodes' CPU (amd64 or arm64), also from an
+  arm64 Mac for an amd64 server: the image has no build steps that need emulation. A
+  cluster with both kinds of node needs `K8S_REGISTRY` (multi-architecture image via
+  `docker buildx`) or `K8S_NODE` to pin cactusdb to one node.
+- **Safe defaults:** one replica (one writer for `cactus.conn.db`), `Recreate` updates,
+  runs as an unprivileged user (`K8S_RUN_AS_UID`, default 1000) with a read-only root
+  filesystem and no capabilities; a short init step hands the volumes to that user.
+  Readiness and liveness checks use `/api/info`. `CACTUSDB_PASSPHRASE` is stored as a
+  Secret.
+- **Uninstall** removes the Deployment, Service and Secret, keeps the data volumes unless
+  you add `--purge`, never touches folders on the nodes, and removes the namespace only if
+  `deploy.sh` created it and it's empty.
+- `kubectl` must be able to reach the cluster (`K8S_CONTEXT` picks a context; `KUBECTL`
+  can be e.g. `sudo k3s kubectl` on a k3s server). Building needs Docker or Podman.
+
+Tested on Docker Desktop (Docker and its Kubernetes) and on k3s v1.31: install, reinstall
+with the data kept, NodePort, LoadBalancer, PVC and hostPath storage, the passphrase
+Secret, and uninstall with and without `--purge`.
+
+### Running in a container (Docker only) — `deploy-container.sh`
+
+The older, Docker-only script. Everything it does, `deploy.sh --docker dd` does too, with
+the options in an env file instead of on the command line.
 
 `deploy-container.sh` builds a small Docker (or Podman) image from the Linux binary in
 `dist/` and runs cactusdb in it, listening on every address. The port is published on the
@@ -477,7 +533,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.6.0 is running in container cactusdb
+cactusdb 1.7.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -658,7 +714,9 @@ CACTUSDB_IT=1 go test ./...
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections and settings (`cactus.conn.db`) |
 | `settings.go` | Changing the export folder from the web UI |
-| `Dockerfile`, `deploy-container.sh` | Container image and deployment script |
+| `Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
+| `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
+| `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 

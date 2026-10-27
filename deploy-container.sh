@@ -151,23 +151,27 @@ esac
 
 CTX=$(mktemp -d)
 trap 'rm -rf "$CTX"' EXIT
+# The context holds only the Dockerfile and rootfs-<arch>/opt/cactusdb with
+# the binary and the empty conn/ and export/ folders: nothing else from dist/
+# (such as a cactus.conn.db or cactus.key) can end up in the image.
+ROOT=$CTX/rootfs-$ARCH/opt/cactusdb
+mkdir -p "$ROOT/conn" "$ROOT/export"
+chmod 0777 "$ROOT/conn" "$ROOT/export"
 if [[ $FROM_SOURCE == yes ]]; then
   command -v go >/dev/null 2>&1 || die "--from-source needs Go installed"
   VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$SCRIPT_DIR/main.go")
   echo "Compiling cactusdb $VERSION for linux/${ARCH}…"
   (cd "$SCRIPT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -trimpath \
-    -ldflags "-s -w -X main.version=$VERSION" -o "$CTX/cactusdb" .)
+    -ldflags "-s -w -X main.version=$VERSION" -o "$ROOT/cactusdb" .)
 else
   BIN=$SCRIPT_DIR/dist/cactusdb-linux-$ARCH
   [[ -f $BIN ]] || die "$BIN not found: run ./build.sh first, or use --from-source"
-  cp "$BIN" "$CTX/cactusdb"
+  cp "$BIN" "$ROOT/cactusdb"
 fi
-chmod 0755 "$CTX/cactusdb"
-# Only the binary and the Dockerfile go into the build: nothing else from
-# dist/ (such as a cactus.conn.db or cactus.key) can end up in the image.
+chmod 0755 "$ROOT/cactusdb"
 cp "$SCRIPT_DIR/Dockerfile" "$CTX/Dockerfile"
 echo "Building image $IMAGE (linux/$ARCH)…"
-"$RUNTIME" build -q -t "$IMAGE" "$CTX" >/dev/null
+"$RUNTIME" build -q --platform "linux/$ARCH" -t "$IMAGE" "$CTX" >/dev/null
 
 # ---- up: data folders on the host ---------------------------------------
 mkdir -p "$EXPORT_DIR" "$CONN_DIR"
