@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.7.0 — 2026-10-27
+
+- **`deploy.sh`**: deploy cactusdb as a container on Docker (`--docker dd`), k3s
+  (`--docker k3s`) or Kubernetes (`--docker k8s`) with `--install`, check it with
+  `--status`, and remove it with `--uninstall` (data kept; `--purge` deletes the data
+  volumes after asking). All settings are in an env file (`--env .env`).
+  - k3s: the image is imported into k3s's containerd, locally or over SSH.
+  - Kubernetes: the image is pushed to a registry, multi-architecture with `docker buildx`.
+  - PVC or hostPath storage; NodePort, LoadBalancer or ClusterIP service; non-root,
+    read-only root filesystem; passphrase as a Secret.
+- **`.env.example`**: every deployment setting with its default and an explanation.
+- The container image has no build steps any more, so an amd64 image builds on an arm64
+  Mac (and the other way round) without emulation. Time-zone data is now built into
+  cactusdb, so `TZ` works in minimal containers and on Windows.
+
 ## 1.6.0 — 2026-10-27
 
 - Exports are sorted into a subfolder of the export folder per type: `json`, `csv`,
