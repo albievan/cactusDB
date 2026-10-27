@@ -32,7 +32,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.4.2"
+var version = "1.5.0"
 
 //go:embed web
 var webFS embed.FS
@@ -59,7 +59,7 @@ type server struct {
 
 func main() {
 	port := flag.Int("port", 8080, "HTTP port to serve the web UI on")
-	host := flag.String("host", "", "web UI: address to listen on (default 127.0.0.1; 0.0.0.0 allows other machines)\ncommand-line export: database server host (default localhost)")
+	host := flag.String("host", "", "web UI: address to listen on (default 0.0.0.0: every network interface; 127.0.0.1 = this computer only)\ncommand-line export: database server host (default localhost)")
 	web := flag.String("web", "", "yes: start the web UI (the default when no --dbtype is given)")
 	connDB := flag.String("conn-db", "", "SQLite file used to store saved connections (default: cactus.conn.db next to the binary)")
 	keyFile := flag.String("key-file", "", "key used to encrypt saved usernames/passwords (default: cactus.key next to the connection file; ignored when $"+passphraseEnv+" is set)")
@@ -218,7 +218,7 @@ func main() {
 		}
 	}
 	if *host == "" {
-		*host = "127.0.0.1"
+		*host = "0.0.0.0" // every network interface, so other computers can connect
 	}
 	if *logFile == "" && background {
 		*logFile = filepath.Join(exeDir(), "cactusdb.log")
@@ -313,7 +313,9 @@ func main() {
 		fmt.Printf("  open %s\n", u)
 	}
 	if ip := net.ParseIP(*host); ip != nil && ip.IsLoopback() {
-		fmt.Println("  (only this computer can connect; start with --host 0.0.0.0 to allow others)")
+		fmt.Println("  (only this computer can connect; leave out --host to allow others)")
+	} else if *host == "0.0.0.0" || *host == "::" {
+		fmt.Println("  (listening on every network interface; --host 127.0.0.1 limits it to this computer)")
 	}
 	if childLog != "" {
 		log.Printf("started in the background, process id %d, listening on %s", os.Getpid(), ln.Addr())
