@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-10-27
+
+- The web UI now listens on **every network interface** (`0.0.0.0`) by default, so it
+  can be opened from other workstations at `http://<ip address>:<port>`. The startup
+  banner lists this computer's addresses. Use `--host 127.0.0.1` for the old
+  this-computer-only behaviour.
+- README: firewall steps for remote access and an updated security note.
+
 ## 1.4.2 — 2026-10-26
 
 - A **Clear** button removes the export status once an export is finished (single

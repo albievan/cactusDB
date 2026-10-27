@@ -19,7 +19,8 @@ or export tables with a single command without opening a browser at all.
 ```sh
 cactusdb --port 8080 --web yes
 ```
-then open **http://localhost:8080** in your browser. Or export without the browser:
+then open **http://localhost:8080** in your browser, or **http://<this computer's IP address>:8080**
+from any other computer on your network. Or export without the browser:
 ```sh
 cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname optima --dbtable all --exportas excel
 ```
@@ -74,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.4.2
+cactusdb 1.5.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -82,11 +83,15 @@ cactusdb 1.4.2
   driver PostgreSQL      github.com/jackc/pgx/v5 v5.11.0 (bundled)
   saved connections: /home/me/cactusdb/cactus.conn.db (credentials encrypted with key file /home/me/cactusdb/cactus.key)
   export folder:     /home/me/cactusdb/export
-  open http://127.0.0.1:8080
-  (only this computer can connect; start with --host 0.0.0.0 to allow others)
+  open http://localhost:8080
+  open http://192.168.1.20:8080
+  (listening on every network interface; --host 127.0.0.1 limits it to this computer)
   press Ctrl+C to stop
 ```
-Open the URL shown in your browser. Leave the terminal window open while you use
+Open one of the URLs shown in your browser. cactusdb listens on every network interface,
+so other computers on your network can use it too, at `http://<this computer's IP address>:<port>`
+(the addresses are listed at startup). If they can't connect, allow the port in this
+computer's firewall (see [Troubleshooting](#8-troubleshooting)). Leave the terminal window open while you use
 cactusdb, and press **Ctrl+C** in it to stop the app.
 
 ## 3. Using cactusdb
@@ -347,7 +352,7 @@ cactusdb --port 8087 --web yes --exportto ./export
 | `--exportto` | folder `export` next to the cactusdb program | Where exported files are saved. Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
 | `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
-| `--host` | `127.0.0.1` (this computer only) | Use `0.0.0.0` to let other computers on your network use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. See [Security](#7-security). |
+| `--host` | `0.0.0.0` (every network interface) | The address to listen on. By default other computers on your network can use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. Use `127.0.0.1` to allow only this computer, `::` to listen on IPv6 too, or one of this computer's IP addresses to listen on that network only. See [Security](#7-security). |
 | `--runas` | `foreground` | `background` starts the web UI in the background: it keeps running after you close the terminal and logs to `--logfile`. See below. |
 | `--logfile` | `cactusdb.log` next to the program, with `--runas background` | Every action is logged here: connections (never passwords), tables opened, queries, exports, saved connections, and every request with its result. In the foreground, the log goes to the terminal and, if you give `--logfile`, to that file too. |
 | `--version` | | Print the version and exit |
@@ -358,17 +363,18 @@ Examples:
 cactusdb --port 9000                                  # different port
 cactusdb --port 8087 --exportto D:\Reports\exports    # exports to another drive (Windows)
 cactusdb --port 8087 --exportto ~/Desktop/exports     # exports to your Desktop (macOS/Linux)
-cactusdb --port 8087 --web yes --host 0.0.0.0         # open from other machines: http://<ip address>:8087
+cactusdb --port 8087 --web yes                        # open from any machine: http://<ip address>:8087
+cactusdb --port 8087 --host 127.0.0.1                 # this computer only
 CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a passphrase (macOS/Linux)
 ```
 
 ### Running in the background
 
 ```sh
-cactusdb --port 8087 --runas background --host 0.0.0.0
+cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.4.2 is running in the background (process id 48211)
+cactusdb 1.5.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -390,7 +396,7 @@ opened…), you get the error straight away. The process id is also written to
 
 The log looks like this:
 ```
-2026/10/26 17:26:30 started in the background, process id 70769, listening on 127.0.0.1:8087
+2026/10/26 17:26:30 started in the background, process id 70769, listening on 0.0.0.0:8087
 2026/10/26 17:26:30 127.0.0.1 connect mariadb: root@10.66.1.136:3306/optima as "cli-10.66.1.136", session f1fc0d2d
 2026/10/26 17:26:30 127.0.0.1 [cli-10.66.1.136] open table orders
 2026/10/26 17:26:30 127.0.0.1 [cli-10.66.1.136] 1000 row(s) (more not shown) in 41ms
@@ -451,9 +457,12 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
   plain-text copy is left behind.
 - Saved passwords never leave the cactusdb process. The browser only sees whether a
   connection has one.
-- By default cactusdb is only reachable **from your own computer**. If you start it with
-  `--host 0.0.0.0`, anyone who can reach that port can use your saved connections and
-  browse those databases. There is no login screen, so only do this on a trusted network.
+- By default cactusdb listens on **every network interface**, so anyone who can reach
+  the port can use your saved connections, browse those databases and (in background
+  mode) shut cactusdb down. There is no login screen, so run it only on a trusted
+  network, or start it with `--host 127.0.0.1` to allow only your own computer. A
+  firewall rule that allows the port only from your workstations' addresses is a good
+  extra safeguard.
 - **Command-line passwords:** a password given with `--dbpassword` can be seen by other
   users of the computer (in the process list) and is kept in your shell history. Leave it
   out to be prompted (nothing is shown as you type), or set `CACTUSDB_DBPASSWORD` in scripts.
@@ -464,7 +473,8 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 
 | Problem | Fix |
 |---------|-----|
-| `cannot listen on 127.0.0.1:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
+| `cannot listen on 0.0.0.0:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
+| Other computers can't open `http://<ip address>:<port>` | Check the address is one printed at startup and that cactusdb wasn't started with `--host 127.0.0.1`. Then allow the port in the firewall: on Windows accept the *Windows Defender Firewall* prompt on first start (or `netsh advfirewall firewall add rule name=cactusdb dir=in action=allow protocol=TCP localport=8080`); on macOS allow cactusdb under *System Settings › Network › Firewall*; on Linux e.g. `sudo ufw allow 8080/tcp` or `sudo firewall-cmd --add-port=8080/tcp`. |
 | `the background server stopped:` followed by log lines | The background copy couldn't start; the lines say why (often the port or the connection file). |
 | `warning: the connection won't be saved` | A command-line export couldn't open `cactus.conn.db` (e.g. a different `cactus.key`). The export still runs. |
 | `cannot decrypt the saved connections in … with …` | The key doesn't match the one the connections were saved with. Put the original `cactus.key` back, set the same `CACTUSDB_PASSPHRASE` as before (or unset it if you used the key file), or start fresh with `--conn-db new.conn.db`. |
