@@ -2,7 +2,7 @@
 # Cross-compiles cactusdb for Linux, macOS and Windows into ./dist.
 # All drivers are pure Go, so CGO is disabled and no toolchains are needed.
 set -e
-VERSION=${VERSION:-1.11.0}
+VERSION=${VERSION:-1.12.0}
 mkdir -p dist
 for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
   os=${target%/*}; arch=${target#*/}
