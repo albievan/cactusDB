@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.8.0
+cactusdb 1.9.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -148,6 +148,22 @@ done. The list fills the whole data area (in several columns on wide screens), s
 as many tables as possible. Opening a table brings the grid back, and **✕** closes the
 list while the export carries on. When the export is finished, **Clear** removes the
 export status. Disconnecting stops an export that is still running.
+
+**Exported files.** The **Exported files** tab lists every file in the export folder: data
+exports, DDL scripts and backups, with when each was created and its size (uncompressed).
+- **Sort:** click a column heading to sort by file name, type, date or size. Click it again
+  to reverse the order.
+- **Filter:** narrow the list with the type buttons, which show how many files of each type
+  there are, or with the name filter.
+- **Select:** tick the files you want, or click their rows. The heading checkbox selects every
+  file shown.
+- **Download selected:** cactusdb first compresses the chosen files into one `.zip` at the
+  highest compression level, each file in a folder for its type. Only then does the download
+  start, and the page shows the original and the compressed size.
+
+The prepared `.zip` can be downloaded again for 15 minutes. After that, or when cactusdb
+stops, it's deleted from the server's temporary folder. Your exports themselves are never
+changed.
 
 **Export folder.** The *Export folder* section in the sidebar shows where exports are saved.
 **Change** lets you type another folder: a full path on the computer cactusdb runs on (a
@@ -427,7 +443,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.8.0 is running in the background (process id 48211)
+cactusdb 1.9.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -548,7 +564,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.8.0 is running in container cactusdb
+cactusdb 1.9.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -731,6 +747,7 @@ CACTUSDB_IT=1 go test ./...
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections and settings (`cactus.conn.db`) |
 | `settings.go` | Changing the export folder from the web UI |
+| `files.go` | The *Exported files* page: listing, and compressed downloads of a selection |
 | `Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |

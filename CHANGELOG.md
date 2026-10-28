@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0 — 2026-10-28
+
+- **Exported files** page (a new tab): every file in the export folder (data exports,
+  DDL scripts, backups) with its creation date and uncompressed size. Sort by file name,
+  type, date or size; filter by type or name; select several files. **Download selected**
+  first compresses them into one `.zip` at the highest compression level, then starts the
+  download and shows how much smaller it got. Prepared downloads are removed after
+  15 minutes or when cactusdb stops.
+
 ## 1.8.0 — 2026-10-27
 
 - **Docker CE** in the deployment scripts: `deploy.sh --docker ce` deploys to Docker CE
