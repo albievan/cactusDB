@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.13.1
+cactusdb 1.13.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -227,7 +227,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.13.1*), as reported by the running program.
+example *v1.13.2*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -493,7 +493,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.13.1 is running in the background (process id 48211)
+cactusdb 1.13.2 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -581,6 +581,13 @@ On k3s and Kubernetes:
 - `kubectl` must be able to reach the cluster (`K8S_CONTEXT` picks a context; `KUBECTL`
   can be e.g. `sudo k3s kubectl` on a k3s server). Building needs Docker or Podman.
 
+**Reaching your databases from the container (`dd`, `ce`):** inside the container,
+`localhost` is the container itself. Use the host `host.docker.internal` for a database on
+the computer running Docker, also one in another container that publishes its port there,
+for example a Firebird container on 3050. Use a server's name or IP address otherwise. cactusdb
+explains this if a connection to `localhost` fails. On k3s and Kubernetes, use the
+database's Service name or a server address.
+
 For `ce` over SSH you need SSH key access to the server and the `docker` command on your
 own machine (Docker Desktop, or just the Docker CLI). The data folders are created by a
 short-lived container, so no `sudo` is needed after Docker CE is installed.
@@ -614,7 +621,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.13.1 is running in container cactusdb
+cactusdb 1.13.2 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -638,6 +645,11 @@ cactusdb 1.13.1 is running in container cactusdb
 
 - `up` replaces a running container with the new image; your data folders are untouched.
   `down` removes the container and keeps the data.
+- **Connecting to databases:** inside the container, `localhost` is the container itself.
+  Use the host `host.docker.internal` for databases on this computer, including database
+  containers that publish their port here, such as Firebird on 3050. Use a server's name or
+  IP address otherwise. The scripts add this name to the container, on Docker Desktop and on
+  Linux.
 - The container runs as your user, so exports and connection files on the host belong to
   you. It restarts automatically (`--restart unless-stopped`) and has a health check.
 - The log goes to `./deploy-container.sh logs` (`docker logs`). The ⏻ Shutdown button isn't
@@ -721,6 +733,7 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 
 | Problem | Fix |
 |---------|-----|
+| In a container (Docker, `deploy.sh`): `dial tcp [::1]:3050: connect: connection refused` (or `127.0.0.1`) | Inside a container, `localhost` is the container itself, not your computer. Use the host **`host.docker.internal`**: it reaches the computer running Docker, and database containers that publish their port there (for example Firebird on 3050). For another server, use its name or IP address. cactusdb says this in the error message too. Containers started by `deploy.sh` or `deploy-container.sh` before 1.13.2 lack this name: run `--install` (or `up`) again. |
 | `cannot listen on 0.0.0.0:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
 | Other computers can't open `http://<ip address>:<port>` | Check the address is one printed at startup and that cactusdb wasn't started with `--host 127.0.0.1`. Then allow the port in the firewall: on Windows accept the *Windows Defender Firewall* prompt on first start (or `netsh advfirewall firewall add rule name=cactusdb dir=in action=allow protocol=TCP localport=8080`); on macOS allow cactusdb under *System Settings › Network › Firewall*; on Linux e.g. `sudo ufw allow 8080/tcp` or `sudo firewall-cmd --add-port=8080/tcp`. |
 | `the background server stopped:` followed by log lines | The background copy couldn't start; the lines say why (often the port or the connection file). |

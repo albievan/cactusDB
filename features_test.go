@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"net/url"
@@ -419,3 +420,27 @@ func TestAPIExportFolderSetting(t *testing.T) {
 }
 
 func strconvQuote(s string) string { b, _ := json.Marshal(s); return string(b) }
+
+// In a container, a failed connection to localhost explains that localhost
+// is the container itself; elsewhere errors are left alone.
+func TestExplainConnErr(t *testing.T) {
+	was := inContainer
+	defer func() { inContainer = was }()
+	refused := errors.New("dial tcp [::1]:3050: connect: connection refused")
+	inContainer = true
+	for _, host := range []string{"localhost", "", "127.0.0.1", "::1", `localhost\SQLEXPRESS`} {
+		err := explainConnErr(ConnParams{Engine: EngineFirebird, Host: host}, refused)
+		if !errors.Is(err, refused) || !strings.Contains(err.Error(), "host.docker.internal") {
+			t.Errorf("host %q: %v", host, err)
+		}
+	}
+	for _, p := range []ConnParams{{Engine: EngineFirebird, Host: "10.0.0.5"}, {Engine: EngineSQLite, Database: "/x.db"}} {
+		if err := explainConnErr(p, refused); err != refused {
+			t.Errorf("%+v got a hint: %v", p, err)
+		}
+	}
+	inContainer = false
+	if err := explainConnErr(ConnParams{Engine: EngineFirebird, Host: "localhost"}, refused); err != refused {
+		t.Errorf("outside a container: %v", err)
+	}
+}
