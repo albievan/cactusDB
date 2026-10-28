@@ -186,6 +186,9 @@
   .filesbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
   .filesbar .spacer { flex: 1; }
   #fFilter { width: 180px; max-width: 100%; }
+  #fConn { width: auto; max-width: 220px; }
+  .ftable td.fconn { font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+  .ftable td.fconn .none { color: var(--muted); font-style: italic; }
   .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
   .ftable td.fname mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ftable td.fname mark { background: #6b5a12; } }
@@ -402,8 +405,8 @@
       <div class="filterrow">
         <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
         <button id="refreshBtn" class="small" title="Reload the object list" disabled>⟳</button>
-        <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in the sql subfolder of the export folder" disabled>DDL</button>
-        <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in the backup subfolder of the export folder" disabled>Backup</button>
+        <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in &lt;export folder&gt;/&lt;connection&gt;/sql" disabled>DDLlt;export folderto a .sql file in the sql subfolder of the export folder" disabled>DDLgt;/to a .sql file in the sql subfolder of the export folder" disabled>DDLlt;connectionto a .sql file in the sql subfolder of the export folder" disabled>DDLgt;/sql" disabled>DDL</button>
+        <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
       </div>
       <div class="objtabs" id="objTabs" role="tablist"></div>
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p></div>
@@ -455,6 +458,8 @@
       <div class="filesbar">
         <span class="flabel">Type</span>
         <div class="ftypes" id="fTypes" role="group" aria-label="Show file types"></div>
+        <label class="flabel" for="fConn">Connection</label>
+        <select id="fConn" title="Show the files of one connection"></select>
         <label class="flabel" for="fFilter">Name</label>
         <input id="fFilter" type="search" placeholder="contains…" spellcheck="false" autocomplete="off"
           title="Shows files whose name contains this text (any case). Several words: all must appear. Esc clears.">
@@ -997,15 +1002,16 @@ async function loadTable(name) {
 // ---- exported files ----------------------------------------------------------
 // Lists the files in the export folder; the selected ones are compressed on
 // the server into one .zip (highest compression) and then downloaded.
-const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, types: new Set(), q: "" };
+const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, types: new Set(), q: "", conn: null };
 // The filters are remembered in this browser (when it allows storage).
 try {
   const saved = JSON.parse(localStorage.getItem("cactusdb.fileFilters") || "{}");
   files.types = new Set(saved.types || []); files.q = saved.q || "";
+  if (typeof saved.conn === "string") files.conn = saved.conn;
   if (saved.sortKey) { files.sortKey = saved.sortKey; files.sortDir = saved.sortDir || -1; }
 } catch (e) { /* no storage: start unfiltered */ }
 function saveFileFilters() {
-  try { localStorage.setItem("cactusdb.fileFilters", JSON.stringify({ types: [...files.types], q: files.q, sortKey: files.sortKey, sortDir: files.sortDir })); } catch (e) { /* not stored */ }
+  try { localStorage.setItem("cactusdb.fileFilters", JSON.stringify({ types: [...files.types], q: files.q, conn: files.conn, sortKey: files.sortKey, sortDir: files.sortDir })); } catch (e) { /* not stored */ }
 }
 // The search words: a name matches when it contains every one (any case).
 const fileTerms = () => files.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -1021,7 +1027,11 @@ function highlightName(name, terms) {
   return out + (open ? "</mark>" : "");
 }
 const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup" };
-const fileKey = (f) => f.kind + "/" + f.name;
+// A file is its connection folder, type and name ("" connection: exported
+// before files were sorted by connection).
+const fileKey = (f) => f.conn + "/" + f.kind + "/" + f.name;
+const fileRef = (f) => ({ conn: f.conn, kind: f.kind, name: f.name });
+const connLabel = (c) => c || "(older exports)";
 
 function fmtSize(n) {
   if (n < 1024) return n + " B";
@@ -1047,7 +1057,7 @@ async function loadFiles() {
 
 function visibleFiles() {
   const terms = fileTerms();
-  const out = files.list.filter((f) => (!files.types.size || files.types.has(f.kind)) &&
+  const out = files.list.filter((f) => (files.conn === null || f.conn === files.conn) && (!files.types.size || files.types.has(f.kind)) &&
     terms.every((t) => f.name.toLowerCase().includes(t)));
   const k = files.sortKey, d = files.sortDir;
   out.sort((a, b) => {
@@ -1055,6 +1065,7 @@ function visibleFiles() {
     if (k === "size") c = a.size - b.size;
     else if (k === "modified") c = Date.parse(a.modified) - Date.parse(b.modified);
     else if (k === "kind") c = (fileTypeNames[a.kind] || a.kind).localeCompare(fileTypeNames[b.kind] || b.kind);
+    else if (k === "conn") c = a.conn.localeCompare(b.conn, undefined, { numeric: true, sensitivity: "base" });
     else c = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
     return c * d || a.name.localeCompare(b.name);
   });
@@ -1062,14 +1073,25 @@ function visibleFiles() {
 }
 
 function renderFiles() {
+  // A connection whose files are all gone is no longer a filter.
+  if (files.conn !== null && !files.list.some((f) => f.conn === files.conn)) files.conn = null;
+  // Type counts are for the chosen connection.
   const counts = {};
-  files.list.forEach((f) => (counts[f.kind] = (counts[f.kind] || 0) + 1));
-  $("fTypes").innerHTML = [["", "All", files.list.length], ...Object.keys(fileTypeNames).filter((t) => counts[t]).map((t) => [t, fileTypeNames[t], counts[t]])]
+  const inConn = files.list.filter((f) => files.conn === null || f.conn === files.conn);
+  inConn.forEach((f) => (counts[f.kind] = (counts[f.kind] || 0) + 1));
+  $("fTypes").innerHTML = [["", "All", inConn.length], ...Object.keys(fileTypeNames).filter((t) => counts[t]).map((t) => [t, fileTypeNames[t], counts[t]])]
     .map(([t, label, n]) => {
       const on = t ? files.types.has(t) : !files.types.size;
       return `<button class="${on ? "on" : ""}" data-ftype="${t}" aria-pressed="${on}" title="${t ? `Show ${esc(label)} files (click several to combine)` : "Show every type"}">${esc(label)}<span class="cnt">${n}</span></button>`;
     }).join("");
   if ($("fFilter").value !== files.q) $("fFilter").value = files.q;
+  // The connection list: every connection folder, with its number of files.
+  const byConn = {};
+  files.list.forEach((f) => (byConn[f.conn] = (byConn[f.conn] || 0) + 1));
+  const conns = Object.keys(byConn).sort((a, b) => (a === "") - (b === "") || a.localeCompare(b, undefined, { sensitivity: "base" }));
+  $("fConn").innerHTML = `<option value="*">All (${files.list.length})</option>` +
+    conns.map((c) => `<option value="${esc(c)}">${esc(connLabel(c))} (${byConn[c]})</option>`).join("");
+  $("fConn").value = files.conn === null ? "*" : files.conn;
   const terms = fileTerms();
 
   const vis = visibleFiles();
@@ -1079,22 +1101,24 @@ function renderFiles() {
   const head = `<thead><tr>
       <th class="ck"><input type="checkbox" id="fAll" aria-label="Select all shown files" ${allOn ? "checked" : ""}></th>
       <th class="facts"></th>
+      <th data-fsort="conn" title="Sort by connection">Connection${arrow("conn")}</th>
       <th data-fsort="name" title="Sort by file name">File name${arrow("name")}</th>
       <th data-fsort="kind" title="Sort by type">Type${arrow("kind")}</th>
       <th data-fsort="modified" title="Sort by date">Created${arrow("modified")}</th>
       <th data-fsort="size" class="fsize" title="Sort by size">Size${arrow("size")}</th></tr></thead>`;
   const rows = vis.map((f) => {
     const k = fileKey(f), on = files.sel.has(k);
-    return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}">
+    return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}${f.conn ? "/" + esc(f.conn) : ""}/${esc(f.kind)}">
       <td class="ck"><input type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
       <td class="facts"><button data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button data-fact="delete" class="del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></td>
+      <td class="fconn">${f.conn ? esc(f.conn) : `<span class="none">${esc(connLabel(""))}</span>`}</td>
       <td class="fname">${highlightName(f.name, terms)}</td>
       <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
       <td class="fdate">${esc(fmtDate(f.modified))}</td>
       <td class="fsize" title="${f.size.toLocaleString()} bytes, uncompressed">${fmtSize(f.size)}</td></tr>`;
   }).join("");
   $("fTable").innerHTML = files.list.length
-    ? `<table>${head}<tbody>${rows || `<tr><td colspan="6" class="fnomatch">No files match the filter. <button class="small" data-fclear="1">Clear the filters</button></td></tr>`}</tbody></table>`
+    ? `<table>${head}<tbody>${rows || `<tr><td colspan="7" class="fnomatch">No files match the filter. <button class="small" data-fclear="1">Clear the filters</button></td></tr>`}</tbody></table>`
     : `<div class="placeholder"><div><p>No exported files yet.</p><p>Exports, DDL scripts and backups appear here.</p></div></div>`;
   const all = $("fAll");
   if (all) all.indeterminate = someOn && !allOn;
@@ -1122,6 +1146,10 @@ $("fTypes").addEventListener("click", (ev) => {
   if (files.types.size && [...new Set(files.list.map((f) => f.kind))].every((k) => files.types.has(k))) files.types.clear();
   saveFileFilters(); renderFiles();
 });
+$("fConn").addEventListener("change", () => {
+  files.conn = $("fConn").value === "*" ? null : $("fConn").value;
+  saveFileFilters(); renderFiles();
+});
 $("fFilter").addEventListener("input", () => { files.q = $("fFilter").value; saveFileFilters(); renderFiles(); });
 $("fFilter").addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && $("fFilter").value) { ev.preventDefault(); $("fFilter").value = ""; files.q = ""; saveFileFilters(); renderFiles(); }
@@ -1129,7 +1157,7 @@ $("fFilter").addEventListener("keydown", (ev) => {
 $("fRefresh").addEventListener("click", loadFiles);
 $("fTable").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-fclear]")) {
-    files.types.clear(); files.q = ""; saveFileFilters(); renderFiles(); return;
+    files.types.clear(); files.q = ""; files.conn = null; saveFileFilters(); renderFiles(); return;
   }
   const th = ev.target.closest("th[data-fsort]");
   if (th) {
@@ -1169,7 +1197,7 @@ async function downloadFiles(chosen) {
   note.innerHTML = `<span class="spin"></span> Compressing ${chosen.length} file${chosen.length === 1 ? "" : "s"} (${fmtSize(chosen.reduce((t, f) => t + f.size, 0))}) at the highest level…`;
   note.hidden = false;
   try {
-    const res = await api("POST", "/api/files/zip", { files: chosen.map((f) => ({ kind: f.kind, name: f.name })) });
+    const res = await api("POST", "/api/files/zip", { files: chosen.map(fileRef) });
     const saved = res.size ? Math.max(0, Math.round((1 - res.zipSize / res.size) * 100)) : 0;
     note.innerHTML = `Compressed ${res.files} file${res.files === 1 ? "" : "s"}: ${fmtSize(res.size)} → <b>${fmtSize(res.zipSize)}</b> (${saved}% smaller) · ` +
       `<a href="${esc(res.download)}" download="${esc(res.name)}">${esc(res.name)}</a> <span class="fsel">(link valid for 15 minutes)</span>` +
@@ -1195,7 +1223,7 @@ function askDelete(list) {
   const size = list.reduce((t, f) => t + f.size, 0);
   $("fdTitle").textContent = list.length === 1 ? "Delete this file?" : `Delete ${list.length} files?`;
   $("fdText").textContent = `${list.length === 1 ? "It" : "They"} will be removed from the export folder (${fmtSize(size)}). This can't be undone.`;
-  const shown = list.slice(0, 12).map((f) => `<li>${esc(f.kind)}/${esc(f.name)}</li>`).join("");
+  const shown = list.slice(0, 12).map((f) => `<li>${f.conn ? esc(f.conn) + "/" : ""}${esc(f.kind)}/${esc(f.name)}</li>`).join("");
   $("fdList").innerHTML = shown + (list.length > 12 ? `<li>… and ${list.length - 12} more</li>` : "");
   $("fDelDialog").showModal();
   $("fdCancel").focus(); // the safe choice is the default
@@ -1206,7 +1234,7 @@ $("fdConfirm").addEventListener("click", async () => {
   const list = fDelPending;
   $("fdConfirm").disabled = true;
   try {
-    const res = await api("POST", "/api/files/delete", { files: list.map((f) => ({ kind: f.kind, name: f.name })) });
+    const res = await api("POST", "/api/files/delete", { files: list.map(fileRef) });
     list.forEach((f) => files.sel.delete(fileKey(f)));
     $("fDelDialog").close();
     if ($("fPrevDialog").open && list.some((f) => fileKey(f) === fPrevKey)) $("fPrevDialog").close();
@@ -1228,12 +1256,12 @@ function tableHTML(cols, rows) {
 async function previewFile(f) {
   fPrevKey = fileKey(f);
   $("fpTitle").textContent = f.name;
-  $("fpMeta").textContent = `${fileTypeNames[f.kind] || f.kind} · ${fmtSize(f.size)} · created ${fmtDate(f.modified)}`;
+  $("fpMeta").textContent = `${connLabel(f.conn)} · ${fileTypeNames[f.kind] || f.kind} · ${fmtSize(f.size)} · created ${fmtDate(f.modified)}`;
   $("fpBody").innerHTML = `<p class="placeholder"><span class="spin"></span> Loading preview…</p>`;
   $("fpFoot").textContent = "";
   if (!$("fPrevDialog").open) $("fPrevDialog").showModal();
   try {
-    const p = await api("GET", `/api/files/preview?kind=${encodeURIComponent(f.kind)}&name=${encodeURIComponent(f.name)}`);
+    const p = await api("GET", `/api/files/preview?conn=${encodeURIComponent(f.conn)}&kind=${encodeURIComponent(f.kind)}&name=${encodeURIComponent(f.name)}`);
     if (fPrevKey !== fileKey(f)) return; // another file was opened meanwhile
     let foot = "";
     switch (p.mode) {

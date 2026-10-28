@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.12.3
+cactusdb 1.13.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -123,8 +123,9 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    **Ctrl+Enter**. Only read queries are accepted (see [Read-only](#read-only)).
 7. **Export** with the **Excel**, **JSON**, **XML** or **CSV** buttons. The export
    always contains **all rows** of the query, not just the rows on screen. The file is
-   saved in a subfolder of the export folder named after its type (`json`, `csv`,
-   `xlsx` or `xml`), and a bar shows the full path with a **Download** link.
+   saved in the connection's folder, in a subfolder for its type:
+   `<export folder>/<connection name>/json|csv|xlsx|xml/` (see
+   [Where exports go](#where-exports-go)). A bar shows the full path with a **Download** link.
    **Clear** removes that bar again.
 
 **Saved connections** appear in their own list. Click one to connect, or **✕** to delete it.
@@ -149,10 +150,30 @@ as many tables as possible. Opening a table brings the grid back, and **✕** cl
 list while the export carries on. When the export is finished, **Clear** removes the
 export status. Disconnecting stops an export that is still running.
 
+<a id="where-exports-go"></a>
+**Where exports go.** Every connection gets its own folder in the export folder, named after
+the connection. Inside it, each kind of file has a subfolder. For a connection called
+`optimo-prod`:
+```
+export/optimo-prod/json/     export/optimo-prod/csv/     export/optimo-prod/xlsx/
+export/optimo-prod/xml/      export/optimo-prod/sql/     (DDL)
+export/optimo-prod/backup/   (backups)
+```
+- **Saved or named connections** use that name. Characters a folder name can't hold become
+  `_`, so `Optima (EU)` becomes `Optima _EU`.
+- **Unnamed connections** use `<host>-<database>`, or the database file's name for SQLite.
+- **The command line** uses the name the connection is saved under, `cli-<host>`.
+- **Older exports** made before version 1.13 stay where they are, directly in
+  `export/<type>/`.
+
 **Exported files.** The **Exported files** tab lists every file in the export folder: data
-exports, DDL scripts and backups, with when each was created and its size (uncompressed).
-- **Sort:** click a column heading to sort by file name, type, date or size. Click it again
-  to reverse the order.
+exports, DDL scripts and backups, with the connection each belongs to, when it was created
+and its size (uncompressed).
+- **Sort:** click a column heading to sort by connection, file name, type, date or size.
+  Click it again to reverse the order.
+- **Filter by connection:** the **Connection** list shows every connection with its number
+  of files. Older exports appear as *(older exports)*. The type counts follow the chosen
+  connection, and a download of one connection's files is named after it.
 - **Filter by type:** the **Type** buttons show how many files of each type there are
   (Excel, CSV, JSON, XML, DDL, Backup). Click one to show only that type, or click several
   to combine them, for example CSV and JSON. **All** shows every type again.
@@ -255,7 +276,7 @@ Free-form queries are named `query_…`. Existing files are never overwritten.
 
 **DDL** in the web UI, or `--exportddl all` on the command line, writes a script that
 recreates the database structure, without data: `<database>_ddl_<date>-<time>.sql`, in the
-`sql` subfolder of the export folder.
+connection's `sql` folder (`<export folder>/<connection>/sql/`).
 
 - **Order:** domains, sequences/generators and exceptions come first, then tables with
   their indexes, then views, functions, procedures, packages, triggers and events.
@@ -277,8 +298,8 @@ empty database and exporting again: the second script is identical to the first.
 ### Database backup
 
 **Backup** (next to **DDL** under *Objects*), or `--backup yes` on the command line, backs
-up the whole connected database to `<database>_backup_<date>-<time>.zip` in the `backup`
-subfolder of the export folder. The web UI shows a **Download** link when it's done.
+up the whole connected database to `<database>_backup_<date>-<time>.zip` in the
+connection's `backup` folder (`<export folder>/<connection>/backup/`). The web UI shows a **Download** link when it's done.
 
 The `.zip` is compressed at the maximum Deflate level and holds:
 
@@ -343,8 +364,8 @@ cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname 
 ```
 ```
 Password for root@10.66.1.136:3306:
-Exporting 1 table(s) as xlsx to /home/me/cactusdb/export/xlsx
-  orders                             15234 rows  /home/me/cactusdb/export/xlsx/orders_20261026-141502.xlsx
+Exporting 1 table(s) as xlsx to /home/me/cactusdb/export/cli-10.66.1.136/xlsx
+  orders                             15234 rows  /home/me/cactusdb/export/cli-10.66.1.136/xlsx/orders_20261026-141502.xlsx
 ```
 
 The password is **asked for** and not shown while you type. For scripts, pass it with
@@ -362,10 +383,10 @@ The password is **asked for** and not shown while you type. For scripts, pass it
 | `--dbtable` | The table or view to export; several separated by commas (`--dbtable orders,customers`); or `all` for every table. |
 | `--showtable` | `all` lists the tables and views; a table name prints its definition (`CREATE TABLE …`). |
 | `--exportas` | `csv` (default), `json`, `xml` or `excel`. |
-| `--exportto` | The base folder for exports. Default: the `export` folder next to cactusdb. Each type goes to its own subfolder: `json`, `csv`, `xlsx` (Excel), `xml`, `sql` for DDL and `backup` for backups. |
+| `--exportto` | The base folder for exports. Default: the `export` folder next to cactusdb. Files go to `<exportto>/cli-<host>/<type>/`: one folder for the connection (named like the saved connection), with a subfolder for each type: `json`, `csv`, `xlsx` (Excel), `xml`, `sql` for DDL and `backup` for backups. |
 | `--threads` | How many tables to export at the same time. Default `4`. |
 | `--exportddl` | `all` writes the DDL of every object to one `.sql` file; table names (comma-separated) write just those tables. See [DDL export](#ddl-export). |
-| `--backup` | `yes` backs up the whole database (DDL and every row) to a compressed `.zip` in the `backup` subfolder. See [Database backup](#backup). |
+| `--backup` | `yes` backs up the whole database (DDL and every row) to a compressed `.zip` in the connection's `backup` folder. See [Database backup](#backup). |
 | `--saveconn` | `yes` (default) saves the connection; `no` doesn't. See below. |
 
 Each table is saved as its own file named `<table>_<date>-<time>.<ext>`, with every
@@ -444,7 +465,7 @@ cactusdb --port 8087 --web yes --exportto ./export
 |--------|---------|--------------|
 | `--web` | `yes` when no `--dbtype` is given | `--web yes` starts the web UI. It's the default, so `cactusdb --port 8087` does the same. |
 | `--port` | `8080` | The port to open in your browser: `http://localhost:<port>` |
-| `--exportto` | folder `export` next to the cactusdb program | The base folder for exported files. Each type is saved in its own subfolder (`json`, `csv`, `xlsx`, `xml`, `sql` for DDL and `backup` for backups). Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
+| `--exportto` | folder `export` next to the cactusdb program | The base folder for exported files: each connection gets a folder in it, with a subfolder for each type (`json`, `csv`, `xlsx`, `xml`, `sql` for DDL and `backup` for backups). See [Where exports go](#where-exports-go). Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
 | `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
 | `--host` | `0.0.0.0` (every network interface) | The address to listen on. By default other computers on your network can use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. Use `127.0.0.1` to allow only this computer, `::` to listen on IPv6 too, or one of this computer's IP addresses to listen on that network only. See [Security](#7-security). |
@@ -469,7 +490,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.12.3 is running in the background (process id 48211)
+cactusdb 1.13.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -497,7 +518,7 @@ The log looks like this:
 2026/10/26 17:26:30 127.0.0.1 [cli-10.66.1.136] 1000 row(s) (more not shown) in 41ms
 2026/10/26 17:26:31 127.0.0.1 [cli-10.66.1.136] query: delete from orders
 2026/10/26 17:26:31 127.0.0.1 [cli-10.66.1.136] query FAILED: cactusdb is read-only: only SELECT queries are allowed …
-2026/10/26 17:26:35 127.0.0.1 [cli-10.66.1.136] export xlsx: 15234 row(s) to /home/me/cactusdb/export/xlsx/orders_20261026-172635.xlsx
+2026/10/26 17:26:35 127.0.0.1 [cli-10.66.1.136] export xlsx: 15234 row(s) to /home/me/cactusdb/export/cli-10.66.1.136/xlsx/orders_20261026-172635.xlsx
 ```
 
 | Environment variable | What it does |
@@ -530,7 +551,7 @@ over the running one and keeps the data. Without `--docker`, the target comes fr
 
 | Target | What `--install` does | Data |
 |--------|-----------------------|------|
-| `dd` | Builds the image and runs a container (restart `unless-stopped`, health check) as your user, publishing `CACTUSDB_PORT` on `DD_BIND` (every address by default) | Host folders `DD_CONN_DIR` and `DD_EXPORT_DIR` (default `~/cactusdb/conn` and `~/cactusdb/export`) |
+| `dd` | Checks and creates the data folders (and `DD_SQLITE_DIR`, if set), then builds the image and runs a container (restart `unless-stopped`, health check) as your user, publishing `CACTUSDB_PORT` on `DD_BIND` (every address by default) | Host folders `DD_CONN_DIR` and `DD_EXPORT_DIR` (default `~/cactusdb/conn` and `~/cactusdb/export`) |
 | `ce` | Docker CE (Docker Engine) on a Linux server. With `CE_HOST=user@server` every docker command runs on the server over SSH: the image is built there for its CPU, and the container runs as the SSH user. `CE_INSTALL_DOCKER=yes` first installs Docker CE if it's missing (Docker's `get.docker.com` script, needs sudo), starts it at boot and adds the user to the `docker` group | Folders on the server, `CE_CONN_DIR` and `CE_EXPORT_DIR` (default `/srv/cactusdb/conn` and `/srv/cactusdb/export`), created and handed to the run user automatically |
 | `k3s` | Builds the image for the nodes' architecture and imports it into k3s (on this machine, over SSH with `K3S_SSH`, or your own `K3S_IMPORT` command), then applies a Namespace, Deployment, Service and volumes | PersistentVolumeClaims (k3s's `local-path`), or folders on the node with `K8S_STORAGE=hostpath` |
 | `k8s` | The same, pushing the image to `K8S_REGISTRY` (Docker Desktop's Kubernetes uses the local image directly) | PersistentVolumeClaims (default StorageClass), or `hostpath` |
@@ -590,11 +611,11 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.12.3 is running in container cactusdb
+cactusdb 1.13.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
-  exports:           /srv/cactusdb/export/{json,csv,xlsx,xml,sql,backup}
+  exports:           /srv/cactusdb/export/<connection>/{json,csv,xlsx,xml,sql,backup}
 ```
 
 | Option | Default | What it does |
@@ -604,7 +625,7 @@ cactusdb 1.12.3 is running in container cactusdb
 | `--data-dir` | `~/cactusdb` | Base folder on the host for `export/` and `conn/` |
 | `--export-dir` | `<data-dir>/export` | Host folder for exports (`/opt/cactusdb/export` in the container) |
 | `--conn-dir` | `<data-dir>/conn` | Host folder for `cactus.conn.db` and `cactus.key` (`/opt/cactusdb/conn`); readable only by you |
-| `--sqlite-dir` | | Host folder of SQLite databases, mounted read-only at `/sqlite`: connect to `/sqlite/<file>` |
+| `--sqlite-dir` | | Host folder of SQLite databases, mounted read-only at `/sqlite`: connect to `/sqlite/<file>`. Created if it doesn't exist yet. |
 | `--tz` | `$TZ` | Time zone for log and file-name times, e.g. `Europe/Amsterdam` |
 | `--name`, `--image` | `cactusdb` | Container and image name |
 | `--runtime` | docker, else podman | Container engine to use |
@@ -637,13 +658,14 @@ cactusdb/
 ├── cactus.key           the key that encrypts saved usernames and passwords
 ├── cactusdb.log         the action log (with --runas background or --logfile)
 ├── cactusdb.pid         the process id of a background cactusdb, while it runs
-└── export/              your exported files, one subfolder per type
-    ├── backup/          database backups (.zip)
-    ├── csv/
-    ├── json/
-    ├── sql/             DDL scripts
-    ├── xlsx/            Excel
-    └── xml/
+└── export/              your exported files, one folder per connection
+    └── optimo-prod/     named after the connection
+        ├── backup/      database backups (.zip)
+        ├── csv/
+        ├── json/
+        ├── sql/         DDL scripts
+        ├── xlsx/        Excel
+        └── xml/
 ```
 
 To move cactusdb to another computer and keep your connections, copy `cactus.conn.db`

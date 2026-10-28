@@ -25,10 +25,20 @@ import (
 // type subfolders, and a download of the selected files as one .zip,
 // compressed at the highest Deflate level before the download starts.
 
+// fileRef names a listed file in a request from the page.
+type fileRef struct {
+	Conn string `json:"conn"`
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
+func (r fileRef) key() string { return r.Conn + "/" + r.Kind + "/" + r.Name }
+
 // zipRetention is how long a prepared .zip stays downloadable.
 const zipRetention = 15 * time.Minute
 
 type exportedFile struct {
+	Conn     string    `json:"conn"` // the connection's folder; "" for exports made before files were sorted by connection
 	Kind     string    `json:"kind"` // the subfolder: csv, json, xlsx, xml, sql or backup
 	Name     string    `json:"name"`
 	Size     int64     `json:"size"`
@@ -43,9 +53,13 @@ type preparedZip struct {
 	timer      *time.Timer
 }
 
-// listExportedFiles lists the files in the type subfolders of every export
-// folder of this run, newest first. A file name found in more than one
-// folder is listed from the current folder.
+// key identifies a listed file: connection/type/name.
+func (f exportedFile) key() string { return f.Conn + "/" + f.Kind + "/" + f.Name }
+
+// listExportedFiles lists the files in every export folder of this run,
+// <export>/<connection>/<type>/ (and <export>/<type>/ from before files
+// were sorted by connection), newest first. A file found in more than one
+// export folder is listed from the current one.
 func (s *server) listExportedFiles() []exportedFile {
 	var out []exportedFile
 	seen := map[string]bool{}
@@ -55,23 +69,38 @@ func (s *server) listExportedFiles() []exportedFile {
 	}
 	sort.Strings(kinds)
 	for _, dir := range s.exportFolders() {
-		for _, kind := range kinds {
-			entries, err := os.ReadDir(exportSubdir(dir, kind))
-			if err != nil {
-				continue
-			}
+		conns := []string{""}
+		if entries, err := os.ReadDir(dir); err == nil {
 			for _, e := range entries {
-				// Unfinished exports are hidden temporary files.
-				if !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") || seen[kind+"/"+e.Name()] {
-					continue
+				if e.IsDir() && !exportSubdirs[e.Name()] && validFileName(e.Name()) {
+					conns = append(conns, e.Name())
 				}
-				fi, err := e.Info()
+			}
+		}
+		for _, conn := range conns {
+			for _, kind := range kinds {
+				kindDir := exportSubdir(filepath.Join(dir, conn), kind)
+				entries, err := os.ReadDir(kindDir)
 				if err != nil {
 					continue
 				}
-				seen[kind+"/"+e.Name()] = true
-				out = append(out, exportedFile{Kind: kind, Name: e.Name(), Size: fi.Size(), Modified: fi.ModTime(),
-					Folder: dir, path: filepath.Join(exportSubdir(dir, kind), e.Name())})
+				for _, e := range entries {
+					// Unfinished exports are hidden temporary files.
+					if !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") {
+						continue
+					}
+					f := exportedFile{Conn: conn, Kind: kind, Name: e.Name(), Folder: dir, path: filepath.Join(kindDir, e.Name())}
+					if seen[f.key()] {
+						continue
+					}
+					fi, err := e.Info()
+					if err != nil {
+						continue
+					}
+					seen[f.key()] = true
+					f.Size, f.Modified = fi.Size(), fi.ModTime()
+					out = append(out, f)
+				}
 			}
 		}
 	}
@@ -96,10 +125,7 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Files []struct {
-			Kind string `json:"kind"`
-			Name string `json:"name"`
-		} `json:"files"`
+		Files []fileRef `json:"files"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
@@ -112,14 +138,14 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 	// Only files in the list can be chosen: no paths, no other folders.
 	byKey := map[string]exportedFile{}
 	for _, f := range s.listExportedFiles() {
-		byKey[f.Kind+"/"+f.Name] = f
+		byKey[f.key()] = f
 	}
 	var chosen []exportedFile
 	var total int64
 	for _, rf := range req.Files {
-		f, ok := byKey[rf.Kind+"/"+rf.Name]
+		f, ok := byKey[rf.key()]
 		if !ok {
-			writeErr(w, 404, fmt.Errorf("%s/%s is not an exported file (any more)", rf.Kind, rf.Name))
+			writeErr(w, 404, fmt.Errorf("%s is not an exported file (any more)", strings.TrimPrefix(rf.key(), "/")))
 			return
 		}
 		if !slices.ContainsFunc(chosen, func(c exportedFile) bool { return c.path == f.path }) {
@@ -128,7 +154,12 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	name := "cactusdb-exports_" + time.Now().Format("20060102-150405") + ".zip"
+	// Named after the connection when every file comes from the same one.
+	prefix := "cactusdb"
+	if c := chosen[0].Conn; c != "" && !slices.ContainsFunc(chosen, func(f exportedFile) bool { return f.Conn != c }) {
+		prefix = c
+	}
+	name := prefix + "-exports_" + time.Now().Format("20060102-150405") + ".zip"
 	if len(chosen) == 1 {
 		name = chosen[0].Name + ".zip"
 	}
@@ -190,7 +221,8 @@ func writeZip(r *http.Request, w io.Writer, files []exportedFile) error {
 		if err != nil {
 			return err
 		}
-		h := &zip.FileHeader{Name: f.Kind + "/" + f.Name, Method: zip.Deflate, Modified: f.Modified}
+		// In the .zip as <connection>/<type>/<name>.
+		h := &zip.FileHeader{Name: strings.TrimPrefix(f.key(), "/"), Method: zip.Deflate, Modified: f.Modified}
 		h.SetMode(0o644)
 		out, err := zw.CreateHeader(h)
 		if err == nil {
@@ -265,11 +297,11 @@ const (
 	previewBytes = 256 << 10
 )
 
-// findExportedFile returns the listed file kind/name; anything else (other
+// findExportedFile returns the listed file ref; anything else (other
 // folders, paths, temporary files) is not found.
-func (s *server) findExportedFile(kind, name string) (exportedFile, bool) {
+func (s *server) findExportedFile(ref fileRef) (exportedFile, bool) {
 	for _, f := range s.listExportedFiles() {
-		if f.Kind == kind && f.Name == name {
+		if f.key() == ref.key() {
 			return f, true
 		}
 	}
@@ -280,12 +312,13 @@ func (s *server) findExportedFile(kind, name string) (exportedFile, bool) {
 // rows for CSV, Excel and JSON arrays, the list of files for a backup .zip
 // (with the start of its SQL script), and text for everything else.
 func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
-	f, ok := s.findExportedFile(r.URL.Query().Get("kind"), r.URL.Query().Get("name"))
+	q := r.URL.Query()
+	f, ok := s.findExportedFile(fileRef{Conn: q.Get("conn"), Kind: q.Get("kind"), Name: q.Get("name")})
 	if !ok {
 		writeErr(w, 404, errors.New("file not found (deleted or moved?)"))
 		return
 	}
-	out := map[string]any{"kind": f.Kind, "name": f.Name, "size": f.Size, "modified": f.Modified, "limit": previewRows}
+	out := map[string]any{"conn": f.Conn, "kind": f.Kind, "name": f.Name, "size": f.Size, "modified": f.Modified, "limit": previewRows}
 	var err error
 	switch {
 	case f.Kind == "csv":
@@ -485,10 +518,7 @@ func (s *server) handleDeleteFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Files []struct {
-			Kind string `json:"kind"`
-			Name string `json:"name"`
-		} `json:"files"`
+		Files []fileRef `json:"files"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
@@ -500,17 +530,17 @@ func (s *server) handleDeleteFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	byKey := map[string]exportedFile{}
 	for _, f := range s.listExportedFiles() {
-		byKey[f.Kind+"/"+f.Name] = f
+		byKey[f.key()] = f
 	}
 	deleted := 0
 	var freed int64
 	failed := []string{}
 	for _, rf := range req.Files {
-		f, ok := byKey[rf.Kind+"/"+rf.Name]
+		f, ok := byKey[rf.key()]
 		if !ok {
 			continue // already gone
 		}
-		delete(byKey, rf.Kind+"/"+rf.Name)
+		delete(byKey, rf.key())
 		if err := os.Remove(f.path); err != nil {
 			failed = append(failed, f.Name+": "+err.Error())
 			logAction(r, "delete %s FAILED: %v", f.path, err)

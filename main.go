@@ -33,7 +33,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.12.3"
+var version = "1.13.0"
 
 //go:embed web
 var webFS embed.FS
@@ -42,7 +42,17 @@ type session struct {
 	engine string
 	label  string
 	dbName string // short database name, for DDL file names
+	folder string // its folder in the export folder: the connection name
 	db     *sql.DB
+}
+
+// exportDir is where this connection's exports go: <export folder>/<connection>.
+func (ss *session) exportDir(base string) string {
+	f := ss.folder
+	if f == "" {
+		f = connFolderName(ss.label)
+	}
+	return filepath.Join(base, f)
 }
 
 type server struct {
@@ -334,7 +344,7 @@ func main() {
 	mux.HandleFunc("POST /api/backup", s.handleBackup)
 	mux.HandleFunc("POST /api/exportall", s.handleExportAll)
 	mux.HandleFunc("GET /api/exportall/{job}", s.handleExportAllStatus)
-	mux.HandleFunc("GET /api/exports/{kind}/{file}", s.handleDownload)
+	mux.HandleFunc("GET /api/exports/{path...}", s.handleDownload)
 	mux.HandleFunc("GET /api/files", s.handleListFiles)
 	mux.HandleFunc("POST /api/files/zip", s.handlePrepareZip)
 	mux.HandleFunc("GET /api/files/zip/{id}", s.handleDownloadZip)
@@ -642,13 +652,15 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			label = req.Name
 		}
 	}
+	folder := connFolderName(label)
 	if label == "" {
 		label = defaultConnName(p)
+		folder = unnamedConnFolder(p)
 	}
 
 	id := newID()
 	s.mu.Lock()
-	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), db: db}
+	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db}
 	s.mu.Unlock()
 	logAction(r, "connect %s as %q, session %s", defaultConnName(p), label, id[:8])
 	resp["session"] = id
@@ -903,7 +915,7 @@ func (s *server) handleExport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("SQL is empty"))
 		return
 	}
-	path, rows, err := exportToDir(r.Context(), s.exportFolder(), ss.engine, ss.db, q, req.Format, req.Name, nil)
+	path, rows, err := exportToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, q, req.Format, req.Name, nil)
 	if err != nil {
 		logAction(r, "[%s] export %s FAILED: %v (sql: %s)", ss.label, req.Format, err, oneLine(q))
 		writeErr(w, 400, err)
@@ -939,7 +951,7 @@ func (s *server) handleExportDDL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	path, n, err := exportDDLToDir(r.Context(), s.exportFolder(), ss.engine, ss.db, ss.label, ss.dbName, ddlTargets(groups), nil)
+	path, n, err := exportDDLToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, ss.label, ss.dbName, ddlTargets(groups), nil)
 	if err != nil {
 		logAction(r, "[%s] DDL export FAILED: %v", ss.label, err)
 		writeErr(w, 400, err)
@@ -955,23 +967,35 @@ func (s *server) handleExportDDL(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// downloadURL is the web UI link to an exported file: its type subfolder and
-// file name.
+// downloadURL is the web UI link to an exported file:
+// /api/exports/<connection>/<type>/<file>.
 func downloadURL(path string) string {
-	return "/api/exports/" + url.PathEscape(filepath.Base(filepath.Dir(path))) + "/" + url.PathEscape(filepath.Base(path))
+	kindDir := filepath.Dir(path)
+	return "/api/exports/" + url.PathEscape(filepath.Base(filepath.Dir(kindDir))) + "/" +
+		url.PathEscape(filepath.Base(kindDir)) + "/" + url.PathEscape(filepath.Base(path))
 }
 
-// handleDownload serves a file from a type subfolder of the export folder.
+// handleDownload serves an exported file: <connection>/<type>/<file>, or
+// <type>/<file> for exports made before files were sorted by connection.
 func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
-	kind, file := r.PathValue("kind"), r.PathValue("file")
-	if file == "" || file != filepath.Base(file) || strings.HasPrefix(file, ".") || !exportSubdirs[kind] {
+	parts := strings.Split(r.PathValue("path"), "/")
+	conn := ""
+	if len(parts) == 3 {
+		conn, parts = parts[0], parts[1:]
+	}
+	if len(parts) != 2 {
+		writeErr(w, 400, errors.New("bad file name"))
+		return
+	}
+	kind, file := parts[0], parts[1]
+	if !validFileName(file) || !exportSubdirs[kind] || (conn != "" && (!validFileName(conn) || conn != connFolderName(conn))) {
 		writeErr(w, 400, errors.New("bad file name"))
 		return
 	}
 	// The newest folder first: the export folder may have been changed since.
 	var path string
 	for _, dir := range s.exportFolders() {
-		if p := filepath.Join(exportSubdir(dir, kind), file); fileExists(p) {
+		if p := filepath.Join(exportSubdir(filepath.Join(dir, conn), kind), file); fileExists(p) {
 			path = p
 			break
 		}
@@ -983,6 +1007,11 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	logAction(r, "download %s", path)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+file+`"`)
 	http.ServeFile(w, r, path)
+}
+
+// validFileName is a plain name: no path, not hidden, not "." or "..".
+func validFileName(name string) bool {
+	return name != "" && name == filepath.Base(name) && !strings.HasPrefix(name, ".") && !strings.ContainsAny(name, `/\`)
 }
 
 // savedConnInfo is what the browser sees of a saved connection: everything

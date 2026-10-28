@@ -380,23 +380,35 @@ eng_install() {
   eng_setup
   local arch user
   arch=$(norm_arch "$("$RUNTIME" info --format '{{.Architecture}}' 2>/dev/null || uname -m)")
+
+  # dd: the folders are on this machine. They are checked and created before
+  # the (slower) image build, so a mistake shows up straight away.
+  local z=
+  if [[ $TARGET == dd ]]; then
+    local d
+    for d in "$E_EXPORT" "$E_CONN" ${E_SQLITE:+"$E_SQLITE"}; do
+      [[ ! -e $d || -d $d ]] || die "$d exists but is a file, not a folder: change it in ${ENV_FILE:-your settings}"
+      if [[ ! -d $d ]]; then
+        mkdir -p "$d" || die "can't create the folder $d"
+        say "Created $d"
+      fi
+    done
+    E_EXPORT=$(cd "$E_EXPORT" && pwd)
+    E_CONN=$(cd "$E_CONN" && pwd)
+    chmod 0700 "$E_CONN" # credentials and their key live here
+    if [[ -n $E_SQLITE ]]; then
+      E_SQLITE=$(cd "$E_SQLITE" && pwd)
+      [[ -n $(ls -A "$E_SQLITE" 2>/dev/null) ]] || say "  (the SQLite folder is empty: put your .db files in $E_SQLITE)"
+    fi
+    if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then z=,Z; fi # label for SELinux
+  fi
+
   IMAGE_REF=$IMAGE:$VERSION
   build_image "$arch"
   "$RUNTIME" tag "$IMAGE_REF" "$IMAGE:latest"
   user=$(eng_user)
 
-  local z=
-  if [[ $TARGET == dd ]]; then
-    mkdir -p "$E_EXPORT" "$E_CONN"
-    E_EXPORT=$(cd "$E_EXPORT" && pwd)
-    E_CONN=$(cd "$E_CONN" && pwd)
-    chmod 0700 "$E_CONN" # credentials and their key live here
-    if [[ -n $E_SQLITE ]]; then
-      [[ -d $E_SQLITE ]] || die "DD_SQLITE_DIR $E_SQLITE is not a folder"
-      E_SQLITE=$(cd "$E_SQLITE" && pwd)
-    fi
-    if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then z=,Z; fi # label for SELinux
-  else
+  if [[ $TARGET == ce ]]; then
     # The folders are on the Docker host: a short-lived root container
     # creates them and hands them to the user cactusdb runs as.
     if [[ -n $CE_HOST ]] && ce_ssh 'command -v selinuxenabled >/dev/null && selinuxenabled' 2>/dev/null; then z=,Z
@@ -430,7 +442,7 @@ eng_install() {
       say "$("$RUNTIME" exec "$NAME" cactusdb --version 2>/dev/null) is running in container $NAME ($engine)"
       eng_urls
       say "  saved connections: $where$E_CONN/cactus.conn.db (key: cactus.key next to it)"
-      say "  exports:           $where$E_EXPORT/{json,csv,xlsx,xml,sql,backup}"
+      say "  exports:           $where$E_EXPORT/<connection>/{json,csv,xlsx,xml,sql,backup}"
       [[ -n $E_SQLITE ]] && say "  SQLite files:      $where$E_SQLITE, open them as /sqlite/<file>"
       return 0
     fi

@@ -111,6 +111,8 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("connected, but listing tables failed: %w", err)
 	}
+	// Everything goes to the connection's own folder: <exportto>/cli-<host>/<type>.
+	o.ExportDir = filepath.Join(o.ExportDir, connFolderName(cliConnName(o.ConnParams)))
 
 	if o.Show != "" {
 		if err := showTables(ctx, o, db, groups, out); err != nil {

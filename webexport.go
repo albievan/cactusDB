@@ -66,7 +66,7 @@ func (s *server) handleExportAll(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	label := ss.label
 	logAction(r, "[%s] export all %d table(s) as %s, job %.8s", label, len(targets), format, id)
-	dir := s.exportFolder()
+	dir := ss.exportDir(s.exportFolder())
 	b := startExportBatch(ctx, ss.engine, ss.db, dir, format, targets, webExportThreads, func(j *exportJob) {
 		if j.err != nil {
 			logAction(r, "[%s] export %s FAILED: %v", label, j.table.name, j.err)
