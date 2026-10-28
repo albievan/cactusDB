@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.2 — 2026-10-28
+
+- Logo: removed the coral flower (red dot); the icon is now just the white cactus and
+  database cylinder on the green tile.
+
 ## 1.12.1 — 2026-10-28
 
 - **New logo**: a modern, flat app-icon tile (emerald-to-teal gradient) with a white
