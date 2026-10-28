@@ -207,3 +207,78 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
 		t.Errorf("left: %v", s.listExportedFiles())
 	}
 }
+
+func TestConnFolderName(t *testing.T) {
+	for in, want := range map[string]string{
+		"optimo-prod":              "optimo-prod",
+		"Optima Prod (EU)":         "Optima Prod _EU",
+		"../../etc":                "etc",
+		"a/b\\c:d*e?":              "a_b_c_d_e",
+		"  .hidden  ":              "hidden",
+		"":                         "connection",
+		"///":                      "connection",
+		"CON":                      "_CON",
+		"csv":                      "csv_db",
+		"Zoë's DB":                 "Zoë_s DB",
+		"root@10.66.1.136+replica": "root@10.66.1.136+replica",
+	} {
+		if got := connFolderName(in); got != want {
+			t.Errorf("connFolderName(%q) = %q, want %q", in, got, want)
+		}
+		if got := connFolderName(in); !validFileName(got) {
+			t.Errorf("connFolderName(%q) = %q is not a plain folder name", in, got)
+		}
+	}
+	for p, want := range map[ConnParams]string{
+		{Engine: EngineMariaDB, Host: "10.66.1.136", Database: "optima"}: "10.66.1.136-optima",
+		{Engine: EngineSQLite, Database: "/data/shop.db"}:                "shop",
+		{Engine: EngineFirebird, Host: "fb1", Database: "/db/ERP.FDB"}:   "fb1-ERP",
+	} {
+		if got := unnamedConnFolder(p); got != want {
+			t.Errorf("unnamedConnFolder(%+v) = %q, want %q", p, got, want)
+		}
+	}
+}
+
+// Files are listed per connection folder, next to exports made before files
+// were sorted by connection; the same name in two connections is two files.
+func TestExportedFilesByConnection(t *testing.T) {
+	s := newTestServer(t)
+	dir := s.exportFolder()
+	for _, p := range []string{"optimo-prod/csv/orders.csv", "optimo-test/csv/orders.csv", "optimo-prod/backup/b.zip", "csv/old.csv"} {
+		os.MkdirAll(filepath.Join(dir, filepath.Dir(p)), 0o755)
+		os.WriteFile(filepath.Join(dir, p), []byte("id\n1\n"), 0o644)
+	}
+	got := map[string]bool{}
+	for _, f := range s.listExportedFiles() {
+		got[f.key()] = true
+	}
+	for _, k := range []string{"optimo-prod/csv/orders.csv", "optimo-test/csv/orders.csv", "optimo-prod/backup/b.zip", "/csv/old.csv"} {
+		if !got[k] {
+			t.Errorf("%s not listed (%v)", k, got)
+		}
+	}
+	if len(got) != 4 {
+		t.Errorf("listed %v", got)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/files/zip", strings.NewReader(`{"files":[{"conn":"optimo-prod","kind":"csv","name":"orders.csv"},{"conn":"optimo-prod","kind":"backup","name":"b.zip"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	s.handlePrepareZip(rec, req)
+	var res map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &res)
+	if rec.Code != 200 || !strings.HasPrefix(res["name"].(string), "optimo-prod-exports_") {
+		t.Errorf("zip of one connection: %d %v", rec.Code, res)
+	}
+	// Deleting one connection's file leaves the other connection's alone.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("POST", "/api/files/delete", strings.NewReader(`{"files":[{"conn":"optimo-test","kind":"csv","name":"orders.csv"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	s.handleDeleteFiles(rec, req)
+	if _, err := os.Stat(filepath.Join(dir, "optimo-prod/csv/orders.csv")); err != nil {
+		t.Error("the other connection's file was deleted")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "optimo-test/csv/orders.csv")); !os.IsNotExist(err) {
+		t.Error("the file was not deleted")
+	}
+}

@@ -14,7 +14,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -294,4 +296,50 @@ func cellString(v any) string {
 	default:
 		return fmt.Sprint(t)
 	}
+}
+
+// connFolderName turns a connection name into the name of its folder in the
+// export folder (<export>/<connection>/<type>/…): letters, digits and
+// " .-_@+" are kept, anything else becomes "_". It is never empty, never a
+// name Windows reserves, and never the name of a type folder.
+func connFolderName(name string) string {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(name) {
+		switch {
+		case unicode.IsLetter(r), unicode.IsDigit(r), strings.ContainsRune(" .-_@+", r):
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	s := b.String()
+	for strings.Contains(s, "__") || strings.Contains(s, "..") {
+		s = strings.ReplaceAll(strings.ReplaceAll(s, "__", "_"), "..", ".")
+	}
+	s = strings.Trim(s, " ._")
+	if r := []rune(s); len(r) > 100 {
+		s = strings.Trim(string(r[:100]), " ._")
+	}
+	if s == "" || strings.Trim(s, "_") == "" {
+		s = "connection"
+	}
+	switch strings.ToUpper(strings.SplitN(s, ".", 2)[0]) {
+	case "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		s = "_" + s
+	}
+	if exportSubdirs[strings.ToLower(s)] {
+		s += "_db" // e.g. a connection called "csv"
+	}
+	return s
+}
+
+// unnamedConnFolder is the folder of a connection that has no name: the
+// database file's name for SQLite and Firebird files, else host-database.
+func unnamedConnFolder(p ConnParams) string {
+	name := ddlFileName(p)
+	if p.Engine != EngineSQLite && p.Host != "" {
+		name = p.Host + "-" + name
+	}
+	return connFolderName(name)
 }

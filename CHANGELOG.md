@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.13.0 — 2026-10-28
+
+- **Exports are sorted by connection**: every export, DDL script and backup goes to
+  `<export folder>/<connection name>/<type>/`, e.g. `export/optimo-prod/json/`. Saved or
+  named connections use their name (made safe for a folder name), unnamed ones
+  `<host>-<database>` or the SQLite file name, the command line `cli-<host>`. Exports made
+  before stay in `export/<type>/` and are still listed and downloadable.
+- *Exported files* page: a **Connection** column (sortable) and a connection filter;
+  type counts follow the chosen connection; a download of one connection's files is named
+  after it.
+- Fixed: `deploy.sh --docker dd` stopped with "DD_SQLITE_DIR … is not a folder" when
+  that folder didn't exist yet, and only after building the image. The SQLite folder is
+  now created like the export and connections folders, and every folder is checked
+  before the build (a path that is a file is still refused). The same for
+  `deploy-container.sh --sqlite-dir`.
+
 ## 1.12.3 — 2026-10-28
 
 - Logo: the cactus is now solid white, without the curved database-disc lines across

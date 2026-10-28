@@ -224,7 +224,11 @@ Z=
 if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then Z=,Z; fi
 MOUNTS=(-v "$CONN_DIR:$APP/conn:rw$Z" -v "$EXPORT_DIR:$APP/export:rw$Z")
 if [[ -n $SQLITE_DIR ]]; then
-  [[ -d $SQLITE_DIR ]] || die "--sqlite-dir $SQLITE_DIR is not a folder"
+  [[ ! -e $SQLITE_DIR || -d $SQLITE_DIR ]] || die "--sqlite-dir $SQLITE_DIR exists but is a file, not a folder"
+  if [[ ! -d $SQLITE_DIR ]]; then
+    mkdir -p "$SQLITE_DIR" || die "can't create the folder $SQLITE_DIR"
+    echo "Created $SQLITE_DIR (put your SQLite .db files in it)"
+  fi
   SQLITE_DIR=$(cd "$SQLITE_DIR" && pwd)
   MOUNTS+=(-v "$SQLITE_DIR:/sqlite:ro$Z")
 fi
@@ -258,7 +262,7 @@ for _ in $(seq 1 30); do
     echo "$VERSION is running in container $NAME"
     urls
     echo "  saved connections: $CONN_DIR/cactus.conn.db (key: $CONN_DIR/cactus.key)"
-    echo "  exports:           $EXPORT_DIR/{json,csv,xlsx,xml,sql,backup}"
+    echo "  exports:           $EXPORT_DIR/<connection>/{json,csv,xlsx,xml,sql,backup}"
     [[ -n $SQLITE_DIR ]] && echo "  SQLite files:      $SQLITE_DIR, open them as /sqlite/<file> (read-only)"
     echo "  log:  $0 logs     stop: $0 down"
     exit 0

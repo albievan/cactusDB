@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -265,37 +266,43 @@ func TestAPIExportAll(t *testing.T) {
 		s.handleExportAllStatus(rec, req)
 		json.Unmarshal(rec.Body.Bytes(), &st)
 	}
-	if st.Folder != filepath.Join(s.exportFolder(), "xlsx") {
-		t.Errorf("folder = %s, want the xlsx subfolder", st.Folder)
+	// <export>/<connection>/<type>: the session's connection is called "shop".
+	if st.Folder != filepath.Join(s.exportFolder(), "shop", "xlsx") {
+		t.Errorf("folder = %s, want the connection's xlsx subfolder", st.Folder)
 	}
 	for _, tb := range st.Tables {
-		if tb.State != "done" || !strings.HasSuffix(tb.File, ".xlsx") || tb.Path != filepath.Join(s.exportFolder(), "xlsx", tb.File) {
+		if tb.State != "done" || !strings.HasSuffix(tb.File, ".xlsx") || tb.Path != filepath.Join(s.exportFolder(), "shop", "xlsx", tb.File) {
 			t.Errorf("%+v", tb)
 		}
 		// The download link finds the file in its subfolder.
-		if tb.Download != "/api/exports/xlsx/"+tb.File {
+		if tb.Download != "/api/exports/shop/xlsx/"+tb.File {
 			t.Errorf("download = %s", tb.Download)
 		}
-		rec = httptest.NewRecorder()
-		req := httptest.NewRequest("GET", tb.Download, nil)
-		req.SetPathValue("kind", "xlsx")
-		req.SetPathValue("file", tb.File)
-		s.handleDownload(rec, req)
-		if rec.Code != 200 || rec.Body.Len() == 0 {
-			t.Errorf("download %s: %d", tb.File, rec.Code)
+		if code := download(s, tb.Download); code != 200 {
+			t.Errorf("download %s: %d", tb.File, code)
 		}
 	}
-	// Only the type subfolders can be downloaded from.
-	for _, kind := range []string{"", "..", "other"} {
-		rec = httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/api/exports/x/y", nil)
-		req.SetPathValue("kind", kind)
-		req.SetPathValue("file", st.Tables[0].File)
-		s.handleDownload(rec, req)
-		if rec.Code != 400 {
-			t.Errorf("subfolder %q: %d", kind, rec.Code)
+	// Only connection and type folders can be downloaded from.
+	f := st.Tables[0].File
+	for _, bad := range []string{"", f, "xlsx", "other/" + f, "shop/other/" + f, "../shop/xlsx/" + f, "shop/../xlsx/" + f,
+		"shop/xlsx/../../" + f, "a/shop/xlsx/" + f, "shop/xlsx/.hidden", "sh*p/xlsx/" + f} {
+		if code := download(s, "/api/exports/"+bad); code != 400 && code != 404 {
+			t.Errorf("%q: %d", bad, code)
 		}
 	}
+}
+
+// download requests an /api/exports/ link and returns the status.
+func download(s *server, link string) int {
+	rec := httptest.NewRecorder()
+	p, _ := url.PathUnescape(strings.TrimPrefix(link, "/api/exports/"))
+	req := httptest.NewRequest("GET", "/api/exports/x", nil)
+	req.SetPathValue("path", p)
+	s.handleDownload(rec, req)
+	if rec.Code == 200 && rec.Body.Len() == 0 {
+		return 0
+	}
+	return rec.Code
 }
 
 // Every export type, DDL included, goes to its own subfolder of the export folder.
@@ -397,17 +404,12 @@ func TestAPIExportFolderSetting(t *testing.T) {
 	if got := savedExportDir(s.store); got != newDir {
 		t.Errorf("saved setting = %q, want %q", got, newDir)
 	}
-	if got := export()["folder"]; got != filepath.Join(newDir, "json") {
+	if got := export()["folder"]; got != filepath.Join(newDir, "shop", "json") {
 		t.Errorf("new export went to %v", got)
 	}
 	// The file exported before the change can still be downloaded.
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", old["download"].(string), nil)
-	req.SetPathValue("kind", "json")
-	req.SetPathValue("file", old["file"].(string))
-	s.handleDownload(rec, req)
-	if rec.Code != 200 {
-		t.Errorf("download from the old folder: %d", rec.Code)
+	if code := download(s, old["download"].(string)); code != 200 {
+		t.Errorf("download from the old folder: %d", code)
 	}
 
 	// Empty means the default folder again, which is saved as "".

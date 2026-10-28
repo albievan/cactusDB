@@ -522,7 +522,7 @@ func (s *server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "[%s] backup started", ss.label)
-	res, err := backupToDir(r.Context(), s.exportFolder(), ss.engine, ss.db, ss.label, ss.dbName, groups, nil)
+	res, err := backupToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, ss.label, ss.dbName, groups, nil)
 	if err != nil {
 		logAction(r, "[%s] backup FAILED: %v", ss.label, err)
 		writeErr(w, 400, err)
