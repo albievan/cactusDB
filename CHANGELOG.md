@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.0 — 2026-10-28
+
+- **Overall progress bar** below the Run button while exporting. For *Export all
+  tables* it shows the percentage, tables done, rows exported, elapsed time and an
+  estimate of the time left. Single exports, DDL exports and backups show a moving bar
+  with the elapsed time. Each ends with a summary that **Clear** removes.
+
 ## 1.10.0 — 2026-10-28
 
 - **Preview** on the *Exported files* page (👁 after each checkbox): CSV, Excel (first

@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.10.0
+cactusdb 1.11.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -182,6 +182,15 @@ there, and saves the choice in `cactus.conn.db`, so it's used again after a rest
 web UI and by command-line exports. **Use default** goes back to the `export` folder next to
 the program. Files exported before the change can still be downloaded until cactusdb stops.
 `--exportto` on the command line always wins over the saved folder.
+
+**Overall progress.** While an export runs, a progress bar below the **Run** button shows
+how far it has got. It stays visible while you open other tables.
+- **Export all tables:** the bar shows the percentage, tables done out of the total, rows
+  exported, time elapsed and about how long is left. Any failures appear in red.
+- **Single exports, DDL and backups:** the server doesn't report how far these have got,
+  so the bar moves to show that the work is in progress, with the elapsed time.
+- **When it's finished:** the bar turns into a summary, for example *✔ Exported 60 of 60
+  tables as Excel · 1,800,000 rows in 0:42*. **Clear** removes it.
 
 **Export the DDL.** The **DDL** button next to the filter writes the `CREATE` statements of
 every object in the database to one `.sql` file (see [DDL export](#ddl-export)).
@@ -453,7 +462,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.10.0 is running in the background (process id 48211)
+cactusdb 1.11.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -574,7 +583,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.10.0 is running in container cactusdb
+cactusdb 1.11.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
