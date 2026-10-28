@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.1 — 2026-10-28
+
+- **New logo**: a modern, flat app-icon tile (emerald-to-teal gradient) with a white
+  cactus whose trunk doubles as a database cylinder, plus a coral flower. It reads
+  well from favicon size up and in light and dark themes. Used in the header, the browser
+  tab, the page placeholders and the README.
+
 ## 1.12.0 — 2026-10-28
 
 - *Exported files* page, better filters:
