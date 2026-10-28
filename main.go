@@ -33,7 +33,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.13.1"
+var version = "1.13.2"
 
 //go:embed web
 var webFS embed.FS
@@ -628,7 +628,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	db, err := openDB(r.Context(), p)
 	if err != nil {
 		logAction(r, "connect FAILED %s: %v", defaultConnName(p), err)
-		writeErr(w, 400, fmt.Errorf("connection failed: %w", err))
+		writeErr(w, 400, fmt.Errorf("connection failed: %w", explainConnErr(p, err)))
 		return
 	}
 	objects, err := listObjects(r.Context(), p.Engine, db)
@@ -687,7 +687,7 @@ func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 	db, err := openDB(r.Context(), p)
 	if err != nil {
 		logAction(r, "test connection FAILED %s: %v", defaultConnName(p), err)
-		writeErr(w, 400, err)
+		writeErr(w, 400, explainConnErr(p, err))
 		return
 	}
 	defer db.Close()

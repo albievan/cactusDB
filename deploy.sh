@@ -423,6 +423,10 @@ eng_install() {
   # Not as root, so the files in the data folders belong to a real user
   # (rootless podman maps root to you already).
   [[ $RUNTIME == podman ]] || args+=(--user "$user")
+  # host.docker.internal reaches the computer running Docker, and the database
+  # containers that publish their ports on it: localhost inside the container
+  # is the container itself. (Podman provides host.containers.internal.)
+  [[ $RUNTIME == podman ]] || args+=(--add-host host.docker.internal:host-gateway)
 
   if eng_exists; then
     say "Replacing the existing container ${NAME}…"

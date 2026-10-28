@@ -247,8 +247,12 @@ if exists; then
   echo "Replacing the existing container ${NAME}…"
   "$RUNTIME" rm -f "$NAME" >/dev/null
 fi
+# host.docker.internal reaches this computer (and database containers that
+# publish their ports on it): localhost inside the container is the container.
+HOST_OPT=()
+[[ $RUNTIME == podman ]] || HOST_OPT=(--add-host host.docker.internal:host-gateway)
 "$RUNTIME" run -d --name "$NAME" --restart unless-stopped \
-  ${USER_OPT[@]+"${USER_OPT[@]}"} "${ENVS[@]}" "${MOUNTS[@]}" \
+  ${USER_OPT[@]+"${USER_OPT[@]}"} ${HOST_OPT[@]+"${HOST_OPT[@]}"} "${ENVS[@]}" "${MOUNTS[@]}" \
   -p "$BIND:$PORT:$PORT" "$IMAGE" >/dev/null
 
 # Wait until it answers (or show why it didn't).

@@ -96,7 +96,7 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 
 	db, err := openDB(ctx, o.ConnParams)
 	if err != nil {
-		return fmt.Errorf("connection failed: %w", err)
+		return fmt.Errorf("connection failed: %w", explainConnErr(o.ConnParams, err))
 	}
 	defer db.Close()
 	if o.Store != nil {

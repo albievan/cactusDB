@@ -23,7 +23,9 @@ COPY rootfs-${TARGETARCH}/ /
 #   takes effect.
 VOLUME ["/opt/cactusdb/conn", "/opt/cactusdb/export"]
 WORKDIR /opt/cactusdb
-ENV CACTUSDB_PORT=8080 PATH=/opt/cactusdb:$PATH
+# CACTUSDB_CONTAINER lets cactusdb explain that "localhost" is the container
+# itself (use host.docker.internal for the computer that runs Docker).
+ENV CACTUSDB_PORT=8080 PATH=/opt/cactusdb:$PATH CACTUSDB_CONTAINER=1
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \

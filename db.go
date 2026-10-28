@@ -507,3 +507,26 @@ func formatGUID(b []byte) string {
 	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
 		b[3], b[2], b[1], b[0], b[5], b[4], b[7], b[6], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15])
 }
+
+// inContainer reports whether cactusdb runs in a container (the image sets
+// CACTUSDB_CONTAINER; Docker and Podman also leave a marker file).
+var inContainer = os.Getenv("CACTUSDB_CONTAINER") != "" || fileExists("/.dockerenv") || fileExists("/run/.containerenv")
+
+// explainConnErr adds a hint to a failed connection to localhost from inside
+// a container, where localhost is the container itself rather than the
+// computer running it.
+func explainConnErr(p ConnParams, err error) error {
+	if err == nil || !inContainer || p.Engine == EngineSQLite {
+		return err
+	}
+	host, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(p.Host)), `\`) // SQL Server: host\INSTANCE
+	if host != "" && host != "localhost" && host != "::1" && host != "[::1]" && !strings.HasPrefix(host, "127.") {
+		return err
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	return fmt.Errorf("%w\n\ncactusdb runs in a container, where %q is the container itself, not this computer. "+
+		"For a database on the computer that runs Docker (also one in another container that publishes its port there), "+
+		"use the host host.docker.internal; for another server, its name or IP address", err, host)
+}

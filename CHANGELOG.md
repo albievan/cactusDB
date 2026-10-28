@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.13.2 — 2026-10-28
+
+- Fixed: cactusdb in a container (`deploy.sh`, `deploy-container.sh`) couldn't reach
+  databases on the computer running Docker. `localhost` there is the container itself,
+  and `host.docker.internal` didn't resolve on every Docker setup. The scripts now
+  start the container with `--add-host host.docker.internal:host-gateway`, so
+  `host.docker.internal` always reaches the computer running Docker and the database
+  containers that publish ports on it.
+- A failed connection to `localhost` from inside a container now explains this and
+  suggests `host.docker.internal` (Connect, Test connection and command line).
+- Tested connections to all six databases (SQLite, MySQL, MariaDB, PostgreSQL, Firebird,
+  SQL Server) both natively and from a container.
+
 ## 1.13.1 — 2026-10-28
 
 - Fixed: in 1.13.0 the **DDL** button under *Objects* showed a long piece of garbled
