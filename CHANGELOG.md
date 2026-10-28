@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1 — 2026-10-28
+
+- Fixed: in 1.13.0 the **DDL** button under *Objects* showed a long piece of garbled
+  text instead of "DDL" (a slip while changing its tooltip). It shows "DDL" again.
+- The version (e.g. `v1.13.0`) is shown under the cactusdb name in the top bar.
+
 ## 1.13.0 — 2026-10-28
 
 - **Exports are sorted by connection**: every export, DDL script and backup goes to
