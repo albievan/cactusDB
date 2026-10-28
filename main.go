@@ -33,7 +33,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.9.0"
+var version = "1.10.0"
 
 //go:embed web
 var webFS embed.FS
@@ -338,6 +338,8 @@ func main() {
 	mux.HandleFunc("GET /api/files", s.handleListFiles)
 	mux.HandleFunc("POST /api/files/zip", s.handlePrepareZip)
 	mux.HandleFunc("GET /api/files/zip/{id}", s.handleDownloadZip)
+	mux.HandleFunc("GET /api/files/preview", s.handlePreviewFile)
+	mux.HandleFunc("POST /api/files/delete", s.handleDeleteFiles)
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)

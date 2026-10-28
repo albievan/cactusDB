@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/xuri/excelize/v2"
 )
 
 // The Exported files page lists the export subfolders and downloads a
@@ -106,5 +109,101 @@ func TestExportedFilesZip(t *testing.T) {
 	}
 	if len(s.zips) != 0 {
 		t.Error("zips left behind")
+	}
+}
+
+func TestExportedFilesPreviewAndDelete(t *testing.T) {
+	s := newTestServer(t)
+	dir := s.exportFolder()
+	put := func(kind, name string, data []byte) string {
+		p := filepath.Join(dir, kind, name)
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	var csvData strings.Builder
+	csvData.WriteString("id,name\n")
+	for i := range 250 {
+		fmt.Fprintf(&csvData, "%d,\"name, %d\"\n", i, i)
+	}
+	put("csv", "big.csv", []byte(csvData.String()))
+	put("json", "rows.json", []byte(`[
+  {"id": 1, "name": "Ann", "z": null},
+  {"id": 2, "name": "Bob"}
+]`))
+	put("sql", "ddl.sql", []byte("CREATE TABLE t (a int);\n"))
+	// An Excel file and a backup .zip, made the way cactusdb makes them.
+	xf := excelize.NewFile()
+	xf.SetSheetRow("Sheet1", "A1", &[]any{"id", "name"})
+	xf.SetSheetRow("Sheet1", "A2", &[]any{1, "Ann"})
+	var xb bytes.Buffer
+	xf.Write(&xb)
+	put("xlsx", "t.xlsx", xb.Bytes())
+	var zb bytes.Buffer
+	zw := zip.NewWriter(&zb)
+	w, _ := zw.Create("shop.sql")
+	io.WriteString(w, "-- Backup of shop\nINSERT INTO t VALUES (1);\n")
+	zw.Close()
+	put("backup", "shop_backup.zip", zb.Bytes())
+
+	preview := func(kind, name string) (int, map[string]any) {
+		rec := httptest.NewRecorder()
+		s.handlePreviewFile(rec, httptest.NewRequest("GET", "/api/files/preview?kind="+kind+"&name="+name, nil))
+		var out map[string]any
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	if _, p := preview("csv", "big.csv"); p["mode"] != "table" || len(p["rows"].([]any)) != previewRows || p["truncated"] != true ||
+		p["rows"].([]any)[0].([]any)[1] != "name, 0" {
+		t.Errorf("csv: %v %v", p["mode"], p["truncated"])
+	}
+	if _, p := preview("xlsx", "t.xlsx"); p["mode"] != "table" || len(p["rows"].([]any)) != 1 || p["truncated"] != false {
+		t.Errorf("xlsx: %v", p)
+	}
+	if _, p := preview("json", "rows.json"); p["mode"] != "json" || len(p["items"].([]any)) != 2 || p["truncated"] != false {
+		t.Errorf("json: %v", p)
+	}
+	if _, p := preview("sql", "ddl.sql"); p["mode"] != "text" || p["text"] != "CREATE TABLE t (a int);\n" {
+		t.Errorf("sql: %v", p)
+	}
+	if _, p := preview("backup", "shop_backup.zip"); p["mode"] != "zip" || len(p["entries"].([]any)) != 1 || !strings.Contains(p["text"].(string), "INSERT INTO") {
+		t.Errorf("zip: %v", p)
+	}
+	for _, bad := range [][2]string{{"csv", "../csv/big.csv"}, {"..", "c.db"}, {"csv", "missing.csv"}} {
+		if code, _ := preview(bad[0], bad[1]); code != 404 {
+			t.Errorf("preview %v: %d", bad, code)
+		}
+	}
+
+	del := func(contentType, body string) (int, map[string]any) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/files/delete", strings.NewReader(body))
+		req.Header.Set("Content-Type", contentType)
+		s.handleDeleteFiles(rec, req)
+		var out map[string]any
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	if code, _ := del("text/plain", `{"files":[{"kind":"sql","name":"ddl.sql"}]}`); code != 415 {
+		t.Errorf("non-JSON delete: %d", code)
+	}
+	outside := filepath.Join(t.TempDir(), "keep.txt")
+	os.WriteFile(outside, []byte("x"), 0o644)
+	code, res := del("application/json", `{"files":[{"kind":"sql","name":"ddl.sql"},{"kind":"csv","name":"big.csv"},{"kind":"csv","name":"../../`+filepath.Base(outside)+`"}]}`)
+	if code != 200 || res["deleted"].(float64) != 2 {
+		t.Fatalf("delete: %d %v", code, res)
+	}
+	for _, p := range []string{filepath.Join(dir, "sql", "ddl.sql"), filepath.Join(dir, "csv", "big.csv")} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("%s still exists", p)
+		}
+	}
+	if _, err := os.Stat(outside); err != nil {
+		t.Error("a file outside the export folder was deleted")
+	}
+	if len(s.listExportedFiles()) != 3 {
+		t.Errorf("left: %v", s.listExportedFiles())
 	}
 }

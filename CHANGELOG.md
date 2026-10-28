@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0 — 2026-10-28
+
+- **Preview** on the *Exported files* page (👁 after each checkbox): CSV, Excel (first
+  sheet) and JSON exports as a table, XML, SQL and other text as text, and backups as
+  their list of files plus the start of the SQL script. At most 200 rows or 256 KB.
+  The preview can also download or delete the file.
+- **Delete** (🗑 after each checkbox) and **Delete selected**: always asks for
+  confirmation first, listing the files and their total size. Only files on the list can
+  be deleted, and only by requests from the page itself.
+
 ## 1.9.0 — 2026-10-28
 
 - **Exported files** page (a new tab): every file in the export folder (data exports,

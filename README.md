@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.9.0
+cactusdb 1.10.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -157,6 +157,16 @@ exports, DDL scripts and backups, with when each was created and its size (uncom
   there are, or with the name filter.
 - **Select:** tick the files you want, or click their rows. The heading checkbox selects every
   file shown.
+- **Preview** (the 👁 button after a file's checkbox) opens the file in a window:
+  - CSV and Excel files (the first sheet) as a table; JSON exports as a table of their objects
+  - XML, DDL scripts and other text as text
+  - a backup as the list of files inside, followed by the start of its SQL script
+
+  A preview shows at most the first 200 rows or 256 KB, and says when there is more.
+  From the preview you can also download or delete that file.
+- **Delete:** the 🗑 button deletes one file, and **Delete selected** deletes every ticked file.
+  cactusdb always asks first, with **Cancel** selected, and shows the files and their total
+  size. Deleted files are gone from the export folder for good.
 - **Download selected:** cactusdb first compresses the chosen files into one `.zip` at the
   highest compression level, each file in a folder for its type. Only then does the download
   start, and the page shows the original and the compressed size.
@@ -443,7 +453,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.9.0 is running in the background (process id 48211)
+cactusdb 1.10.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -564,7 +574,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.9.0 is running in container cactusdb
+cactusdb 1.10.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -663,7 +673,8 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
   users of the computer (in the process list) and is kept in your shell history. Leave it
   out to be prompted (nothing is shown as you type), or set `CACTUSDB_DBPASSWORD` in scripts.
 - cactusdb never writes to your databases (see [Read-only](#read-only)). The only files it
-  writes are `cactus.conn.db`, `cactus.key` and the files in the export folder.
+  writes (and, on the *Exported files* page when you confirm, deletes) are `cactus.conn.db`,
+  `cactus.key` and the files in the export folder.
 
 ## 8. Troubleshooting
 
@@ -747,7 +758,7 @@ CACTUSDB_IT=1 go test ./...
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections and settings (`cactus.conn.db`) |
 | `settings.go` | Changing the export folder from the web UI |
-| `files.go` | The *Exported files* page: listing, and compressed downloads of a selection |
+| `files.go` | The *Exported files* page: listing, previews, deleting, and compressed downloads of a selection |
 | `Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |

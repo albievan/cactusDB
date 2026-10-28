@@ -173,7 +173,7 @@
   #filesPane { display: grid; grid-template-rows: auto auto 1fr auto; background: var(--panel); }
   .filesbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
   .filesbar .spacer { flex: 1; }
-  #fFilter { width: 200px; max-width: 100%; }
+  #fFilter { width: 160px; max-width: 100%; }
   .ftypes { display: flex; gap: 4px; flex-wrap: wrap; }
   .ftypes button { padding: 2px 9px; font-size: 12px; border-radius: 999px; }
   .ftypes button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
@@ -189,6 +189,24 @@
   .ftable td.fsize, .ftable th.fsize { text-align: right; }
   .ftable tbody tr { cursor: pointer; }
   .ftable tbody tr.sel td { background: var(--accent-soft) !important; }
+  .ftable th.facts, .ftable td.facts { width: 70px; padding: 3px 6px; cursor: default; }
+  .facts button { padding: 3px 5px; border: 1px solid transparent; background: none; color: var(--muted); line-height: 0; border-radius: 5px; }
+  .facts button:hover:not(:disabled) { border-color: var(--border); color: var(--text); background: var(--panel); }
+  .facts button.del:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+  .facts svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .fdlist { margin: 8px 0 0; padding-left: 18px; max-height: 200px; overflow: auto; font: 12px/1.6 var(--mono); overflow-wrap: anywhere; }
+  dialog.modal.fprev { width: min(1100px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); padding: 0; }
+  dialog.modal.fprev[open] { display: grid; grid-template-rows: auto 1fr auto; }
+  .fphead { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .fphead h3 { margin: 0; font: 600 14px var(--mono); overflow-wrap: anywhere; }
+  .fphead .spacer { flex: 1; }
+  .fpmeta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .fpbody { overflow: auto; min-height: 0; background: var(--panel); }
+  .fpbody pre { margin: 0; padding: 12px 16px; font: 12px/1.5 var(--mono); white-space: pre; tab-size: 4; }
+  .fpbody table td { font-size: 12px; }
+  .fpbody .fpzip { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .fpbody .fpzip table { margin-top: 6px; }
+  .fpfoot { padding: 6px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--panel-2); }
   .ffoot { padding: 6px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--panel-2); overflow-wrap: anywhere; }
   #defPane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); }
   .defbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -419,6 +437,7 @@
         <span class="spacer"></span>
         <span class="fsel" id="fSel"></span>
         <button class="small" id="fRefresh" title="Reload the list">⟳</button>
+        <button class="danger" id="fDelete" disabled title="Delete the selected files (asks first)">Delete selected</button>
         <button class="primary" id="fDownload" disabled title="Compress the selected files into one .zip (highest compression), then download it">Download selected</button>
       </div>
       <div class="exportnote" id="fNote" hidden></div>
@@ -484,6 +503,29 @@
       <button type="submit" class="primary" id="edSave">Save</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="fDelDialog" class="modal" aria-labelledby="fdTitle">
+  <h3 id="fdTitle">Delete files?</h3>
+  <p class="sdtext" id="fdText"></p>
+  <ul class="fdlist" id="fdList"></ul>
+  <div class="dactions">
+    <span class="spacer"></span>
+    <button type="button" id="fdCancel">Cancel</button>
+    <button type="button" class="dangerfill" id="fdConfirm">Delete</button>
+  </div>
+</dialog>
+
+<dialog id="fPrevDialog" class="modal fprev" aria-labelledby="fpTitle">
+  <div class="fphead">
+    <div><h3 id="fpTitle"></h3><div class="fpmeta" id="fpMeta"></div></div>
+    <span class="spacer"></span>
+    <button type="button" id="fpDownload" title="Compress this file (highest level) and download it">Download</button>
+    <button type="button" class="danger" id="fpDelete" title="Delete this file (asks first)">Delete</button>
+    <button type="button" id="fpClose" aria-label="Close preview">✕</button>
+  </div>
+  <div class="fpbody" id="fpBody"></div>
+  <div class="fpfoot" id="fpFoot"></div>
 </dialog>
 
 <dialog id="shutdownDialog" class="modal" aria-labelledby="sdTitle">
@@ -984,6 +1026,7 @@ function renderFiles() {
   const someOn = vis.some((f) => files.sel.has(fileKey(f)));
   const head = `<thead><tr>
       <th class="ck"><input type="checkbox" id="fAll" aria-label="Select all shown files" ${allOn ? "checked" : ""}></th>
+      <th class="facts"></th>
       <th data-fsort="name" title="Sort by file name">File name${arrow("name")}</th>
       <th data-fsort="kind" title="Sort by type">Type${arrow("kind")}</th>
       <th data-fsort="modified" title="Sort by date">Created${arrow("modified")}</th>
@@ -992,13 +1035,14 @@ function renderFiles() {
     const k = fileKey(f), on = files.sel.has(k);
     return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}">
       <td class="ck"><input type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
+      <td class="facts"><button data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button data-fact="delete" class="del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></td>
       <td class="fname">${esc(f.name)}</td>
       <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
       <td class="fdate">${esc(fmtDate(f.modified))}</td>
       <td class="fsize" title="${f.size.toLocaleString()} bytes, uncompressed">${fmtSize(f.size)}</td></tr>`;
   }).join("");
   $("fTable").innerHTML = files.list.length
-    ? `<table>${head}<tbody>${rows || `<tr><td colspan="5" class="placeholder">No files match the filter.</td></tr>`}</tbody></table>`
+    ? `<table>${head}<tbody>${rows || `<tr><td colspan="6" class="placeholder">No files match the filter.</td></tr>`}</tbody></table>`
     : `<div class="placeholder"><div><p>No exported files yet.</p><p>Exports, DDL scripts and backups appear here.</p></div></div>`;
   const all = $("fAll");
   if (all) all.indeterminate = someOn && !allOn;
@@ -1008,6 +1052,7 @@ function renderFiles() {
   $("fSel").textContent = selected.length ? `${selected.length} selected · ${fmtSize(selSize)}` : "";
   const dl = $("fDownload");
   if (!dl.dataset.busy) dl.disabled = !selected.length;
+  $("fDelete").disabled = !selected.length;
   const total = files.list.reduce((t, f) => t + f.size, 0);
   $("fFoot").textContent = `${files.list.length} file${files.list.length === 1 ? "" : "s"} · ${fmtSize(total)} uncompressed` +
     (vis.length !== files.list.length ? ` · ${vis.length} shown` : "") + (files.folder ? ` · ${files.folder}` : "");
@@ -1035,6 +1080,13 @@ $("fTable").addEventListener("click", (ev) => {
     renderFiles(); return;
   }
   const tr = ev.target.closest("tr[data-fkey]");
+  const act = ev.target.closest("[data-fact]");
+  if (tr && act) {
+    const f = files.list.find((x) => fileKey(x) === tr.dataset.fkey);
+    if (f && act.dataset.fact === "preview") previewFile(f);
+    if (f && act.dataset.fact === "delete") askDelete([f]);
+    return;
+  }
   if (tr) {
     const k = tr.dataset.fkey;
     files.sel.has(k) ? files.sel.delete(k) : files.sel.add(k);
@@ -1042,8 +1094,9 @@ $("fTable").addEventListener("click", (ev) => {
   }
 });
 
-$("fDownload").addEventListener("click", async () => {
-  const chosen = files.list.filter((f) => files.sel.has(fileKey(f)));
+$("fDownload").addEventListener("click", () => downloadFiles(files.list.filter((f) => files.sel.has(fileKey(f)))));
+
+async function downloadFiles(chosen) {
   if (!chosen.length) return;
   const b = $("fDownload"), note = $("fNote");
   b.disabled = true; b.dataset.busy = "1"; b.textContent = "Compressing…";
@@ -1066,7 +1119,95 @@ $("fDownload").addEventListener("click", async () => {
   } finally {
     delete b.dataset.busy; b.textContent = "Download selected"; b.disabled = !files.sel.size;
   }
+}
+
+// ---- delete (always asks first) ----
+let fDelPending = [];
+function askDelete(list) {
+  if (!list.length) return;
+  fDelPending = list;
+  const size = list.reduce((t, f) => t + f.size, 0);
+  $("fdTitle").textContent = list.length === 1 ? "Delete this file?" : `Delete ${list.length} files?`;
+  $("fdText").textContent = `${list.length === 1 ? "It" : "They"} will be removed from the export folder (${fmtSize(size)}). This can't be undone.`;
+  const shown = list.slice(0, 12).map((f) => `<li>${esc(f.kind)}/${esc(f.name)}</li>`).join("");
+  $("fdList").innerHTML = shown + (list.length > 12 ? `<li>… and ${list.length - 12} more</li>` : "");
+  $("fDelDialog").showModal();
+  $("fdCancel").focus(); // the safe choice is the default
+}
+$("fDelete").addEventListener("click", () => askDelete(files.list.filter((f) => files.sel.has(fileKey(f)))));
+$("fdCancel").addEventListener("click", () => $("fDelDialog").close());
+$("fdConfirm").addEventListener("click", async () => {
+  const list = fDelPending;
+  $("fdConfirm").disabled = true;
+  try {
+    const res = await api("POST", "/api/files/delete", { files: list.map((f) => ({ kind: f.kind, name: f.name })) });
+    list.forEach((f) => files.sel.delete(fileKey(f)));
+    $("fDelDialog").close();
+    if ($("fPrevDialog").open && list.some((f) => fileKey(f) === fPrevKey)) $("fPrevDialog").close();
+    if (res.failed.length) toast(`Deleted ${res.deleted}; could not delete: ${res.failed.join("; ")}`, true);
+    else toast(`Deleted ${res.deleted} file${res.deleted === 1 ? "" : "s"} (${fmtSize(res.freed)})`);
+  } catch (e) { toast("Delete failed: " + e.message, true); }
+  finally { $("fdConfirm").disabled = false; loadFiles(); }
 });
+
+// ---- preview ----
+let fPrevKey = null;
+function tableHTML(cols, rows) {
+  return `<table><thead><tr><th class="n">#</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map((r, i) => `<tr><td class="n">${i + 1}</td>${cols.map((_, j) => {
+      const v = r[j];
+      return v === null || v === undefined ? `<td class="null">NULL</td>` : `<td>${esc(typeof v === "object" ? JSON.stringify(v) : v)}</td>`;
+    }).join("")}</tr>`).join("") + "</tbody></table>";
+}
+async function previewFile(f) {
+  fPrevKey = fileKey(f);
+  $("fpTitle").textContent = f.name;
+  $("fpMeta").textContent = `${fileTypeNames[f.kind] || f.kind} · ${fmtSize(f.size)} · created ${fmtDate(f.modified)}`;
+  $("fpBody").innerHTML = `<p class="placeholder"><span class="spin"></span> Loading preview…</p>`;
+  $("fpFoot").textContent = "";
+  if (!$("fPrevDialog").open) $("fPrevDialog").showModal();
+  try {
+    const p = await api("GET", `/api/files/preview?kind=${encodeURIComponent(f.kind)}&name=${encodeURIComponent(f.name)}`);
+    if (fPrevKey !== fileKey(f)) return; // another file was opened meanwhile
+    let foot = "";
+    switch (p.mode) {
+      case "table":
+        $("fpBody").innerHTML = p.columns.length ? tableHTML(p.columns, p.rows) : `<p class="placeholder">The file is empty.</p>`;
+        foot = `${p.rows.length.toLocaleString()} row${p.rows.length === 1 ? "" : "s"}` + (p.truncated ? ` shown: the first ${p.limit} of more` : "") +
+          (p.sheet ? ` · sheet "${p.sheet}"${p.sheets > 1 ? ` (1 of ${p.sheets})` : ""}` : "");
+        break;
+      case "json": {
+        const cols = [];
+        p.items.forEach((o) => Object.keys(o).forEach((k) => { if (!cols.includes(k)) cols.push(k); }));
+        $("fpBody").innerHTML = p.items.length ? tableHTML(cols, p.items.map((o) => cols.map((c) => o[c]))) : `<p class="placeholder">The array is empty.</p>`;
+        foot = `${p.items.length.toLocaleString()} object${p.items.length === 1 ? "" : "s"}` + (p.truncated ? ` shown: the first ${p.limit} of more` : "");
+        break;
+      }
+      case "zip":
+        $("fpBody").innerHTML = `<div class="fpzip"><b>Files in this archive</b>${tableHTML(["File", "Size", "Compressed"],
+          p.entries.map((e) => [e.name, fmtSize(e.size), fmtSize(e.compressed)]))}</div>` +
+          (p.text !== undefined ? `<pre>${esc(p.text)}</pre>` : "");
+        foot = p.textOf ? `Showing the start of ${p.textOf}` + (p.truncated ? " (first 256 KB)" : "") : "";
+        break;
+      case "text": {
+        let text = p.text;
+        if (f.kind === "json" && !p.truncated) { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* show as is */ } }
+        $("fpBody").innerHTML = `<pre>${esc(text)}</pre>`;
+        foot = p.truncated ? "Showing the first 256 KB" : "";
+        break;
+      }
+      default:
+        $("fpBody").innerHTML = `<p class="placeholder">This file can't be previewed. Download it to open it.</p>`;
+    }
+    $("fpFoot").textContent = foot;
+  } catch (e) {
+    $("fpBody").innerHTML = `<p class="placeholder">${esc(e.message)}</p>`;
+  }
+}
+const prevFile = () => files.list.find((x) => fileKey(x) === fPrevKey);
+$("fpClose").addEventListener("click", () => $("fPrevDialog").close());
+$("fpDownload").addEventListener("click", () => { const f = prevFile(); if (f) downloadFiles([f]); });
+$("fpDelete").addEventListener("click", () => { const f = prevFile(); if (f) askDelete([f]); });
 $("fNote").addEventListener("click", (ev) => { if (ev.target.dataset.act === "close-fnote") $("fNote").hidden = true; });
 
 // ---- tabs & definition -----------------------------------------------------
