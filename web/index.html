@@ -169,7 +169,27 @@
   .tabs .title { margin-left: 12px; font-size: 12px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pane { min-height: 0; min-width: 0; }
   #dataPane { display: grid; grid-template-rows: auto auto auto 1fr; }
-  #dataPane[hidden], #defPane[hidden] { display: none; }
+  #dataPane[hidden], #defPane[hidden], #filesPane[hidden] { display: none; }
+  #filesPane { display: grid; grid-template-rows: auto auto 1fr auto; background: var(--panel); }
+  .filesbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+  .filesbar .spacer { flex: 1; }
+  #fFilter { width: 200px; max-width: 100%; }
+  .ftypes { display: flex; gap: 4px; flex-wrap: wrap; }
+  .ftypes button { padding: 2px 9px; font-size: 12px; border-radius: 999px; }
+  .ftypes button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .ftypes .cnt { color: var(--muted); margin-left: 3px; font-size: 11px; }
+  .fsel { font-size: 12px; color: var(--muted); }
+  .ftable { overflow: auto; min-height: 0; }
+  .ftable table { width: 100%; }
+  .ftable td, .ftable th { max-width: none; }
+  .ftable th.ck, .ftable td.ck { width: 34px; text-align: center; padding: 5px 6px; cursor: default; }
+  .ftable td.fname { font-family: var(--mono); font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+  .ftable td.ftype span { font-size: 10px; text-transform: uppercase; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; color: var(--muted); }
+  .ftable td.fdate, .ftable td.fsize { font-variant-numeric: tabular-nums; font-size: 12px; }
+  .ftable td.fsize, .ftable th.fsize { text-align: right; }
+  .ftable tbody tr { cursor: pointer; }
+  .ftable tbody tr.sel td { background: var(--accent-soft) !important; }
+  .ffoot { padding: 6px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--panel-2); overflow-wrap: anywhere; }
   #defPane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); }
   .defbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
   .defbar .kind { font-size: 10px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
@@ -359,6 +379,7 @@
     <div class="tabs">
       <button data-tab="data" class="on">Data</button>
       <button data-tab="def">Definition</button>
+      <button data-tab="files" title="Download exported files, compressed">Exported files</button>
       <span class="title" id="tabTitle"></span>
     </div>
     <div class="pane" id="dataPane">
@@ -390,6 +411,19 @@
     <div class="grid" id="grid">
       <div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>Connect to a database, then pick a table on the left.</p></div></div>
     </div>
+    </div>
+    <div class="pane" id="filesPane" hidden>
+      <div class="filesbar">
+        <div class="ftypes" id="fTypes" role="group" aria-label="File type"></div>
+        <input id="fFilter" type="search" placeholder="Filter by name…" spellcheck="false">
+        <span class="spacer"></span>
+        <span class="fsel" id="fSel"></span>
+        <button class="small" id="fRefresh" title="Reload the list">⟳</button>
+        <button class="primary" id="fDownload" disabled title="Compress the selected files into one .zip (highest compression), then download it">Download selected</button>
+      </div>
+      <div class="exportnote" id="fNote" hidden></div>
+      <div class="ftable" id="fTable"></div>
+      <div class="ffoot" id="fFoot"></div>
     </div>
     <div class="pane" id="defPane" hidden>
       <div class="defbar">
@@ -894,6 +928,147 @@ async function loadTable(name) {
   } catch (e) { setInfo(e.message, true); }
 }
 
+// ---- exported files ----------------------------------------------------------
+// Lists the files in the export folder; the selected ones are compressed on
+// the server into one .zip (highest compression) and then downloaded.
+const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, type: "", q: "" };
+const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup" };
+const fileKey = (f) => f.kind + "/" + f.name;
+
+function fmtSize(n) {
+  if (n < 1024) return n + " B";
+  const units = ["KB", "MB", "GB", "TB"];
+  let i = -1;
+  do { n /= 1024; i++; } while (n >= 1024 && i < units.length - 1);
+  return n.toFixed(n < 10 ? 2 : 1) + " " + units[i];
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+async function loadFiles() {
+  try {
+    const res = await api("GET", "/api/files");
+    files.list = res.files;
+    files.folder = res.folder;
+    const keys = new Set(files.list.map(fileKey));
+    files.sel.forEach((k) => { if (!keys.has(k)) files.sel.delete(k); });
+    renderFiles();
+  } catch (e) { toast(e.message, true); }
+}
+
+function visibleFiles() {
+  const q = files.q.toLowerCase();
+  const out = files.list.filter((f) => (!files.type || f.kind === files.type) && (!q || f.name.toLowerCase().includes(q)));
+  const k = files.sortKey, d = files.sortDir;
+  out.sort((a, b) => {
+    let c;
+    if (k === "size") c = a.size - b.size;
+    else if (k === "modified") c = Date.parse(a.modified) - Date.parse(b.modified);
+    else if (k === "kind") c = (fileTypeNames[a.kind] || a.kind).localeCompare(fileTypeNames[b.kind] || b.kind);
+    else c = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+    return c * d || a.name.localeCompare(b.name);
+  });
+  return out;
+}
+
+function renderFiles() {
+  const counts = {};
+  files.list.forEach((f) => (counts[f.kind] = (counts[f.kind] || 0) + 1));
+  $("fTypes").innerHTML = [["", "All", files.list.length], ...Object.keys(fileTypeNames).filter((t) => counts[t]).map((t) => [t, fileTypeNames[t], counts[t]])]
+    .map(([t, label, n]) => `<button class="${files.type === t ? "on" : ""}" data-ftype="${t}">${esc(label)}<span class="cnt">${n}</span></button>`).join("");
+
+  const vis = visibleFiles();
+  const arrow = (k) => files.sortKey === k ? `<span class="dir">${files.sortDir > 0 ? "▲" : "▼"}</span>` : "";
+  const allOn = vis.length > 0 && vis.every((f) => files.sel.has(fileKey(f)));
+  const someOn = vis.some((f) => files.sel.has(fileKey(f)));
+  const head = `<thead><tr>
+      <th class="ck"><input type="checkbox" id="fAll" aria-label="Select all shown files" ${allOn ? "checked" : ""}></th>
+      <th data-fsort="name" title="Sort by file name">File name${arrow("name")}</th>
+      <th data-fsort="kind" title="Sort by type">Type${arrow("kind")}</th>
+      <th data-fsort="modified" title="Sort by date">Created${arrow("modified")}</th>
+      <th data-fsort="size" class="fsize" title="Sort by size">Size${arrow("size")}</th></tr></thead>`;
+  const rows = vis.map((f) => {
+    const k = fileKey(f), on = files.sel.has(k);
+    return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}">
+      <td class="ck"><input type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
+      <td class="fname">${esc(f.name)}</td>
+      <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
+      <td class="fdate">${esc(fmtDate(f.modified))}</td>
+      <td class="fsize" title="${f.size.toLocaleString()} bytes, uncompressed">${fmtSize(f.size)}</td></tr>`;
+  }).join("");
+  $("fTable").innerHTML = files.list.length
+    ? `<table>${head}<tbody>${rows || `<tr><td colspan="5" class="placeholder">No files match the filter.</td></tr>`}</tbody></table>`
+    : `<div class="placeholder"><div><p>No exported files yet.</p><p>Exports, DDL scripts and backups appear here.</p></div></div>`;
+  const all = $("fAll");
+  if (all) all.indeterminate = someOn && !allOn;
+
+  const selected = files.list.filter((f) => files.sel.has(fileKey(f)));
+  const selSize = selected.reduce((t, f) => t + f.size, 0);
+  $("fSel").textContent = selected.length ? `${selected.length} selected · ${fmtSize(selSize)}` : "";
+  const dl = $("fDownload");
+  if (!dl.dataset.busy) dl.disabled = !selected.length;
+  const total = files.list.reduce((t, f) => t + f.size, 0);
+  $("fFoot").textContent = `${files.list.length} file${files.list.length === 1 ? "" : "s"} · ${fmtSize(total)} uncompressed` +
+    (vis.length !== files.list.length ? ` · ${vis.length} shown` : "") + (files.folder ? ` · ${files.folder}` : "");
+}
+
+$("fTypes").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-ftype]");
+  if (b) { files.type = b.dataset.ftype; renderFiles(); }
+});
+$("fFilter").addEventListener("input", () => { files.q = $("fFilter").value; renderFiles(); });
+$("fRefresh").addEventListener("click", loadFiles);
+$("fTable").addEventListener("click", (ev) => {
+  const th = ev.target.closest("th[data-fsort]");
+  if (th) {
+    const k = th.dataset.fsort;
+    // Dates and sizes start with the newest/largest, names with A.
+    if (files.sortKey === k) files.sortDir = -files.sortDir;
+    else { files.sortKey = k; files.sortDir = k === "modified" || k === "size" ? -1 : 1; }
+    renderFiles(); return;
+  }
+  if (ev.target.id === "fAll") {
+    const vis = visibleFiles();
+    const on = ev.target.checked;
+    vis.forEach((f) => (on ? files.sel.add(fileKey(f)) : files.sel.delete(fileKey(f))));
+    renderFiles(); return;
+  }
+  const tr = ev.target.closest("tr[data-fkey]");
+  if (tr) {
+    const k = tr.dataset.fkey;
+    files.sel.has(k) ? files.sel.delete(k) : files.sel.add(k);
+    renderFiles();
+  }
+});
+
+$("fDownload").addEventListener("click", async () => {
+  const chosen = files.list.filter((f) => files.sel.has(fileKey(f)));
+  if (!chosen.length) return;
+  const b = $("fDownload"), note = $("fNote");
+  b.disabled = true; b.dataset.busy = "1"; b.textContent = "Compressing…";
+  note.innerHTML = `<span class="spin"></span> Compressing ${chosen.length} file${chosen.length === 1 ? "" : "s"} (${fmtSize(chosen.reduce((t, f) => t + f.size, 0))}) at the highest level…`;
+  note.hidden = false;
+  try {
+    const res = await api("POST", "/api/files/zip", { files: chosen.map((f) => ({ kind: f.kind, name: f.name })) });
+    const saved = res.size ? Math.max(0, Math.round((1 - res.zipSize / res.size) * 100)) : 0;
+    note.innerHTML = `Compressed ${res.files} file${res.files === 1 ? "" : "s"}: ${fmtSize(res.size)} → <b>${fmtSize(res.zipSize)}</b> (${saved}% smaller) · ` +
+      `<a href="${esc(res.download)}" download="${esc(res.name)}">${esc(res.name)}</a> <span class="fsel">(link valid for 15 minutes)</span>` +
+      `<button class="clearnote" data-act="close-fnote" title="Clear">Clear</button>`;
+    // Only now, with the .zip complete, does the download start.
+    const a = document.createElement("a");
+    a.href = res.download; a.download = res.name;
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) {
+    note.hidden = true;
+    toast("Download failed: " + e.message, true);
+    loadFiles();
+  } finally {
+    delete b.dataset.busy; b.textContent = "Download selected"; b.disabled = !files.sel.size;
+  }
+});
+$("fNote").addEventListener("click", (ev) => { if (ev.target.dataset.act === "close-fnote") $("fNote").hidden = true; });
+
 // ---- tabs & definition -----------------------------------------------------
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -902,7 +1077,9 @@ function showTab(tab) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   $("dataPane").hidden = tab !== "data";
   $("defPane").hidden = tab !== "def";
+  $("filesPane").hidden = tab !== "files";
   if (tab === "def") loadDefinition();
+  if (tab === "files") loadFiles();
 }
 
 async function loadDefinition() {

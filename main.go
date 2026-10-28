@@ -33,7 +33,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.8.0"
+var version = "1.9.0"
 
 //go:embed web
 var webFS embed.FS
@@ -56,7 +56,8 @@ type server struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
-	batches  map[string]*webBatch // "export all tables" jobs, by id
+	batches  map[string]*webBatch    // "export all tables" jobs, by id
+	zips     map[string]*preparedZip // compressed downloads of the Exported files page, by id
 
 	background bool          // started with --runas background: the UI may shut it down
 	shutdown   chan struct{} // closed by /api/shutdown
@@ -334,6 +335,9 @@ func main() {
 	mux.HandleFunc("POST /api/exportall", s.handleExportAll)
 	mux.HandleFunc("GET /api/exportall/{job}", s.handleExportAllStatus)
 	mux.HandleFunc("GET /api/exports/{kind}/{file}", s.handleDownload)
+	mux.HandleFunc("GET /api/files", s.handleListFiles)
+	mux.HandleFunc("POST /api/files/zip", s.handlePrepareZip)
+	mux.HandleFunc("GET /api/files/zip/{id}", s.handleDownloadZip)
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)
@@ -417,6 +421,7 @@ func (s *server) release() {
 		delete(s.sessions, id)
 	}
 	s.mu.Unlock()
+	s.dropZips()
 }
 
 // handleInfo tells the page how this cactusdb runs, e.g. whether it offers
