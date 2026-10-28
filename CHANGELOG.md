@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.3 — 2026-10-28
+
+- Logo: the cactus is now solid white, without the curved database-disc lines across
+  the trunk.
+
 ## 1.12.2 — 2026-10-28
 
 - Logo: removed the coral flower (red dot); the icon is now just the white cactus and
