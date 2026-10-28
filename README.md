@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.11.0
+cactusdb 1.12.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -153,8 +153,15 @@ export status. Disconnecting stops an export that is still running.
 exports, DDL scripts and backups, with when each was created and its size (uncompressed).
 - **Sort:** click a column heading to sort by file name, type, date or size. Click it again
   to reverse the order.
-- **Filter:** narrow the list with the type buttons, which show how many files of each type
-  there are, or with the name filter.
+- **Filter by type:** the **Type** buttons show how many files of each type there are
+  (Excel, CSV, JSON, XML, DDL, Backup). Click one to show only that type, or click several
+  to combine them, for example CSV and JSON. **All** shows every type again.
+- **Search by name:** the **Name** box shows files whose name contains what you type,
+  ignoring case. With several words, for example `order 2026`, a name must contain all of
+  them, in any order. The matching text is highlighted. **Esc** or **✕** clears the box.
+- Type, name and search filters combine. The footer shows how many files are shown and
+  their size. If nothing matches, **Clear the filters** resets them. The filters and the
+  sort order are remembered in your browser.
 - **Select:** tick the files you want, or click their rows. The heading checkbox selects every
   file shown.
 - **Preview** (the 👁 button after a file's checkbox) opens the file in a window:
@@ -462,7 +469,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.11.0 is running in the background (process id 48211)
+cactusdb 1.12.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -583,7 +590,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.11.0 is running in container cactusdb
+cactusdb 1.12.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)

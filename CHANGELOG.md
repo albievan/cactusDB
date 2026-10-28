@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.0 — 2026-10-28
+
+- *Exported files* page, better filters:
+  - The **Type** buttons can be combined (for example CSV and JSON); **All** resets.
+  - The **Name** search finds names containing the text in any case; with several
+    words, a name must contain all of them. Matches are highlighted.
+  - **Esc** clears the search, and a **Clear the filters** button appears when nothing
+    matches.
+  - The footer shows the size of the files shown.
+  - Filters and the sort order are remembered in the browser.
+
 ## 1.11.0 — 2026-10-28
 
 - **Overall progress bar** below the Run button while exporting. For *Export all

@@ -185,7 +185,12 @@
   #filesPane { display: grid; grid-template-rows: auto auto 1fr auto; background: var(--panel); }
   .filesbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
   .filesbar .spacer { flex: 1; }
-  #fFilter { width: 160px; max-width: 100%; }
+  #fFilter { width: 180px; max-width: 100%; }
+  .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .ftable td.fname mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ftable td.fname mark { background: #6b5a12; } }
+  :root[data-theme="dark"] .ftable td.fname mark { background: #6b5a12; }
+  .fnomatch { text-align: center; color: var(--muted); padding: 24px !important; }
   .ftypes { display: flex; gap: 4px; flex-wrap: wrap; }
   .ftypes button { padding: 2px 9px; font-size: 12px; border-radius: 999px; }
   .ftypes button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
@@ -448,8 +453,11 @@
     </div>
     <div class="pane" id="filesPane" hidden>
       <div class="filesbar">
-        <div class="ftypes" id="fTypes" role="group" aria-label="File type"></div>
-        <input id="fFilter" type="search" placeholder="Filter by name…" spellcheck="false">
+        <span class="flabel">Type</span>
+        <div class="ftypes" id="fTypes" role="group" aria-label="Show file types"></div>
+        <label class="flabel" for="fFilter">Name</label>
+        <input id="fFilter" type="search" placeholder="contains…" spellcheck="false" autocomplete="off"
+          title="Shows files whose name contains this text (any case). Several words: all must appear. Esc clears.">
         <span class="spacer"></span>
         <span class="fsel" id="fSel"></span>
         <button class="small" id="fRefresh" title="Reload the list">⟳</button>
@@ -989,7 +997,29 @@ async function loadTable(name) {
 // ---- exported files ----------------------------------------------------------
 // Lists the files in the export folder; the selected ones are compressed on
 // the server into one .zip (highest compression) and then downloaded.
-const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, type: "", q: "" };
+const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, types: new Set(), q: "" };
+// The filters are remembered in this browser (when it allows storage).
+try {
+  const saved = JSON.parse(localStorage.getItem("cactusdb.fileFilters") || "{}");
+  files.types = new Set(saved.types || []); files.q = saved.q || "";
+  if (saved.sortKey) { files.sortKey = saved.sortKey; files.sortDir = saved.sortDir || -1; }
+} catch (e) { /* no storage: start unfiltered */ }
+function saveFileFilters() {
+  try { localStorage.setItem("cactusdb.fileFilters", JSON.stringify({ types: [...files.types], q: files.q, sortKey: files.sortKey, sortDir: files.sortDir })); } catch (e) { /* not stored */ }
+}
+// The search words: a name matches when it contains every one (any case).
+const fileTerms = () => files.q.toLowerCase().split(/\s+/).filter(Boolean);
+function highlightName(name, terms) {
+  if (!terms.length) return esc(name);
+  const lower = name.toLowerCase(), hit = new Array(name.length).fill(false);
+  terms.forEach((t) => { for (let i = lower.indexOf(t); i >= 0; i = lower.indexOf(t, i + 1)) hit.fill(true, i, i + t.length); });
+  let out = "", open = false;
+  for (let i = 0; i < name.length; i++) {
+    if (hit[i] !== open) { out += hit[i] ? "<mark>" : "</mark>"; open = hit[i]; }
+    out += esc(name[i]);
+  }
+  return out + (open ? "</mark>" : "");
+}
 const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup" };
 const fileKey = (f) => f.kind + "/" + f.name;
 
@@ -1016,8 +1046,9 @@ async function loadFiles() {
 }
 
 function visibleFiles() {
-  const q = files.q.toLowerCase();
-  const out = files.list.filter((f) => (!files.type || f.kind === files.type) && (!q || f.name.toLowerCase().includes(q)));
+  const terms = fileTerms();
+  const out = files.list.filter((f) => (!files.types.size || files.types.has(f.kind)) &&
+    terms.every((t) => f.name.toLowerCase().includes(t)));
   const k = files.sortKey, d = files.sortDir;
   out.sort((a, b) => {
     let c;
@@ -1034,7 +1065,12 @@ function renderFiles() {
   const counts = {};
   files.list.forEach((f) => (counts[f.kind] = (counts[f.kind] || 0) + 1));
   $("fTypes").innerHTML = [["", "All", files.list.length], ...Object.keys(fileTypeNames).filter((t) => counts[t]).map((t) => [t, fileTypeNames[t], counts[t]])]
-    .map(([t, label, n]) => `<button class="${files.type === t ? "on" : ""}" data-ftype="${t}">${esc(label)}<span class="cnt">${n}</span></button>`).join("");
+    .map(([t, label, n]) => {
+      const on = t ? files.types.has(t) : !files.types.size;
+      return `<button class="${on ? "on" : ""}" data-ftype="${t}" aria-pressed="${on}" title="${t ? `Show ${esc(label)} files (click several to combine)` : "Show every type"}">${esc(label)}<span class="cnt">${n}</span></button>`;
+    }).join("");
+  if ($("fFilter").value !== files.q) $("fFilter").value = files.q;
+  const terms = fileTerms();
 
   const vis = visibleFiles();
   const arrow = (k) => files.sortKey === k ? `<span class="dir">${files.sortDir > 0 ? "▲" : "▼"}</span>` : "";
@@ -1052,13 +1088,13 @@ function renderFiles() {
     return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}">
       <td class="ck"><input type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
       <td class="facts"><button data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button data-fact="delete" class="del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></td>
-      <td class="fname">${esc(f.name)}</td>
+      <td class="fname">${highlightName(f.name, terms)}</td>
       <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
       <td class="fdate">${esc(fmtDate(f.modified))}</td>
       <td class="fsize" title="${f.size.toLocaleString()} bytes, uncompressed">${fmtSize(f.size)}</td></tr>`;
   }).join("");
   $("fTable").innerHTML = files.list.length
-    ? `<table>${head}<tbody>${rows || `<tr><td colspan="6" class="placeholder">No files match the filter.</td></tr>`}</tbody></table>`
+    ? `<table>${head}<tbody>${rows || `<tr><td colspan="6" class="fnomatch">No files match the filter. <button class="small" data-fclear="1">Clear the filters</button></td></tr>`}</tbody></table>`
     : `<div class="placeholder"><div><p>No exported files yet.</p><p>Exports, DDL scripts and backups appear here.</p></div></div>`;
   const all = $("fAll");
   if (all) all.indeterminate = someOn && !allOn;
@@ -1071,23 +1107,37 @@ function renderFiles() {
   $("fDelete").disabled = !selected.length;
   const total = files.list.reduce((t, f) => t + f.size, 0);
   $("fFoot").textContent = `${files.list.length} file${files.list.length === 1 ? "" : "s"} · ${fmtSize(total)} uncompressed` +
-    (vis.length !== files.list.length ? ` · ${vis.length} shown` : "") + (files.folder ? ` · ${files.folder}` : "");
+    (vis.length !== files.list.length ? ` · ${vis.length} shown (${fmtSize(vis.reduce((t, f) => t + f.size, 0))})` : "") + (files.folder ? ` · ${files.folder}` : "");
 }
 
 $("fTypes").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-ftype]");
-  if (b) { files.type = b.dataset.ftype; renderFiles(); }
+  if (!b) return;
+  // "All" shows every type; a type button adds or removes that type.
+  const t = b.dataset.ftype;
+  if (!t) files.types.clear();
+  else if (files.types.has(t)) files.types.delete(t);
+  else files.types.add(t);
+  // Every type ticked is the same as All.
+  if (files.types.size && [...new Set(files.list.map((f) => f.kind))].every((k) => files.types.has(k))) files.types.clear();
+  saveFileFilters(); renderFiles();
 });
-$("fFilter").addEventListener("input", () => { files.q = $("fFilter").value; renderFiles(); });
+$("fFilter").addEventListener("input", () => { files.q = $("fFilter").value; saveFileFilters(); renderFiles(); });
+$("fFilter").addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && $("fFilter").value) { ev.preventDefault(); $("fFilter").value = ""; files.q = ""; saveFileFilters(); renderFiles(); }
+});
 $("fRefresh").addEventListener("click", loadFiles);
 $("fTable").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-fclear]")) {
+    files.types.clear(); files.q = ""; saveFileFilters(); renderFiles(); return;
+  }
   const th = ev.target.closest("th[data-fsort]");
   if (th) {
     const k = th.dataset.fsort;
     // Dates and sizes start with the newest/largest, names with A.
     if (files.sortKey === k) files.sortDir = -files.sortDir;
     else { files.sortKey = k; files.sortDir = k === "modified" || k === "size" ? -1 : 1; }
-    renderFiles(); return;
+    saveFileFilters(); renderFiles(); return;
   }
   if (ev.target.id === "fAll") {
     const vis = visibleFiles();
