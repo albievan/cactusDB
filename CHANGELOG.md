@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.14.1 — 2026-10-29
+
+- **"Failed to fetch" explained.** When the browser gets no answer, the page now says what
+  it was doing (e.g. running the query), the request, and after how long. It then checks
+  cactusdb and tells you which case applies:
+  - cactusdb is running, so the connection was cut on the way (firewall, proxy, VPN)
+  - cactusdb doesn't answer (stopped, crashed or the network is down)
+  - cactusdb was restarted meanwhile
+
+  Requests that only read (running a query, loading a table) are retried once first.
+- Fixed: using a cactusdb on another computer (e.g. a server) could fail with "Failed to
+  fetch" while the same database worked from a local cactusdb. A firewall or VPN in
+  between silently dropped idle connections, and the browser sent the next request into
+  the dead one. cactusdb now closes idle connections after 20 seconds, before such
+  devices do.
+- An internal error inside cactusdb is now returned as an error message (details in the
+  log) instead of cutting the connection.
+
 ## 1.14.0 — 2026-10-29
 
 - **A password for every saved connection.** Saving a connection now asks for its own

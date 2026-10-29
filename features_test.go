@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -447,4 +448,27 @@ func TestExplainConnErr(t *testing.T) {
 	if err := explainConnErr(ConnParams{Engine: EngineFirebird, Host: "localhost"}, refused); err != refused {
 		t.Errorf("outside a container: %v", err)
 	}
+}
+
+// A crash in a handler becomes an error the page can show, instead of a cut
+// connection ("Failed to fetch").
+func TestRecoverPanics(t *testing.T) {
+	h := recoverPanics(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var m map[string]int
+		m["boom"]++ // panics: assignment to entry in nil map
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("POST", "/api/query", nil))
+	if rec.Code != 500 || !strings.Contains(rec.Body.String(), "internal error in cactusdb while handling POST /api/query") ||
+		!strings.Contains(rec.Body.String(), "nil map") {
+		t.Errorf("got %d %s", rec.Code, rec.Body)
+	}
+	// A deliberate abort is passed on.
+	defer func() {
+		if recover() != http.ErrAbortHandler {
+			t.Error("http.ErrAbortHandler was swallowed")
+		}
+	}()
+	recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) })).
+		ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
 }
