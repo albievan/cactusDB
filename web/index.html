@@ -334,7 +334,7 @@
   .toast {
     position: fixed; right: 16px; bottom: 16px; padding: 10px 14px; border-radius: 8px;
     background: var(--text); color: var(--bg); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
-    opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 420px;
+    opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 520px; white-space: pre-line;
   }
   .toast.show { opacity: 1; transform: none; }
   .toast.err { background: var(--danger); color: #fff; }
@@ -687,11 +687,22 @@ const state = { engines: [], engine: "sqlite", session: null, label: "", objects
   result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
 let pending = 0; // API calls in flight: the header animation speeds up while busy
-async function api(method, url, body) {
+async function api(method, url, body, retried = false) {
   const opt = { method, headers: {} };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   document.body.classList.toggle("busy", ++pending > 0);
-  const res = await fetch(url, opt).finally(() => document.body.classList.toggle("busy", --pending > 0));
+  const t0 = performance.now();
+  let res;
+  try {
+    res = await fetch(url, opt);
+  } catch (e) {
+    // No answer at all: the browser only says "Failed to fetch". A request
+    // that only reads is tried once more (the first try may have gone into a
+    // connection a firewall had silently dropped); otherwise find out why.
+    const secs = (performance.now() - t0) / 1000;
+    if (!retried && canRetry(method, url)) return api(method, url, body, true);
+    throw await lostConnection(method, url, secs, retried, e);
+  } finally { document.body.classList.toggle("busy", --pending > 0); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || res.statusText);
@@ -705,6 +716,62 @@ async function api(method, url, body) {
 // connection download only for the session that opened it.
 const dlLink = (url) => url + (url.includes("?") ? "&" : "?") + "session=" + encodeURIComponent(state.session || "");
 
+// ---- when cactusdb doesn't answer -------------------------------------------
+// Requests that only read, safe to send twice.
+function canRetry(method, url) {
+  const path = url.split("?")[0];
+  return method === "GET" || ["/api/query", "/api/testconn", "/api/files/preview", "/api/superuser/reveal"].includes(path) ||
+    /^\/api\/connections\/\d+\/unlock$/.test(path);
+}
+// What the page was doing, in words.
+function actionOf(method, url) {
+  const path = url.split("?")[0];
+  const known = [
+    [/^\/api\/query$/, "running the query"], [/^\/api\/select$/, "loading the table"], [/^\/api\/connect$/, "connecting to the database"],
+    [/^\/api\/testconn$/, "testing the connection"], [/^\/api\/export$/, "exporting"], [/^\/api\/exportall/, "exporting all tables"],
+    [/^\/api\/exportddl$/, "exporting the DDL"], [/^\/api\/backup$/, "backing up the database"], [/^\/api\/objects$/, "loading the object list"],
+    [/^\/api\/definition$/, "loading the definition"], [/^\/api\/files\/zip/, "compressing the files"], [/^\/api\/files\/preview$/, "loading the preview"],
+    [/^\/api\/files/, "loading the exported files"], [/^\/api\/queries/, "working with saved queries"], [/^\/api\/connections/, "working with saved connections"],
+    [/^\/api\/superuser/, "checking the superuser password"], [/^\/api\/settings$/, "saving the settings"], [/^\/api\/disconnect$/, "disconnecting"],
+  ];
+  const k = known.find(([re]) => re.test(path));
+  return k ? k[1] : `calling ${path}`;
+}
+// lostConnection explains a request that got no answer: it asks cactusdb
+// whether it is still there, and whether it was restarted meanwhile.
+async function lostConnection(method, url, secs, retried, cause) {
+  const path = url.split("?")[0], host = location.host;
+  const took = secs < 1 ? `${Math.round(secs * 1000)} ms` : `${secs.toFixed(1)} s`;
+  const lines = [`No answer from cactusdb at ${host} while ${actionOf(method, url)} (${method} ${path}): the connection was closed after ${took}` +
+    (retried ? ", also when tried a second time" : "") + ` (the browser reports “${cause && cause.message || "Failed to fetch"}”).`];
+  let info = null;
+  if (navigator.onLine === false) {
+    lines.push("This computer is offline: check its network connection, then try again.");
+  } else {
+    try {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
+      const r = await fetch("/api/info?check=" + Date.now(), { cache: "no-store", signal: ctl.signal });
+      clearTimeout(t);
+      info = r.ok ? await r.json() : null;
+    } catch (e) { info = null; }
+    if (!info) {
+      lines.push(`cactusdb doesn't answer now either: it may have stopped or crashed (look at its log on ${location.hostname}, or start it again), ` +
+        `or the network to ${location.hostname} is down (VPN, Wi-Fi, firewall).`);
+    } else if (state.serverPid && info.pid !== state.serverPid) {
+      lines.push(`cactusdb was restarted meanwhile (process ${state.serverPid} → ${info.pid}, started ${new Date(info.started).toLocaleTimeString()}): ` +
+        "the request was lost and your connection to the database has ended. Reload the page and connect again.");
+    } else {
+      lines.push(`cactusdb is running (v${info.version}, the same process), so the connection was cut on the way between this computer and ${location.hostname}: ` +
+        "usually a firewall, proxy or VPN that drops idle or long-running connections. Try again. " +
+        (secs > 20 ? `If long requests keep failing after about ${Math.round(secs)} s, that device probably has a time limit: ask for it to be raised, or narrow the query (WHERE, fewer rows).`
+          : "If it keeps happening, look at the cactusdb log on the server for this request."));
+    }
+  }
+  const err = new Error(lines.join("\n"));
+  err.status = 0; err.data = { lost: true, server: info };
+  return err;
+}
+
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -713,7 +780,8 @@ let toastTimer;
 function toast(msg, isErr) {
   const t = $("toast");
   t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = "toast"), isErr ? 5000 : 2500);
+  // Long explanations stay up long enough to read.
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = "toast"), isErr ? Math.max(5000, msg.length * 60) : 2500);
 }
 
 function setInfo(msg, isErr) {
@@ -2034,6 +2102,7 @@ $("exportNote").addEventListener("click", (ev) => {
 async function loadInfo() {
   try {
     const info = await api("GET", "/api/info");
+    state.serverPid = info.pid; // to recognise a restart
     $("appVersion").textContent = info.version ? "v" + info.version : "";
     $("appVersion").title = info.version ? `cactusdb ${info.version}` : "";
     $("shutdownBtn").hidden = !info.background;

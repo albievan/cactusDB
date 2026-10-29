@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.14.0"
+var version = "1.14.1"
 
 //go:embed web
 var webFS embed.FS
@@ -393,7 +394,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot listen on %s: %v", addr, err)
 	}
-	srv := &http.Server{Handler: logRequests(mux), ReadHeaderTimeout: 10 * time.Second}
+	// IdleTimeout closes a browser's idle keep-alive connection before a
+	// firewall, VPN or NAT between it and cactusdb silently drops it: the
+	// browser would otherwise send the next request into a dead connection
+	// and get no answer ("Failed to fetch").
+	srv := &http.Server{Handler: logRequests(recoverPanics(mux)), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
 
 	fmt.Printf("cactusdb %s\n", version)
 	for _, d := range driverInfo() {
@@ -478,7 +483,7 @@ func (s *server) release() {
 // handleInfo tells the page how this cactusdb runs, e.g. whether it offers
 // the Shutdown button.
 func (s *server) handleInfo(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"version": version, "background": s.background, "pid": os.Getpid()})
+	writeJSON(w, 200, map[string]any{"version": version, "background": s.background, "pid": os.Getpid(), "started": processStart.Format(time.RFC3339)})
 }
 
 // handleShutdown stops a background cactusdb. It must be a JSON request, which
@@ -497,6 +502,9 @@ func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 	s.stopOnce.Do(func() { close(s.shutdown) })
 }
+
+// processStart lets the page see that cactusdb was restarted.
+var processStart = time.Now()
 
 func fatalUsage(msg string) {
 	fmt.Fprintf(os.Stderr, "cactusdb: %s\nRun cactusdb --help for usage.\n", msg)
@@ -562,6 +570,48 @@ func logRequests(h http.Handler) http.Handler {
 		h.ServeHTTP(rec, r)
 		log.Printf("%s %s %s -> %d (%s)", clientIP(r), r.Method, r.URL.Path, rec.status, time.Since(start).Round(time.Millisecond))
 	})
+}
+
+// recoverPanics turns a crash in a handler into an error the page can show:
+// otherwise the connection is just cut and the browser only says "Failed to
+// fetch". The details go to the log.
+func recoverPanics(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tw := &headerTracker{ResponseWriter: w}
+		defer func() {
+			v := recover()
+			if v == nil {
+				return
+			}
+			if v == http.ErrAbortHandler { // a deliberate abort, not a crash
+				panic(v)
+			}
+			log.Printf("%s %s %s: INTERNAL ERROR: %v\n%s", clientIP(r), r.Method, r.URL.Path, v, debug.Stack())
+			if !tw.wrote {
+				writeErr(tw, 500, fmt.Errorf("internal error in cactusdb while handling %s %s: %v (the details are in the cactusdb log)", r.Method, r.URL.Path, v))
+			}
+		}()
+		h.ServeHTTP(tw, r)
+	})
+}
+
+// headerTracker remembers whether a response has started.
+type headerTracker struct {
+	http.ResponseWriter
+	wrote bool
+}
+
+func (t *headerTracker) WriteHeader(code int) { t.wrote = true; t.ResponseWriter.WriteHeader(code) }
+func (t *headerTracker) Write(b []byte) (int, error) {
+	t.wrote = true
+	return t.ResponseWriter.Write(b)
+}
+
+// Flush keeps streaming responses working through the wrapper.
+func (t *headerTracker) Flush() {
+	if f, ok := t.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func clientIP(r *http.Request) string {
