@@ -44,7 +44,77 @@ type exportedFile struct {
 	Size     int64     `json:"size"`
 	Modified time.Time `json:"modified"`
 	Folder   string    `json:"folder"` // the export folder it is in
-	path     string
+	// Protected: the files of a connection with its own password need that
+	// password (or the superuser password) to be previewed, downloaded or deleted.
+	Protected bool `json:"protected,omitempty"`
+	path      string
+}
+
+// protectedFolders maps the export folder of every connection that has its
+// own password to that connection's id.
+func (s *server) protectedFolders() map[string]int64 {
+	out := map[string]int64{}
+	list, err := s.store.List()
+	if err != nil {
+		return out
+	}
+	for _, c := range list {
+		if c.Lock != "" {
+			out[connFolderName(c.Name)] = c.ID
+		}
+	}
+	return out
+}
+
+// fileUnlock is how a request from the page opens protected files: the
+// connection password per connection folder, or the superuser password.
+type fileUnlock struct {
+	Unlock        map[string]string `json:"unlock"`
+	SuperPassword string            `json:"superPassword"`
+}
+
+// unlockFolders checks the passwords for every protected connection folder
+// among folders. On failure it has written a 403 naming the folder (so the
+// page can ask for that connection's password) and returns false.
+func (s *server) unlockFolders(w http.ResponseWriter, r *http.Request, folders []string, u fileUnlock) bool {
+	prot := s.protectedFolders()
+	done := map[string]bool{}
+	for _, f := range folders {
+		id, ok := prot[f]
+		if !ok || done[f] {
+			continue
+		}
+		done[f] = true
+		rec := &statusCapture{header: http.Header{}}
+		if _, _, ok := s.unlockConnAs(rec, r, id, u.Unlock[f], u.SuperPassword); !ok {
+			msg := "this connection's files are protected: enter its connection password"
+			if rec.code == 429 || (u.Unlock[f] != "" || u.SuperPassword != "") {
+				msg = strings.TrimSpace(rec.errText())
+			}
+			writeJSON(w, map[bool]int{true: 429, false: 403}[rec.code == 429], map[string]any{"error": msg, "locked": true, "conn": f})
+			return false
+		}
+	}
+	return true
+}
+
+// statusCapture records a handler's error response instead of sending it.
+type statusCapture struct {
+	header http.Header
+	code   int
+	body   []byte
+}
+
+func (c *statusCapture) Header() http.Header  { return c.header }
+func (c *statusCapture) WriteHeader(code int) { c.code = code }
+func (c *statusCapture) Write(b []byte) (int, error) {
+	c.body = append(c.body, b...)
+	return len(b), nil
+}
+func (c *statusCapture) errText() string {
+	var e struct{ Error string }
+	json.Unmarshal(c.body, &e)
+	return e.Error
 }
 
 // preparedZip is a .zip built for download.
@@ -113,6 +183,10 @@ func (s *server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 	if files == nil {
 		files = []exportedFile{}
 	}
+	prot := s.protectedFolders()
+	for i := range files {
+		_, files[i].Protected = prot[files[i].Conn]
+	}
 	writeJSON(w, 200, map[string]any{"folder": s.exportFolder(), "files": files})
 }
 
@@ -126,6 +200,7 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Files []fileRef `json:"files"`
+		fileUnlock
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
@@ -139,6 +214,13 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 	byKey := map[string]exportedFile{}
 	for _, f := range s.listExportedFiles() {
 		byKey[f.key()] = f
+	}
+	folders := make([]string, len(req.Files))
+	for i, rf := range req.Files {
+		folders[i] = rf.Conn
+	}
+	if !s.unlockFolders(w, r, folders, req.fileUnlock) {
+		return
 	}
 	var chosen []exportedFile
 	var total int64
@@ -312,8 +394,18 @@ func (s *server) findExportedFile(ref fileRef) (exportedFile, bool) {
 // rows for CSV, Excel and JSON arrays, the list of files for a backup .zip
 // (with the start of its SQL script), and text for everything else.
 func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	f, ok := s.findExportedFile(fileRef{Conn: q.Get("conn"), Kind: q.Get("kind"), Name: q.Get("name")})
+	var req struct {
+		fileRef
+		fileUnlock
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if !s.unlockFolders(w, r, []string{req.Conn}, req.fileUnlock) {
+		return
+	}
+	f, ok := s.findExportedFile(req.fileRef)
 	if !ok {
 		writeErr(w, 404, errors.New("file not found (deleted or moved?)"))
 		return
@@ -519,6 +611,7 @@ func (s *server) handleDeleteFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Files []fileRef `json:"files"`
+		fileUnlock
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
@@ -526,6 +619,13 @@ func (s *server) handleDeleteFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Files) == 0 {
 		writeErr(w, 400, errors.New("no files selected"))
+		return
+	}
+	folders := make([]string, len(req.Files))
+	for i, rf := range req.Files {
+		folders[i] = rf.Conn
+	}
+	if !s.unlockFolders(w, r, folders, req.fileUnlock) {
 		return
 	}
 	byKey := map[string]exportedFile{}

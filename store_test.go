@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -167,22 +169,25 @@ func TestAPIKeepsPasswordsServerSide(t *testing.T) {
 	}
 	defer st.db.Close()
 	s := &server{store: st, sessions: map[string]*session{}}
-	post := func(body string) {
+	post := func(body string) int64 {
 		rec := httptest.NewRecorder()
 		s.handleSaveConn(rec, httptest.NewRequest("POST", "/api/connections", strings.NewReader(body)))
 		if rec.Code != 200 {
 			t.Fatalf("save: %d %s", rec.Code, rec.Body)
 		}
+		var out struct{ ID int64 }
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return out.ID
 	}
-	post(`{"name":"x","engine":"postgres","host":"a","username":"u","password":"` + testPass + `"}`)
-	post(`{"name":"x","engine":"postgres","host":"b","username":"u","password":"","keepPassword":true}`)
+	id := post(`{"name":"x","engine":"postgres","host":"a","username":"u","password":"` + testPass + `","newLockPassword":"lock-pw-1"}`)
+	post(`{"id":` + strconv.FormatInt(id, 10) + `,"name":"x","engine":"postgres","host":"b","username":"u","password":"","keepPassword":true,"lockPassword":"lock-pw-1"}`)
 
 	rec := httptest.NewRecorder()
 	s.handleListConns(rec, httptest.NewRequest("GET", "/api/connections", nil))
-	if strings.Contains(rec.Body.String(), testPass) || !strings.Contains(rec.Body.String(), `"hasPassword":true`) {
-		t.Errorf("list must hide the password but flag it: %s", rec.Body)
+	if strings.Contains(rec.Body.String(), testPass) || !strings.Contains(rec.Body.String(), `"locked":true`) {
+		t.Errorf("list must hide the password and show the lock: %s", rec.Body)
 	}
-	if c, _ := st.GetByName("x"); c.Password != testPass || c.Host != "b" {
-		t.Errorf("password not kept on save: %+v", c)
+	if c, _, err := st.Unlock(id, "lock-pw-1"); err != nil || c.Password != testPass || c.Host != "b" {
+		t.Errorf("password not kept on save: %+v %v", c, err)
 	}
 }

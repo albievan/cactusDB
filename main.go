@@ -33,7 +33,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.13.2"
+var version = "1.14.0"
 
 //go:embed web
 var webFS embed.FS
@@ -44,6 +44,9 @@ type session struct {
 	dbName string // short database name, for DDL file names
 	folder string // its folder in the export folder: the connection name
 	db     *sql.DB
+
+	savedID int64      // the saved connection it was opened from (0: none), for saved queries
+	connBox *secretBox // that connection's own key (nil: it has no password)
 }
 
 // exportDir is where this connection's exports go: <export folder>/<connection>.
@@ -69,6 +72,8 @@ type server struct {
 	batches  map[string]*webBatch    // "export all tables" jobs, by id
 	zips     map[string]*preparedZip // compressed downloads of the Exported files page, by id
 
+	throttle lockThrottle // slows down guessing connection passwords
+
 	background bool          // started with --runas background: the UI may shut it down
 	shutdown   chan struct{} // closed by /api/shutdown
 	stopOnce   sync.Once
@@ -88,6 +93,7 @@ func main() {
 	dbPort := flag.Int("dbport", 0, "command-line export: database server port (default: the engine's standard port)")
 	dbTable := flag.String("dbtable", "", "command-line export: table to export, several separated by commas, or all")
 	showTable := flag.String("showtable", "", "command-line: all lists the tables and views; a table name prints its definition")
+	superuser := flag.String("superuser", "", "set = set or change the superuser password (it opens every saved connection); status = show whether one is set")
 	backupDB := flag.String("backup", "", "command-line: yes = back up the whole database (DDL and all rows) to a compressed .zip in the backup subfolder")
 	exportDDL := flag.String("exportddl", "", "command-line: write the DDL (CREATE statements) of all objects, or of the named tables, to a .sql file")
 	exportAs := flag.String("exportas", "csv", "command-line export: csv, json, xml or excel")
@@ -163,6 +169,20 @@ func main() {
 	}
 	if *keyFile == "" {
 		*keyFile = filepath.Join(filepath.Dir(*connDB), keyFileName)
+	}
+	if set["superuser"] {
+		st, err := openStore(*connDB, *keyFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cactusdb: cannot open %s: %v\n", *connDB, err)
+			os.Exit(1)
+		}
+		err = superuserCLI(st, *superuser)
+		st.db.Close()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "cactusdb:", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	if cliMode {
@@ -306,6 +326,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot open connection store %s: %v", *connDB, err)
 	}
+	// The superuser password can come from the environment (containers); it
+	// only ever sets a missing one, and isn't kept in the environment.
+	if msg, err := store.superuserFromEnv(os.Getenv(superuserEnv)); err != nil {
+		log.Printf("warning: %v", err)
+	} else if msg != "" {
+		log.Print(msg)
+	}
+	os.Unsetenv(superuserEnv)
 	exportToFlag := ""
 	if set["exportto"] {
 		exportToFlag = exportDir
@@ -348,11 +376,17 @@ func main() {
 	mux.HandleFunc("GET /api/files", s.handleListFiles)
 	mux.HandleFunc("POST /api/files/zip", s.handlePrepareZip)
 	mux.HandleFunc("GET /api/files/zip/{id}", s.handleDownloadZip)
-	mux.HandleFunc("GET /api/files/preview", s.handlePreviewFile)
+	mux.HandleFunc("POST /api/files/preview", s.handlePreviewFile)
 	mux.HandleFunc("POST /api/files/delete", s.handleDeleteFiles)
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)
+	mux.HandleFunc("POST /api/connections/{id}/unlock", s.handleUnlockConn)
+	mux.HandleFunc("GET /api/superuser", s.handleSuperuserStatus)
+	mux.HandleFunc("POST /api/superuser/reveal", s.handleSuperuserReveal)
+	mux.HandleFunc("GET /api/queries", s.handleListQueries)
+	mux.HandleFunc("POST /api/queries", s.handleSaveQuery)
+	mux.HandleFunc("DELETE /api/queries/{id}", s.handleDeleteQuery)
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)
@@ -367,6 +401,11 @@ func main() {
 	}
 	fmt.Printf("  saved connections: %s (credentials encrypted with %s)\n", *connDB, store.keyDesc)
 	fmt.Printf("  export folder:     %s\n", exportDir)
+	if store.SuperuserSet() {
+		fmt.Println("  superuser:         set (opens every saved connection)")
+	} else {
+		fmt.Println("  superuser:         not set (cactusdb --superuser set)")
+	}
 	for _, u := range browseURLs(*host, *port) {
 		fmt.Printf("  open %s\n", u)
 	}
@@ -600,6 +639,71 @@ type connectReq struct {
 	// KeepPasswordOf uses the stored password of that saved connection when
 	// Password is empty, so the browser never needs to hold saved passwords.
 	KeepPasswordOf int64 `json:"keepPasswordOf"`
+	// LockPassword is the connection password of SavedID / KeepPasswordOf;
+	// NewLockPassword protects a connection saved with Save.
+	LockPassword    string `json:"lockPassword"`
+	NewLockPassword string `json:"newLockPassword"`
+	SuperPassword   string `json:"superPassword"` // opens any saved connection instead of LockPassword
+}
+
+// unlockConn opens saved connection id with its connection password. On
+// failure it has written the error (a wrong password counts towards the
+// throttle) and returns ok false.
+func (s *server) unlockConn(w http.ResponseWriter, r *http.Request, id int64, password string) (SavedConn, *secretBox, bool) {
+	return s.unlockConnAs(w, r, id, password, "")
+}
+
+// superThrottleID throttles wrong superuser passwords.
+const superThrottleID = -1
+
+// unlockConnAs is unlockConn that also accepts the superuser password.
+func (s *server) unlockConnAs(w http.ResponseWriter, r *http.Request, id int64, password, superPassword string) (SavedConn, *secretBox, bool) {
+	tid := id
+	if superPassword != "" {
+		tid = superThrottleID
+	}
+	if wait := s.throttle.wait(tid); wait > 0 {
+		writeErr(w, 429, fmt.Errorf("too many wrong passwords: try again in %d seconds", int(wait.Seconds())+1))
+		return SavedConn{}, nil, false
+	}
+	var c SavedConn
+	var box *secretBox
+	var err error
+	if superPassword != "" {
+		c, box, err = s.store.UnlockAsSuperuser(id, superPassword)
+		if errors.Is(err, errLockWrong) {
+			s.throttle.failed(superThrottleID)
+			logAction(r, "superuser unlock FAILED: wrong superuser password")
+			writeJSON(w, 403, map[string]any{"error": "wrong superuser password", "locked": true})
+			return c, nil, false
+		}
+		if errors.Is(err, errNoSuperuser) || errors.Is(err, errNoEscrow) {
+			writeErr(w, 409, err)
+			return c, nil, false
+		}
+		if err == nil {
+			s.throttle.ok(superThrottleID)
+			logAction(r, "superuser opened connection %q", c.Name)
+		}
+	} else {
+		c, box, err = s.store.Unlock(id, password)
+	}
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		writeErr(w, 404, errors.New("saved connection not found"))
+	case errors.Is(err, errLockRequired):
+		writeJSON(w, 403, map[string]any{"error": err.Error(), "locked": true})
+	case errors.Is(err, errLockWrong):
+		s.throttle.failed(id)
+		logAction(r, "unlock %q FAILED: wrong connection password", c.Name)
+		writeJSON(w, 403, map[string]any{"error": err.Error(), "locked": true})
+	case err != nil:
+		writeErr(w, 500, err)
+	default:
+		s.throttle.ok(id)
+		return c, box, true
+	}
+	return c, box, false
 }
 
 func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
@@ -610,20 +714,27 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	p := req.ConnParams
 	label := req.Name
+	var savedID int64
+	var connBox *secretBox
 	if req.SavedID != 0 {
-		c, err := s.store.Get(req.SavedID)
-		if err != nil {
-			writeErr(w, 404, fmt.Errorf("saved connection not found"))
+		c, box, ok := s.unlockConnAs(w, r, req.SavedID, req.LockPassword, req.SuperPassword)
+		if !ok {
 			return
 		}
-		p, label = c.ConnParams, c.Name
+		p, label, savedID, connBox = c.ConnParams, c.Name, c.ID, box
 	} else if req.KeepPasswordOf != 0 && p.Password == "" {
-		c, err := s.store.Get(req.KeepPasswordOf)
-		if err != nil {
-			writeErr(w, 404, fmt.Errorf("saved connection not found"))
+		c, _, ok := s.unlockConnAs(w, r, req.KeepPasswordOf, req.LockPassword, req.SuperPassword)
+		if !ok {
 			return
 		}
 		p.Password = c.Password
+	}
+	if req.Save && req.SavedID == 0 {
+		// Every saved connection gets its own password: check it before connecting.
+		if err := checkLockPassword(req.NewLockPassword); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
 	}
 	db, err := openDB(r.Context(), p)
 	if err != nil {
@@ -643,13 +754,13 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSpace(req.Name) == "" {
 			req.Name = defaultConnName(p)
 		}
-		id, err := s.store.Save(SavedConn{Name: strings.TrimSpace(req.Name), ConnParams: p})
+		id, box, err := s.store.SaveLocked(SavedConn{Name: strings.TrimSpace(req.Name), ConnParams: p}, req.NewLockPassword, nil)
 		if err != nil {
 			resp["saveError"] = err.Error()
 		} else {
-			logAction(r, "save connection %q", req.Name)
+			logAction(r, "save connection %q (password-protected)", req.Name)
 			resp["savedId"] = id
-			label = req.Name
+			label, savedID, connBox = strings.TrimSpace(req.Name), id, box
 		}
 	}
 	folder := connFolderName(label)
@@ -660,12 +771,15 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	id := newID()
 	s.mu.Lock()
-	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db}
+	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db,
+		savedID: savedID, connBox: connBox}
 	s.mu.Unlock()
 	logAction(r, "connect %s as %q, session %s", defaultConnName(p), label, id[:8])
 	resp["session"] = id
 	resp["engine"] = p.Engine
 	resp["label"] = label
+	resp["savedConn"] = savedID // saved queries are kept for saved connections
+	resp["folder"] = folder     // its folder in the export folder (the Exported files page)
 	writeJSON(w, 200, resp)
 }
 
@@ -679,9 +793,11 @@ func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 	}
 	p := req.ConnParams
 	if req.KeepPasswordOf != 0 && p.Password == "" {
-		if c, err := s.store.Get(req.KeepPasswordOf); err == nil {
-			p.Password = c.Password
+		c, _, ok := s.unlockConnAs(w, r, req.KeepPasswordOf, req.LockPassword, req.SuperPassword)
+		if !ok {
+			return
 		}
+		p.Password = c.Password
 	}
 	start := time.Now()
 	db, err := openDB(r.Context(), p)
@@ -992,6 +1108,16 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("bad file name"))
 		return
 	}
+	// A protected connection's files: only for the session that opened it.
+	if id, ok := s.protectedFolders()[conn]; ok && conn != "" {
+		s.mu.Lock()
+		ss := s.sessions[r.URL.Query().Get("session")]
+		s.mu.Unlock()
+		if ss == nil || ss.savedID != id {
+			writeErr(w, 403, errors.New("this connection's files are protected: download them from the Exported files page with its connection password"))
+			return
+		}
+	}
 	// The newest folder first: the export folder may have been changed since.
 	var path string
 	for _, dir := range s.exportFolders() {
@@ -1025,6 +1151,7 @@ type savedConnInfo struct {
 	Username    string `json:"username"`
 	Database    string `json:"database"`
 	HasPassword bool   `json:"hasPassword"`
+	Locked      bool   `json:"locked"` // has its own connection password; username shown only after unlocking
 	Created     string `json:"created"`
 }
 
@@ -1037,33 +1164,52 @@ func (s *server) handleListConns(w http.ResponseWriter, r *http.Request) {
 	out := make([]savedConnInfo, len(list))
 	for i, c := range list {
 		out[i] = savedConnInfo{ID: c.ID, Name: c.Name, Engine: c.Engine, Host: c.Host, Port: c.Port,
-			Username: c.Username, Database: c.Database, HasPassword: c.Password != "", Created: c.Created}
+			Username: c.Username, Database: c.Database, HasPassword: c.Password != "", Locked: c.Lock != "", Created: c.Created}
 	}
 	writeJSON(w, 200, out)
 }
 
-func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
+// handleUnlockConn checks a connection password and returns the connection's
+// details for editing (never its database password).
+func (s *server) handleUnlockConn(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, errors.New("bad id"))
+		return
+	}
 	var req struct {
-		SavedConn
-		KeepPassword bool `json:"keepPassword"` // empty password = keep the stored one
+		LockPassword  string `json:"lockPassword"`
+		SuperPassword string `json:"superPassword"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
-	// With an id this edits that connection, which may be renamed;
-	// without, it saves (or replaces) the connection with this name.
+	c, _, ok := s.unlockConnAs(w, r, id, req.LockPassword, req.SuperPassword)
+	if !ok {
+		return
+	}
+	writeJSON(w, 200, savedConnInfo{ID: c.ID, Name: c.Name, Engine: c.Engine, Host: c.Host, Port: c.Port,
+		Username: c.Username, Database: c.Database, HasPassword: c.Password != "", Locked: c.Lock != "", Created: c.Created})
+}
+
+// handleSaveConn saves a connection with its own connection password: a new
+// one (no id; the password is required), or an existing one (id), which
+// needs its current connection password and may get a new one.
+func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SavedConn
+		KeepPassword    bool   `json:"keepPassword"`    // empty database password = keep the stored one
+		LockPassword    string `json:"lockPassword"`    // the current connection password (editing)
+		NewLockPassword string `json:"newLockPassword"` // a new connection password ("" = keep it)
+		SuperPassword   string `json:"superPassword"`   // the superuser password instead of LockPassword
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
 	c := req.SavedConn
 	c.Name = strings.TrimSpace(c.Name)
-	if req.KeepPassword && c.Password == "" {
-		old, err := s.store.GetByName(c.Name)
-		if c.ID != 0 {
-			old, err = s.store.Get(c.ID)
-		}
-		if err == nil {
-			c.Password = old.Password
-		}
-	}
 	if c.Name == "" {
 		c.Name = defaultConnName(c.ConnParams)
 	}
@@ -1071,28 +1217,80 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("engine is required"))
 		return
 	}
-	id, err := s.store.Save(c)
-	if err != nil {
-		writeErr(w, 500, err)
+	var oldBox *secretBox
+	if c.ID != 0 {
+		old, box, ok := s.unlockConnAs(w, r, c.ID, req.LockPassword, req.SuperPassword)
+		if !ok {
+			return
+		}
+		oldBox = box
+		if req.KeepPassword && c.Password == "" {
+			c.Password = old.Password
+		}
+		if old.Lock == "" && req.NewLockPassword == "" {
+			writeErr(w, 400, errors.New("choose a connection password: every saved connection is protected by its own password"))
+			return
+		}
+	} else if req.NewLockPassword == "" {
+		writeErr(w, 400, errors.New("choose a connection password: every saved connection is protected by its own password"))
 		return
 	}
-	if c.ID != 0 && id != c.ID { // renamed: drop the old entry
-		s.store.Delete(c.ID)
+	id, box, err := s.store.SaveLocked(c, req.NewLockPassword, oldBox)
+	if err != nil {
+		code := 400
+		if strings.Contains(err.Error(), "already exists") {
+			code = 409
+		}
+		writeErr(w, code, err)
+		return
 	}
-	logAction(r, "save connection %q (%s)", c.Name, defaultConnName(c.ConnParams))
+	// Open sessions of this connection follow a new name or password.
+	s.mu.Lock()
+	for _, ss := range s.sessions {
+		if ss.savedID == id {
+			ss.connBox, ss.label = box, c.Name
+		}
+	}
+	s.mu.Unlock()
+	logAction(r, "save connection %q (%s, password-protected)", c.Name, defaultConnName(c.ConnParams))
 	writeJSON(w, 200, map[string]any{"id": id})
 }
 
+// handleDeleteConn deletes a saved connection and its saved queries; one
+// with its own password needs it. JSON only, like the other changes.
 func (s *server) handleDeleteConn(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeErr(w, 400, errors.New("bad id"))
 		return
 	}
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		writeErr(w, 415, errors.New("expected a JSON request"))
+		return
+	}
+	var req struct {
+		LockPassword  string `json:"lockPassword"`
+		SuperPassword string `json:"superPassword"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	c, _, ok := s.unlockConnAs(w, r, id, req.LockPassword, req.SuperPassword)
+	if !ok {
+		return
+	}
 	if err := s.store.Delete(id); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
-	logAction(r, "delete saved connection %d", id)
+	s.mu.Lock()
+	for _, ss := range s.sessions {
+		if ss.savedID == id {
+			ss.savedID, ss.connBox = 0, nil
+		}
+	}
+	s.mu.Unlock()
+	logAction(r, "delete saved connection %q and its saved queries", c.Name)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

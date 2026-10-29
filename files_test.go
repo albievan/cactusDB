@@ -150,7 +150,8 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
 
 	preview := func(kind, name string) (int, map[string]any) {
 		rec := httptest.NewRecorder()
-		s.handlePreviewFile(rec, httptest.NewRequest("GET", "/api/files/preview?kind="+kind+"&name="+name, nil))
+		b, _ := json.Marshal(map[string]string{"kind": kind, "name": name})
+		s.handlePreviewFile(rec, httptest.NewRequest("POST", "/api/files/preview", bytes.NewReader(b)))
 		var out map[string]any
 		json.Unmarshal(rec.Body.Bytes(), &out)
 		return rec.Code, out

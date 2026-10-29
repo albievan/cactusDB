@@ -202,16 +202,20 @@ func newTestServer(t *testing.T) *server {
 // Editing a saved connection with an id can rename it and keep its password.
 func TestAPISaveRenameKeepsPassword(t *testing.T) {
 	s := newTestServer(t)
-	id, _ := s.store.Save(SavedConn{Name: "old", ConnParams: ConnParams{Engine: EngineMySQL, Host: "h", Password: testPass}})
+	id, _, err := s.store.SaveLocked(SavedConn{Name: "old", ConnParams: ConnParams{Engine: EngineMySQL, Host: "h", Password: testPass}}, "lock-pw-1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
-	body, _ := json.Marshal(map[string]any{"id": id, "name": "new", "engine": "mysql", "host": "h2", "keepPassword": true})
+	body, _ := json.Marshal(map[string]any{"id": id, "name": "new", "engine": "mysql", "host": "h2", "keepPassword": true, "lockPassword": "lock-pw-1"})
 	s.handleSaveConn(rec, httptest.NewRequest("POST", "/api/connections", bytes.NewReader(body)))
 	if rec.Code != 200 {
 		t.Fatalf("save: %d %s", rec.Code, rec.Body)
 	}
 	list, _ := s.store.List()
-	if len(list) != 1 || list[0].Name != "new" || list[0].Password != testPass || list[0].Host != "h2" {
-		t.Errorf("after rename: %+v", list)
+	c, _, err := s.store.Unlock(id, "lock-pw-1")
+	if len(list) != 1 || err != nil || c.Name != "new" || c.Password != testPass || c.Host != "h2" {
+		t.Errorf("after rename: %+v %v", c, err)
 	}
 }
 

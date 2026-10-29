@@ -101,7 +101,9 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 	defer db.Close()
 	if o.Store != nil {
 		name := cliConnName(o.ConnParams)
-		if _, err := o.Store.Save(SavedConn{Name: name, ConnParams: o.ConnParams}); err != nil {
+		if _, err := o.Store.SaveUnlocked(SavedConn{Name: name, ConnParams: o.ConnParams}); errors.Is(err, errLockedSave) {
+			fmt.Fprintf(os.Stderr, "cactusdb: note: %q is password-protected in the web UI, so it was not updated\n", name)
+		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "cactusdb: warning: could not save the connection: %v\n", err)
 		} else {
 			fmt.Fprintf(out, "Connection saved as %q\n", name)
@@ -321,6 +323,10 @@ func defaultPort(engine string) int {
 	return 0
 }
 
+// stdinLines reads piped input, shared by every prompt so that a second
+// prompt gets the second line.
+var stdinLines = bufio.NewReader(os.Stdin)
+
 // promptPassword reads a password without echo from the terminal, or a line
 // from standard input when it is not a terminal (e.g. piped from a file).
 func promptPassword(prompt string) (string, error) {
@@ -330,7 +336,7 @@ func promptPassword(prompt string) (string, error) {
 		fmt.Fprintln(os.Stderr)
 		return string(pw), err
 	}
-	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	line, err := stdinLines.ReadString('\n')
 	if err != nil && !(errors.Is(err, io.EOF) && line != "") {
 		return "", fmt.Errorf("no password given: use --dbpassword, $%s, or run in a terminal to be prompted", dbPasswordEnv)
 	}
