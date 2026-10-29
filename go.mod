@@ -8,6 +8,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/nakagami/firebirdsql v0.9.23
 	github.com/xuri/excelize/v2 v2.11.0
+	golang.org/x/crypto v0.55.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/term v0.47.0
 	modernc.org/sqlite v1.61.0
@@ -34,7 +35,6 @@ require (
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
-	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/text v0.41.0 // indirect

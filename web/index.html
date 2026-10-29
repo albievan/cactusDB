@@ -61,8 +61,37 @@
   .layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); min-height: 0; }
   aside {
     background: var(--panel); border-right: 1px solid var(--border);
-    overflow-y: auto; display: flex; flex-direction: column;
+    overflow: hidden; display: flex; flex-direction: column; position: relative;
   }
+  /* The pop-up menu with the connection, saved connections, export folder and drivers. */
+  .navbar { margin-top: auto; border-top: 1px solid var(--border); padding: 8px; background: var(--panel-2); }
+  #navMenuBtn { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 7px 10px; }
+  #navMenuBtn[aria-expanded="true"] { border-color: var(--accent); }
+  #navMenuBtn[aria-expanded="true"] .navcaret { transform: rotate(180deg); }
+  .navicon { font-size: 16px; color: var(--muted); }
+  .navtext { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  .navtext small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .navcaret { color: var(--muted); font-size: 11px; transition: transform .15s; }
+  .navmenu { position: absolute; left: 8px; right: 8px; bottom: 60px; max-height: calc(100% - 76px); overflow-y: auto; z-index: 30;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.28); }
+  .navmenu[hidden] { display: none; }
+  .navmenu section.box:last-child { border-bottom: 0; }
+  .hbtns { display: flex; gap: 6px; }
+  .superbar { margin: 0 0 8px; font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .superbar[hidden] { display: none; }
+  .hint-inline { font-size: 11px; color: var(--muted); font-weight: normal; margin-left: 4px; }
+  .dlock { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); }
+  .dlock[hidden] { display: none; }
+  #savedList .lock { font-size: 11px; margin-left: 4px; }
+  #savedList .det { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  textarea.mono { font-family: var(--mono); font-size: 12px; }
+  #queriesPane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); }
+  #qFilter { width: 260px; max-width: 100%; }
+  #queriesPane[hidden] { display: none; }
+  .qdesc { white-space: normal !important; color: var(--muted); font-size: 12px; }
+  .qsql { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 380px !important; }
+  .qacts { white-space: nowrap; width: 1%; }
+  .qacts button { margin-left: 4px; }
   section.box { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   section.box h2 {
     font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
@@ -348,6 +377,27 @@
 
 <div class="layout">
   <aside>
+    <section class="box" id="objectsBox" data-sec="objects">
+      <h2><button class="toggle" aria-expanded="true">Objects</button><span id="objCount"></span></h2>
+      <div class="exportall">
+        <span>Export all tables</span>
+        <button data-allfmt="xlsx" title="Export all tables to Excel, one file per table" aria-label="Export all tables to Excel" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#217346"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XLS</text></svg></button>
+        <button data-allfmt="csv" title="Export all tables to CSV, one file per table" aria-label="Export all tables to CSV" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#0e7490"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">CSV</text></svg></button>
+        <button data-allfmt="json" title="Export all tables to JSON, one file per table" aria-label="Export all tables to JSON" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#b45309"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">JSON</text></svg></button>
+        <button data-allfmt="xml" title="Export all tables to XML, one file per table" aria-label="Export all tables to XML" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#7c3aed"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XML</text></svg></button>
+      </div>
+      <div class="filterrow">
+        <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
+        <button id="refreshBtn" class="small" title="Reload the object list" disabled>⟳</button>
+        <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in &lt;export folder&gt;/&lt;connection&gt;/sql" disabled>DDL</button>
+        <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
+      </div>
+      <div class="objtabs" id="objTabs" role="tablist"></div>
+      <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators: open <b>☰ Connections</b> below.</p></div>
+    </section>
+    <!-- Connections and settings live in a pop-up menu, opened from the bar at
+         the bottom, so the sidebar shows only the database's objects. -->
+    <div class="navmenu" id="navMenu" hidden role="dialog" aria-label="Connections and settings">
     <section class="box" data-sec="connection">
       <h2><button class="toggle" aria-expanded="true">Connection<span class="sub" id="connSub"></span></button></h2>
       <div class="engines" id="engines"></div>
@@ -370,10 +420,14 @@
         <input id="dbName" spellcheck="false">
       </div>
 
-      <label class="check"><input type="checkbox" id="saveConn"> Save connection (incl. password)</label>
+      <label class="check"><input type="checkbox" id="saveConn"> Save connection (protected by its own password)</label>
       <div id="saveNameWrap" hidden>
         <label for="connName">Connection name</label>
         <input id="connName" placeholder="e.g. Production MySQL">
+        <label for="connLock">Connection password <span class="hint-inline">protects this saved connection</span></label>
+        <input id="connLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
+        <label for="connLock2">Confirm connection password</label>
+        <input id="connLock2" type="password" autocomplete="new-password">
       </div>
 
       <div class="actions">
@@ -383,7 +437,8 @@
     </section>
 
     <section class="box" data-sec="saved">
-      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button><button id="newConnBtn" class="small" title="Add a connection and test it before saving">+ New</button></h2>
+      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button><span class="hbtns"><button id="superBtn" class="small" title="Superuser: open every saved connection">🛡</button><button id="newConnBtn" class="small" title="Add a connection and test it before saving">+ New</button></span></h2>
+      <p class="superbar" id="superBar" hidden>🛡 Superuser: every connection is open. <button class="small" id="superOut">Sign out</button></p>
       <ul class="list" id="savedList"><li class="empty">None yet</li></ul>
     </section>
 
@@ -397,30 +452,21 @@
       <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
     </section>
 
-    <section class="box" id="objectsBox" data-sec="objects">
-      <h2><button class="toggle" aria-expanded="true">Objects</button><span id="objCount"></span></h2>
-      <div class="exportall">
-        <span>Export all tables</span>
-        <button data-allfmt="xlsx" title="Export all tables to Excel, one file per table" aria-label="Export all tables to Excel" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#217346"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XLS</text></svg></button>
-        <button data-allfmt="csv" title="Export all tables to CSV, one file per table" aria-label="Export all tables to CSV" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#0e7490"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">CSV</text></svg></button>
-        <button data-allfmt="json" title="Export all tables to JSON, one file per table" aria-label="Export all tables to JSON" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#b45309"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">JSON</text></svg></button>
-        <button data-allfmt="xml" title="Export all tables to XML, one file per table" aria-label="Export all tables to XML" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#7c3aed"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XML</text></svg></button>
-      </div>
-      <div class="filterrow">
-        <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
-        <button id="refreshBtn" class="small" title="Reload the object list" disabled>⟳</button>
-        <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in &lt;export folder&gt;/&lt;connection&gt;/sql" disabled>DDL</button>
-        <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
-      </div>
-      <div class="objtabs" id="objTabs" role="tablist"></div>
-      <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p></div>
-    </section>
+    </div>
+    <div class="navbar">
+      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Connections, saved connections, export folder and drivers">
+        <span class="navicon" aria-hidden="true">☰</span>
+        <span class="navtext"><b>Connections</b><small id="navConn">Not connected</small></span>
+        <span class="navcaret" aria-hidden="true">▴</span>
+      </button>
+    </div>
   </aside>
 
   <main>
     <div class="tabs">
       <button data-tab="data" class="on">Data</button>
       <button data-tab="def">Definition</button>
+      <button data-tab="queries" id="queriesTab" hidden title="Queries saved for this connection">Saved queries</button>
       <button data-tab="files" title="Download exported files, compressed">Exported files</button>
       <span class="title" id="tabTitle"></span>
     </div>
@@ -429,6 +475,7 @@
       <textarea id="sql" spellcheck="false" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
       <div class="toolbar">
         <button class="primary" id="runBtn" disabled>▶ Run <small>(Ctrl+Enter)</small></button>
+        <button id="saveQueryBtn" disabled title="Save this query for the connection">💾 Save query</button>
         <div class="group">
           <span>Show</span>
           <select id="limit">
@@ -457,6 +504,15 @@
     <div class="grid" id="grid">
       <div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>Connect to a database, then pick a table on the left.</p></div></div>
     </div>
+    </div>
+    <div class="pane" id="queriesPane" hidden>
+      <div class="filesbar">
+        <span class="flabel">Saved queries</span><span class="fsel" id="qConn"></span>
+        <input id="qFilter" type="search" placeholder="Filter by name or description…" spellcheck="false" autocomplete="off">
+        <span class="spacer"></span>
+        <button class="primary" id="qNew" title="Save the query in the editor">+ Save current query</button>
+      </div>
+      <div class="ftable" id="qTable"></div>
     </div>
     <div class="pane" id="filesPane" hidden>
       <div class="filesbar">
@@ -510,6 +566,14 @@
       <label for="dDb" id="dDbLabel">Database</label>
       <input id="dDb" spellcheck="false">
     </div>
+    <div class="dlock" id="dLockWrap">
+      <label for="dLock" id="dLockLabel">Connection password</label>
+      <input id="dLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
+      <label for="dLock2">Confirm connection password</label>
+      <input id="dLock2" type="password" autocomplete="new-password">
+      <p class="hint" id="dLockHint">Every saved connection has its own password. You need it to connect, edit or delete
+        the connection, and to download its exported files. It also encrypts the saved username, password and queries.</p>
+    </div>
     <div id="dResult" class="dresult" hidden></div>
     <div class="dactions">
       <button type="button" id="dTest">Test connection</button>
@@ -534,6 +598,40 @@
       <span class="spacer"></span>
       <button type="button" id="edCancel">Cancel</button>
       <button type="submit" class="primary" id="edSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="pwDialog" class="modal" aria-labelledby="pwTitle">
+  <form method="dialog" id="pwForm">
+    <h3 id="pwTitle">Connection password</h3>
+    <p class="sdtext" id="pwText"></p>
+    <label for="pwInput" id="pwLabel">Connection password</label>
+    <input id="pwInput" type="password" autocomplete="off">
+    <label class="check" id="pwSuperWrap"><input type="checkbox" id="pwSuper"> Use the superuser password instead</label>
+    <div id="pwResult" class="dresult bad" hidden></div>
+    <div class="dactions">
+      <span class="spacer"></span>
+      <button type="button" id="pwCancel">Cancel</button>
+      <button type="submit" class="primary" id="pwOk">Unlock</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="sqDialog" class="modal" aria-labelledby="sqTitle">
+  <form method="dialog" id="sqForm">
+    <h3 id="sqTitle">Save query</h3>
+    <label for="sqName">Name</label>
+    <input id="sqName" maxlength="100" placeholder="e.g. Open orders" autocomplete="off">
+    <label for="sqDesc">Description</label>
+    <textarea id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
+    <label for="sqSql">Query <span class="hint-inline">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
+    <textarea id="sqSql" rows="8" spellcheck="false" class="mono"></textarea>
+    <div id="sqResult" class="dresult bad" hidden></div>
+    <div class="dactions">
+      <span class="spacer"></span>
+      <button type="button" id="sqCancel">Cancel</button>
+      <button type="submit" class="primary" id="sqSave">Save</button>
     </div>
   </form>
 </dialog>
@@ -595,9 +693,17 @@ async function api(method, url, body) {
   document.body.classList.toggle("busy", ++pending > 0);
   const res = await fetch(url, opt).finally(() => document.body.classList.toggle("busy", --pending > 0));
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) {
+    const err = new Error(data.error || res.statusText);
+    err.status = res.status; err.data = data;
+    throw err;
+  }
   return data;
 }
+
+// dlLink adds the session to a download link: the files of a protected
+// connection download only for the session that opened it.
+const dlLink = (url) => url + (url.includes("?") ? "&" : "?") + "session=" + encodeURIComponent(state.session || "");
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -721,19 +827,99 @@ $("edForm").addEventListener("submit", (ev) => { ev.preventDefault(); saveExport
 $("edDefault").addEventListener("click", () => saveExportDir(""));
 $("edCancel").addEventListener("click", () => $("exportDirDialog").close());
 
+// ---- passwords ----------------------------------------------------------------
+// Every saved connection has its own connection password; the superuser
+// password opens all of them. Both are asked for when needed and kept only in
+// this page's memory, never stored by the browser.
+const unlocks = {};      // saved connection id -> { lockPassword } once unlocked
+const fileUnlocks = {};  // export folder -> connection password (Exported files page)
+let superPw = null;      // the superuser password, while signed in as superuser
+const credsFor = (id) => (superPw ? { superPassword: superPw } : unlocks[id] || {});
+
+// askPassword asks for a password in a dialog. It resolves to
+// { lockPassword } or { superPassword }, or null when cancelled. check, if
+// given, is tried with the answer and may throw to show an error and ask again.
+function askPassword({ title, text, label = "Connection password", ok = "Unlock", allowSuper = true, superOnly = false, check }) {
+  return new Promise((resolve) => {
+    const d = $("pwDialog");
+    $("pwTitle").textContent = title; $("pwText").textContent = text || ""; $("pwText").hidden = !text;
+    $("pwInput").value = ""; $("pwResult").hidden = true; $("pwOk").textContent = ok;
+    $("pwSuper").checked = superOnly; $("pwSuperWrap").hidden = superOnly || !allowSuper;
+    const setLabel = () => ($("pwLabel").textContent = $("pwSuper").checked ? "Superuser password" : label);
+    setLabel();
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; cleanup(); if (d.open) d.close(); resolve(v); };
+    const onSubmit = async (ev) => {
+      ev.preventDefault();
+      const pw = $("pwInput").value;
+      if (!pw) return;
+      const v = $("pwSuper").checked ? { superPassword: pw } : { lockPassword: pw };
+      if (check) {
+        $("pwOk").disabled = true;
+        try { await check(v); } catch (e) {
+          $("pwResult").textContent = e.message; $("pwResult").hidden = false;
+          $("pwInput").select(); return;
+        } finally { $("pwOk").disabled = false; }
+      }
+      finish(v);
+    };
+    const onCancel = () => finish(null);
+    const onClose = () => finish(null);
+    const cleanup = () => {
+      $("pwForm").removeEventListener("submit", onSubmit); $("pwCancel").removeEventListener("click", onCancel);
+      d.removeEventListener("close", onClose); $("pwSuper").removeEventListener("change", setLabel);
+    };
+    $("pwForm").addEventListener("submit", onSubmit); $("pwCancel").addEventListener("click", onCancel);
+    d.addEventListener("close", onClose); $("pwSuper").addEventListener("change", setLabel);
+    d.showModal(); $("pwInput").focus();
+  });
+}
+
+// withUnlock runs fn(creds) for saved connection c, asking for its connection
+// password when the server says it is locked, until it works or is cancelled.
+async function withUnlock(c, fn, how = "", first = null) {
+  let creds = first || credsFor(c.id);
+  for (;;) {
+    try {
+      const res = await fn(creds);
+      if (creds.lockPassword) unlocks[c.id] = { lockPassword: creds.lockPassword };
+      return res;
+    } catch (e) {
+      if (!(e.data && e.data.locked)) throw e;
+      if (creds.superPassword && creds === credsFor(c.id)) superPw = null;
+      const again = Object.keys(creds).length > 0;
+      creds = await askPassword({ title: `Unlock “${c.name}”`,
+        text: (again ? e.message + ". " : "") + `Enter the connection password of “${c.name}”${how}.` });
+      if (!creds) return null;
+      if (creds.superPassword) superPw = creds.superPassword;
+    }
+  }
+}
+
 // ---- saved connections ---------------------------------------------------
 async function loadSaved() {
   try {
-    const list = await api("GET", "/api/connections");
+    const list = superPw
+      ? await api("POST", "/api/superuser/reveal", { superPassword: superPw }).catch((e) => { superPw = null; throw e; })
+      : await api("GET", "/api/connections");
     state.saved = list;
     $("savedSub").textContent = "· " + list.length;
-    $("savedList").innerHTML = list.length ? list.map((c) => `
+    $("superBar").hidden = !superPw;
+    $("superBtn").classList.toggle("on", !!superPw);
+    $("savedList").innerHTML = list.length ? list.map((c) => {
+      const lock = c.locked ? `<span class="lock" title="Protected by its own connection password">🔒</span>`
+        : `<span class="lock" title="No connection password yet: Edit to set one">🔓</span>`;
+      const where = c.engine === "sqlite" ? c.database
+        : `${c.username ? c.username + "@" : ""}${c.host || ""}${c.port ? ":" + c.port : ""}${c.database ? " / " + c.database : ""}`;
+      const det = superPw ? `<span class="det" title="${esc(where)}">${esc(where)}${c.needsOwnPassword ? " · open once with its own password" : ""}</span>` : "";
+      return `
       <li data-id="${c.id}" title="Click to connect">
         <span class="tag">${esc(c.engine)}</span>
-        <span class="name">${esc(c.name)}</span>
+        <span class="name">${esc(c.name)}${lock}${det}</span>
         <button class="small" data-act="edit" title="Edit and test this connection">Edit</button>
         <button class="small" data-act="del" title="Delete">✕</button>
-      </li>`).join("") : `<li class="empty">None yet</li>`;
+      </li>`;
+    }).join("") : `<li class="empty">None yet</li>`;
   } catch (e) { toast(e.message, true); }
 }
 
@@ -743,23 +929,76 @@ $("savedList").addEventListener("click", async (ev) => {
   const id = +li.dataset.id;
   const c = state.saved.find((x) => x.id === id);
   const act = ev.target.dataset.act;
-  if (act === "edit") { openConnDialog(c); return; }
-  if (act === "del") {
-    if (!confirm(`Delete saved connection "${c.name}"?`)) return;
-    await api("DELETE", "/api/connections/" + id).catch((e) => toast(e.message, true));
-    loadSaved(); return;
-  }
+  if (act === "edit") { editConnection(c); return; }
+  if (act === "del") { deleteConnection(c); return; }
   fillForm(c);
   connect({ savedId: id });
 });
 
-$("saveConn").addEventListener("change", () => { $("saveNameWrap").hidden = !$("saveConn").checked; });
+// Editing a protected connection first unlocks it, which also returns the
+// details to show (the username) — never its database password.
+async function editConnection(c) {
+  if (!c.locked && !superPw) { openConnDialog(c, {}); return; }
+  try {
+    let creds;
+    const info = await withUnlock(c, async (cr) => { creds = cr; return api("POST", `/api/connections/${c.id}/unlock`, cr); }, " to edit it");
+    if (info) openConnDialog(info, creds);
+  } catch (e) { toast(e.message, true); }
+}
 
+async function deleteConnection(c) {
+  const what = `Delete “${c.name}” and all its saved queries? This can't be undone.`;
+  let creds = credsFor(c.id);
+  if (c.locked && !creds.superPassword) {
+    creds = await askPassword({ title: `Delete “${c.name}”?`, text: what + " Enter its connection password to confirm.", ok: "Delete" });
+    if (!creds) return;
+  } else if (!confirm(what)) return;
+  try {
+    // Exactly the password typed to confirm, not one remembered from earlier.
+    await withUnlock(c, (cr) => api("DELETE", "/api/connections/" + c.id, cr), " to delete it", creds);
+    delete unlocks[c.id];
+    toast(`Deleted “${c.name}”`);
+  } catch (e) { toast(e.message, true); }
+  loadSaved();
+}
+
+$("superBtn").addEventListener("click", async (ev) => {
+  ev.stopPropagation();
+  if (superPw) { signOutSuper(); return; }
+  try {
+    const st = await api("GET", "/api/superuser");
+    if (!st.set) { toast("No superuser password has been set. Set one with: cactusdb --superuser set", true); return; }
+  } catch (e) { toast(e.message, true); return; }
+  const v = await askPassword({ title: "Superuser", text: "The superuser password opens every saved connection, its saved queries and its exported files.",
+    label: "Superuser password", ok: "Sign in", superOnly: true,
+    check: (v) => api("POST", "/api/superuser/reveal", v) });
+  if (!v) return;
+  superPw = v.superPassword;
+  toast("Signed in as superuser");
+  loadSaved();
+  if ($("filesPane").hidden === false) loadFiles();
+});
+function signOutSuper() { superPw = null; toast("Signed out as superuser"); loadSaved(); }
+$("superOut").addEventListener("click", (ev) => { ev.stopPropagation(); signOutSuper(); });
+
+// The sidebar's Save: a new saved connection, protected by its own password.
+function newLockFromForm(a, b) {
+  const pw = $(a).value, again = $(b).value;
+  if (pw.length < 6) throw new Error("Choose a connection password of at least 6 characters.");
+  if (pw !== again) throw new Error("The two connection passwords differ.");
+  return pw;
+}
+$("saveConn").addEventListener("change", () => { $("saveNameWrap").hidden = !$("saveConn").checked; });
 $("saveOnlyBtn").addEventListener("click", async () => {
   try {
     const p = formParams();
-    await api("POST", "/api/connections", { name: $("connName").value, ...p, keepPassword: !p.password && !!state.formSavedId });
-    toast("Connection saved to cactus.conn.db");
+    if (!$("saveConn").checked) { $("saveConn").checked = true; $("saveNameWrap").hidden = false; $("connName").focus(); return; }
+    const lock = newLockFromForm("connLock", "connLock2");
+    const body = { name: $("connName").value, ...p, newLockPassword: lock };
+    if (!p.password && state.formSavedId) Object.assign(body, { keepPasswordOf: state.formSavedId }, credsFor(state.formSavedId));
+    await api("POST", "/api/connections", body);
+    $("connLock").value = $("connLock2").value = "";
+    toast("Connection saved, protected by its connection password");
     loadSaved();
   } catch (e) { toast(e.message, true); }
 });
@@ -767,7 +1006,7 @@ $("saveOnlyBtn").addEventListener("click", async () => {
 // ---- new / edit connection dialog ------------------------------------------
 // Saved passwords stay on the server: when editing, a blank password keeps
 // the stored one (keepPassword / keepPasswordOf).
-const dlg = { editId: 0, hasPassword: false, tested: null };
+const dlg = { editId: 0, hasPassword: false, locked: false, creds: {}, tested: null };
 
 function dlgEngine(keepPort) {
   const id = $("dEngine").value, isFile = id === "sqlite";
@@ -802,10 +1041,12 @@ function dlgResult(cls, text) {
   r.hidden = !cls; r.className = "dresult " + (cls || ""); r.textContent = text || "";
 }
 
-function openConnDialog(c) {
+function openConnDialog(c, creds = {}) {
   $("dEngine").innerHTML = state.engines.map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
   dlg.editId = c ? c.id : 0;
   dlg.hasPassword = !!(c && c.hasPassword);
+  dlg.locked = !!(c && c.locked);
+  dlg.creds = creds || {};
   $("dTitle").textContent = c ? "Edit connection" : "New connection";
   $("dName").value = c ? c.name : "";
   $("dEngine").value = c ? c.engine : state.engine;
@@ -816,6 +1057,11 @@ function openConnDialog(c) {
   allowShowPassword("dPass", !c); // new connections only, never when editing
   $("dFile").value = c && c.engine === "sqlite" ? c.database : "";
   $("dDb").value = c && c.engine !== "sqlite" ? c.database : "";
+  // The connection password: required for a new connection (and for one
+  // saved before connections had passwords); optional to change otherwise.
+  $("dLock").value = $("dLock2").value = "";
+  $("dLockLabel").textContent = dlg.locked ? "New connection password (leave blank to keep the current one)" : "Connection password";
+  $("dLock").placeholder = dlg.locked ? "" : "at least 6 characters";
   dlgEngine(!!c);
   if (c) $("dPort").value = c.port || "";
   $("connDialog").showModal();
@@ -826,6 +1072,7 @@ $("newConnBtn").addEventListener("click", (ev) => { ev.stopPropagation(); openCo
 $("dEngine").addEventListener("change", () => dlgEngine(false));
 $("dForm").addEventListener("input", (ev) => { if (ev.target.id !== "dName") dlgResult(); });
 $("dCancel").addEventListener("click", () => $("connDialog").close());
+$("connDialog").addEventListener("close", () => { $("dLock").value = $("dLock2").value = ""; });
 
 $("dTest").addEventListener("click", async () => {
   const p = dlgParams();
@@ -833,7 +1080,7 @@ $("dTest").addEventListener("click", async () => {
   b.disabled = true; dlgResult("busy", "Connecting…");
   try {
     const body = { ...p };
-    if (!p.password && dlg.hasPassword) body.keepPasswordOf = dlg.editId;
+    if (!p.password && dlg.hasPassword) Object.assign(body, { keepPasswordOf: dlg.editId }, dlg.creds);
     const res = await api("POST", "/api/testconn", body);
     dlgResult("ok", `✔ Connection works${res.version ? " – " + res.version : ""}\n${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} · ${res.elapsedMs} ms`);
   } catch (e) {
@@ -847,12 +1094,33 @@ $("dSave").addEventListener("click", async () => {
     dlgResult("bad", p.engine === "sqlite" ? "Enter the database file." : "Enter the host.");
     return;
   }
+  let lock = "";
   try {
-    await api("POST", "/api/connections", { id: dlg.editId, name: $("dName").value, ...p, keepPassword: !p.password && dlg.hasPassword });
+    if (!dlg.locked || $("dLock").value || $("dLock2").value) lock = newLockFromForm("dLock", "dLock2");
+  } catch (e) { dlgResult("bad", "✘ " + e.message); $("dLock").focus(); return; }
+  try {
+    await api("POST", "/api/connections", { id: dlg.editId, name: $("dName").value, ...p, keepPassword: !p.password && dlg.hasPassword,
+      ...dlg.creds, newLockPassword: lock });
+    if (dlg.editId && lock) unlocks[dlg.editId] = { lockPassword: lock };
     $("connDialog").close();
-    toast("Connection saved");
+    toast(lock ? "Connection saved, protected by its connection password" : "Connection saved");
     loadSaved();
   } catch (e) { dlgResult("bad", "✘ " + e.message); }
+});
+
+// ---- the pop-up menu (connections and settings) -----------------------------
+function setNavMenu(open) {
+  $("navMenu").hidden = !open;
+  $("navMenuBtn").setAttribute("aria-expanded", String(open));
+}
+$("navMenuBtn").addEventListener("click", (ev) => { ev.stopPropagation(); setNavMenu($("navMenu").hidden); });
+document.addEventListener("click", (ev) => {
+  // Clicks inside the menu, or in a dialog it opened, keep it open.
+  if ($("navMenu").hidden || ev.target.closest("#navMenu, #navMenuBtn, dialog")) return;
+  setNavMenu(false);
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && !$("navMenu").hidden && !document.querySelector("dialog[open]")) { setNavMenu(false); $("navMenuBtn").focus(); }
 });
 
 // ---- connect -------------------------------------------------------------
@@ -861,28 +1129,41 @@ async function connect(extra = {}) {
   btn.disabled = true; btn.textContent = "Connecting…";
   try {
     const body = { ...formParams(), ...extra };
-    if (!extra.savedId && !body.password && state.formSavedId) body.keepPasswordOf = state.formSavedId;
-    if (!extra.savedId && $("saveConn").checked) { body.save = true; body.name = $("connName").value; }
-    const res = await api("POST", "/api/connect", body);
+    if (!extra.savedId && !body.password && state.formSavedId) Object.assign(body, { keepPasswordOf: state.formSavedId }, credsFor(state.formSavedId), extra);
+    if (extra.savedId && !extra.lockPassword && !extra.superPassword) Object.assign(body, credsFor(extra.savedId));
+    if (!extra.savedId && $("saveConn").checked) {
+      body.save = true; body.name = $("connName").value;
+      body.newLockPassword = newLockFromForm("connLock", "connLock2");
+    }
+    const savedId = extra.savedId || body.keepPasswordOf;
+    const c = savedId && (state.saved || []).find((x) => x.id === savedId);
+    const res = c ? await withUnlock(c, (cr) => api("POST", "/api/connect", { ...body, ...cr })) : await api("POST", "/api/connect", body);
+    if (!res) return; // cancelled
     if (state.session) api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
     state.session = res.session; state.label = res.label; state.engine = res.engine;
+    state.savedConn = res.savedConn || 0; state.folder = res.folder || "";
+    if (state.savedConn && c && unlocks[c.id]) fileUnlocks[state.folder] = unlocks[c.id].lockPassword;
+    if (res.savedId && body.newLockPassword) { unlocks[res.savedId] = { lockPassword: body.newLockPassword }; fileUnlocks[state.folder] = body.newLockPassword; }
     state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null;
     const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
     $("disconnectBtn").hidden = false;
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false; $("backupBtn").disabled = false;
     setExportAllEnabled(true);
-    $("runBtn").disabled = false;
+    $("runBtn").disabled = false; $("saveQueryBtn").disabled = false;
+    $("queriesTab").hidden = false;
     state.objTab = "table";
     renderObjects();
     $("connSub").textContent = "· " + res.label;
-    ["connection", "saved", "drivers"].forEach((sec) => setCollapsed(sec, true, false));
+    $("navConn").textContent = res.label;
+    $("connLock").value = $("connLock2").value = "";
+    setNavMenu(false);
     setCollapsed("objects", false, false);
     clearGrid("Pick a table on the left to view its data.");
     clearDef("Select an object on the left to see its definition.");
     showTab("data");
     if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
-    else if (res.savedId) { toast("Connected and saved"); loadSaved(); }
+    else if (res.savedId) { toast("Connected and saved, protected by its connection password"); loadSaved(); }
     else toast("Connected");
   } catch (e) {
     toast(e.message, true);
@@ -895,16 +1176,108 @@ $("connectBtn").addEventListener("click", () => connect());
 $("disconnectBtn").addEventListener("click", async () => {
   await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
   state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null;
+  state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
-  $("disconnectBtn").hidden = true; $("runBtn").disabled = true;
+  $("disconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
+  $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
-  $("objTree").innerHTML = `<p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators…</p>`;
-  $("objTabs").innerHTML = ""; $("connSub").textContent = "";
+  $("objTree").innerHTML = `<p class="empty">Connect to a database: open <b>☰ Connections</b> below.</p>`;
+  $("objTabs").innerHTML = ""; $("connSub").textContent = ""; $("navConn").textContent = "Not connected";
   setCollapsed("connection", false, false);
   clearDef("Select an object on the left to see its definition.");
   $("tabTitle").textContent = "";
   setExportEnabled(false); setInfo("");
   clearGrid("Connect to a database, then pick a table on the left.");
+  if (!$("queriesPane").hidden) showTab("data");
+  setNavMenu(true);
+});
+
+// ---- saved queries -----------------------------------------------------------
+// Kept for the saved connection, encrypted with its connection password.
+// Only read-only queries can be saved; the server checks.
+const queries = { list: [], q: "" };
+async function loadQueries() {
+  if (!state.session) return;
+  try {
+    const res = await api("GET", "/api/queries?" + new URLSearchParams({ session: state.session }));
+    queries.saved = res.saved; queries.list = res.queries;
+    renderQueries();
+  } catch (e) { toast(e.message, true); }
+}
+function renderQueries() {
+  $("qConn").textContent = state.label ? "· " + state.label : "";
+  $("qNew").disabled = !queries.saved;
+  if (!queries.saved) {
+    $("qTable").innerHTML = `<div class="placeholder"><div><p>Queries are kept for saved connections.</p>
+      <p>Save this connection (it gets its own connection password), then connect to it to save queries for it.</p></div></div>`;
+    return;
+  }
+  const q = queries.q.toLowerCase();
+  const vis = queries.list.filter((x) => !q || x.name.toLowerCase().includes(q) || (x.description || "").toLowerCase().includes(q));
+  if (!queries.list.length) {
+    $("qTable").innerHTML = `<div class="placeholder"><div><p>No saved queries for this connection yet.</p>
+      <p>Write a read-only query on the Data tab and press <b>💾 Save query</b>.</p></div></div>`;
+    return;
+  }
+  $("qTable").innerHTML = `<table><thead><tr><th>Name</th><th>Description</th><th>Query</th><th>Changed</th><th></th></tr></thead><tbody>` +
+    (vis.length ? vis.map((x) => `<tr data-qid="${x.id}">
+      <td><b>${esc(x.name)}</b></td>
+      <td class="qdesc">${esc(x.description || "")}</td>
+      <td class="qsql" title="${esc(x.sql)}">${esc(x.sql.replace(/\s+/g, " "))}</td>
+      <td class="fdate">${esc(fmtDate(x.updated))}</td>
+      <td class="qacts"><button class="small primary" data-qact="run" title="Open in the editor and run">▶ Run</button><button class="small" data-qact="edit">Edit</button><button class="small danger" data-qact="del" title="Delete (asks first)">Delete</button></td>
+    </tr>`).join("") : `<tr><td colspan="5" class="fnomatch">No saved query matches.</td></tr>`) + `</tbody></table>`;
+}
+$("qFilter").addEventListener("input", () => { queries.q = $("qFilter").value; renderQueries(); });
+$("qTable").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-qact]");
+  if (!b) return;
+  const x = queries.list.find((q) => q.id === +b.closest("tr").dataset.qid);
+  if (!x) return;
+  if (b.dataset.qact === "run") {
+    $("sql").value = x.sql; state.result = null;
+    showTab("data"); $("runBtn").click();
+  } else if (b.dataset.qact === "edit") {
+    openQueryDialog(x);
+  } else if (confirm(`Delete the saved query “${x.name}”?`)) {
+    try {
+      await api("DELETE", `/api/queries/${x.id}?` + new URLSearchParams({ session: state.session }));
+      toast(`Deleted “${x.name}”`); loadQueries();
+    } catch (e) { toast(e.message, true); }
+  }
+});
+
+let sqEdit = 0;
+function openQueryDialog(x) {
+  if (!state.savedConn) {
+    toast("Queries can only be saved for a saved connection: save this connection first.", true);
+    return;
+  }
+  sqEdit = x ? x.id : 0;
+  $("sqTitle").textContent = x ? "Edit saved query" : "Save query";
+  $("sqName").value = x ? x.name : "";
+  $("sqDesc").value = x ? x.description : "";
+  $("sqSql").value = x ? x.sql : $("sql").value.trim();
+  $("sqResult").hidden = true;
+  $("sqDialog").showModal();
+  $("sqName").focus();
+}
+$("saveQueryBtn").addEventListener("click", () => openQueryDialog(null));
+$("qNew").addEventListener("click", () => openQueryDialog(null));
+$("sqCancel").addEventListener("click", () => $("sqDialog").close());
+$("sqForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const body = { session: state.session, id: sqEdit, name: $("sqName").value, description: $("sqDesc").value, sql: $("sqSql").value };
+  if (!body.name.trim()) { $("sqResult").textContent = "Give the query a name."; $("sqResult").hidden = false; return; }
+  $("sqSave").disabled = true;
+  try {
+    await api("POST", "/api/queries", body);
+    $("sqDialog").close();
+    toast(`Saved “${body.name.trim()}”`);
+    loadQueries();
+  } catch (e) {
+    $("sqResult").textContent = e.message; $("sqResult").hidden = false;
+  } finally { $("sqSave").disabled = false; }
 });
 
 // ---- objects --------------------------------------------------------------
@@ -1036,6 +1409,22 @@ const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql
 const fileKey = (f) => f.conn + "/" + f.kind + "/" + f.name;
 const fileRef = (f) => ({ conn: f.conn, kind: f.kind, name: f.name });
 const connLabel = (c) => c || "(older exports)";
+// withFileUnlock runs fn(unlock) for files of protected connections, asking
+// for a connection's password when the server names one, until it works.
+async function withFileUnlock(fn) {
+  for (;;) {
+    const unlock = superPw ? { superPassword: superPw } : { unlock: { ...fileUnlocks } };
+    try { return await fn(unlock); } catch (e) {
+      if (!(e.data && e.data.locked && e.data.conn)) throw e;
+      const conn = e.data.conn;
+      const tried = superPw || fileUnlocks[conn];
+      const v = await askPassword({ title: `Files of “${conn}”`,
+        text: (tried ? e.message + ". " : "") + `These files belong to a protected connection. Enter the connection password of “${conn}”.` });
+      if (!v) return null;
+      if (v.superPassword) superPw = v.superPassword; else { superPw = null; fileUnlocks[conn] = v.lockPassword; }
+    }
+  }
+}
 
 function fmtSize(n) {
   if (n < 1024) return n + " B";
@@ -1115,7 +1504,7 @@ function renderFiles() {
     return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}${f.conn ? "/" + esc(f.conn) : ""}/${esc(f.kind)}">
       <td class="ck"><input type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
       <td class="facts"><button data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button data-fact="delete" class="del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></td>
-      <td class="fconn">${f.conn ? esc(f.conn) : `<span class="none">${esc(connLabel(""))}</span>`}</td>
+      <td class="fconn">${f.conn ? esc(f.conn) : `<span class="none">${esc(connLabel(""))}</span>`}${f.protected ? `<span class="plock" title="Protected: needs the connection's password">🔒</span>` : ""}</td>
       <td class="fname">${highlightName(f.name, terms)}</td>
       <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
       <td class="fdate">${esc(fmtDate(f.modified))}</td>
@@ -1201,7 +1590,8 @@ async function downloadFiles(chosen) {
   note.innerHTML = `<span class="spin"></span> Compressing ${chosen.length} file${chosen.length === 1 ? "" : "s"} (${fmtSize(chosen.reduce((t, f) => t + f.size, 0))}) at the highest level…`;
   note.hidden = false;
   try {
-    const res = await api("POST", "/api/files/zip", { files: chosen.map(fileRef) });
+    const res = await withFileUnlock((u) => api("POST", "/api/files/zip", { files: chosen.map(fileRef), ...u }));
+    if (!res) { note.hidden = true; return; }
     const saved = res.size ? Math.max(0, Math.round((1 - res.zipSize / res.size) * 100)) : 0;
     note.innerHTML = `Compressed ${res.files} file${res.files === 1 ? "" : "s"}: ${fmtSize(res.size)} → <b>${fmtSize(res.zipSize)}</b> (${saved}% smaller) · ` +
       `<a href="${esc(res.download)}" download="${esc(res.name)}">${esc(res.name)}</a> <span class="fsel">(link valid for 15 minutes)</span>` +
@@ -1238,7 +1628,8 @@ $("fdConfirm").addEventListener("click", async () => {
   const list = fDelPending;
   $("fdConfirm").disabled = true;
   try {
-    const res = await api("POST", "/api/files/delete", { files: list.map(fileRef) });
+    const res = await withFileUnlock((u) => api("POST", "/api/files/delete", { files: list.map(fileRef), ...u }));
+    if (!res) return;
     list.forEach((f) => files.sel.delete(fileKey(f)));
     $("fDelDialog").close();
     if ($("fPrevDialog").open && list.some((f) => fileKey(f) === fPrevKey)) $("fPrevDialog").close();
@@ -1265,7 +1656,8 @@ async function previewFile(f) {
   $("fpFoot").textContent = "";
   if (!$("fPrevDialog").open) $("fPrevDialog").showModal();
   try {
-    const p = await api("GET", `/api/files/preview?conn=${encodeURIComponent(f.conn)}&kind=${encodeURIComponent(f.kind)}&name=${encodeURIComponent(f.name)}`);
+    const p = await withFileUnlock((u) => api("POST", "/api/files/preview", { ...fileRef(f), ...u }));
+    if (!p) { $("fPrevDialog").close(); return; }
     if (fPrevKey !== fileKey(f)) return; // another file was opened meanwhile
     let foot = "";
     switch (p.mode) {
@@ -1317,6 +1709,8 @@ function showTab(tab) {
   $("dataPane").hidden = tab !== "data";
   $("defPane").hidden = tab !== "def";
   $("filesPane").hidden = tab !== "files";
+  $("queriesPane").hidden = tab !== "queries";
+  if (tab === "queries") loadQueries();
   if (tab === "def") loadDefinition();
   if (tab === "files") loadFiles();
 }
@@ -1509,7 +1903,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
     const res = await runWithOverall(`Exporting all rows of ${name} as ${fmt === "xlsx" ? "Excel" : fmt.toUpperCase()}`,
       () => api("POST", "/api/export", { session: state.session, sql, format: fmt, name }),
       (r) => `Exported <b>${r.rows.toLocaleString()}</b> row${r.rows === 1 ? "" : "s"} of ${esc(name)}`);
-    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(res.download)}" download>Download</a><button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     toast("Saved " + res.file);
   } catch (e) { toast("Export failed: " + e.message, true); }
@@ -1524,7 +1918,7 @@ $("ddlBtn").addEventListener("click", async () => {
       () => api("POST", "/api/exportddl", { session: state.session }),
       (r) => `Exported the DDL of <b>${r.objects.toLocaleString()}</b> object${r.objects === 1 ? "" : "s"}`);
     closeExportPanel(false);
-    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(res.download)}" download>Download</a><button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     showTab("data");
     toast("Saved " + res.file);
@@ -1545,7 +1939,7 @@ $("backupBtn").addEventListener("click", async () => {
       () => api("POST", "/api/backup", { session: state.session }),
       (r) => `Backed up <b>${r.tables.toLocaleString()}</b> tables and <b>${r.rows.toLocaleString()}</b> rows (${esc(r.sizeText)} compressed)`);
     const failed = res.failed && res.failed.length ? ` <span class="warn">· rows of ${res.failed.length} table${res.failed.length === 1 ? "" : "s"} could not be read: ${esc(res.failed.join(", "))}</span>` : "";
-    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code> · <a href="${esc(res.download)}" download>Download</a>${failed}<button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a>${failed}<button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     toast("Saved " + res.file);
   } catch (e) {
     note.hidden = true;
@@ -1624,7 +2018,7 @@ function renderExportAll(st) {
         if (t.total > 0) s = `${pct}% · ${t.rows.toLocaleString()} / ${t.total.toLocaleString()} rows`;
         else { s = `${t.rows.toLocaleString()} rows`; bar = `<span class="bar busy"><i></i></span>`; }
         break;
-      case "done": s = `${t.rows.toLocaleString()} rows · <a href="${esc(t.download)}" download>${esc(t.file)}</a>`; break;
+      case "done": s = `${t.rows.toLocaleString()} rows · <a href="${esc(dlLink(t.download))}" download>${esc(t.file)}</a>`; break;
       default: s = `<span class="err">failed: ${esc(t.error)}</span>`;
     }
     return `<li><span class="n" title="${esc(t.name)}">${esc(t.name)}</span>${bar}<span class="s">${s}</span></li>`;
@@ -1676,6 +2070,7 @@ $("engines").addEventListener("click", (ev) => {
   loadSaved();
   loadSettings();
   loadInfo();
+  if (!state.session) setNavMenu(true); // not connected yet: show the connections
   api("GET", "/api/drivers").then((list) => {
     $("driversSub").textContent = "· " + list.length + " built in";
     $("driverList").innerHTML = list.map((d) =>

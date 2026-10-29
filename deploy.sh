@@ -110,6 +110,7 @@ IMAGE=${CACTUSDB_IMAGE:-cactusdb}
 PORT=${CACTUSDB_PORT:-8080}
 TZ_NAME=${CACTUSDB_TZ:-${TZ:-}}
 PASSPHRASE=${CACTUSDB_PASSPHRASE:-}
+SUPERUSER_PW=${CACTUSDB_SUPERUSER_PASSWORD:-}
 RUNTIME=${CONTAINER_RUNTIME:-}
 # dd
 DD_BIND=${DD_BIND:-0.0.0.0}
@@ -420,6 +421,8 @@ eng_install() {
   [[ -n $E_SQLITE ]] && args+=(-v "$E_SQLITE:/sqlite:ro$z")
   [[ -n $TZ_NAME ]] && args+=(-e "TZ=$TZ_NAME")
   [[ -n $PASSPHRASE ]] && args+=(-e "CACTUSDB_PASSPHRASE=$PASSPHRASE")
+  # Sets the superuser password on the first start (never changes one).
+  [[ -n $SUPERUSER_PW ]] && args+=(-e "CACTUSDB_SUPERUSER_PASSWORD=$SUPERUSER_PW")
   # Not as root, so the files in the data folders belong to a real user
   # (rootless podman maps root to you already).
   [[ $RUNTIME == podman ]] || args+=(--user "$user")
@@ -515,7 +518,7 @@ metadata:
 ---
 EOF
   fi
-  if [[ -n $PASSPHRASE ]]; then
+  if [[ -n $PASSPHRASE || -n $SUPERUSER_PW ]]; then
     cat <<EOF
 apiVersion: v1
 kind: Secret
@@ -526,9 +529,10 @@ metadata:
 $(labels 4)
 type: Opaque
 stringData:
-  CACTUSDB_PASSPHRASE: $(yaml_str "$PASSPHRASE")
----
 EOF
+    [[ -n $PASSPHRASE ]] && echo "  CACTUSDB_PASSPHRASE: $(yaml_str "$PASSPHRASE")"
+    [[ -n $SUPERUSER_PW ]] && echo "  CACTUSDB_SUPERUSER_PASSWORD: $(yaml_str "$SUPERUSER_PW")"
+    echo "---"
   fi
   if [[ $STORAGE == pvc ]]; then
     local which size
@@ -602,6 +606,10 @@ EOF
   [[ -n $PASSPHRASE ]] && cat <<EOF
             - name: CACTUSDB_PASSPHRASE
               valueFrom: { secretKeyRef: { name: $NAME, key: CACTUSDB_PASSPHRASE } }
+EOF
+  [[ -n $SUPERUSER_PW ]] && cat <<EOF
+            - name: CACTUSDB_SUPERUSER_PASSWORD
+              valueFrom: { secretKeyRef: { name: $NAME, key: CACTUSDB_SUPERUSER_PASSWORD } }
 EOF
   cat <<EOF
           ports:

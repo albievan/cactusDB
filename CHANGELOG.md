@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.14.0 — 2026-10-29
+
+- **A password for every saved connection.** Saving a connection now asks for its own
+  connection password. It's needed to connect, edit or delete the connection and to
+  use its exported files. The connection's username, password and saved queries are
+  encrypted with a key derived from it (Argon2id, AES-256-GCM), so `cactus.key` alone
+  no longer reveals them. Wrong guesses are slowed down. Connections saved before stay
+  usable and can be given a password with **Edit**. The command line never replaces a
+  protected connection.
+- **Saved queries per connection**: **💾 Save query** next to Run, with a name and a
+  description; a **Saved queries** tab to run, edit or delete them. Only read-only
+  queries can be saved. Stored in `cactus.conn.db`, encrypted with the connection's
+  password.
+- **Superuser password**: opens every connection, its saved queries and its exported
+  files (🛡 in *Saved connections*). It is never stored or built into cactusdb: set it
+  with `cactusdb --superuser set`, or once with `CACTUSDB_SUPERUSER_PASSWORD`
+  (`.env.example`, deploy scripts).
+- **Exported files of a protected connection** can be previewed, downloaded or deleted
+  only with its connection password or the superuser password (🔒 on the *Exported
+  files* page). Previews are requested by POST, so passwords never appear in URLs.
+- **Sidebar:** only the database's objects stay in the sidebar. The connection form,
+  saved connections, export folder and drivers are in the **☰ Connections** pop-up menu
+  at the bottom.
+- Fixed: two password prompts in a row from piped input (`--superuser set`) read only
+  the first line.
+
 ## 1.13.2 — 2026-10-28
 
 - Fixed: cactusdb in a container (`deploy.sh`, `deploy-container.sh`) couldn't reach

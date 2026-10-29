@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.13.2
+cactusdb 1.14.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -96,7 +96,13 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 
 ## 3. Using cactusdb
 
-1. **Choose the database type** at the top left: SQLite, MySQL, MariaDB, Firebird, SQL Server or PostgreSQL.
+The left sidebar shows the **objects** of the database you're connected to. Everything else
+is in the **☰ Connections** menu at the bottom of the sidebar: the connection form, saved
+connections, the export folder and the drivers. The menu opens by itself while you're not
+connected and closes once you are. Click outside it or press Esc to close it.
+
+1. **Choose the database type** in the *Connection* section of the ☰ Connections menu:
+   SQLite, MySQL, MariaDB, Firebird, SQL Server or PostgreSQL.
 2. **Fill in the connection details:**
 
    | Engine | What to enter |
@@ -107,13 +113,13 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    | PostgreSQL | Host, port (default 5432), username (often `postgres`), password, database name (leave blank to use the database named after the user) |
    | SQL Server | Host, port (default 1433), SQL Server login (e.g. `sa`) and password, database name (leave blank for the login's default database). For a named instance, enter the host as `server\INSTANCE` and clear the port. |
 
-3. *(Optional)* Tick **Save connection**, give it a name, and it will be remembered,
-   including the password, which is stored encrypted (see [Security](#7-security)).
-   Or click **Save** to store it without connecting.
-4. Click **Connect**. The Connection, Saved connections and Drivers sections fold away so
-   the **Objects** list gets the whole sidebar. Click any section heading (▸/▾) to open or
-   close it again. Objects are split into tabs (Tables, Views, Procedures, Functions,
-   Triggers, Generators/Sequences…), see [Browsing objects](#browsing-objects).
+3. *(Optional)* Tick **Save connection**, give it a name, and choose a **connection
+   password** (at least 6 characters, typed twice). The connection is remembered, and is
+   protected by that password (see [Connection passwords](#connection-passwords)). Or click
+   **Save** to store it without connecting.
+4. Click **Connect**. The menu closes and the **Objects** list has the sidebar to itself.
+   Objects are split into tabs (Tables, Views, Procedures, Functions, Triggers,
+   Generators/Sequences…), see [Browsing objects](#browsing-objects).
 5. **Click a table or view.** cactusdb writes the query that selects every column
    (`SELECT "id", "name", … FROM "customers"`) and shows the data in the grid.
    - Click a column heading to sort; click again to reverse.
@@ -128,7 +134,61 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
    [Where exports go](#where-exports-go)). A bar shows the full path with a **Download** link.
    **Clear** removes that bar again.
 
-**Saved connections** appear in their own list. Click one to connect, or **✕** to delete it.
+**Saved connections** appear in their own list in the menu. Click one to connect, **Edit**
+to change it, or **✕** to delete it. 🔒 marks a connection protected by its own password,
+🔓 one saved by an older cactusdb or by the command line that has none yet (**Edit** it to
+set one).
+
+<a id="connection-passwords"></a>
+**Connection passwords.** Every connection you save gets its own **connection password**,
+which you choose when you save it. You need it to:
+- connect to the connection
+- open it with **Edit** (the details are shown only then)
+- **delete** it
+- preview, download or delete its [exported files](#exported-files)
+
+cactusdb asks for it the first time you need it, and then remembers it in that browser tab
+until you reload the page.
+
+It isn't only a prompt: the connection's database username and password, and its
+[saved queries](#saved-queries), are encrypted with a key derived from the connection
+password (Argon2id, then AES-256-GCM). Without it they can't be read, not even with
+`cactus.key`. After five wrong guesses for a connection, each further attempt has to wait,
+from 2 seconds up to 5 minutes.
+
+To change it, open the connection with **Edit** and fill in *New connection password*. Its
+saved queries are re-encrypted with the new password. A forgotten connection password can't
+be recovered. The [superuser](#superuser) can still open the connection, if one was set up
+before; otherwise delete the connection and save it again.
+
+<a id="superuser"></a>
+**Superuser.** The superuser password opens every saved connection, its saved queries and
+its exported files, without each connection's own password. Click **🛡** next to
+*Saved connections* and sign in. The list then shows every connection's details, and you
+can connect to, edit or delete any of them. **Sign out** ends it, and so does reloading the
+page.
+- **Setting it:** set it on the computer that runs cactusdb with
+  `cactusdb --superuser set`, which asks twice and, when changing it, first asks for the
+  current one. `cactusdb --superuser status` shows whether one is set. In a container, set
+  `CACTUSDB_SUPERUSER_PASSWORD` once (see `.env.example`). It only sets a missing password
+  and never changes an existing one.
+- **Never stored:** the password itself is never stored, and it isn't part of the program.
+  It encrypts the private half of a key pair, and every connection password is also
+  sealed to the public half (X25519). So saving a connection never needs the superuser
+  password, but opening a connection with it does.
+- **Older connections:** connections saved *before* the superuser password was set can be
+  opened by the superuser once they've been opened with their own password.
+
+<a id="saved-queries"></a>
+**Saved queries.** For a saved connection, write a query on the *Data* tab and click
+**💾 Save query**, then give it a **name** and a **description**. Only read-only queries can
+be saved: cactusdb checks it with the same rules as running a query, so `INSERT`,
+`UPDATE`, `DELETE`, schema changes and several statements at once are refused.
+
+The **Saved queries** tab, shown while you're connected, lists the connection's queries.
+Filter them by name or description, then **▶ Run** a query (it opens in the editor and
+runs), **Edit** it, or **Delete** it. Saved queries are kept in `cactus.conn.db`, encrypted
+with the connection's password, and are deleted with the connection.
 
 **Adding and editing connections.** Click **+ New** next to *Saved connections* to open the
 connection form: a name, the database type and the connection details. Click
@@ -166,6 +226,7 @@ export/optimo-prod/backup/   (backups)
 - **Older exports** made before version 1.13 stay where they are, directly in
   `export/<type>/`.
 
+<a id="exported-files"></a>
 **Exported files.** The **Exported files** tab lists every file in the export folder: data
 exports, DDL scripts and backups, with the connection each belongs to, when it was created
 and its size (uncompressed).
@@ -227,7 +288,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.13.2*), as reported by the running program.
+example *v1.14.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -493,7 +554,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.13.2 is running in the background (process id 48211)
+cactusdb 1.14.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -621,7 +682,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.13.2 is running in container cactusdb
+cactusdb 1.14.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -711,6 +772,16 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 
   On macOS and Linux both files are readable only by your user account. Don't commit
   either one to git.
+- **Connection passwords** add a second layer for each saved connection. Its username,
+  password and saved queries are encrypted again with a key derived from the
+  connection's own password (Argon2id: 3 passes, 64 MiB, random salt per connection). So
+  even someone with `cactus.conn.db` *and* `cactus.key` can't read them without that
+  password. Wrong guesses are slowed down. The connection's exported files are only served
+  to someone who gives its password. See [Connection passwords](#connection-passwords).
+- **The superuser password** is never stored. It protects an X25519 private key, and each
+  connection password is sealed to the matching public key (with HKDF-SHA256 and
+  AES-256-GCM). Choose a long one, keep it somewhere safe, and don't put it in shared
+  files. It opens everything. See [Superuser](#superuser).
 - **Upgrading from an older cactusdb** that stored passwords in plain text: on first start
   the saved credentials are encrypted automatically, and the file is compacted so no
   plain-text copy is left behind.
@@ -734,6 +805,9 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 | Problem | Fix |
 |---------|-----|
 | In a container (Docker, `deploy.sh`): `dial tcp [::1]:3050: connect: connection refused` (or `127.0.0.1`) | Inside a container, `localhost` is the container itself, not your computer. Use the host **`host.docker.internal`**: it reaches the computer running Docker, and database containers that publish their port there (for example Firebird on 3050). For another server, use its name or IP address. cactusdb says this in the error message too. Containers started by `deploy.sh` or `deploy-container.sh` before 1.13.2 lack this name: run `--install` (or `up`) again. |
+| A saved connection asks for a password I don't have | Since 1.14 every saved connection has its own connection password. If you forgot it, the superuser can open it (🛡), provided a superuser password was set before the connection's password and the connection has been opened since. Otherwise delete it (✕) and save it again. |
+| *wrong connection password* / *try again in N seconds* | After five wrong passwords for a connection, each further try has to wait (2 seconds, doubling up to 5 minutes). Wait, then type the password carefully. |
+| *No superuser password has been set* | Set one on the computer running cactusdb: `cactusdb --superuser set` (in a container: `docker exec -it cactusdb cactusdb --conn-db /opt/cactusdb/conn/cactus.conn.db --superuser set`). |
 | `cannot listen on 0.0.0.0:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
 | Other computers can't open `http://<ip address>:<port>` | Check the address is one printed at startup and that cactusdb wasn't started with `--host 127.0.0.1`. Then allow the port in the firewall: on Windows accept the *Windows Defender Firewall* prompt on first start (or `netsh advfirewall firewall add rule name=cactusdb dir=in action=allow protocol=TCP localport=8080`); on macOS allow cactusdb under *System Settings › Network › Firewall*; on Linux e.g. `sudo ufw allow 8080/tcp` or `sudo firewall-cmd --add-port=8080/tcp`. |
 | `the background server stopped:` followed by log lines | The background copy couldn't start; the lines say why (often the port or the connection file). |
@@ -812,6 +886,9 @@ CACTUSDB_IT=1 go test ./...
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections and settings (`cactus.conn.db`) |
 | `settings.go` | Changing the export folder from the web UI |
+| `lock.go` | Connection passwords (Argon2id keys), saved queries in the store, the wrong-password throttle |
+| `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
+| `queries.go` | The saved-queries API (read-only check) |
 | `files.go` | The *Exported files* page: listing, previews, deleting, and compressed downloads of a selection |
 | `Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |

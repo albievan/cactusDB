@@ -16,6 +16,7 @@ type SavedConn struct {
 	ID      int64  `json:"id"`
 	Name    string `json:"name"`
 	Created string `json:"created"`
+	Lock    string `json:"-"` // the connection password's key derivation; "" = none (see lock.go)
 	ConnParams
 }
 
@@ -59,6 +60,12 @@ func (s *Store) init(path, keyFile string) error {
 	);
 	CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
 	if err != nil {
+		return err
+	}
+	if err := s.migrateLocks(); err != nil {
+		return err
+	}
+	if err := s.migrateSuperuser(); err != nil {
 		return err
 	}
 
@@ -179,15 +186,24 @@ func (s *Store) decrypt(c *SavedConn) error {
 	return nil
 }
 
-const connCols = `id, name, engine, host, port, username, password, database, created_at`
+const connCols = `id, name, engine, host, port, username, password, database, created_at, lock`
 
 func scanConn(sc interface{ Scan(...any) error }) (SavedConn, error) {
 	var c SavedConn
-	err := sc.Scan(&c.ID, &c.Name, &c.Engine, &c.Host, &c.Port, &c.Username, &c.Password, &c.Database, &c.Created)
+	err := sc.Scan(&c.ID, &c.Name, &c.Engine, &c.Host, &c.Port, &c.Username, &c.Password, &c.Database, &c.Created, &c.Lock)
 	return c, err
 }
 
-// List returns all saved connections with decrypted usernames and passwords.
+// hideLocked blanks the credentials of a connection with its own password:
+// they can only be read with Unlock.
+func hideLocked(c *SavedConn) {
+	if c.Lock != "" {
+		c.Username, c.Password = "", ""
+	}
+}
+
+// List returns all saved connections with decrypted usernames and passwords
+// (blank for connections with their own password: see Unlock).
 func (s *Store) List() ([]SavedConn, error) {
 	rows, err := s.db.Query(`SELECT ` + connCols + ` FROM connections ORDER BY name COLLATE NOCASE`)
 	if err != nil {
@@ -203,6 +219,7 @@ func (s *Store) List() ([]SavedConn, error) {
 		if err := s.decrypt(&c); err != nil {
 			return nil, err
 		}
+		hideLocked(&c)
 		out = append(out, c)
 	}
 	return out, rows.Err()
@@ -213,7 +230,9 @@ func (s *Store) Get(id int64) (SavedConn, error) {
 	if err != nil {
 		return c, err
 	}
-	return c, s.decrypt(&c)
+	err = s.decrypt(&c)
+	hideLocked(&c)
+	return c, err
 }
 
 // GetByName returns a saved connection by name, or sql.ErrNoRows.
@@ -222,7 +241,9 @@ func (s *Store) GetByName(name string) (SavedConn, error) {
 	if err != nil {
 		return c, err
 	}
-	return c, s.decrypt(&c)
+	err = s.decrypt(&c)
+	hideLocked(&c)
+	return c, err
 }
 
 // Save inserts a connection, or replaces the one with the same name.
@@ -241,7 +262,11 @@ func (s *Store) Save(c SavedConn) (int64, error) {
 	return id, err
 }
 
+// Delete deletes a saved connection and its saved queries.
 func (s *Store) Delete(id int64) error {
+	if _, err := s.db.Exec(`DELETE FROM queries WHERE conn_id = ?`, id); err != nil {
+		return err
+	}
 	_, err := s.db.Exec(`DELETE FROM connections WHERE id = ?`, id)
 	return err
 }
