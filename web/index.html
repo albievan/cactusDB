@@ -755,11 +755,13 @@ async function lostConnection(method, url, secs, retried, cause) {
       info = r.ok ? await r.json() : null;
     } catch (e) { info = null; }
     if (!info) {
-      lines.push(`cactusdb doesn't answer now either: it may have stopped or crashed (look at its log on ${location.hostname}, or start it again), ` +
+      lines.push(`cactusdb doesn't answer now either: it may have stopped or crashed (look at its log on ${location.hostname}, or start it again; ` +
+        "a cactusdb killed by the system, for instance for lack of memory during a large export, says so when it starts again), " +
         `or the network to ${location.hostname} is down (VPN, Wi-Fi, firewall).`);
     } else if (state.serverPid && info.pid !== state.serverPid) {
       lines.push(`cactusdb was restarted meanwhile (process ${state.serverPid} → ${info.pid}, started ${new Date(info.started).toLocaleTimeString()}): ` +
-        "the request was lost and your connection to the database has ended. Reload the page and connect again.");
+        "the request was lost and your connection to the database has ended. Reload the page and connect again." +
+        (info.previousRun ? `\nWhy it stopped: ${info.previousRun}.` : ""));
     } else {
       lines.push(`cactusdb is running (v${info.version}, the same process), so the connection was cut on the way between this computer and ${location.hostname}: ` +
         "usually a firewall, proxy or VPN that drops idle or long-running connections. Try again. " +
@@ -2103,6 +2105,11 @@ async function loadInfo() {
   try {
     const info = await api("GET", "/api/info");
     state.serverPid = info.pid; // to recognise a restart
+    // Once per restart, say why the previous cactusdb ended when it didn't stop normally.
+    const seenKey = "cactusdb.previousRun." + info.pid;
+    let seen = false;
+    try { seen = localStorage.getItem(seenKey) === "1"; localStorage.setItem(seenKey, "1"); } catch (e) { /* no storage: show it */ }
+    if (info.previousRun && !seen) toast(`cactusdb was restarted: ${info.previousRun}.`, true);
     $("appVersion").textContent = info.version ? "v" + info.version : "";
     $("appVersion").title = info.version ? `cactusdb ${info.version}` : "";
     $("shutdownBtn").hidden = !info.background;

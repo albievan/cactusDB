@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.14.1"
+var version = "1.15.0"
 
 //go:embed web
 var webFS embed.FS
@@ -78,6 +78,8 @@ type server struct {
 	background bool          // started with --runas background: the UI may shut it down
 	shutdown   chan struct{} // closed by /api/shutdown
 	stopOnce   sync.Once
+
+	previousRun string // how the previous run ended, when it didn't stop normally (crash.go)
 }
 
 func main() {
@@ -399,6 +401,8 @@ func main() {
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
 	srv := &http.Server{Handler: logRequests(recoverPanics(mux)), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
+	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
+	s.previousRun = previous
 
 	fmt.Printf("cactusdb %s\n", version)
 	for _, d := range driverInfo() {
@@ -418,6 +422,9 @@ func main() {
 		fmt.Println("  (only this computer can connect; leave out --host to allow others)")
 	} else if *host == "0.0.0.0" || *host == "::" {
 		fmt.Println("  (listening on every network interface; --host 127.0.0.1 limits it to this computer)")
+	}
+	if previous != "" {
+		log.Printf("warning: %s", previous)
 	}
 	if childLog != "" {
 		log.Printf("started in the background, process id %d, listening on %s", os.Getpid(), ln.Addr())
@@ -452,6 +459,7 @@ func main() {
 	s.release()
 	store.db.Close()
 	log.Printf("stopped")
+	stopped()
 }
 
 // release cancels running exports, waits briefly for them to clean up their
@@ -483,7 +491,8 @@ func (s *server) release() {
 // handleInfo tells the page how this cactusdb runs, e.g. whether it offers
 // the Shutdown button.
 func (s *server) handleInfo(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"version": version, "background": s.background, "pid": os.Getpid(), "started": processStart.Format(time.RFC3339)})
+	writeJSON(w, 200, map[string]any{"version": version, "background": s.background, "pid": os.Getpid(), "started": processStart.Format(time.RFC3339),
+		"previousRun": s.previousRun})
 }
 
 // handleShutdown stops a background cactusdb. It must be a JSON request, which

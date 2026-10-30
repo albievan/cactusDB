@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.14.1
+cactusdb 1.15.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -288,7 +288,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.14.1*), as reported by the running program.
+example *v1.15.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -554,7 +554,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.14.1 is running in the background (process id 48211)
+cactusdb 1.15.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -682,7 +682,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.14.1 is running in container cactusdb
+cactusdb 1.15.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -734,6 +734,9 @@ cactusdb/
 ├── cactus.key           the key that encrypts saved usernames and passwords
 ├── cactusdb.log         the action log (with --runas background or --logfile)
 ├── cactusdb.pid         the process id of a background cactusdb, while it runs
+├── cactusdb-8080.running  marks a running web UI (on port 8080); left behind, it tells the
+│                        next start that cactusdb was killed (see Troubleshooting)
+├── cactusdb-crash.log   what Go printed when cactusdb crashed, if it ever did
 └── export/              your exported files, one folder per connection
     └── optimo-prod/     named after the connection
         ├── backup/      database backups (.zip)
@@ -805,7 +808,8 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 | Problem | Fix |
 |---------|-----|
 | In a container (Docker, `deploy.sh`): `dial tcp [::1]:3050: connect: connection refused` (or `127.0.0.1`) | Inside a container, `localhost` is the container itself, not your computer. Use the host **`host.docker.internal`**: it reaches the computer running Docker, and database containers that publish their port there (for example Firebird on 3050). For another server, use its name or IP address. cactusdb says this in the error message too. Containers started by `deploy.sh` or `deploy-container.sh` before 1.13.2 lack this name: run `--install` (or `up`) again. |
-| *No answer from cactusdb at … (the browser reports “Failed to fetch”)* | The browser got no answer at all, and the message says what cactusdb was doing, after how long, and what it found when it checked:<br>• **"cactusdb is running … cut on the way"**: a firewall, proxy, VPN or Wi-Fi drop between your computer and the server closed the connection. Since 1.14.1 cactusdb closes idle connections itself after 20 seconds, before such devices drop them silently, and the page retries a read-only request once. If long requests still fail after the same number of seconds, that device has a time limit: have it raised, or narrow the query.<br>• **"doesn't answer now either"**: cactusdb stopped or crashed (look at its log or start it again), or the network to the server is down.<br>• **"was restarted meanwhile"**: reload the page and connect again.<br>An internal error inside cactusdb no longer cuts the connection: it's shown as *internal error in cactusdb…*, with the details in the log. |
+| *cactusdb was restarted: the previous cactusdb … stopped without shutting down* | The previous cactusdb was killed rather than stopped with Ctrl+C or Shutdown, most often by the system for lack of memory. Since 1.15.0 Excel exports use far less memory (exporting four large tables at once used to need hundreds of MB). Give the server or container more memory, or export fewer tables at once. |
+| *No answer from cactusdb at … (the browser reports “Failed to fetch”)* | The browser got no answer at all, and the message says what cactusdb was doing, after how long, and what it found when it checked:<br>• **"cactusdb is running … cut on the way"**: a firewall, proxy, VPN or Wi-Fi drop between your computer and the server closed the connection. Since 1.14.1 cactusdb closes idle connections itself after 20 seconds, before such devices drop them silently, and the page retries a read-only request once. If long requests still fail after the same number of seconds, that device has a time limit: have it raised, or narrow the query.<br>• **"doesn't answer now either"**: cactusdb stopped or crashed (look at its log or start it again), or the network to the server is down. When you start it again it says why the previous run ended, in its terminal and on the page: *crashed: …* (the details are in `cactusdb-crash.log` next to the connection file), or *stopped without shutting down*, which means it was killed: most often by the system because the server ran out of memory (on Linux, `dmesg | grep -i -E 'killed process|out of memory'` shows it; in a container, raise its memory limit), or the server or container restarted.<br>• **"was restarted meanwhile"**: reload the page and connect again.<br>An internal error inside cactusdb no longer cuts the connection: it's shown as *internal error in cactusdb…*, with the details in the log. |
 | A saved connection asks for a password I don't have | Since 1.14 every saved connection has its own connection password. If you forgot it, the superuser can open it (🛡), provided a superuser password was set before the connection's password and the connection has been opened since. Otherwise delete it (✕) and save it again. |
 | *wrong connection password* / *try again in N seconds* | After five wrong passwords for a connection, each further try has to wait (2 seconds, doubling up to 5 minutes). Wait, then type the password carefully. |
 | *No superuser password has been set* | Set one on the computer running cactusdb: `cactusdb --superuser set` (in a container: `docker exec -it cactusdb cactusdb --conn-db /opt/cactusdb/conn/cactus.conn.db --superuser set`). |

@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -139,6 +141,12 @@ func runExports(ctx context.Context, o cliOptions, db *sql.DB, targets []tableRe
 func runExportJob(ctx context.Context, engine string, db *sql.DB, dir, format string, j *exportJob) {
 	j.start = time.Now()
 	defer func() {
+		// The job runs in its own goroutine, where a panic would stop all of
+		// cactusdb: fail this table instead.
+		if v := recover(); v != nil {
+			log.Printf("export %s: INTERNAL ERROR: %v\n%s", j.table.name, v, debug.Stack())
+			j.err = fmt.Errorf("internal error in cactusdb while exporting %s: %v (the details are in the cactusdb log)", j.table.name, v)
+		}
 		j.elapsed = time.Since(j.start)
 		if j.err != nil {
 			j.state.Store(jobFailed)

@@ -7,4 +7,5 @@ export/
 run-claude
 *.log
 *.pid
+*.running
 .env

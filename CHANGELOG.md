@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.15.0 — 2026-10-30
+
+- Fixed: **cactusdb on a server could stop in the middle of "Export all"**, leaving the page
+  with *No answer from cactusdb … doesn't answer now either*. Excel exports built each
+  finished workbook in memory, and four tables export at once, so large tables could
+  make the server run out of memory and the system killed cactusdb. Workbooks are now
+  written straight to the file: four 400,000-row tables need 210 MB instead of 560 MB.
+- An internal error while exporting a table now fails only that table, with a message,
+  instead of stopping cactusdb.
+- **Why did cactusdb stop?** When cactusdb starts after a run that didn't shut down, it
+  says why, in its terminal and once on the page: *crashed* with the error (kept in
+  `cactusdb-crash.log` next to the connection file), or *stopped without shutting down*,
+  that is killed, most often for lack of memory, with how to check that.
+
 ## 1.14.1 — 2026-10-29
 
 - **"Failed to fetch" explained.** When the browser gets no answer, the page now says what

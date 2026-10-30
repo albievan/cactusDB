@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"context"
@@ -209,6 +210,10 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, name string, progress func(rows int)) (int, error) {
 	xf := excelize.NewFile()
 	defer xf.Close()
+	// Write the workbook's zip straight to w: excelize otherwise builds the
+	// whole compressed file in memory first, many times its size with four
+	// tables exporting at once, which got cactusdb killed for lack of memory.
+	xf.SetZipWriter(func(io.Writer) excelize.ZipWriter { return zip.NewWriter(w) })
 	sheet := sheetName(name)
 	xf.SetSheetName("Sheet1", sheet)
 	sw, err := xf.NewStreamWriter(sheet)
