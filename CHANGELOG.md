@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.0 — 2026-11-05
+
+- **Rows and size of every table**: the new **# MB** button next to the Tables tab shows
+  each table's row count and size in MB (data and indexes), with totals for the
+  database. Rows are counted exactly, four tables at a time, for up to 30 seconds;
+  slower tables show the database's estimate, marked ≈. Works on MySQL, MariaDB,
+  PostgreSQL, SQL Server and SQLite; Firebird shows row counts only.
+
 ## 1.15.0 — 2026-10-30
 
 - Fixed: **cactusdb on a server could stop in the middle of "Export all"**, leaving the page

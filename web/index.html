@@ -205,6 +205,10 @@
   .objtabs button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .objtabs button.on .cnt { color: var(--accent); }
   .objtabs button.none { opacity: .45; }
+  .objtabs button.statsbtn { padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .objtabs button.statsbtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .objstats { margin-top: 6px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  ul.list li .meta { margin-left: auto; padding-left: 6px; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 400; }
   #objTree { overflow-y: auto; flex: 1; min-height: 0; margin-top: 8px; }
   #objTree ul.list { font-family: var(--mono); font-size: 13px; }
   main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
@@ -393,6 +397,7 @@
         <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
       </div>
       <div class="objtabs" id="objTabs" role="tablist"></div>
+      <div class="objstats" id="objStats" hidden></div>
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators: open <b>☰ Connections</b> below.</p></div>
     </section>
     <!-- Connections and settings live in a pop-up menu, opened from the bar at
@@ -1214,7 +1219,7 @@ async function connect(extra = {}) {
     state.savedConn = res.savedConn || 0; state.folder = res.folder || "";
     if (state.savedConn && c && unlocks[c.id]) fileUnlocks[state.folder] = unlocks[c.id].lockPassword;
     if (res.savedId && body.newLockPassword) { unlocks[res.savedId] = { lockPassword: body.newLockPassword }; fileUnlocks[state.folder] = body.newLockPassword; }
-    state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null;
+    state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null; resetTableStats();
     const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
     $("disconnectBtn").hidden = false;
@@ -1245,7 +1250,7 @@ $("connectBtn").addEventListener("click", () => connect());
 
 $("disconnectBtn").addEventListener("click", async () => {
   await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
-  state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null;
+  state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null; resetTableStats();
   state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
   $("disconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
@@ -1370,17 +1375,66 @@ function renderObjects() {
     const on = cur && g.type === cur.type;
     const n = f ? g.matches.length : g.items.length;
     return `<button role="tab" aria-selected="${on}" data-objtab="${g.type}" class="${on ? "on" : ""}${f && !n ? " none" : ""}"` +
-      ` title="${esc(g.label)}">${ICONS[g.type] || "•"} ${esc(g.label)} <span class="cnt">${n}</span></button>`;
+      ` title="${esc(g.label)}">${ICONS[g.type] || "•"} ${esc(g.label)} <span class="cnt">${n}</span></button>` +
+      (g.type === "table" && g.items.length ? `<button class="statsbtn${tstats.show ? " on" : ""}" data-stats aria-pressed="${tstats.show}"` +
+        ` title="${tstats.show ? "Hide" : "Show"} the number of rows and the size (MB) of each table">${tstats.loading ? "…" : "# MB"}</button>` : "");
   }).join("");
+  renderStatsSummary(cur);
   if (!cur) { $("objTree").innerHTML = `<p class="empty">No objects</p>`; return; }
   $("objTree").innerHTML = cur.matches.length
     ? `<ul class="list">` + cur.matches.map((n) => {
         const on = state.sel && state.sel.type === cur.type && state.sel.name === n ? "on" : "";
-        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n)}</span></li>`;
+        const st = cur.type === "table" && tstats.show && tstats.byName ? tstats.byName.get(n) : null;
+        const meta = st ? `<span class="meta">${statText(st)}</span>` : "";
+        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}${st ? " — " + esc(statTitle(st)) : ""}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n)}</span>${meta}</li>`;
       }).join("") + `</ul>`
     : `<p class="empty">${f ? "No match" : "None in this database"}</p>`;
 }
 $("objFilter").addEventListener("input", renderObjects);
+
+// ---- rows and size of each table (the "# MB" button) --------------------------
+const tstats = { show: false, loading: false, byName: null, total: null };
+function resetTableStats() { tstats.show = false; tstats.loading = false; tstats.byName = null; tstats.total = null; }
+const fmtInt = (n) => Number(n).toLocaleString();
+function fmtMB(bytes) {
+  if (bytes == null || bytes < 0) return "? MB";
+  const mb = bytes / 1048576;
+  return mb === 0 ? "0 MB" : mb < 0.1 ? "<0.1 MB" : `${mb.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
+}
+const rowsText = (rows, exact) => rows < 0 ? "? rows" : `${exact ? "" : "≈"}${fmtInt(rows)}`;
+const statText = (st) => `${rowsText(st.rows, st.exact)} · ${fmtMB(st.bytes)}`;
+const statTitle = (st) => (st.rows < 0 ? "rows unknown" : `${st.exact ? "" : "about "}${fmtInt(st.rows)} rows${st.exact ? "" : " (estimated: counting took too long)"}`) +
+  ", " + (st.bytes < 0 ? "size unknown (the database doesn't report it)" : `${fmtMB(st.bytes)} with indexes`);
+function renderStatsSummary(cur) {
+  const box = $("objStats");
+  const show = tstats.show && tstats.total && cur && cur.type === "table";
+  box.hidden = !show;
+  if (!show) return;
+  const t = tstats.total;
+  box.textContent = `${fmtInt(t.tables.length)} tables · ${t.exact ? "" : "≈"}${fmtInt(t.rows)} rows · ${t.bytes < 0 ? "size unknown" : fmtMB(t.bytes)}`;
+  box.title = t.exact ? "Every table was counted exactly" : "≈: some tables were too slow to count, their row counts are the database's estimates";
+}
+$("objTabs").addEventListener("click", async (ev) => {
+  if (!ev.target.closest("button[data-stats]")) return;
+  ev.stopPropagation();
+  if (tstats.loading) return;
+  if (tstats.show) { tstats.show = false; renderObjects(); return; }
+  state.objTab = "table";
+  if (!tstats.byName) {
+    tstats.loading = true; renderObjects();
+    const session = state.session;
+    try {
+      const res = await api("GET", "/api/tablestats?" + new URLSearchParams({ session }));
+      if (session !== state.session) return; // disconnected meanwhile
+      tstats.total = res;
+      tstats.byName = new Map(res.tables.map((t) => [t.name, t]));
+    } catch (e) {
+      toast(e.message, true);
+      return;
+    } finally { tstats.loading = false; renderObjects(); }
+  }
+  tstats.show = true; renderObjects();
+});
 
 $("objTabs").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-objtab]");
@@ -1414,7 +1468,7 @@ for (const [sec, c] of Object.entries(loadCollapsed())) setCollapsed(sec, c, fal
 $("refreshBtn").addEventListener("click", async () => {
   try {
     const res = await api("GET", "/api/objects?" + new URLSearchParams({ session: state.session }));
-    state.objects = res.objects; renderObjects(); toast("Object list refreshed");
+    state.objects = res.objects; resetTableStats(); renderObjects(); toast("Object list refreshed");
   } catch (e) { toast(e.message, true); }
 });
 

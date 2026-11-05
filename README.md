@@ -75,7 +75,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.15.0
+cactusdb 1.16.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -288,7 +288,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.15.0*), as reported by the running program.
+example *v1.16.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -299,6 +299,12 @@ those objects.
 
 - The **filter** box searches every tab at once. Each tab shows its number of matches,
   and the list jumps to a tab that has matches.
+- **# MB**, next to the Tables tab, shows the number of rows and the size of each table
+  (data and indexes, in MB), with the totals under the tabs: e.g.
+  `179 tables · 12,345,678 rows · 4,321.5 MB`. Click it again to hide them. Rows are
+  counted exactly, four tables at a time, for up to 30 seconds; a table that takes
+  longer shows the database's estimate, marked `≈`. Sizes come from the database's
+  catalog; Firebird doesn't keep one per table, so it shows `? MB`.
 - **⟳** reloads the list after the database has changed.
 - Every sidebar section (Connection, Saved connections, Drivers, Objects) folds open and
   closed from its heading, and cactusdb remembers your choice.
@@ -554,7 +560,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.15.0 is running in the background (process id 48211)
+cactusdb 1.16.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -682,7 +688,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.15.0 is running in container cactusdb
+cactusdb 1.16.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
