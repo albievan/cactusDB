@@ -5,17 +5,21 @@ import (
 	"time"
 )
 
-// sessionIdle is how long a session may go without a request before it is
-// closed. A browser tab that was closed or reloaded never says goodbye, and
-// its database connections would otherwise stay open as long as cactusdb
-// runs, counting against the database server's connection limit.
-const sessionIdle = 30 * time.Minute
+// A page left alone disconnects itself after the idle time (Settings, default
+// 15 minutes). A browser tab that was closed or reloaded can't, so the server
+// also closes every session unused for the idle time: otherwise its database
+// connections would stay open as long as cactusdb runs, counting against the
+// database server's connection limit. The server waits a little longer than
+// the page, so the page is the one that reports it.
+const serverIdleGrace = 2 * time.Minute
 
-// expireSessions closes, every minute, the sessions idle for longer than
-// idle, unless a query or an export is still using them.
-func (s *server) expireSessions(idle time.Duration) {
+// expireSessions closes, every minute, the sessions idle for longer than the
+// idle time, unless a query or an export is still using them.
+func (s *server) expireSessions() {
 	for range time.Tick(time.Minute) {
-		s.closeIdleSessions(idle)
+		if m := s.idleMinutes(); m > 0 {
+			s.closeIdleSessions(time.Duration(m)*time.Minute + serverIdleGrace)
+		}
 	}
 }
 

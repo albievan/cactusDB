@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -15,6 +16,24 @@ import (
 // unless --exportto is given, which always wins.
 
 const exportDirKey = "export_dir"
+
+// The idle time: a connection unused for this long is disconnected, by the
+// page and, for pages that were closed, by the server. 0 means never.
+const (
+	idleMinutesKey     = "idle_minutes"
+	defaultIdleMinutes = 15
+	maxIdleMinutes     = 24 * 60
+)
+
+// idleMinutes returns the idle time setting.
+func (s *server) idleMinutes() int {
+	if v, err := s.store.meta(idleMinutesKey); err == nil && v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
+	}
+	return defaultIdleMinutes
+}
 
 // savedExportDir returns the export folder saved from the web UI, or "".
 func savedExportDir(st *Store) string {
@@ -64,6 +83,8 @@ func (s *server) settingsJSON() map[string]any {
 		"exportDir":        s.exportFolder(),
 		"defaultExportDir": s.defaultExportDir,
 		"exportToFlag":     s.exportToFlag, // set when --exportto overrides the saved folder at startup
+		"idleMinutes":      s.idleMinutes(),
+		"defaultIdle":      defaultIdleMinutes,
 	}
 }
 
@@ -71,32 +92,47 @@ func (s *server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, s.settingsJSON())
 }
 
-// handleSaveSettings changes the export folder and saves it for the next
-// start. An empty folder means the default one. Like /api/shutdown it only
-// accepts JSON, so other websites can't change it.
+// handleSaveSettings changes the export folder and/or the idle time and saves
+// them for the next start. An empty folder means the default one. Like
+// /api/shutdown it only accepts JSON, so other websites can't change it.
 func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 		writeErr(w, 415, errors.New("expected a JSON request"))
 		return
 	}
 	var req struct {
-		ExportDir string `json:"exportDir"`
+		ExportDir   *string `json:"exportDir"`
+		IdleMinutes *int    `json:"idleMinutes"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
-	dir, saved, err := checkExportDir(req.ExportDir, s.defaultExportDir)
-	if err != nil {
-		writeErr(w, 400, err)
-		return
+	if req.IdleMinutes != nil {
+		n := *req.IdleMinutes
+		if n < 0 || n > maxIdleMinutes {
+			writeErr(w, 400, fmt.Errorf("the idle time must be between 0 (never disconnect) and %d minutes", maxIdleMinutes))
+			return
+		}
+		if err := s.store.setMeta(idleMinutesKey, strconv.Itoa(n)); err != nil {
+			writeErr(w, 500, fmt.Errorf("cannot save the setting: %w", err))
+			return
+		}
+		logAction(r, "idle time set to %d minute(s)", n)
 	}
-	if err := s.store.setMeta(exportDirKey, saved); err != nil {
-		writeErr(w, 500, fmt.Errorf("cannot save the setting: %w", err))
-		return
+	if req.ExportDir != nil {
+		dir, saved, err := checkExportDir(*req.ExportDir, s.defaultExportDir)
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := s.store.setMeta(exportDirKey, saved); err != nil {
+			writeErr(w, 500, fmt.Errorf("cannot save the setting: %w", err))
+			return
+		}
+		s.setExportFolder(dir)
+		logAction(r, "export folder set to %s", dir)
 	}
-	s.setExportFolder(dir)
-	logAction(r, "export folder set to %s", dir)
 	writeJSON(w, 200, s.settingsJSON())
 }
 
