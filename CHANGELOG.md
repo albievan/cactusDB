@@ -14,6 +14,11 @@
   backup is running, and the time starts again when that finishes. The time is set in the
   new **☰ → ⚙ Settings** (0 = never) and saved on the server. The server closes sessions
   of closed pages after the same time (it used to wait 30 minutes).
+- **Setup scripts**: `setup.sh` (Linux, macOS) and `setup.ps1` (Windows) download only
+  the build for this computer, save it as `cactusdb` / `cactusdb.exe`, check that it runs,
+  and update it when run again:
+  `curl -fsSL https://raw.githubusercontent.com/albievan/cactusDB/main/setup.sh | sh` or
+  `irm https://raw.githubusercontent.com/albievan/cactusDB/main/setup.ps1 | iex`.
 
 ## 1.17.0 — 2026-11-06
 

@@ -29,7 +29,34 @@ cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname 
 
 ## 1. Download
 
-Pick the file for your computer from the [`dist/`](dist) folder:
+The quickest way is a setup script. It picks the right build for your computer (Intel/AMD
+or ARM), downloads only that one, saves it as `cactusdb` (`cactusdb.exe` on Windows) and
+checks that it runs. Run it in the folder cactusdb should live in, because cactusdb keeps
+its files next to itself.
+
+**Linux and macOS** ([`setup.sh`](setup.sh)):
+```sh
+mkdir -p ~/cactusdb && cd ~/cactusdb
+curl -fsSL https://raw.githubusercontent.com/albievan/cactusDB/main/setup.sh | sh
+./cactusdb --port 8080
+```
+
+**Windows**, in PowerShell ([`setup.ps1`](setup.ps1)):
+```powershell
+mkdir C:\cactusdb -Force; cd C:\cactusdb
+irm https://raw.githubusercontent.com/albievan/cactusDB/main/setup.ps1 | iex
+.\cactusdb.exe --port 8080
+```
+
+- **Another folder:** pass it to the script (`… | sh -s -- /opt/cactusdb`, or
+  `.\setup.ps1 C:\cactusdb`) or set `CACTUSDB_DIR`.
+- **Another branch or tag:** set `CACTUSDB_REF` (the default is `main`).
+- **Updating:** run the script again. It replaces `cactusdb` in place. A cactusdb that is
+  running keeps running, and the new version is used from its next start.
+- **macOS:** the script also clears the download quarantine, so you can skip the `xattr`
+  step below.
+
+Or pick the file for your computer from the [`dist/`](dist) folder yourself:
 
 | Your computer | Download |
 |---------------|----------|
@@ -930,6 +957,7 @@ CACTUSDB_IT=1 go test ./...
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
+| `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 
 ## Changes
