@@ -163,6 +163,12 @@ func openAndPing(ctx context.Context, driver, dsn string, maxConns int) (*sql.DB
 		return nil, err
 	}
 	db.SetMaxOpenConns(maxConns)
+	// Close pooled connections soon after use. A connection left idle is
+	// eventually cut by the database server (wait_timeout), a firewall or a
+	// VPN, and the next request on it fails; idle connections also count
+	// against the server's connection limit, shared with other applications.
+	db.SetConnMaxIdleTime(time.Minute)
+	db.SetConnMaxLifetime(30 * time.Minute)
 	pctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := db.PingContext(pctx); err != nil {

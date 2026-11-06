@@ -75,6 +75,15 @@
   .navmenu { position: absolute; left: 8px; right: 8px; bottom: 60px; max-height: calc(100% - 76px); overflow-y: auto; z-index: 30;
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.28); }
   .navmenu[hidden] { display: none; }
+  .menuitems { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border); }
+  .menuitems button { text-align: left; padding: 8px 10px; font-size: 13px; }
+  .menuitems button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul.list li button.go { display: inline-block; padding: 2px 8px; color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .home { padding: 4px 2px; }
+  .home h3 { margin: 4px 0 8px; font-size: 13px; }
+  .home .homeactions { display: flex; gap: 6px; margin: 10px 0 14px; }
+  .home .homefolder { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .home .homefolder code { overflow-wrap: anywhere; }
   .navmenu section.box:last-child { border-bottom: 0; }
   .hbtns { display: flex; gap: 6px; }
   .superbar { margin: 0 0 8px; font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; justify-content: space-between; }
@@ -402,8 +411,16 @@
     </section>
     <!-- Connections and settings live in a pop-up menu, opened from the bar at
          the bottom, so the sidebar shows only the database's objects. -->
-    <div class="navmenu" id="navMenu" hidden role="dialog" aria-label="Connections and settings">
-    <section class="box" data-sec="connection">
+    <div class="navmenu" id="navMenu" hidden role="dialog" aria-label="Menu">
+    <nav class="menuitems" aria-label="Menu">
+      <button data-menu="connections" title="Your saved connections">🔌 Connections</button>
+      <button data-menu="new" title="Add a connection, test it, then connect or save it">＋ New connection</button>
+      <button data-menu="folder" title="Choose where exports and backups are saved">📁 Folder setup</button>
+      <button data-menu="drivers" title="The databases cactusdb supports and their drivers">⚙ Drivers</button>
+    </nav>
+    <!-- The quick-connect form is kept for the code that fills it, but never
+         shown: connections are added and edited in the connection dialog. -->
+    <section class="box" data-sec="connection" hidden>
       <h2><button class="toggle" aria-expanded="true">Connection<span class="sub" id="connSub"></span></button></h2>
       <div class="engines" id="engines"></div>
 
@@ -447,19 +464,9 @@
       <ul class="list" id="savedList"><li class="empty">None yet</li></ul>
     </section>
 
-    <section class="box" data-sec="exportdir">
-      <h2><button class="toggle" aria-expanded="true">Export folder</button><button id="exportDirBtn" class="small" title="Choose where exports are saved">Change</button></h2>
-      <div class="folder"><code id="exportDirShow">…</code></div>
-    </section>
-
-    <section class="box" data-sec="drivers">
-      <h2><button class="toggle" aria-expanded="true">Drivers<span class="sub" id="driversSub"></span></button></h2>
-      <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
-    </section>
-
     </div>
     <div class="navbar">
-      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Connections, saved connections, export folder and drivers">
+      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup and drivers">
         <span class="navicon" aria-hidden="true">☰</span>
         <span class="navtext"><b>Connections</b><small id="navConn">Not connected</small></span>
         <span class="navcaret" aria-hidden="true">▴</span>
@@ -584,14 +591,25 @@
       <button type="button" id="dTest">Test connection</button>
       <span class="spacer"></span>
       <button type="button" id="dCancel">Cancel</button>
+      <button type="button" id="dConnect" title="Connect with these details, without saving them">Connect</button>
       <button type="button" class="primary" id="dSave">Save</button>
     </div>
   </form>
 </dialog>
 
+<dialog id="driversDialog" class="modal" aria-labelledby="drTitle">
+  <form method="dialog">
+    <h3 id="drTitle">Drivers<span class="sub" id="driversSub"></span></h3>
+    <p class="hint">The databases cactusdb can connect to. Every driver is compiled into cactusdb: nothing to download or install.</p>
+    <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
+    <div class="dactions"><span class="spacer"></span><button type="submit" class="primary">Close</button></div>
+  </form>
+</dialog>
+
 <dialog id="exportDirDialog" class="modal" aria-labelledby="edTitle">
   <form method="dialog" id="edForm">
-    <h3 id="edTitle">Export folder</h3>
+    <h3 id="edTitle">Folder setup</h3>
+    <p class="hint">Exports and backups are saved in <code id="exportDirShow">…</code>, one folder per connection.</p>
     <label for="edPath">Folder on the cactusdb server</label>
     <input id="edPath" spellcheck="false" autocomplete="off">
     <p class="hint">A full path, e.g. <code id="edExample"></code>. It's created if it doesn't exist. Each export type
@@ -705,7 +723,7 @@ async function api(method, url, body, retried = false) {
     // that only reads is tried once more (the first try may have gone into a
     // connection a firewall had silently dropped); otherwise find out why.
     const secs = (performance.now() - t0) / 1000;
-    if (!retried && canRetry(method, url)) return api(method, url, body, true);
+    if (!retried && canRetry(method, url, body)) return api(method, url, body, true);
     throw await lostConnection(method, url, secs, retried, e);
   } finally { document.body.classList.toggle("busy", --pending > 0); }
   const data = await res.json().catch(() => ({}));
@@ -723,8 +741,9 @@ const dlLink = (url) => url + (url.includes("?") ? "&" : "?") + "session=" + enc
 
 // ---- when cactusdb doesn't answer -------------------------------------------
 // Requests that only read, safe to send twice.
-function canRetry(method, url) {
+function canRetry(method, url, body) {
   const path = url.split("?")[0];
+  if (path === "/api/connect") return !(body && body.save);
   return method === "GET" || ["/api/query", "/api/testconn", "/api/files/preview", "/api/superuser/reveal"].includes(path) ||
     /^\/api\/connections\/\d+\/unlock$/.test(path);
 }
@@ -872,13 +891,13 @@ function showSettings(st) {
   Object.assign(settings, st);
   $("exportDirShow").textContent = st.exportDir;
   $("exportDirShow").title = st.exportDir;
+  renderHome();
 }
 async function loadSettings() {
   try { showSettings(await api("GET", "/api/settings")); }
   catch (e) { $("exportDirShow").textContent = "(unknown)"; }
 }
-$("exportDirBtn").addEventListener("click", (ev) => {
-  ev.stopPropagation();
+function openFolderDialog() {
   $("edPath").value = settings.exportDir || "";
   $("edExample").textContent = settings.defaultExportDir || "";
   $("edFlagNote").hidden = !settings.exportToFlag;
@@ -887,7 +906,7 @@ $("exportDirBtn").addEventListener("click", (ev) => {
   $("edResult").hidden = true;
   $("exportDirDialog").showModal();
   $("edPath").select();
-});
+}
 async function saveExportDir(dir) {
   $("edSave").disabled = $("edDefault").disabled = true;
   try {
@@ -981,7 +1000,12 @@ async function loadSaved() {
     $("savedSub").textContent = "· " + list.length;
     $("superBar").hidden = !superPw;
     $("superBtn").classList.toggle("on", !!superPw);
-    $("savedList").innerHTML = list.length ? list.map((c) => {
+    $("savedList").innerHTML = savedRows(list);
+    renderHome();
+  } catch (e) { toast(e.message, true); }
+}
+function savedRows(list) {
+    return list.length ? list.map((c) => {
       const lock = c.locked ? `<span class="lock" title="Protected by its own connection password">🔒</span>`
         : `<span class="lock" title="No connection password yet: Edit to set one">🔓</span>`;
       const where = c.engine === "sqlite" ? c.database
@@ -991,14 +1015,31 @@ async function loadSaved() {
       <li data-id="${c.id}" title="Click to connect">
         <span class="tag">${esc(c.engine)}</span>
         <span class="name">${esc(c.name)}${lock}${det}</span>
+        <button class="small go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}">▶</button>
         <button class="small" data-act="edit" title="Edit and test this connection">Edit</button>
         <button class="small" data-act="del" title="Delete">✕</button>
       </li>`;
-    }).join("") : `<li class="empty">None yet</li>`;
-  } catch (e) { toast(e.message, true); }
+    }).join("") : `<li class="empty">None yet: add one with ＋ New connection</li>`;
 }
 
-$("savedList").addEventListener("click", async (ev) => {
+// Not connected: the saved connections and the export folder fill the object list.
+function renderHome() {
+  if (state.session) return;
+  $("objTree").innerHTML = `<div class="home">
+    <h3>Connect to a database</h3>
+    <ul class="list" id="homeSaved">${savedRows(state.saved || [])}</ul>
+    <div class="homeactions"><button class="small" data-home="new">＋ New connection</button></div>
+    <p class="homefolder">📁 Exports go to <code>${esc(settings.exportDir || "…")}</code> <button class="small" data-home="folder">Change</button></p>
+  </div>`;
+}
+$("objTree").addEventListener("click", (ev) => {
+  const h = ev.target.closest("button[data-home]");
+  if (h) { ev.stopPropagation(); h.dataset.home === "new" ? openConnDialog(null) : openFolderDialog(); return; }
+  if (ev.target.closest("#homeSaved")) savedClick(ev);
+});
+
+$("savedList").addEventListener("click", (ev) => savedClick(ev));
+async function savedClick(ev) {
   const li = ev.target.closest("li[data-id]");
   if (!li) return;
   const id = +li.dataset.id;
@@ -1007,8 +1048,8 @@ $("savedList").addEventListener("click", async (ev) => {
   if (act === "edit") { editConnection(c); return; }
   if (act === "del") { deleteConnection(c); return; }
   fillForm(c);
-  connect({ savedId: id });
-});
+  connect({ savedId: id, label: c.name });
+}
 
 // Editing a protected connection first unlocks it, which also returns the
 // details to show (the username) — never its database password.
@@ -1163,6 +1204,18 @@ $("dTest").addEventListener("click", async () => {
   } finally { b.disabled = false; }
 });
 
+$("dConnect").addEventListener("click", () => {
+  const p = dlgParams();
+  if (p.engine === "sqlite" ? !p.database : !p.host) {
+    dlgResult("bad", p.engine === "sqlite" ? "Enter the database file." : "Enter the host.");
+    return;
+  }
+  const extra = { ...p, name: $("dName").value.trim() };
+  if (!p.password && dlg.hasPassword) Object.assign(extra, { keepPasswordOf: dlg.editId }, dlg.creds);
+  $("connDialog").close();
+  connect(extra);
+});
+
 $("dSave").addEventListener("click", async () => {
   const p = dlgParams();
   if (p.engine === "sqlite" ? !p.database : !p.host) {
@@ -1189,6 +1242,17 @@ function setNavMenu(open) {
   $("navMenuBtn").setAttribute("aria-expanded", String(open));
 }
 $("navMenuBtn").addEventListener("click", (ev) => { ev.stopPropagation(); setNavMenu($("navMenu").hidden); });
+$("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-menu]");
+  if (!b) return;
+  ev.stopPropagation();
+  switch (b.dataset.menu) {
+    case "connections": setCollapsed("saved", false, false); $("savedList").scrollIntoView({ block: "nearest" }); break;
+    case "new": setNavMenu(false); openConnDialog(null); break;
+    case "folder": setNavMenu(false); openFolderDialog(); break;
+    case "drivers": setNavMenu(false); $("driversDialog").showModal(); break;
+  }
+});
 document.addEventListener("click", (ev) => {
   // Clicks inside the menu, or in a dialog it opened, keep it open.
   if ($("navMenu").hidden || ev.target.closest("#navMenu, #navMenuBtn, dialog")) return;
@@ -1202,6 +1266,10 @@ document.addEventListener("keydown", (ev) => {
 async function connect(extra = {}) {
   const btn = $("connectBtn");
   btn.disabled = true; btn.textContent = "Connecting…";
+  const before = $("status").innerHTML;
+  $("status").textContent = `Connecting${extra.label || extra.name ? " to " + (extra.label || extra.name) : ""}…`;
+  delete extra.label;
+  let ok = false;
   try {
     const body = { ...formParams(), ...extra };
     if (!extra.savedId && !body.password && state.formSavedId) Object.assign(body, { keepPasswordOf: state.formSavedId }, credsFor(state.formSavedId), extra);
@@ -1240,13 +1308,20 @@ async function connect(extra = {}) {
     if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
     else if (res.savedId) { toast("Connected and saved, protected by its connection password"); loadSaved(); }
     else toast("Connected");
+    ok = true;
   } catch (e) {
     toast(e.message, true);
   } finally {
     btn.disabled = false; btn.textContent = "Connect";
+    if (!ok && $("status").textContent.startsWith("Connecting")) $("status").innerHTML = before;
   }
 }
 $("connectBtn").addEventListener("click", () => connect());
+// Closing or reloading the page ends its session, so its database
+// connections don't stay open on the server.
+window.addEventListener("pagehide", () => {
+  if (state.session) navigator.sendBeacon("/api/disconnect", new Blob([JSON.stringify({ session: state.session })], { type: "application/json" }));
+});
 
 $("disconnectBtn").addEventListener("click", async () => {
   await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
@@ -1256,7 +1331,7 @@ $("disconnectBtn").addEventListener("click", async () => {
   $("disconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
-  $("objTree").innerHTML = `<p class="empty">Connect to a database: open <b>☰ Connections</b> below.</p>`;
+  renderHome();
   $("objTabs").innerHTML = ""; $("connSub").textContent = ""; $("navConn").textContent = "Not connected";
   setCollapsed("connection", false, false);
   clearDef("Select an object on the left to see its definition.");
@@ -2200,7 +2275,7 @@ $("engines").addEventListener("click", (ev) => {
   loadSaved();
   loadSettings();
   loadInfo();
-  if (!state.session) setNavMenu(true); // not connected yet: show the connections
+  renderHome();
   api("GET", "/api/drivers").then((list) => {
     $("driversSub").textContent = "· " + list.length + " built in";
     $("driverList").innerHTML = list.map((d) =>
