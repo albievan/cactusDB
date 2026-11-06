@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.18.0
+cactusdb 1.19.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -127,7 +127,7 @@ The left sidebar shows the **objects** of the database you're connected to. Whil
 not connected it shows your **saved connections** instead, each with a **▶** button to
 connect, a **＋ New connection** button and the export folder.
 
-The **☰ Connections** menu at the bottom of the sidebar has four items:
+The **☰ Connections** menu at the bottom of the sidebar has these items:
 
 | Menu item | What it does |
 |---|---|
@@ -136,6 +136,7 @@ The **☰ Connections** menu at the bottom of the sidebar has four items:
 | **📁 Folder setup** | Shows where exports and backups are saved, and lets you change it |
 | **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
 | **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below) |
+| **⬆ Check for update** | Whether a newer cactusdb is out, with the command to download it for every system, each with a copy button (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
 the connection dialog, opened by **＋ New connection** or **Edit**, never in the sidebar.
@@ -200,6 +201,21 @@ something is running (a query, an export, *Export all*, a backup); the time star
 when that finishes. Change the time in **☰ → ⚙ Settings** (0 = never). The setting is saved
 in `cactus.conn.db` on the cactusdb server and applies to everyone using it. The server
 also closes connections of pages that were closed, a little after the same time.
+
+**Checking for an update.** When the page opens, cactusdb checks whether a newer version is
+out. When one is, a dot appears on the **☰ Connections** button, and the cactusdb log says so
+at startup. **☰ → ⬆ Check for update** shows the version you have and the latest one, and the
+command that downloads cactusdb for each system:
+
+- the setup scripts for **Linux and macOS** (`setup.sh`) and **Windows** (`setup.ps1`), which
+  pick the right file themselves
+- one command per file: Linux amd64 and arm64, macOS Apple Silicon (arm64) and Intel (amd64),
+  and Windows amd64 and arm64
+
+The system the cactusdb you're using runs on is marked **this server**. Click the small copy
+button next to a command, paste it in a terminal on that computer, in cactusdb's folder, and
+restart cactusdb. The check reads one small file from GitHub: [`VERSION`](VERSION). If the
+cactusdb server has no internet access, your browser reads it instead.
 
 It isn't only a prompt: the connection's database username and password, and its
 [saved queries](#saved-queries), are encrypted with a key derived from the connection
@@ -339,7 +355,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.18.0*), as reported by the running program.
+example *v1.19.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -611,7 +627,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.18.0 is running in the background (process id 48211)
+cactusdb 1.19.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -739,7 +755,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.18.0 is running in container cactusdb
+cactusdb 1.19.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -916,7 +932,7 @@ cactusdb is written in Go and uses pure-Go drivers, so no CGO or C compiler is n
 
 ```sh
 go build -o cactusdb .   # build for this computer
-./build.sh               # build all six binaries into dist/
+./build.sh               # build all six binaries into dist/, as the version in VERSION
 go test ./...            # unit tests
 ```
 
@@ -957,6 +973,7 @@ CACTUSDB_IT=1 go test ./...
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
+| `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 

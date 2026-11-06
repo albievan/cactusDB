@@ -1,23 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="cactusDB">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-35 77 460 460" role="img" aria-label="cactusDB">
   <title>cactusDB</title>
-  <defs>
-    <linearGradient id="cdb-tile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3ddc97"/>
-      <stop offset=".55" stop-color="#10a37f"/>
-      <stop offset="1" stop-color="#0b6b78"/>
-    </linearGradient>
-    <linearGradient id="cdb-shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity=".25"/>
-      <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#cdb-tile)"/>
-  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#cdb-shine)"/>
-  <!-- a solid white cactus -->
-  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M49 108V36a15 15 0 0 1 30 0v72z" fill="#fff" stroke="none"/>
-    <path d="M52 74H43a9 9 0 0 1-9-9V55" stroke-width="16"/>
-    <path d="M76 62h9a9 9 0 0 0 9-9V40" stroke-width="16"/>
+  <!-- a cactus drawn as two circuit traces, each ending in a ring -->
+  <g fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#8fcbb0">
+      <path d="M160 295V145a37 37 0 0 1 74 0V385l30-13q26-12 26-40V260"/>
+      <circle cx="290" cy="243" r="15"/>
+    </g>
+    <g stroke="#5a9174">
+      <path d="M97 209V280q0 22 22 31l20 9q23 10 23 34V475a37 37 0 0 0 74 0V430"/>
+      <circle cx="97" cy="192" r="15"/>
+    </g>
   </g>
-  <path d="M30 110h68" stroke="#fff" stroke-opacity=".5" stroke-width="5" stroke-linecap="round"/>
 </svg>

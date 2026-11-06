@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.19.0 — 2026-11-06
+
+- **New logo**: a cactus drawn as two circuit traces.
+- **Check for update**: a new **☰ → ⬆ Check for update** shows whether a newer cactusdb
+  is out, and the command that downloads it for every system: the setup scripts for
+  Linux/macOS and Windows, and one command per file (Linux, macOS and Windows, each for
+  Intel/AMD and ARM). Each has a small copy button. The system cactusdb runs on is marked
+  **this server**. The page checks when it opens and puts a dot on the menu button when an
+  update is available. The log says so at startup too. The check reads the new
+  [`VERSION`](VERSION) file on GitHub, from the browser when the server has no internet.
+- Fixed: copying (a definition, a command) failed on a cactusdb opened as
+  `http://<server>`, because the browser only allows the clipboard API on https and localhost.
+- Messages now show above an open dialog instead of behind it.
+
 ## 1.18.0 — 2026-11-06
 
 - **The password prompt says what you're about to do**:
