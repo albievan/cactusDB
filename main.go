@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.18.0"
+var version = "1.19.0"
 
 //go:embed web
 var webFS embed.FS
@@ -362,6 +362,7 @@ func main() {
 	mux.HandleFunc("GET /api/engines", s.handleEngines)
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("GET /api/info", s.handleInfo)
+	mux.HandleFunc("GET /api/update", s.handleUpdate)
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("POST /api/settings", s.handleSaveSettings)
 	mux.HandleFunc("POST /api/shutdown", s.handleShutdown)
@@ -405,6 +406,7 @@ func main() {
 	// and get no answer ("Failed to fetch").
 	srv := &http.Server{Handler: logRequests(recoverPanics(mux)), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
 	go s.expireSessions()
+	go logUpdate()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
 	s.previousRun = previous
 

@@ -319,6 +319,24 @@
     background: var(--panel); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
   dialog.modal::backdrop { background: rgba(0,0,0,.35); }
   dialog.modal h3 { margin: 0 0 6px; font-size: 16px; }
+  dialog.modal.wide { width: min(640px, calc(100vw - 32px)); }
+  /* Check for update: one row per system, with a small copy button. */
+  .upstatus { font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); margin: 6px 0 4px; }
+  .upstatus.new { background: var(--accent-soft); border-color: var(--accent); }
+  .upstatus.bad { background: var(--danger-soft); border-color: var(--danger); }
+  ul.setup { margin-top: 8px; max-height: min(52vh, 460px); overflow-y: auto; }
+  ul.setup li { cursor: default; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 6px 8px; }
+  ul.setup li:hover { background: none; }
+  ul.setup li.group { display: block; padding: 10px 8px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+  ul.setup li.here { background: var(--accent-soft); border-radius: 6px; }
+  ul.setup .plat { font-size: 12px; font-weight: 600; }
+  ul.setup .plat .tag { margin-left: 6px; color: var(--accent); border-color: var(--accent); }
+  ul.setup code { grid-column: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow-x: auto; display: block; padding-bottom: 2px; }
+  ul.setup li button.copy, ul.setup li:hover button.copy { display: inline-flex; grid-column: 2; grid-row: 1 / span 2; padding: 4px 6px; line-height: 0; }
+  button.copy svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  button.copy.done { color: var(--accent); border-color: var(--accent); }
+  .updot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 1px; }
+  .updot[hidden] { display: none; }
   .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--border); border-top-color: var(--accent);
     border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; margin-right: 4px; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -419,6 +437,7 @@
       <button data-menu="folder" title="Choose where exports and backups are saved">📁 Folder setup</button>
       <button data-menu="drivers" title="The databases cactusdb supports and their drivers">🧩 Drivers</button>
       <button data-menu="settings" title="When to disconnect an unused connection">⚙ Settings</button>
+      <button data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system">⬆ Check for update<span class="updot" id="updateDot" hidden></span></button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
          shown: connections are added and edited in the connection dialog. -->
@@ -468,9 +487,9 @@
 
     </div>
     <div class="navbar">
-      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup, drivers and settings">
+      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup, drivers, settings and updates">
         <span class="navicon" aria-hidden="true">☰</span>
-        <span class="navtext"><b>Connections</b><small id="navConn">Not connected</small></span>
+        <span class="navtext"><b>Connections<span class="updot" id="navUpdateDot" hidden title="A newer cactusdb is available"></span></b><small id="navConn">Not connected</small></span>
         <span class="navcaret" aria-hidden="true">▴</span>
       </button>
     </div>
@@ -623,6 +642,23 @@
     <p class="hint">The databases cactusdb can connect to. Every driver is compiled into cactusdb: nothing to download or install.</p>
     <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
     <div class="dactions"><span class="spacer"></span><button type="submit" class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="updateDialog" class="modal wide" aria-labelledby="upTitle">
+  <form method="dialog">
+    <h3 id="upTitle">Check for update</h3>
+    <div id="upStatus" class="upstatus">Checking…</div>
+    <p class="hint">To update, run one command on the computer cactusdb runs on, in the folder it's in, then restart
+      cactusdb. Your saved connections and exports stay where they are. The setup scripts pick the right file for the
+      system themselves; the other commands download one particular file as <code>cactusdb</code> (<code>cactusdb.exe</code> on Windows).</p>
+    <ul class="list setup" id="upList"></ul>
+    <div class="dactions">
+      <button type="button" id="upRefresh">Check again</button>
+      <a id="upChangelog" target="_blank" rel="noopener" href="#">What's new</a>
+      <span class="spacer"></span>
+      <button type="submit" class="primary">Close</button>
+    </div>
   </form>
 </dialog>
 
@@ -825,6 +861,9 @@ function esc(s) {
 let toastTimer;
 function toast(msg, isErr) {
   const t = $("toast");
+  // An open modal dialog covers the page: show the message inside it.
+  const d = document.querySelector("dialog[open]");
+  if (t.parentElement !== (d || document.body)) (d || document.body).appendChild(t);
   t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
   // Long explanations stay up long enough to read.
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = "toast"), isErr ? Math.max(5000, msg.length * 60) : 2500);
@@ -1307,6 +1346,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "folder": setNavMenu(false); openFolderDialog(); break;
     case "drivers": setNavMenu(false); $("driversDialog").showModal(); break;
     case "settings": setNavMenu(false); openSettingsDialog(); break;
+    case "update": setNavMenu(false); openUpdateDialog(); break;
   }
 });
 document.addEventListener("click", (ev) => {
@@ -2017,9 +2057,25 @@ function clearDef(msg) {
   $("defSrc").className = ""; $("defSrc").textContent = msg; $("copyDefBtn").disabled = true;
 }
 
+// copyText copies to the clipboard. navigator.clipboard only exists on https
+// and localhost, so a cactusdb opened as http://<server> copies the old way.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* try the old way */ }
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+  (document.querySelector("dialog[open]") || document.body).appendChild(ta); // a modal dialog blocks focus outside it
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
 $("copyDefBtn").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText($("defSrc").dataset.raw || ""); toast("Definition copied"); }
-  catch { toast("Copy failed – select the text and copy it manually", true); }
+  if (await copyText($("defSrc").dataset.raw || "")) toast("Definition copied");
+  else toast("Copy failed – select the text and copy it manually", true);
 });
 
 const SQL_KEYWORDS = new Set(("select from where and or not null is in as on join left right inner outer full cross " +
@@ -2305,6 +2361,105 @@ $("exportNote").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-act=close-export]")) closeExportPanel(true);
 });
 
+// ---- check for update -------------------------------------------------------
+const COPY_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+const PLATFORMS = [
+  { os: "linux", arch: "amd64", label: "Linux · Intel/AMD 64-bit (amd64, x86_64)" },
+  { os: "linux", arch: "arm64", label: "Linux · ARM 64-bit (arm64, aarch64: Raspberry Pi 4/5, Graviton)" },
+  { os: "darwin", arch: "arm64", label: "macOS · Apple Silicon (M1/M2/M3/M4, darwin arm64)" },
+  { os: "darwin", arch: "amd64", label: "macOS · Intel (darwin amd64)" },
+  { os: "windows", arch: "amd64", label: "Windows · Intel/AMD 64-bit (amd64, x64)" },
+  { os: "windows", arch: "arm64", label: "Windows · ARM 64-bit (arm64: Snapdragon, Surface Pro X)" },
+];
+let updateInfo = null;
+
+// setupCommands lists the commands to download cactusdb, for every system.
+function setupCommands(u) {
+  const rows = [
+    { group: "Setup script: picks the right file itself" },
+    { os: "linux darwin", label: "Linux and macOS · any processor", cmd: `curl -fsSL ${u.raw}setup.sh | sh` },
+    { os: "windows", label: "Windows (PowerShell) · any processor", cmd: `irm ${u.raw}setup.ps1 | iex` },
+    { group: "One particular file" },
+  ];
+  for (const p of PLATFORMS) {
+    const url = u.dist + `cactusdb-${p.os}-${p.arch}` + (p.os === "windows" ? ".exe" : "");
+    rows.push({ os: p.os, arch: p.arch, label: p.label, cmd: p.os === "windows"
+      ? `Invoke-WebRequest -UseBasicParsing ${url} -OutFile cactusdb.exe`
+      : `curl -fL -o cactusdb ${url} && chmod +x cactusdb` });
+  }
+  return rows;
+}
+
+function renderUpdate(u) {
+  const st = $("upStatus");
+  if (u.error) {
+    st.className = "upstatus bad";
+    st.textContent = `This is cactusdb ${u.current}. Could not check for a newer version: ${u.error}. The commands below still download the latest cactusdb.`;
+  } else if (u.newer) {
+    st.className = "upstatus new";
+    st.innerHTML = `<b>cactusdb ${esc(u.latest)} is available.</b> This is ${esc(u.current)}. Copy the command for the computer cactusdb runs on.`;
+  } else {
+    st.className = "upstatus";
+    st.textContent = `cactusdb ${u.current} is up to date` + (u.via ? ` (checked from this browser: ${u.via})` : "") + ".";
+  }
+  $("upChangelog").href = u.changelog;
+  const here = (r) => r.os && r.os.split(" ").includes(u.os) && (!r.arch || r.arch === u.arch);
+  $("upList").innerHTML = setupCommands(u).map((r, i) => r.group
+    ? `<li class="group">${esc(r.group)}</li>`
+    : `<li class="${here(r) ? "here" : ""}"><span class="plat">${esc(r.label)}${here(r) ? `<span class="tag" title="The cactusdb you're using runs on ${esc(u.os)}/${esc(u.arch)}">this server</span>` : ""}</span>
+        <code>${esc(r.cmd)}</code>
+        <button type="button" class="copy" data-copy="${i}" title="Copy the command" aria-label="Copy the command for ${esc(r.label)}">${COPY_ICON}</button></li>`).join("");
+  $("upList").dataset.cmds = JSON.stringify(setupCommands(u).map((r) => r.cmd || ""));
+  const dot = !!u.newer;
+  $("updateDot").hidden = !dot; $("navUpdateDot").hidden = !dot;
+  if (dot) $("appVersion").title = `cactusdb ${u.current} · ${u.latest} is available (☰ → Check for update)`;
+}
+
+// checkUpdate asks the server, which asks GitHub. A server without internet
+// access fails; the browser often has it, so it then asks GitHub itself.
+async function checkUpdate(refresh) {
+  let u = await api("GET", "/api/update" + (refresh ? "?refresh=1" : ""));
+  if (u.error) {
+    try {
+      const r = await fetch(u.latestUrl, { cache: "no-store" });
+      const v = r.ok ? (await r.text()).trim() : "";
+      if (/^\d+(\.\d+)*$/.test(v)) u = { ...u, error: "", latest: v, newer: newerVersion(v, u.current), via: "the cactusdb server has no internet access" };
+    } catch (e) { /* neither can reach GitHub */ }
+  }
+  updateInfo = u;
+  renderUpdate(u);
+  return u;
+}
+
+function newerVersion(a, b) {
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+async function openUpdateDialog() {
+  $("upStatus").className = "upstatus"; $("upStatus").innerHTML = `<span class="spin"></span>Checking GitHub for a newer cactusdb…`;
+  if (!updateInfo) $("upList").innerHTML = "";
+  $("updateDialog").showModal();
+  try { await checkUpdate(true); }
+  catch (e) { $("upStatus").className = "upstatus bad"; $("upStatus").textContent = "Could not check for an update: " + e.message; }
+}
+
+$("upRefresh").addEventListener("click", openUpdateDialog);
+$("upList").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-copy]");
+  if (!b) return;
+  const cmd = JSON.parse($("upList").dataset.cmds || "[]")[+b.dataset.copy];
+  if (cmd && await copyText(cmd)) {
+    toast("Command copied: paste it in a terminal on the cactusdb computer");
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`; b.classList.add("done");
+    setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); }, 1500);
+  } else toast("Copy failed – select the command and copy it manually", true);
+});
+
 // ---- shutdown (background mode only) ----------------------------------------
 async function loadInfo() {
   try {
@@ -2352,6 +2507,7 @@ $("engines").addEventListener("click", (ev) => {
   loadSettings();
   loadInfo();
   renderHome();
+  checkUpdate(false).catch(() => {}); // only shows a dot in the menu when a newer version exists
   api("GET", "/api/drivers").then((list) => {
     $("driversSub").textContent = "· " + list.length + " built in";
     $("driverList").innerHTML = list.map((d) =>
