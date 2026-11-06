@@ -221,19 +221,27 @@
   .objhead button { border: 0; background: none; padding: 2px 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; cursor: pointer; }
   .objhead button:hover, .objhead button.on { color: var(--accent); }
   .objhead .hname { flex: 1; text-align: left; }
-  .objhead .hrows, ul.list li .meta.rows { width: 74px; text-align: right; }
-  .objhead .hmb, ul.list li .meta.mb { width: 64px; text-align: right; }
+  .objhead .hrows, ul.list li .meta.rows { width: 62px; text-align: right; }
+  .objhead .hmb, ul.list li .meta.mb { width: 46px; text-align: right; }
   ul.list li .meta.rows, ul.list li .meta.mb { margin-left: 0; padding-left: 4px; }
   ul.list li .meta.rows { margin-left: auto; }
   .objstats { margin-top: 6px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
   ul.list li .meta { margin-left: auto; padding-left: 6px; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 400; }
   #objTree { overflow-y: auto; flex: 1; min-height: 0; margin-top: 8px; }
   #objTree ul.list { font-family: var(--mono); font-size: 13px; }
+  /* The whole name stays visible: a long one wraps instead of being cut off. */
+  #objTree ul.list li { white-space: normal; align-items: baseline; }
+  #objTree ul.list li .name { overflow: visible; text-overflow: clip; overflow-wrap: break-word; min-width: 0; }
+  #objTree ul.list li .icon { align-self: center; }
+  /* The open object looks like the active tab pill. */
+  #objTree ul.list li.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); border-radius: 14px; }
   main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
   .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); border-bottom: 1px solid var(--border); }
   .tabs button { border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; background: none; padding: 6px 14px; margin-bottom: -1px; color: var(--muted); }
   .tabs button.on { background: var(--panel); border-color: var(--border); color: var(--text); font-weight: 600; }
-  .tabs .title { margin-left: 12px; font-size: 12px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabs .title { margin-left: 12px; font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--accent); font-weight: 600; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 4px; max-width: 45%; }
+  .tabs .title:empty { display: none; }
   .pane { min-height: 0; min-width: 0; }
   #dataPane { display: grid; grid-template-rows: auto auto auto 1fr; }
   #dataPane[hidden], #defPane[hidden], #filesPane[hidden] { display: none; }
@@ -339,7 +347,7 @@
   ul.setup li.here { background: var(--accent-soft); border-radius: 6px; }
   ul.setup .plat { font-size: 12px; font-weight: 600; }
   ul.setup .plat .tag { margin-left: 6px; color: var(--accent); border-color: var(--accent); }
-  ul.setup code { grid-column: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow-x: auto; display: block; padding-bottom: 2px; }
+  ul.setup code { grid-column: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   ul.setup li button.copy, ul.setup li:hover button.copy { display: inline-flex; grid-column: 2; grid-row: 1 / span 2; padding: 4px 6px; line-height: 0; }
   button.copy svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   button.copy.done { color: var(--accent); border-color: var(--accent); }
@@ -663,7 +671,7 @@
     <ul class="list setup" id="upList"></ul>
     <div class="dactions">
       <button type="button" id="upRefresh">Check again</button>
-      <a id="upChangelog" target="_blank" rel="noopener" href="#">What's new</a>
+      <button type="button" id="upChangelog" title="The changes in every version (CHANGELOG on GitHub, opens in a new tab)">What's new</button>
       <span class="spacer"></span>
       <button type="submit" class="primary">Close</button>
     </div>
@@ -775,7 +783,9 @@ const state = { engines: [], engine: "sqlite", session: null, label: "", objects
 
 let pending = 0; // API calls in flight: the header animation speeds up while busy
 async function api(method, url, body, retried = false) {
-  const opt = { method, headers: {} };
+  // Errors come back as 200 with the status in a header: firewalls that see a
+  // 401 or 403 may block this computer from cactusdb for minutes.
+  const opt = { method, headers: { "X-Cactusdb-Errors": "in-header" } };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   document.body.classList.toggle("busy", ++pending > 0);
   const t0 = performance.now();
@@ -791,9 +801,10 @@ async function api(method, url, body, retried = false) {
     throw await lostConnection(method, url, secs, retried, e);
   } finally { document.body.classList.toggle("busy", --pending > 0); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || res.statusText);
-    err.status = res.status; err.data = data;
+  const status = +(res.headers.get("X-Cactusdb-Status") || res.status);
+  if (status >= 400 || !res.ok) {
+    const err = new Error(data.error || res.statusText || `error ${status}`);
+    err.status = status; err.data = data;
     throw err;
   }
   return data;
@@ -801,7 +812,7 @@ async function api(method, url, body, retried = false) {
 
 // dlLink adds the session to a download link: the files of a protected
 // connection download only for the session that opened it.
-const dlLink = (url) => url + (url.includes("?") ? "&" : "?") + "session=" + encodeURIComponent(state.session || "");
+const dlLink = (url) => url + (url.includes("?") ? "&" : "?") + "session=" + encodeURIComponent(state.session || "") + "&errors=in-header";
 
 // ---- when cactusdb doesn't answer -------------------------------------------
 // Requests that only read, safe to send twice.
@@ -1596,7 +1607,7 @@ function renderObjects() {
         const on = state.sel && state.sel.type === cur.type && state.sel.name === n ? "on" : "";
         const st = withStats ? tstats.byName.get(n) : null;
         const meta = st ? `<span class="meta rows">${rowsCell(st)}</span><span class="meta mb">${mbCell(st)}</span>` : "";
-        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}${st ? " — " + esc(statTitle(st)) : ""}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n)}</span>${meta}</li>`;
+        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}${st ? " — " + esc(statTitle(st)) : ""}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n).replace(/[_.]/g, "$&<wbr>")}</span>${meta}</li>`;
       }).join("") + `</ul>`
     : `<p class="empty">${f ? "No match" : "None in this database"}</p>`;
 }
@@ -1725,7 +1736,7 @@ $("objTree").addEventListener("click", async (ev) => {
   const group = state.objects.find((g) => g.type === type);
   state.sel = { type, name, label: group ? group.label.replace(/s$/, "") : type };
   renderObjects();
-  $("tabTitle").textContent = name;
+  $("tabTitle").textContent = name; $("tabTitle").title = name;
   if (group && group.queryable) {
     state.table = name;
     showTab("data");
@@ -2457,12 +2468,12 @@ function renderUpdate(u) {
     st.className = "upstatus";
     st.textContent = `cactusdb ${u.current} is up to date` + (u.via ? ` (checked from this browser: ${u.via})` : "") + ".";
   }
-  $("upChangelog").href = u.changelog;
+  $("upChangelog").dataset.href = u.changelog;
   const here = (r) => r.os && r.os.split(" ").includes(u.os) && (!r.arch || r.arch === u.arch);
   $("upList").innerHTML = setupCommands(u).map((r, i) => r.group
     ? `<li class="group">${esc(r.group)}</li>`
     : `<li class="${here(r) ? "here" : ""}"><span class="plat">${esc(r.label)}${here(r) ? `<span class="tag" title="The cactusdb you're using runs on ${esc(u.os)}/${esc(u.arch)}">this server</span>` : ""}</span>
-        <code>${esc(r.cmd)}</code>
+        <code title="${esc(r.cmd)}">${esc(r.cmd)}</code>
         <button type="button" class="copy" data-copy="${i}" title="Copy the command" aria-label="Copy the command for ${esc(r.label)}">${COPY_ICON}</button></li>`).join("");
   $("upList").dataset.cmds = JSON.stringify(setupCommands(u).map((r) => r.cmd || ""));
   const dot = !!u.newer;
@@ -2504,6 +2515,7 @@ async function openUpdateDialog() {
 }
 
 $("upRefresh").addEventListener("click", openUpdateDialog);
+$("upChangelog").addEventListener("click", () => window.open($("upChangelog").dataset.href || "https://github.com/albievan/cactusDB/blob/main/CHANGELOG.md", "_blank", "noopener"));
 $("upList").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-copy]");
   if (!b) return;
