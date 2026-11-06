@@ -10,6 +10,7 @@
   trace. Now the terminal can never hold up a request (lines it doesn't take are dropped and
   counted), cactusdb keeps running when its terminal closes (SIGHUP, SIGPIPE), and a start on
   a port that's still in use names the cactusdb running there.
+  The *No answer from cactusdb* message now mentions this case and `--runas background`.
 - **Rows and MB of every table as soon as you connect**, from the database's statistics
   (instant, marked `≈`), in a Rows and an MB column. **⟳ # MB** counts every table exactly.
 - **Sort the table list** by clicking **Name**, **Rows** or **MB** above it: a second click
