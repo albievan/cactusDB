@@ -81,6 +81,7 @@
   ul.list li button.go { display: inline-block; padding: 2px 8px; color: var(--accent); border-color: var(--accent); font-weight: 600; }
   .home { padding: 4px 2px; }
   .home h3 { margin: 4px 0 8px; font-size: 13px; }
+  .home .idlenote { font-size: 12px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 8px; margin: 0 0 10px; }
   .home .homeactions { display: flex; gap: 6px; margin: 10px 0 14px; }
   .home .homefolder { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .home .homefolder code { overflow-wrap: anywhere; }
@@ -416,7 +417,8 @@
       <button data-menu="connections" title="Your saved connections">🔌 Connections</button>
       <button data-menu="new" title="Add a connection, test it, then connect or save it">＋ New connection</button>
       <button data-menu="folder" title="Choose where exports and backups are saved">📁 Folder setup</button>
-      <button data-menu="drivers" title="The databases cactusdb supports and their drivers">⚙ Drivers</button>
+      <button data-menu="drivers" title="The databases cactusdb supports and their drivers">🧩 Drivers</button>
+      <button data-menu="settings" title="When to disconnect an unused connection">⚙ Settings</button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
          shown: connections are added and edited in the connection dialog. -->
@@ -466,7 +468,7 @@
 
     </div>
     <div class="navbar">
-      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup and drivers">
+      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup, drivers and settings">
         <span class="navicon" aria-hidden="true">☰</span>
         <span class="navtext"><b>Connections</b><small id="navConn">Not connected</small></span>
         <span class="navcaret" aria-hidden="true">▴</span>
@@ -593,6 +595,24 @@
       <button type="button" id="dCancel">Cancel</button>
       <button type="button" id="dConnect" title="Connect with these details, without saving them">Connect</button>
       <button type="button" class="primary" id="dSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settingsDialog" class="modal" aria-labelledby="stTitle">
+  <form method="dialog" id="stForm">
+    <h3 id="stTitle">Settings</h3>
+    <label for="stIdle">Disconnect after this many minutes without activity</label>
+    <input id="stIdle" type="number" min="0" max="1440" step="1" required>
+    <p class="hint">When nobody clicks, types or scrolls for this long, cactusdb disconnects from the database.
+      It never disconnects while something is running (a query, an export, a backup), and counts again from when it
+      finishes. <b>0</b> means never. The default is <span id="stDefault">15</span> minutes. The setting is saved on
+      the cactusdb server and applies to everyone using it.</p>
+    <div id="stResult" class="dresult bad" hidden></div>
+    <div class="dactions">
+      <span class="spacer"></span>
+      <button type="button" id="stCancel">Cancel</button>
+      <button type="submit" class="primary" id="stSave">Save</button>
     </div>
   </form>
 </dialog>
@@ -907,6 +927,29 @@ function openFolderDialog() {
   $("exportDirDialog").showModal();
   $("edPath").select();
 }
+function openSettingsDialog() {
+  $("stIdle").value = settings.idleMinutes ?? 15;
+  $("stDefault").textContent = settings.defaultIdle ?? 15;
+  $("stResult").hidden = true;
+  $("settingsDialog").showModal();
+  $("stIdle").select();
+}
+$("stCancel").addEventListener("click", () => $("settingsDialog").close());
+$("stForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const n = Number($("stIdle").value);
+  if (!Number.isInteger(n) || n < 0 || n > 1440) {
+    $("stResult").textContent = "Enter a whole number of minutes from 0 (never) to 1440."; $("stResult").hidden = false; return;
+  }
+  $("stSave").disabled = true;
+  try {
+    showSettings(await api("POST", "/api/settings", { idleMinutes: n }));
+    $("settingsDialog").close();
+    toast(n ? `Unused connections now disconnect after ${n} minute${n === 1 ? "" : "s"}` : "Connections are never disconnected for being unused");
+  } catch (e) {
+    $("stResult").textContent = e.message; $("stResult").hidden = false;
+  } finally { $("stSave").disabled = false; }
+});
 async function saveExportDir(dir) {
   $("edSave").disabled = $("edDefault").disabled = true;
   try {
@@ -971,8 +1014,16 @@ function askPassword({ title, text, label = "Connection password", ok = "Unlock"
 
 // withUnlock runs fn(creds) for saved connection c, asking for its connection
 // password when the server says it is locked, until it works or is cancelled.
-async function withUnlock(c, fn, how = "", first = null) {
+// The password prompt says what it is for: action is "connect", "edit" or
+// "delete".
+const UNLOCK_WORDS = {
+  connect: (n) => ({ title: `Connect to “${n}”`, text: `“${n}” is protected by its connection password. Enter it to connect.`, ok: "Connect" }),
+  edit: (n) => ({ title: `Edit “${n}”`, text: `Enter the connection password of “${n}” to unlock it for editing.`, ok: "Unlock to edit" }),
+  delete: (n) => ({ title: `Delete “${n}”?`, text: `Enter the connection password of “${n}” to delete it and its saved queries.`, ok: "Delete" }),
+};
+async function withUnlock(c, fn, action = "connect", first = null) {
   let creds = first || credsFor(c.id);
+  let typed = !!first; // creds the user typed, as opposed to ones remembered from earlier
   for (;;) {
     try {
       const res = await fn(creds);
@@ -980,10 +1031,13 @@ async function withUnlock(c, fn, how = "", first = null) {
       return res;
     } catch (e) {
       if (!(e.data && e.data.locked)) throw e;
-      if (creds.superPassword && creds === credsFor(c.id)) superPw = null;
-      const again = Object.keys(creds).length > 0;
-      creds = await askPassword({ title: `Unlock “${c.name}”`,
-        text: (again ? e.message + ". " : "") + `Enter the connection password of “${c.name}”${how}.` });
+      // A remembered password that no longer works is forgotten quietly:
+      // only a password typed in this prompt is reported as wrong.
+      if (!typed) { delete unlocks[c.id]; if (creds.superPassword) superPw = null; }
+      const w = UNLOCK_WORDS[action](c.name);
+      creds = await askPassword({ title: w.title, ok: w.ok,
+        text: (typed ? e.message.charAt(0).toUpperCase() + e.message.slice(1) + ". " : "") + w.text });
+      typed = true;
       if (!creds) return null;
       if (creds.superPassword) superPw = creds.superPassword;
     }
@@ -1026,6 +1080,7 @@ function savedRows(list) {
 function renderHome() {
   if (state.session) return;
   $("objTree").innerHTML = `<div class="home">
+    ${state.idleNote ? `<p class="idlenote">⏱ ${esc(state.idleNote.charAt(0).toUpperCase() + state.idleNote.slice(1))}.</p>` : ""}
     <h3>Connect to a database</h3>
     <ul class="list" id="homeSaved">${savedRows(state.saved || [])}</ul>
     <div class="homeactions"><button class="small" data-home="new">＋ New connection</button></div>
@@ -1057,7 +1112,7 @@ async function editConnection(c) {
   if (!c.locked && !superPw) { openConnDialog(c, {}); return; }
   try {
     let creds;
-    const info = await withUnlock(c, async (cr) => { creds = cr; return api("POST", `/api/connections/${c.id}/unlock`, cr); }, " to edit it");
+    const info = await withUnlock(c, async (cr) => { creds = cr; return api("POST", `/api/connections/${c.id}/unlock`, cr); }, "edit");
     if (info) openConnDialog(info, creds);
   } catch (e) { toast(e.message, true); }
 }
@@ -1071,7 +1126,7 @@ async function deleteConnection(c) {
   } else if (!confirm(what)) return;
   try {
     // Exactly the password typed to confirm, not one remembered from earlier.
-    await withUnlock(c, (cr) => api("DELETE", "/api/connections/" + c.id, cr), " to delete it", creds);
+    await withUnlock(c, (cr) => api("DELETE", "/api/connections/" + c.id, cr), "delete", creds);
     delete unlocks[c.id];
     toast(`Deleted “${c.name}”`);
   } catch (e) { toast(e.message, true); }
@@ -1251,6 +1306,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "new": setNavMenu(false); openConnDialog(null); break;
     case "folder": setNavMenu(false); openFolderDialog(); break;
     case "drivers": setNavMenu(false); $("driversDialog").showModal(); break;
+    case "settings": setNavMenu(false); openSettingsDialog(); break;
   }
 });
 document.addEventListener("click", (ev) => {
@@ -1280,14 +1336,15 @@ async function connect(extra = {}) {
     }
     const savedId = extra.savedId || body.keepPasswordOf;
     const c = savedId && (state.saved || []).find((x) => x.id === savedId);
-    const res = c ? await withUnlock(c, (cr) => api("POST", "/api/connect", { ...body, ...cr })) : await api("POST", "/api/connect", body);
+    const res = c ? await withUnlock(c, (cr) => api("POST", "/api/connect", { ...body, ...cr }), "connect") : await api("POST", "/api/connect", body);
     if (!res) return; // cancelled
     if (state.session) api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
     state.session = res.session; state.label = res.label; state.engine = res.engine;
     state.savedConn = res.savedConn || 0; state.folder = res.folder || "";
     if (state.savedConn && c && unlocks[c.id]) fileUnlocks[state.folder] = unlocks[c.id].lockPassword;
     if (res.savedId && body.newLockPassword) { unlocks[res.savedId] = { lockPassword: body.newLockPassword }; fileUnlocks[state.folder] = body.newLockPassword; }
-    state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null; resetTableStats();
+    state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null; resetTableStats(); state.idleNote = "";
+    idle.last = Date.now();
     const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
     $("disconnectBtn").hidden = false;
@@ -1323,8 +1380,11 @@ window.addEventListener("pagehide", () => {
   if (state.session) navigator.sendBeacon("/api/disconnect", new Blob([JSON.stringify({ session: state.session })], { type: "application/json" }));
 });
 
-$("disconnectBtn").addEventListener("click", async () => {
+$("disconnectBtn").addEventListener("click", () => disconnect());
+async function disconnect(reason = "") {
+  const label = state.label;
   await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
+  state.idleNote = reason ? reason.replace("%s", label) : "";
   state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null; resetTableStats();
   state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
@@ -1339,8 +1399,24 @@ $("disconnectBtn").addEventListener("click", async () => {
   setExportEnabled(false); setInfo("");
   clearGrid("Connect to a database, then pick a table on the left.");
   if (!$("queriesPane").hidden) showTab("data");
-  setNavMenu(true);
-});
+  if (state.idleNote) { $("status").textContent = "Not connected · " + state.idleNote; toast(state.idleNote); renderHome(); }
+  else setNavMenu(true);
+}
+
+// ---- disconnect when idle ---------------------------------------------------
+// After the idle time (Settings, default 15 minutes) without a click, key or
+// scroll, the page disconnects, but never while something is running: a
+// query, an export, a backup or any other request. The time starts again when
+// it finishes.
+const idle = { last: Date.now() };
+for (const ev of ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"])
+  document.addEventListener(ev, () => { idle.last = Date.now(); }, { capture: true, passive: true });
+setInterval(() => {
+  const m = settings.idleMinutes ?? 15;
+  if (!state.session || pending > 0 || overall.running || !(m > 0)) { idle.last = Date.now(); return; }
+  if (Date.now() - idle.last >= m * 60000)
+    disconnect(`disconnected from “%s” after ${m} minute${m === 1 ? "" : "s"} without activity (change this in ☰ → Settings)`);
+}, 5000);
 
 // ---- saved queries -----------------------------------------------------------
 // Kept for the saved connection, encrypted with its connection password.

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.18.0 — 2026-11-06
+
+- **The password prompt says what you're about to do**:
+  - **Connect to “…”** with a **Connect** button
+  - **Edit “…”** with **Unlock to edit**
+  - **Delete “…”?** with **Delete**
+
+  A remembered password that no longer works is forgotten quietly, instead of opening
+  the prompt with *wrong connection password* before you typed anything.
+- **Disconnect when idle**: after 15 minutes without a click, key or scroll, cactusdb
+  disconnects and says why. It never disconnects while a query, export, *Export all* or
+  backup is running, and the time starts again when that finishes. The time is set in the
+  new **☰ → ⚙ Settings** (0 = never) and saved on the server. The server closes sessions
+  of closed pages after the same time (it used to wait 30 minutes).
+
 ## 1.17.0 — 2026-11-06
 
 - Fixed: **connecting to a cactusdb on a server worked only sometimes.** cactusdb kept every

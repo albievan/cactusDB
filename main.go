@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.17.0"
+var version = "1.18.0"
 
 //go:embed web
 var webFS embed.FS
@@ -404,7 +404,7 @@ func main() {
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
 	srv := &http.Server{Handler: logRequests(recoverPanics(mux)), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
-	go s.expireSessions(sessionIdle)
+	go s.expireSessions()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
 	s.previousRun = previous
 
