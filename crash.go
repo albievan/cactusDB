@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -62,6 +64,26 @@ func previousRun(marker, crashPath string) string {
 	}
 	return what + " stopped without shutting down: it was killed, most often by the system because the computer ran out of memory " +
 		"(see `dmesg | grep -i -E 'killed process|out of memory'`; in a container, a memory limit), or the machine or container restarted"
+}
+
+// portInUse explains a port that is already taken, naming the cactusdb that
+// last ran on it there: one that kept running after its terminal closed.
+func portInUse(err error, dir string, port int) string {
+	if !errors.Is(err, syscall.EADDRINUSE) {
+		return ""
+	}
+	b, rerr := os.ReadFile(filepath.Join(dir, fmt.Sprintf("cactusdb-%d.running", port)))
+	if rerr != nil {
+		return fmt.Sprintf(" (another program uses port %d: pick another with --port)", port)
+	}
+	pid := ""
+	for _, l := range strings.Split(string(b), "\n") {
+		if v, ok := strings.CutPrefix(l, "pid="); ok {
+			pid = v
+		}
+	}
+	return fmt.Sprintf(" (most likely cactusdb is still running there as process %s, e.g. after its terminal was closed: "+
+		"open it in the browser, or stop it with kill %s, or Stop-Process -Id %s on Windows)", pid, pid, pid)
 }
 
 // lastCrashLine returns the last "panic:" or "fatal error:" line in the crash

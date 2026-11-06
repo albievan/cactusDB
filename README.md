@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.19.0
+cactusdb 1.20.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -113,7 +113,7 @@ cactusdb 1.19.0
   open http://localhost:8080
   open http://192.168.1.20:8080
   (listening on every network interface; --host 127.0.0.1 limits it to this computer)
-  press Ctrl+C to stop
+  press Ctrl+C to stop (closing this terminal doesn't stop it; --runas background runs it without one)
 ```
 Open one of the URLs shown in your browser. cactusdb listens on every network interface,
 so other computers on your network can use it too, at `http://<this computer's IP address>:<port>`
@@ -355,7 +355,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.19.0*), as reported by the running program.
+example *v1.20.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -366,12 +366,19 @@ those objects.
 
 - The **filter** box searches every tab at once. Each tab shows its number of matches,
   and the list jumps to a tab that has matches.
-- **# MB**, next to the Tables tab, shows the number of rows and the size of each table
-  (data and indexes, in MB), with the totals under the tabs: e.g.
-  `179 tables · 12,345,678 rows · 4,321.5 MB`. Click it again to hide them. Rows are
-  counted exactly, four tables at a time, for up to 30 seconds; a table that takes
-  longer shows the database's estimate, marked `≈`. Sizes come from the database's
-  catalog; Firebird doesn't keep one per table, so it shows `? MB`.
+- **Rows and size of every table** are shown as soon as you connect: a **Rows** and an
+  **MB** column (data and indexes) next to each table, and the totals under the tabs, e.g.
+  `179 tables · ≈12,345,678 rows · 4,321.5 MB`. On connecting they come from the
+  database's own statistics, which is instant but approximate, marked `≈` (MySQL and
+  MariaDB's InnoDB estimate can be off by a few percent or more). Tables the database has
+  no estimate for (SQLite, Firebird) are counted, for up to 10 seconds.
+- **⟳ # MB**, next to the Tables tab, counts the rows of every table exactly and measures
+  the sizes again: four tables at a time, for up to 30 seconds; a table that takes longer
+  keeps the estimate, marked `≈`. Sizes come from the database's catalog; Firebird
+  doesn't keep one per table, so it shows `?`.
+- **Sorting:** click a column heading above the list (**Name**, **Rows**, **MB**) to sort by
+  it; click it again to reverse the order. ▲ is ascending, ▼ descending. Rows and MB start
+  with the biggest. The order is remembered in this browser.
 - **⟳** reloads the list after the database has changed.
 - The Objects and Saved connections sections fold open and closed from their heading, and
   cactusdb remembers your choice.
@@ -627,7 +634,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.19.0 is running in the background (process id 48211)
+cactusdb 1.20.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -755,7 +762,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.19.0 is running in container cactusdb
+cactusdb 1.20.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -881,6 +888,7 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 | Problem | Fix |
 |---------|-----|
 | In a container (Docker, `deploy.sh`): `dial tcp [::1]:3050: connect: connection refused` (or `127.0.0.1`) | Inside a container, `localhost` is the container itself, not your computer. Use the host **`host.docker.internal`**: it reaches the computer running Docker, and database containers that publish their port there (for example Firebird on 3050). For another server, use its name or IP address. cactusdb says this in the error message too. Containers started by `deploy.sh` or `deploy-container.sh` before 1.13.2 lack this name: run `--install` (or `up`) again. |
+| On a server, connecting is quick but a table stays at *Loading …* and the request times out, then later cactusdb doesn't answer at all, with nothing in `cactusdb-crash.log` | Before 1.20.0, cactusdb wrote every request to the terminal it was started in, and waited for the terminal to take it. When that terminal stopped reading, an SSH session whose VPN or network dropped, or a terminal paused or scrolled back, the output filled up after about a hundred requests and every request then waited: the page still loaded, but tables didn't. When SSH finally closed the dead session, the hangup signal (SIGHUP) stopped cactusdb on the spot, without a crash. Since 1.20.0 the terminal can't hold up a request (log lines it doesn't take are dropped and counted), and cactusdb keeps running when its terminal closes. For a server, start it with **`--runas background`** anyway, or as a service: it then logs to `cactusdb.log` and needs no terminal at all. If a later start says the port is in use, cactusdb names the copy that's still running. |
 | Connecting to a cactusdb on a server works sometimes, and sometimes not, while a cactusdb on your own computer always works | Before 1.17.0 cactusdb kept every session's database connections open until it stopped: a closed or reloaded browser tab left its connections behind, and idle connections were cut by the database server (`wait_timeout`), a firewall or the VPN, so the next request on one failed. A server that runs for days collected them until the database's connection limit, shared with its other applications, was reached. cactusdb now closes database connections idle for a minute, disconnects after the idle time of ⚙ Settings (default 15 minutes), ends the session when the page is closed, and retries a connect that got no answer. The log shows how long each connect took (`connect … in 120ms`), and a failed connect shows the database's exact error. |
 | *cactusdb was restarted: the previous cactusdb … stopped without shutting down* | The previous cactusdb was killed rather than stopped with Ctrl+C or Shutdown, most often by the system for lack of memory. Since 1.15.0 Excel exports use far less memory (exporting four large tables at once used to need hundreds of MB). Give the server or container more memory, or export fewer tables at once. |
 | *No answer from cactusdb at … (the browser reports “Failed to fetch”)* | The browser got no answer at all, and the message says what cactusdb was doing, after how long, and what it found when it checked:<br>• **"cactusdb is running … cut on the way"**: a firewall, proxy, VPN or Wi-Fi drop between your computer and the server closed the connection. Since 1.14.1 cactusdb closes idle connections itself after 20 seconds, before such devices drop them silently, and the page retries a read-only request once. If long requests still fail after the same number of seconds, that device has a time limit: have it raised, or narrow the query.<br>• **"doesn't answer now either"**: cactusdb stopped or crashed (look at its log or start it again), or the network to the server is down. When you start it again it says why the previous run ended, in its terminal and on the page: *crashed: …* (the details are in `cactusdb-crash.log` next to the connection file), or *stopped without shutting down*, which means it was killed: most often by the system because the server ran out of memory (on Linux, `dmesg | grep -i -E 'killed process|out of memory'` shows it; in a container, raise its memory limit), or the server or container restarted.<br>• **"was restarted meanwhile"**: reload the page and connect again.<br>An internal error inside cactusdb no longer cuts the connection: it's shown as *internal error in cactusdb…*, with the details in the log. |
@@ -973,6 +981,7 @@ CACTUSDB_IT=1 go test ./...
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
+| `termlog.go` | Logging to the terminal without ever holding up a request |
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |

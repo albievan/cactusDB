@@ -217,6 +217,14 @@
   .objtabs button.none { opacity: .45; }
   .objtabs button.statsbtn { padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--muted); }
   .objtabs button.statsbtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .objhead { display: flex; align-items: center; gap: 6px; padding: 2px 8px 4px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .objhead button { border: 0; background: none; padding: 2px 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; cursor: pointer; }
+  .objhead button:hover, .objhead button.on { color: var(--accent); }
+  .objhead .hname { flex: 1; text-align: left; }
+  .objhead .hrows, ul.list li .meta.rows { width: 74px; text-align: right; }
+  .objhead .hmb, ul.list li .meta.mb { width: 64px; text-align: right; }
+  ul.list li .meta.rows, ul.list li .meta.mb { margin-left: 0; padding-left: 4px; }
+  ul.list li .meta.rows { margin-left: auto; }
   .objstats { margin-top: 6px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
   ul.list li .meta { margin-left: auto; padding-left: 6px; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 400; }
   #objTree { overflow-y: auto; flex: 1; min-height: 0; margin-top: 8px; }
@@ -1384,6 +1392,7 @@ async function connect(extra = {}) {
     if (state.savedConn && c && unlocks[c.id]) fileUnlocks[state.folder] = unlocks[c.id].lockPassword;
     if (res.savedId && body.newLockPassword) { unlocks[res.savedId] = { lockPassword: body.newLockPassword }; fileUnlocks[state.folder] = body.newLockPassword; }
     state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null; resetTableStats(); state.idleNote = "";
+    setTimeout(() => loadTableStats(true), 0); // rows and MB per table, from the database's estimates
     idle.last = Date.now();
     const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
@@ -1567,25 +1576,80 @@ function renderObjects() {
     const n = f ? g.matches.length : g.items.length;
     return `<button role="tab" aria-selected="${on}" data-objtab="${g.type}" class="${on ? "on" : ""}${f && !n ? " none" : ""}"` +
       ` title="${esc(g.label)}">${ICONS[g.type] || "•"} ${esc(g.label)} <span class="cnt">${n}</span></button>` +
-      (g.type === "table" && g.items.length ? `<button class="statsbtn${tstats.show ? " on" : ""}" data-stats aria-pressed="${tstats.show}"` +
-        ` title="${tstats.show ? "Hide" : "Show"} the number of rows and the size (MB) of each table">${tstats.loading ? "…" : "# MB"}</button>` : "");
+      (g.type === "table" && g.items.length ? `<button class="statsbtn${tstats.exact ? " on" : ""}" data-stats` +
+        ` title="Count the rows of every table exactly and measure their size (MB) again">${tstats.loading ? `<span class="spin"></span>` : "⟳ # MB"}</button>` : "");
   }).join("");
   renderStatsSummary(cur);
   if (!cur) { $("objTree").innerHTML = `<p class="empty">No objects</p>`; return; }
+  const withStats = cur.type === "table" && !!tstats.byName;
+  const sort = withStats || objSort.key === "name" ? objSort : { key: "name", dir: 1 };
+  const head = (key, cls, label) => {
+    const on = sort.key === key;
+    return `<button type="button" class="${cls}${on ? " on" : ""}" data-sort="${key}" aria-sort="${on ? (sort.dir > 0 ? "ascending" : "descending") : "none"}"` +
+      ` title="Sort by ${label.toLowerCase()}${on ? (sort.dir > 0 ? " (now ascending; click for descending)" : " (now descending; click for ascending)") : ""}">${label}${on ? (sort.dir > 0 ? " ▲" : " ▼") : ""}</button>`;
+  };
   $("objTree").innerHTML = cur.matches.length
-    ? `<ul class="list">` + cur.matches.map((n) => {
+    ? `<div class="objhead">${head("name", "hname", "Name")}${withStats ? head("rows", "hrows", "Rows") + head("bytes", "hmb", "MB") : ""}</div>` +
+      `<ul class="list">` + sortObjects(cur.matches, sort, withStats).map((n) => {
         const on = state.sel && state.sel.type === cur.type && state.sel.name === n ? "on" : "";
-        const st = cur.type === "table" && tstats.show && tstats.byName ? tstats.byName.get(n) : null;
-        const meta = st ? `<span class="meta">${statText(st)}</span>` : "";
+        const st = withStats ? tstats.byName.get(n) : null;
+        const meta = st ? `<span class="meta rows">${rowsCell(st)}</span><span class="meta mb">${mbCell(st)}</span>` : "";
         return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}${st ? " — " + esc(statTitle(st)) : ""}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n)}</span>${meta}</li>`;
       }).join("") + `</ul>`
     : `<p class="empty">${f ? "No match" : "None in this database"}</p>`;
 }
+
+// Sorting the object list: by name, or for tables by rows or size; a second
+// click on the same column reverses it. Unknown values sort last.
+const objSort = (() => {
+  try { const v = JSON.parse(localStorage.getItem("cactusdb.objSort")); if (v && ["name", "rows", "bytes"].includes(v.key)) return { key: v.key, dir: v.dir < 0 ? -1 : 1 }; } catch (e) { /* default */ }
+  return { key: "name", dir: 1 };
+})();
+function sortObjects(names, sort, withStats) {
+  const list = [...names];
+  const cmpName = (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+  if (sort.key === "name" || !withStats) return list.sort((a, b) => sort.dir * cmpName(a, b));
+  const val = (n) => { const st = tstats.byName.get(n); const v = st ? st[sort.key] : -1; return v == null ? -1 : v; };
+  return list.sort((a, b) => {
+    const x = val(a), y = val(b);
+    if ((x < 0) !== (y < 0)) return x < 0 ? 1 : -1;
+    return x !== y ? sort.dir * (x - y) : cmpName(a, b);
+  });
+}
+$("objTree").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-sort]");
+  if (!b) return;
+  ev.stopPropagation();
+  const key = b.dataset.sort;
+  if (objSort.key === key) objSort.dir = -objSort.dir;
+  else { objSort.key = key; objSort.dir = key === "name" ? 1 : -1; } // biggest first
+  try { localStorage.setItem("cactusdb.objSort", JSON.stringify(objSort)); } catch (e) { /* not remembered */ }
+  renderObjects();
+});
 $("objFilter").addEventListener("input", renderObjects);
 
 // ---- rows and size of each table (the "# MB" button) --------------------------
-const tstats = { show: false, loading: false, byName: null, total: null };
-function resetTableStats() { tstats.show = false; tstats.loading = false; tstats.byName = null; tstats.total = null; }
+// Loaded when connecting (the database's estimates, quick) and counted
+// exactly with the ⟳ # MB button.
+const tstats = { loading: false, exact: false, byName: null, total: null, seq: 0 };
+function resetTableStats() { tstats.loading = false; tstats.exact = false; tstats.byName = null; tstats.total = null; tstats.seq++; }
+async function loadTableStats(quick) {
+  const session = state.session, seq = ++tstats.seq;
+  const hasTables = state.objects.some((g) => g.type === "table" && g.items.length);
+  if (!session || !hasTables) return;
+  tstats.loading = true; renderObjects();
+  try {
+    const res = await api("GET", "/api/tablestats?" + new URLSearchParams({ session, quick: quick ? "1" : "0" }));
+    if (session !== state.session || seq !== tstats.seq) return; // disconnected or reloaded meanwhile
+    tstats.total = res; tstats.exact = !quick;
+    tstats.byName = new Map(res.tables.map((t) => [t.name, t]));
+    if (!quick) toast(res.exact ? "Rows counted and sizes measured" : "Sizes measured; some tables were too slow to count and show the database's estimate (≈)");
+  } catch (e) {
+    if (session === state.session && seq === tstats.seq && !quick) toast(e.message, true);
+  } finally {
+    if (seq === tstats.seq) { tstats.loading = false; renderObjects(); }
+  }
+}
 const fmtInt = (n) => Number(n).toLocaleString();
 function fmtMB(bytes) {
   if (bytes == null || bytes < 0) return "? MB";
@@ -1593,38 +1657,26 @@ function fmtMB(bytes) {
   return mb === 0 ? "0 MB" : mb < 0.1 ? "<0.1 MB" : `${mb.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
 }
 const rowsText = (rows, exact) => rows < 0 ? "? rows" : `${exact ? "" : "≈"}${fmtInt(rows)}`;
-const statText = (st) => `${rowsText(st.rows, st.exact)} · ${fmtMB(st.bytes)}`;
+// The columns of the table list: the header says what the number is.
+const rowsCell = (st) => st.rows < 0 ? "?" : `${st.exact ? "" : "≈"}${fmtInt(st.rows)}`;
+const mbCell = (st) => st.bytes == null || st.bytes < 0 ? "?" : fmtMB(st.bytes).replace(" MB", "");
 const statTitle = (st) => (st.rows < 0 ? "rows unknown" : `${st.exact ? "" : "about "}${fmtInt(st.rows)} rows${st.exact ? "" : " (estimated: counting took too long)"}`) +
   ", " + (st.bytes < 0 ? "size unknown (the database doesn't report it)" : `${fmtMB(st.bytes)} with indexes`);
 function renderStatsSummary(cur) {
   const box = $("objStats");
-  const show = tstats.show && tstats.total && cur && cur.type === "table";
+  const show = tstats.total && cur && cur.type === "table";
   box.hidden = !show;
   if (!show) return;
   const t = tstats.total;
   box.textContent = `${fmtInt(t.tables.length)} tables · ${t.exact ? "" : "≈"}${fmtInt(t.rows)} rows · ${t.bytes < 0 ? "size unknown" : fmtMB(t.bytes)}`;
-  box.title = t.exact ? "Every table was counted exactly" : "≈: some tables were too slow to count, their row counts are the database's estimates";
+  box.title = t.exact ? "Every table was counted exactly" : "≈: the database's estimate, not an exact count; ⟳ # MB counts every table exactly";
 }
 $("objTabs").addEventListener("click", async (ev) => {
   if (!ev.target.closest("button[data-stats]")) return;
   ev.stopPropagation();
   if (tstats.loading) return;
-  if (tstats.show) { tstats.show = false; renderObjects(); return; }
   state.objTab = "table";
-  if (!tstats.byName) {
-    tstats.loading = true; renderObjects();
-    const session = state.session;
-    try {
-      const res = await api("GET", "/api/tablestats?" + new URLSearchParams({ session }));
-      if (session !== state.session) return; // disconnected meanwhile
-      tstats.total = res;
-      tstats.byName = new Map(res.tables.map((t) => [t.name, t]));
-    } catch (e) {
-      toast(e.message, true);
-      return;
-    } finally { tstats.loading = false; renderObjects(); }
-  }
-  tstats.show = true; renderObjects();
+  loadTableStats(false);
 });
 
 $("objTabs").addEventListener("click", (ev) => {
@@ -1660,6 +1712,7 @@ $("refreshBtn").addEventListener("click", async () => {
   try {
     const res = await api("GET", "/api/objects?" + new URLSearchParams({ session: state.session }));
     state.objects = res.objects; resetTableStats(); renderObjects(); toast("Object list refreshed");
+    loadTableStats(true);
   } catch (e) { toast(e.message, true); }
 });
 
