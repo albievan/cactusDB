@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.19.0"
+var version = "1.20.0"
 
 //go:embed web
 var webFS embed.FS
@@ -318,6 +318,7 @@ func main() {
 		return
 	}
 	childLog := os.Getenv(backgroundEnv) // set when this is the background copy
+	var logCopy io.Writer                // the --logfile of a foreground cactusdb
 	if *logFile != "" && childLog == "" {
 		// Foreground with --logfile: log to the terminal and the file.
 		f, err := os.OpenFile(*logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
@@ -326,6 +327,7 @@ func main() {
 		}
 		defer f.Close()
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
+		logCopy = f
 	}
 	store, err := openStore(*connDB, *keyFile)
 	if err != nil {
@@ -398,7 +400,16 @@ func main() {
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("cannot listen on %s: %v", addr, err)
+		log.Fatalf("cannot listen on %s: %v%s", addr, err, portInUse(err, filepath.Dir(*connDB), *port))
+	}
+	// From here on the terminal must never hold up a request (see termlog.go).
+	term := newTermWriter(os.Stderr)
+	if childLog == "" {
+		if logCopy != nil {
+			log.SetOutput(io.MultiWriter(term, logCopy))
+		} else {
+			log.SetOutput(term)
+		}
 	}
 	// IdleTimeout closes a browser's idle keep-alive connection before a
 	// firewall, VPN or NAT between it and cactusdb silently drops it: the
@@ -440,7 +451,7 @@ func main() {
 			fmt.Printf("  log file:          %s\n", *logFile)
 			log.Printf("started, process id %d, listening on %s", os.Getpid(), ln.Addr())
 		}
-		fmt.Println("  press Ctrl+C to stop")
+		fmt.Println("  press Ctrl+C to stop (closing this terminal doesn't stop it; --runas background runs it without one)")
 	}
 
 	// Ctrl+C, kill, or the web UI's Shutdown button all stop the server the
@@ -449,23 +460,37 @@ func main() {
 	go func() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-		select {
-		case sig := <-stop:
-			log.Printf("stopping (%v)", sig)
-		case <-s.shutdown:
-			log.Printf("stopping (shutdown requested from the web UI)")
+		// A closed terminal (SSH session ended or dropped) sends SIGHUP, and
+		// writing to a pipe whose reader is gone SIGPIPE: either would kill
+		// cactusdb on the spot, without a word in the log or crash log.
+		hup := make(chan os.Signal, 1)
+		signal.Notify(hup, syscall.SIGHUP, syscall.SIGPIPE)
+		for {
+			select {
+			case sig := <-hup:
+				log.Printf("%v received (the terminal was closed?): cactusdb keeps running as process %d; stop it with kill %d", sig, os.Getpid(), os.Getpid())
+				continue
+			case sig := <-stop:
+				log.Printf("stopping (%v)", sig)
+			case <-s.shutdown:
+				log.Printf("stopping (shutdown requested from the web UI)")
+			}
+			break
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		srv.Shutdown(ctx)
 	}()
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
+		log.Print(err)
+		term.flush(2 * time.Second)
+		os.Exit(1)
 	}
 	s.release()
 	store.db.Close()
 	log.Printf("stopped")
 	stopped()
+	term.flush(2 * time.Second)
 }
 
 // release cancels running exports, waits briefly for them to clean up their

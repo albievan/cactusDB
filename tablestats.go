@@ -13,10 +13,13 @@ import (
 // object list. The size and a row estimate come from the database's
 // catalog in one query; the rows are then counted exactly, a few tables at a
 // time, within a time budget: a table not counted in time keeps the estimate.
+// The quick variant, used when connecting, only counts the tables the catalog
+// has no estimate for, so opening a database doesn't load its server.
 
 const (
 	tableStatsThreads = 4
 	tableStatsBudget  = 30 * time.Second
+	quickStatsBudget  = 10 * time.Second
 )
 
 type tableStat struct {
@@ -48,8 +51,9 @@ func tableSizeQuery(engine string) string {
 	return "" // Firebird keeps no size per table
 }
 
-// tableStats returns the rows and size of each of tables.
-func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string) []tableStat {
+// tableStats returns the rows and size of each of tables. With quick, only
+// tables without a row estimate are counted.
+func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string, quick bool) []tableStat {
 	out := make([]tableStat, len(tables))
 	idx := make(map[string]int, len(tables))
 	for i, t := range tables {
@@ -77,7 +81,11 @@ func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string)
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, tableStatsBudget)
+	budget := tableStatsBudget
+	if quick {
+		budget = quickStatsBudget
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	queue := make(chan int)
 	var wg sync.WaitGroup
@@ -93,6 +101,9 @@ func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string)
 	for i := range out {
 		if ctx.Err() != nil {
 			break
+		}
+		if quick && out[i].Rows >= 0 {
+			continue
 		}
 		queue <- i
 	}
@@ -123,7 +134,8 @@ func (s *server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	start := time.Now()
-	stats := tableStats(r.Context(), ss.engine, ss.db, tables)
+	quick := r.URL.Query().Get("quick") == "1"
+	stats := tableStats(r.Context(), ss.engine, ss.db, tables, quick)
 	var rows, bytes int64
 	exact, sized := true, false
 	for _, t := range stats {
@@ -138,6 +150,10 @@ func (s *server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 	if !sized {
 		bytes = -1
 	}
-	logAction(r, "[%s] table sizes of %d table(s) in %s", ss.label, len(stats), time.Since(start).Round(time.Millisecond))
+	how := "counted"
+	if quick {
+		how = "estimated"
+	}
+	logAction(r, "[%s] table sizes of %d table(s) %s in %s", ss.label, len(stats), how, time.Since(start).Round(time.Millisecond))
 	writeJSON(w, 200, map[string]any{"tables": stats, "rows": rows, "exact": exact, "bytes": bytes})
 }

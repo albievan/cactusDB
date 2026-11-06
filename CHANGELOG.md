@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.20.0 — 2026-11-06
+
+- Fixed: **on a server, tables sometimes didn't load and cactusdb later stopped answering**,
+  with an empty crash log. cactusdb wrote every request to the terminal it ran in and waited
+  for it. When that terminal stopped reading (an SSH session over a dropped VPN, a paused
+  terminal), every request hung after about a hundred lines, while the page itself still
+  loaded. When SSH closed the dead session, its hangup signal stopped cactusdb without a
+  trace. Now the terminal can never hold up a request (lines it doesn't take are dropped and
+  counted), cactusdb keeps running when its terminal closes (SIGHUP, SIGPIPE), and a start on
+  a port that's still in use names the cactusdb running there.
+- **Rows and MB of every table as soon as you connect**, from the database's statistics
+  (instant, marked `≈`), in a Rows and an MB column. **⟳ # MB** counts every table exactly.
+- **Sort the table list** by clicking **Name**, **Rows** or **MB** above it: a second click
+  reverses the order (▲ ascending, ▼ descending).
+
 ## 1.19.0 — 2026-11-06
 
 - **New logo**: a cactus drawn as two circuit traces.
