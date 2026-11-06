@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.21.0 — 2026-11-07
+
+- Fixed: **on a server, tables, connecting and saving queries stopped working for about five
+  minutes at a time**, while the same database always worked from a cactusdb on your own
+  computer. Something between the browser and the server (a firewall or intrusion-prevention
+  device) blocks a computer from cactusdb's port for about five minutes as soon as cactusdb
+  answers **403**. It answers 403 to "this connection is protected: enter its password",
+  which the page receives every time it opens a protected connection, and to a wrong
+  connection password. During the block nothing on that port answers, not even open
+  connections. Now the web UI receives every error as 200 with the real status in the
+  `X-Cactusdb-Status` header, so those devices see nothing to block. Scripts and other
+  clients still get the usual status codes.
+- **Full table names**: long names wrap at `_` instead of being cut off.
+- **The open table is highlighted** in the list and next to the tabs, like the active tab.
+- **What's new** in *Check for update* is a button, readable in dark mode. The commands no
+  longer show scroll bars: the copy button copies the whole command.
+
 ## 1.20.0 — 2026-11-06
 
 - Fixed: **on a server, tables sometimes didn't load and cactusdb later stopped answering**,

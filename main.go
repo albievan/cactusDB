@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.20.0"
+var version = "1.21.0"
 
 //go:embed web
 var webFS embed.FS
@@ -415,7 +415,7 @@ func main() {
 	// firewall, VPN or NAT between it and cactusdb silently drops it: the
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
-	srv := &http.Server{Handler: logRequests(recoverPanics(mux)), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
+	srv := &http.Server{Handler: statusInHeader(logRequests(recoverPanics(mux))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
 	go s.expireSessions()
 	go logUpdate()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
@@ -593,6 +593,48 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Some firewalls and intrusion-prevention devices take an HTTP 401 or 403 for
+// an attack and block the client from the port for minutes, open connections
+// included: one locked connection or expired session then made cactusdb on a
+// server unreachable from that computer. The web UI therefore asks (with the
+// header below, or errors=in-header in a download link) for errors as a 200
+// whose real status is in a response header; other clients, such as
+// scripts, get the status as usual.
+const (
+	statusInHeaderReq  = "X-Cactusdb-Errors"
+	statusInHeaderResp = "X-Cactusdb-Status"
+)
+
+type statusInHeaderWriter struct {
+	http.ResponseWriter
+}
+
+func (w statusInHeaderWriter) WriteHeader(code int) {
+	if code >= 400 {
+		w.Header().Set(statusInHeaderResp, strconv.Itoa(code))
+		code = http.StatusOK
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w statusInHeaderWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w statusInHeaderWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func statusInHeader(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Download links can't send a header: they say so in the URL.
+		if r.Header.Get(statusInHeaderReq) == "in-header" || r.URL.Query().Get("errors") == "in-header" {
+			w = statusInHeaderWriter{w}
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 // logRequests logs every API call with its result, duration and client.
