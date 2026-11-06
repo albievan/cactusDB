@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.17.0 — 2026-11-06
+
+- Fixed: **connecting to a cactusdb on a server worked only sometimes.** cactusdb kept every
+  session's database connections open until it stopped. Each closed or reloaded tab left
+  its connections behind, and idle connections were cut by the database, a firewall or the
+  VPN, so the next request on one failed. Now:
+  - database connections idle for a minute are closed
+  - sessions unused for 30 minutes are closed (not while a query or export runs)
+  - closing the page ends its session
+  - a connect that got no answer is retried once
+  - the log records how long each connect took
+- **New menu** at the bottom of the sidebar: **Connections**, **New connection**, **Folder
+  setup** and **Drivers**. Folder setup and Drivers open in their own dialog.
+- The connection form is no longer always shown: **New connection** or **Edit** opens it,
+  and its new **Connect** button connects without saving.
+- Each saved connection has a compact **▶** button to connect.
+- While you're not connected, the sidebar lists your saved connections with **▶**, a **New
+  connection** button and the export folder.
+
 ## 1.16.0 — 2026-11-05
 
 - **Rows and size of every table**: the new **# MB** button next to the Tables tab shows

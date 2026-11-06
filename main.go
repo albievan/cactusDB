@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.16.0"
+var version = "1.17.0"
 
 //go:embed web
 var webFS embed.FS
@@ -48,6 +48,8 @@ type session struct {
 
 	savedID int64      // the saved connection it was opened from (0: none), for saved queries
 	connBox *secretBox // that connection's own key (nil: it has no password)
+
+	lastUsed time.Time // the last request, for closing forgotten sessions; guarded by server.mu
 }
 
 // exportDir is where this connection's exports go: <export folder>/<connection>.
@@ -402,6 +404,7 @@ func main() {
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
 	srv := &http.Server{Handler: logRequests(recoverPanics(mux)), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
+	go s.expireSessions(sessionIdle)
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
 	s.previousRun = previous
 
@@ -678,6 +681,7 @@ func (s *server) session(r *http.Request, id string) (*session, error) {
 	if !ok {
 		return nil, errors.New("not connected (session expired) - please connect again")
 	}
+	ss.lastUsed = time.Now()
 	return ss, nil
 }
 
@@ -796,9 +800,10 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	start := time.Now()
 	db, err := openDB(r.Context(), p)
 	if err != nil {
-		logAction(r, "connect FAILED %s: %v", defaultConnName(p), err)
+		logAction(r, "connect FAILED %s after %s: %v", defaultConnName(p), time.Since(start).Round(time.Millisecond), err)
 		writeErr(w, 400, fmt.Errorf("connection failed: %w", explainConnErr(p, err)))
 		return
 	}
@@ -832,9 +837,9 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	s.mu.Lock()
 	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db,
-		savedID: savedID, connBox: connBox}
+		savedID: savedID, connBox: connBox, lastUsed: time.Now()}
 	s.mu.Unlock()
-	logAction(r, "connect %s as %q, session %s", defaultConnName(p), label, id[:8])
+	logAction(r, "connect %s as %q, session %s, in %s", defaultConnName(p), label, id[:8], time.Since(start).Round(time.Millisecond))
 	resp["session"] = id
 	resp["engine"] = p.Engine
 	resp["label"] = label
