@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"os"
+	"os/exec"
+	"strconv"
 	"syscall"
 
 	"golang.org/x/sys/windows"
@@ -28,3 +31,37 @@ func detachedProcess() *syscall.SysProcAttr {
 }
 
 const stopHint = "taskkill /PID %d /F"
+
+// restartProcess starts exe (after an upgrade) as a new process: Windows
+// can't replace a running one. A background cactusdb starts it detached,
+// logging to the same file; a cactusdb in a console waits for it there, so
+// the console stays in use until it stops. It only returns when exe can't be
+// started.
+func restartProcess(exe string, args, env []string, childLog string) error {
+	cmd := exec.Command(exe, args...)
+	cmd.Env = env
+	if childLog != "" {
+		f, err := os.OpenFile(childLog, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+		if err != nil {
+			return err
+		}
+		cmd.Stdout, cmd.Stderr = f, f
+		cmd.SysProcAttr = detachedProcess()
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+		os.WriteFile(pidFile(childLog), []byte(strconv.Itoa(cmd.Process.Pid)+"\n"), 0o644)
+		os.Exit(0)
+	}
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	err := cmd.Wait()
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		os.Exit(ee.ExitCode())
+	}
+	os.Exit(0)
+	return nil
+}

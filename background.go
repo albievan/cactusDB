@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -44,7 +45,8 @@ func startBackground(logFile, probeURL string, urls []string) error {
 	start, _ := f.Seek(0, 2)
 
 	cmd := exec.Command(exe, withoutFlag(os.Args[1:], "runas")...)
-	cmd.Env = append(os.Environ(), backgroundEnv+"="+logFile)
+	typed, _ := json.Marshal(os.Args[1:]) // saved as the startup options (upgrade.go)
+	cmd.Env = append(os.Environ(), backgroundEnv+"="+logFile, startedArgsEnv+"="+string(typed))
 	cmd.Stdout, cmd.Stderr = f, f
 	cmd.SysProcAttr = detachedProcess()
 	if err := cmd.Start(); err != nil {

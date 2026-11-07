@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.30.0 — 2026-11-07
+
+- **Install an update from the browser**: ☰ → ⬆ Check for update → **Install and restart**.
+  The server downloads the binary for its own system from GitHub, checks it against the new
+  `dist/SHA256SUMS` and by running it with `--version`, puts it in place (the previous
+  version is kept as `cactusdb.old`), stops, and starts the new version with the options it
+  was started with. The page follows the download and reloads when the new version answers.
+  On Linux and macOS the new version keeps the process id, terminal, log file and service
+  manager; started with `--runas background` it stays in the background. If it can't start,
+  the previous version is put back.
+- **Startup options saved**: every start of the web UI records how it was started (the
+  options as typed, the program, folder, run mode, version, process, user and computer, and
+  the names of the `CACTUSDB_…` variables) in the new `startup_options` table of
+  `cactus.conn.db`, one row per port. The restart after an update reads them from there, and
+  the Shutdown dialog shows the real command to start cactusdb again.
+- A server without internet access can be sent the binary by the browser, with the
+  superuser password.
+- Not offered in containers (update the image) or when the program's folder isn't writable.
+
 ## 1.29.0 — 2026-11-07
 
 - **Google Analytics, opt-in**: each cactusdb server can have its own Measurement ID

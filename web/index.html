@@ -467,6 +467,15 @@
   ul.setup li button.copy, ul.setup li:hover button.copy { display: inline-flex; grid-column: 2; grid-row: 1 / span 2; padding: 4px 6px; line-height: 0; }
   button.copy svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   button.copy.done { color: var(--accent); border-color: var(--accent); }
+  /* Install: the new version replaces this one and restarts. */
+  .upinstall { border: 1px solid var(--accent); border-radius: 6px; padding: 8px 10px; margin: 6px 0 4px; font-size: 13px; }
+  .upinstall p { margin: 0 0 8px; }
+  .upinstall code { font-size: 12px; overflow-wrap: anywhere; }
+  .upinstall .uprow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .upinstall .bar { flex: 1 1 160px; height: 7px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; }
+  .upinstall .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .upinstall .upmsg { font-size: 12px; color: var(--muted); }
+  .upinstall .upmsg.bad { color: var(--danger); }
   .updot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 1px; }
   .updot[hidden] { display: none; }
   .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--border); border-top-color: var(--accent);
@@ -886,7 +895,15 @@
   <form method="dialog">
     <h3 id="upTitle">Check for update</h3>
     <div id="upStatus" class="upstatus">Checking…</div>
-    <p class="hint">To update, run one command on the computer cactusdb runs on, in the folder it's in, then restart
+    <div id="upInstall" class="upinstall" hidden>
+      <p id="upInstallText"></p>
+      <div class="uprow">
+        <button type="button" class="primary" id="upInstallBtn">Install and restart</button>
+        <span class="bar" id="upBarWrap" hidden><i id="upBar"></i></span>
+        <span class="upmsg" id="upMsg" role="status"></span>
+      </div>
+    </div>
+    <p class="hint">Or update by hand: run one command on the computer cactusdb runs on, in the folder it's in, then restart
       cactusdb. Your saved connections and exports stay where they are. The setup scripts pick the right file for the
       system themselves; the other commands download one particular file as <code>cactusdb</code> (<code>cactusdb.exe</code> on Windows).</p>
     <ul class="list setup" id="upList"></ul>
@@ -3229,7 +3246,8 @@ function renderUpdate(u) {
     st.textContent = `This is cactusdb ${u.current}. Could not check for a newer version: ${u.error}. The commands below still download the latest cactusdb.`;
   } else if (u.newer) {
     st.className = "upstatus new";
-    st.innerHTML = `<b>cactusdb ${esc(u.latest)} is available.</b> This is ${esc(u.current)}. Copy the command for the computer cactusdb runs on.`;
+    st.innerHTML = `<b>cactusdb ${esc(u.latest)} is available.</b> This is ${esc(u.current)}. ` +
+      (u.canInstall ? "Install it from here, or copy the command for the computer cactusdb runs on." : "Copy the command for the computer cactusdb runs on.");
   } else {
     st.className = "upstatus";
     st.textContent = `cactusdb ${u.current} is up to date` + (u.via ? ` (checked from this browser: ${u.via})` : "") + ".";
@@ -3242,9 +3260,162 @@ function renderUpdate(u) {
         <code title="${esc(r.cmd)}">${esc(r.cmd)}</code>
         <button type="button" class="copy" data-copy="${i}" title="Copy the command" aria-label="Copy the command for ${esc(r.label)}">${COPY_ICON}</button></li>`).join("");
   $("upList").dataset.cmds = JSON.stringify(setupCommands(u).map((r) => r.cmd || ""));
+  renderInstall(u);
   const dot = !!u.newer;
   $("updateDot").hidden = !dot; $("navUpdateDot").hidden = !dot;
   if (dot) $("appVersion").title = `cactusdb ${u.current} · ${u.latest} is available (☰ → Check for update)`;
+}
+
+// ---- install the new version from here ------------------------------------
+// The server downloads the binary for its own system, checks it, puts it in
+// place of the running one and restarts with the options it was started with
+// (saved in the connection database). A server without internet access is
+// sent the file by this browser instead, with the superuser password.
+const upg = { armed: false, busy: false };
+
+function upgMsg(text, bad) { $("upMsg").textContent = text; $("upMsg").className = "upmsg" + (bad ? " bad" : ""); }
+function upgBar(frac) {
+  $("upBarWrap").hidden = frac == null;
+  if (frac != null) $("upBar").style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + "%";
+}
+const mb = (n) => (n / 1048576).toFixed(1) + " MB";
+
+function renderInstall(u) {
+  const box = $("upInstall"), btn = $("upInstallBtn");
+  const job = u.job && u.job.state && u.job.state !== "failed" ? u.job : null;
+  box.hidden = !(u.newer || job);
+  if (box.hidden || upg.busy) return;
+  const offline = !!u.via; // the server couldn't reach GitHub; this browser could
+  const cmd = u.startCommand ? `<code>${esc(u.startCommand)}</code>` : "the options it was started with";
+  let text;
+  if (!u.canInstall) {
+    text = `cactusdb can't install it itself here: ${esc(u.installError || "")}`;
+  } else if (offline && !u.superuserSet) {
+    text = `The cactusdb server can't reach GitHub, so this browser would download the new version and send it to the server, ` +
+      `which needs the superuser password; none is set (<code>cactusdb --superuser set</code> on the server). Use the command below instead.`;
+  } else {
+    text = (offline
+      ? `The cactusdb server can't reach GitHub, so this browser downloads <code>${esc(u.binary)}</code> and sends it to the server (with the superuser password). `
+      : `The server downloads <code>${esc(u.binary)}</code> from GitHub. `) +
+      `cactusdb checks it, puts it in place of <code>${esc(u.executable)}</code> (this version is kept as <code>${esc(u.backup)}</code>) ` +
+      `and restarts with the options it was started with: ${cmd}. Everyone using cactusdb is disconnected for a moment, and running exports stop.`;
+  }
+  $("upInstallText").innerHTML = text;
+  const can = u.canInstall && (!offline || u.superuserSet);
+  btn.hidden = !can; btn.disabled = false;
+  upgArm(false);
+  if (job) { btn.hidden = true; pollUpgrade().catch((e) => { upgMsg(e.message, true); btn.hidden = false; }); }
+  else if (u.job && u.job.state === "failed") upgMsg("The last try failed: " + u.job.error, true);
+  else upgMsg("");
+  upgBar(null);
+}
+
+function upgArm(on) {
+  upg.armed = on;
+  const v = updateInfo && updateInfo.latest ? " " + updateInfo.latest : "";
+  $("upInstallBtn").textContent = on ? `Yes, install${v} and restart` : `Install${v} and restart`;
+  $("upInstallBtn").classList.toggle("dangerfill", on);
+}
+
+$("upInstallBtn").addEventListener("click", async () => {
+  if (!upg.armed) { upgArm(true); upgMsg("Click again to install: cactusdb restarts."); return; }
+  const u = updateInfo;
+  upg.busy = true; $("upInstallBtn").disabled = true; upgArm(false);
+  try {
+    if (u.via) await installFromBrowser(u);
+    else {
+      upgMsg("Starting…");
+      await api("POST", "/api/upgrade", {});
+      await pollUpgrade();
+    }
+  } catch (e) {
+    upg.busy = false; $("upInstallBtn").disabled = false; $("upInstallBtn").hidden = false; upgBar(null);
+    if (e.data && e.data.offline) { upgMsg(e.message + ". Check again: this browser may be able to download it.", true); return; }
+    upgMsg(e.message, true);
+  }
+});
+
+// pollUpgrade follows the server's download until it restarts.
+async function pollUpgrade() {
+  upg.busy = true; $("upInstallBtn").hidden = true;
+  for (;;) {
+    let j;
+    try { j = await api("GET", "/api/upgrade"); }
+    catch (e) { j = { state: "restarting" }; } // it stopped answering: it is restarting
+    if (j.state === "failed") { upg.busy = false; throw new Error(j.error); }
+    if (j.state === "downloading" || j.state === "receiving") {
+      upgBar(j.total > 0 ? j.done / j.total : 0);
+      upgMsg(j.total > 0 ? `Downloading on the server: ${mb(j.done)} of ${mb(j.total)}` : `Downloading on the server: ${mb(j.done || 0)}`);
+    } else if (j.state === "checking") { upgBar(1); upgMsg("Checking the new version…"); }
+    else if (j.state === "installing") { upgBar(1); upgMsg("Installing…"); }
+    else if (j.state === "restarting") return waitForRestart(j.to || (updateInfo && updateInfo.latest));
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+// installFromBrowser downloads the binary here and sends it to the server.
+async function installFromBrowser(u) {
+  const dist = u.distRaw || u.raw + "dist/", url = dist + u.binary;
+  upgMsg("Downloading in this browser…"); upgBar(0);
+  const res = await fetch(url, { cache: "no-store" }).catch((e) => { throw new Error(`this browser can't download ${url}: ${e.message}`); });
+  if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${url}`);
+  const total = +res.headers.get("Content-Length") || 0, parts = [];
+  let done = 0;
+  const reader = res.body.getReader();
+  for (;;) {
+    const { done: end, value } = await reader.read();
+    if (end) break;
+    parts.push(value); done += value.length;
+    upgBar(total ? done / total : 0); upgMsg(`Downloading in this browser: ${mb(done)}` + (total ? ` of ${mb(total)}` : ""));
+  }
+  const file = new Blob(parts, { type: "application/octet-stream" });
+  let sum = "";
+  try {
+    const r = await fetch(dist + "SHA256SUMS", { cache: "no-store" });
+    if (r.ok) {
+      const line = (await r.text()).split("\n").map((l) => l.trim().split(/\s+/)).find((f) => f.length === 2 && f[1].replace(/^\*/, "") === u.binary);
+      if (line) sum = line[0];
+    }
+  } catch (e) { /* the server still runs the file with --version */ }
+  const send = async (pw) => {
+    upgMsg(`Sending ${mb(file.size)} to the server…`);
+    const r = await fetch("/api/upgrade/upload", { method: "POST", body: file, headers: { "Content-Type": "application/octet-stream",
+      "X-Cactusdb-Errors": "in-header", "X-Cactusdb-Page": usage.page, "X-Cactusdb-Superuser": pw, "X-Cactusdb-Sha256": sum } });
+    const data = await r.json().catch(() => ({}));
+    const status = +(r.headers.get("X-Cactusdb-Status") || r.status);
+    if (status >= 400) { const e = new Error(data.error || `error ${status}`); e.status = status; throw e; }
+    return data;
+  };
+  let job = null;
+  if (superPw) { try { job = await send(superPw); } catch (e) { if (e.status !== 403) throw e; } }
+  if (!job) {
+    const ok = await askPassword({ title: "Install the new version", superOnly: true, ok: "Install",
+      text: "The file runs on the server, so installing a file sent from this browser needs the superuser password.",
+      check: async (a) => { job = await send(a.superPassword); } });
+    if (!ok) { upg.busy = false; $("upInstallBtn").disabled = false; upgBar(null); upgMsg("Not installed."); return; }
+  }
+  return waitForRestart(job.to);
+}
+
+// waitForRestart waits for the new version to answer, then reloads the page.
+async function waitForRestart(to) {
+  upgBar(1); upgMsg(`cactusdb ${to || ""} is starting…`);
+  const t0 = Date.now();
+  while (Date.now() - t0 < 120000) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const r = await fetch("/api/info?check=" + Date.now(), { cache: "no-store" });
+      const info = r.ok ? await r.json() : null;
+      if (info && info.version && (!to || info.version === to)) {
+        upgMsg(`cactusdb ${info.version} is running. Reloading the page…`);
+        toast(`cactusdb ${info.version} is installed and running`);
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+    } catch (e) { /* still restarting */ }
+  }
+  upg.busy = false;
+  throw new Error(`cactusdb didn't answer within 2 minutes after the restart. Look at its log on the server; the previous version is kept as ${updateInfo && updateInfo.backup || "cactusdb.old"}`);
 }
 
 // checkUpdate asks the server, which asks GitHub. A server without internet
@@ -3307,7 +3478,7 @@ async function loadInfo() {
     $("appVersion").title = info.version ? `cactusdb ${info.version}` : "";
     $("shutdownBtn").hidden = !info.background;
     $("sdPid").textContent = info.pid ? ` (process id ${info.pid})` : "";
-    $("restartCmd").textContent = `cactusdb --port ${location.port || 80} --runas background`;
+    $("restartCmd").textContent = info.startCommand || `cactusdb --port ${location.port || 80} --runas background`;
   } catch (e) { /* an older server without /api/info: no Shutdown button */ }
 }
 

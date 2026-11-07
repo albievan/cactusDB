@@ -109,7 +109,7 @@ func updateJSON(latest string, err error) map[string]any {
 	out := map[string]any{
 		"current": version, "os": runtime.GOOS, "arch": runtime.GOARCH,
 		"latest": latest, "newer": err == nil && newerVersion(latest, version),
-		"repo": repoURL, "raw": rawURL, "dist": repoURL + "/raw/main/dist/", "latestUrl": latestURL,
+		"repo": repoURL, "raw": rawURL, "dist": repoURL + "/raw/main/dist/", "latestUrl": latestURL, "distRaw": distURL,
 		"changelog": repoURL + "/blob/main/CHANGELOG.md",
 	}
 	if err != nil {
@@ -120,7 +120,11 @@ func updateJSON(latest string, err error) map[string]any {
 
 func (s *server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	latest, err := latestVersion(r.Context(), r.URL.Query().Get("refresh") == "1")
-	writeJSON(w, 200, updateJSON(latest, err))
+	out := updateJSON(latest, err)
+	for k, v := range s.upgradeInfo() {
+		out[k] = v
+	}
+	writeJSON(w, 200, out)
 }
 
 // logUpdate says at startup when a newer cactusdb is available.

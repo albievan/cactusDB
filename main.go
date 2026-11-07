@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.29.0"
+var version = "1.30.0"
 
 //go:embed web
 var webFS embed.FS
@@ -86,7 +86,10 @@ type server struct {
 	stopOnce   sync.Once
 
 	previousRun string // how the previous run ended, when it didn't stop normally (crash.go)
-	logPath     string // the log file shown by ☰ → Logs; "" = only the lines in memory (logs.go)
+	port        int    // the web UI's port: the key of its saved startup options (upgrade.go)
+	upgrade     *upgradeJob
+	restart     *restartPlan // set when a new version is in place: restart once stopped
+	logPath     string       // the log file shown by ☰ → Logs; "" = only the lines in memory (logs.go)
 	crashPath   string
 }
 
@@ -383,7 +386,7 @@ func main() {
 	}
 	s := &server{store: store, sessions: map[string]*session{}, defaultExportDir: defaultExportDir,
 		defaultConnDB: defaultConnDB, connDBFlag: flagValueIf(set["conn-db"], *connDB),
-		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{})}
+		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{}), port: *port}
 	s.setExportFolder(exportDir)
 
 	static, _ := fs.Sub(webFS, "web")
@@ -395,6 +398,9 @@ func main() {
 	mux.HandleFunc("GET /api/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/logs/zip", s.handleLogsZip)
 	mux.HandleFunc("GET /api/update", s.handleUpdate)
+	mux.HandleFunc("POST /api/upgrade", s.handleUpgrade)
+	mux.HandleFunc("GET /api/upgrade", s.handleUpgradeStatus)
+	mux.HandleFunc("POST /api/upgrade/upload", s.handleUpgradeUpload)
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("POST /api/settings", s.handleSaveSettings)
 	mux.HandleFunc("POST /api/shutdown", s.handleShutdown)
@@ -476,6 +482,11 @@ func main() {
 	go logUpdate()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
 	s.previousRun = previous
+	// How this cactusdb was started, so an upgrade from the web UI can start
+	// the new version the same way (upgrade.go).
+	if err := saveStartup(store, currentStartup(*port)); err != nil {
+		log.Printf("warning: cannot save the startup options (an upgrade from the web UI can't restart cactusdb): %v", err)
+	}
 
 	fmt.Printf("cactusdb %s\n", version)
 	for _, d := range driverInfo() {
@@ -529,7 +540,14 @@ func main() {
 			case sig := <-stop:
 				log.Printf("stopping (%v)", sig)
 			case <-s.shutdown:
-				log.Printf("stopping (shutdown requested from the web UI)")
+				s.mu.Lock()
+				upgrading := s.restart != nil
+				s.mu.Unlock()
+				if upgrading {
+					log.Printf("stopping to start the new version")
+				} else {
+					log.Printf("stopping (shutdown requested from the web UI)")
+				}
 			}
 			break
 		}
@@ -543,10 +561,20 @@ func main() {
 		os.Exit(1)
 	}
 	s.release()
+	s.mu.Lock()
+	restart := s.restart
+	s.mu.Unlock()
 	store.DB().Close()
-	log.Printf("stopped")
+	if restart != nil {
+		log.Printf("stopped; starting cactusdb %s", restart.to)
+	} else {
+		log.Printf("stopped")
+	}
 	stopped()
 	term.flush(2 * time.Second)
+	if restart != nil {
+		restart.restartNow(childLog)
+	}
 }
 
 // release cancels running exports, waits briefly for them to clean up their
@@ -578,8 +606,12 @@ func (s *server) release() {
 // handleInfo tells the page how this cactusdb runs, e.g. whether it offers
 // the Shutdown button.
 func (s *server) handleInfo(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"version": version, "background": s.background, "pid": os.Getpid(), "started": processStart.Format(time.RFC3339),
-		"previousRun": s.previousRun})
+	info := map[string]any{"version": version, "background": s.background, "pid": os.Getpid(), "started": processStart.Format(time.RFC3339),
+		"previousRun": s.previousRun}
+	if o, err := loadStartup(s.store, s.port); err == nil {
+		info["startCommand"] = o.Command
+	}
+	writeJSON(w, 200, info)
 }
 
 // handleShutdown stops a background cactusdb. It must be a JSON request, which

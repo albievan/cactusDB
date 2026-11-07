@@ -9,3 +9,7 @@ run-claude
 *.pid
 *.running
 .env
+cactus.conn.db.location
+*.old
+*.old.exe
+*.download

@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.29.0
+cactusdb 1.30.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -145,7 +145,7 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 | **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
 | **📜 Logs** | Opens the **Logs** tab (see below) |
 | **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
-| **⬆ Check for update** | Whether a newer cactusdb is out, with the command to download it for every system, each with a copy button (see below) |
+| **⬆ Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
 the connection dialog, opened by **＋ New connection** or **Edit**, never in the sidebar.
@@ -225,6 +225,53 @@ The system the cactusdb you're using runs on is marked **this server**. Click th
 button next to a command, paste it in a terminal on that computer, in cactusdb's folder, and
 restart cactusdb. The check reads one small file from GitHub: [`VERSION`](VERSION). If the
 cactusdb server has no internet access, your browser reads it instead.
+
+<a id="install-update"></a>
+**Installing an update from the browser.** When a newer version is out, the dialog also
+has **Install *x.y.z* and restart** (click it twice: the second click confirms). It shows
+what will happen first: which file is replaced and the command cactusdb restarts with.
+
+1. The cactusdb server downloads the binary for its own system from `dist/` on GitHub (the
+   bar shows the progress).
+2. It checks the file against [`dist/SHA256SUMS`](dist/SHA256SUMS), and runs it with
+   `--version`: it must start on this computer and be a newer cactusdb.
+3. It puts it in place of the running program. The version you had is kept next to it as
+   `cactusdb.old` (`cactusdb.old.exe` on Windows); to go back, stop cactusdb and rename it.
+4. It stops like **Shutdown** does: running exports stop, and everyone using cactusdb is
+   disconnected.
+5. It starts the new version **with the options it was started with** (see below). The page
+   waits for it and reloads itself.
+
+The options come from the connection database. Every time the web UI starts, cactusdb saves
+how it was started in the `startup_options` table of `cactus.conn.db`, one row per port:
+
+| Column | |
+|---|---|
+| `port` | the web UI's port |
+| `args` | the options as typed, as a JSON array, e.g. `["--port","8080","--runas","background"]` |
+| `command` | the same as one command line, as shown in the dialog |
+| `executable`, `working_dir` | the program and the folder it was started in |
+| `run_as` | `foreground` or `background` |
+| `env` | the names of the `CACTUSDB_…` environment variables that were set, never their values |
+| `version`, `pid`, `started_at`, `started_by`, `hostname` | which cactusdb, process, time (UTC), user and computer |
+
+Started with `--runas background`, the new version runs in the background too, logging to
+the same file. On Linux and macOS the new version takes over the running process: the same
+process id, terminal, environment (so `CACTUSDB_PASSPHRASE` still applies) and service
+manager (systemd, launchd). On Windows it starts as a new process; in a console window it
+keeps that window. If the new version can't be started, cactusdb puts the previous one back
+and starts that. The usage log records *install update* and *upgrade installed* (with the
+versions and the command).
+
+When **the cactusdb server can't reach GitHub** but your browser can, your browser
+downloads the file and sends it to the server. As the server then runs a file it didn't
+download itself, this asks for the [superuser password](#superuser) (wrong guesses are slowed
+down like everywhere else); without a superuser, use the commands instead.
+
+Install isn't offered when cactusdb can't replace itself: in a **container** (update the
+image with `deploy.sh`, or the next start would bring the old version back), or when the
+folder of the program isn't writable for the user cactusdb runs as (the dialog says so; use
+the command, as a user that may).
 
 It isn't only a prompt: the connection's database username and password, and its
 [saved queries](#saved-queries), are encrypted with a key derived from the connection
@@ -446,7 +493,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.29.0*), as reported by the running program.
+example *v1.30.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -752,7 +799,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.29.0 is running in the background (process id 48211)
+cactusdb 1.30.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -882,7 +929,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.29.0 is running in container cactusdb
+cactusdb 1.30.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -930,7 +977,9 @@ Next to the program (unless you chose other locations with the options above):
 ```
 cactusdb/
 ├── cactusdb(.exe)       the program
-├── cactus.conn.db       your saved connections, the chosen export folder and the usage log
+├── cactusdb.old(.exe)   the previous version, after an update installed from the web UI
+├── cactus.conn.db       your saved connections, the chosen export folder, the usage log and
+│                        the startup options (for installing an update from the web UI)
 │                        (an SQLite database; can be moved: ☰ → Folder setup)
 ├── cactus.conn.db.location  where it was moved to, if it was
 ├── cactus.key           the key that encrypts saved usernames and passwords
@@ -1089,7 +1138,15 @@ is sent and how to set it up. In short:
   out to be prompted (nothing is shown as you type), or set `CACTUSDB_DBPASSWORD` in scripts.
 - cactusdb never writes to your databases (see [Read-only](#read-only)). The only files it
   writes (and, on the *Exported files* page when you confirm, deletes) are `cactus.conn.db`,
-  `cactus.key` and the files in the export folder.
+  `cactus.key` and the files in the export folder, and, when an update is installed from
+  the web UI, the program itself (the previous one is kept as `cactusdb.old`).
+- **Installing an update from the web UI** only ever downloads the file for this system
+  from `dist/` of this repository on GitHub (over HTTPS), checks it against
+  `dist/SHA256SUMS` and runs it with `--version` before using it; it must be newer than the
+  running version. Like Shutdown it only accepts a JSON request, so other websites can't
+  start it. A file sent from the browser (for a server without internet access) needs the
+  superuser password. `startup_options` holds the names of `CACTUSDB_…` variables, never
+  their values.
 - **The usage log** in `cactus.conn.db` (see *The usage log*) holds the SQL that was run
   (shortened), table and connection names and IP addresses, but never passwords or a whole
   session id. It isn't encrypted, so give `cactus.conn.db` to someone else only if they
@@ -1179,7 +1236,7 @@ CACTUSDB_IT=1 go test ./...
 | `ddl.go`, `tables.go` | DDL export; constraints, indexes and foreign keys of tables |
 | `backup.go` | Database backup: DDL plus every row as `INSERT`s, in a maximum-compression `.zip` |
 | `background.go` | `--runas background` |
-| `sys_windows.go`, `sys_other.go` | Platform specifics: detaching from the terminal, console colours |
+| `sys_windows.go`, `sys_other.go` | Platform specifics: detaching from the terminal, console colours, restarting after an update |
 | `db.go` | Connecting, listing columns, running queries |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `tablestats.go`, `rowsize.go` | Rows and size of every table; the size estimated as rows × the columns' declared sizes when the database doesn't report it |
@@ -1202,6 +1259,7 @@ CACTUSDB_IT=1 go test ./...
 | `logs.go`, `logrotate.go` | The Logs tab (live, any day, crash log, .zip of every log); a new log file every day |
 | `termlog.go` | Logging to the terminal without ever holding up a request |
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |
+| `upgrade.go`, `dist/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written by `build.sh`) |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 

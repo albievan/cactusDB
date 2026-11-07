@@ -12,3 +12,8 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 wi
   echo "building $out"
   CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "$out" .
 done
+# Checksums: an upgrade from the web UI checks the downloaded binary with them.
+cd dist
+if command -v sha256sum >/dev/null 2>&1; then sha256sum cactusdb-*-* > SHA256SUMS
+else shasum -a 256 cactusdb-*-* > SHA256SUMS; fi
+echo "wrote dist/SHA256SUMS"

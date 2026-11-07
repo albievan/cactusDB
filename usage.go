@@ -154,6 +154,8 @@ var usageFunctions = map[string]string{
 	"GET /api/info":                     "open page",
 	"GET /api/logs/zip":                 "download logs",
 	"GET /api/update":                   "check for update",
+	"POST /api/upgrade":                 "install update",
+	"POST /api/upgrade/upload":          "install update from browser",
 	"GET /api/settings":                 "read settings",
 	"POST /api/settings":                "save settings",
 	"POST /api/shutdown":                "shut down",
@@ -197,7 +199,7 @@ var usageFunctions = map[string]string{
 // the tab is a ui event).
 func usageSkipped(r *http.Request) bool {
 	return r.Method == "GET" && (strings.HasPrefix(r.URL.Path, "/api/exportall/") ||
-		strings.HasPrefix(r.URL.Path, "/api/compare/") || r.URL.Path == "/api/logs")
+		strings.HasPrefix(r.URL.Path, "/api/compare/") || r.URL.Path == "/api/logs" || r.URL.Path == "/api/upgrade")
 }
 
 // recordRequest records API call r, answered with status after d.
