@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,8 +40,8 @@ const zipRetention = 15 * time.Minute
 
 type exportedFile struct {
 	Conn     string    `json:"conn"` // the connection's folder; "" for exports made before files were sorted by connection
-	Kind     string    `json:"kind"` // the subfolder: csv, json, xlsx, xml, sql or backup
-	Name     string    `json:"name"`
+	Kind     string    `json:"kind"` // the subfolder: csv, json, xlsx, xml, sql, backup or queries
+	Name     string    `json:"name"` // for queries: <day>/<file>
 	Size     int64     `json:"size"`
 	Modified time.Time `json:"modified"`
 	Folder   string    `json:"folder"` // the export folder it is in
@@ -126,6 +127,15 @@ type preparedZip struct {
 // key identifies a listed file: connection/type/name.
 func (f exportedFile) key() string { return f.Conn + "/" + f.Kind + "/" + f.Name }
 
+// format is the file's type (csv, xlsx, …): its folder, or for an export of
+// a saved query, which are sorted by day, its extension.
+func (f exportedFile) format() string {
+	if f.Kind == queriesSubdir {
+		return strings.TrimPrefix(filepath.Ext(f.Name), ".")
+	}
+	return f.Kind
+}
+
 // listExportedFiles lists the files in every export folder of this run,
 // <export>/<connection>/<type>/ (and <export>/<type>/ from before files
 // were sorted by connection), newest first. A file found in more than one
@@ -172,9 +182,40 @@ func (s *server) listExportedFiles() []exportedFile {
 					out = append(out, f)
 				}
 			}
+			if conn != "" {
+				out = append(out, listQueryExports(dir, conn, seen)...)
+			}
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Modified.After(out[j].Modified) })
+	return out
+}
+
+// listQueryExports lists the exports of saved queries of a connection:
+// <dir>/<conn>/queries/<day>/<file>, as kind queries and name <day>/<file>.
+func listQueryExports(dir, conn string, seen map[string]bool) []exportedFile {
+	var out []exportedFile
+	qdir := filepath.Join(dir, conn, queriesSubdir)
+	days, _ := os.ReadDir(qdir)
+	for _, d := range days {
+		if !d.IsDir() || !validFileName(d.Name()) {
+			continue
+		}
+		entries, _ := os.ReadDir(filepath.Join(qdir, d.Name()))
+		for _, e := range entries {
+			if !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			f := exportedFile{Conn: conn, Kind: queriesSubdir, Name: d.Name() + "/" + e.Name(), Folder: dir, path: filepath.Join(qdir, d.Name(), e.Name())}
+			fi, err := e.Info()
+			if seen[f.key()] || err != nil {
+				continue
+			}
+			seen[f.key()] = true
+			f.Size, f.Modified = fi.Size(), fi.ModTime()
+			out = append(out, f)
+		}
+	}
 	return out
 }
 
@@ -251,7 +292,7 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	err = writeZip(r, tmp, chosen)
+	missing, err := writeZip(r, tmp, chosen)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
@@ -277,10 +318,14 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 	}
 	s.zips[id] = pz
 	s.mu.Unlock()
-	logAction(r, "compressed %d file(s), %s to %s, for download as %s", len(chosen), humanSize(total), humanSize(fi.Size()), name)
+	if len(missing) > 0 {
+		logAction(r, "compress: %d file(s) skipped, no longer there: %s", len(missing), strings.Join(missing, ", "))
+	}
+	logAction(r, "compressed %d file(s), %s to %s, for download as %s", len(chosen)-len(missing), humanSize(total), humanSize(fi.Size()), name)
 	writeJSON(w, 200, map[string]any{
 		"name":     name,
-		"files":    len(chosen),
+		"files":    len(chosen) - len(missing),
+		"missing":  missing,
 		"size":     total,
 		"zipSize":  fi.Size(),
 		"seconds":  time.Since(start).Seconds(),
@@ -290,18 +335,25 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 
 // writeZip writes files to w as a .zip at the highest compression level,
 // each under <type>/<name>, stopping if the request is cancelled.
-func writeZip(r *http.Request, w io.Writer, files []exportedFile) error {
+// writeZip writes files to w as a .zip. A file that is gone by the time it is
+// its turn (deleted, or replaced by a newer export) is skipped and returned
+// in missing, instead of failing the whole download.
+func writeZip(r *http.Request, w io.Writer, files []exportedFile) (missing []string, err error) {
 	zw := zip.NewWriter(w)
 	zw.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
 		return flate.NewWriter(out, flate.BestCompression)
 	})
 	for _, f := range files {
 		if err := r.Context().Err(); err != nil {
-			return err
+			return missing, err
 		}
 		in, err := os.Open(f.path)
+		if errors.Is(err, fs.ErrNotExist) {
+			missing = append(missing, strings.TrimPrefix(f.key(), "/"))
+			continue
+		}
 		if err != nil {
-			return err
+			return missing, err
 		}
 		// In the .zip as <connection>/<type>/<name>.
 		h := &zip.FileHeader{Name: strings.TrimPrefix(f.key(), "/"), Method: zip.Deflate, Modified: f.Modified}
@@ -312,10 +364,13 @@ func writeZip(r *http.Request, w io.Writer, files []exportedFile) error {
 		}
 		in.Close()
 		if err != nil {
-			return err
+			return missing, err
 		}
 	}
-	return zw.Close()
+	if len(missing) == len(files) {
+		return missing, errors.New("none of the files exists any more: reload the list")
+	}
+	return missing, zw.Close()
 }
 
 // ctxReader stops reading when the request is cancelled, so a large file
@@ -412,17 +467,21 @@ func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
 	}
 	out := map[string]any{"conn": f.Conn, "kind": f.Kind, "name": f.Name, "size": f.Size, "modified": f.Modified, "limit": previewRows}
 	var err error
-	switch {
-	case f.Kind == "csv":
+	switch f.format() {
+	case "csv":
 		err = previewCSV(f.path, out)
-	case f.Kind == "xlsx":
+	case "xlsx":
 		err = previewXLSX(f.path, out)
-	case f.Kind == "json":
+	case "json":
 		if previewJSONRows(f.path, out) != nil {
 			err = previewText(f.path, out)
 		}
-	case strings.HasSuffix(f.Name, ".zip"):
-		err = previewZip(f.path, out)
+	case "zip", "backup":
+		if strings.HasSuffix(f.Name, ".zip") {
+			err = previewZip(f.path, out)
+		} else {
+			err = previewText(f.path, out)
+		}
 	default:
 		err = previewText(f.path, out)
 	}

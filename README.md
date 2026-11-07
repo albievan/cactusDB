@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.22.0
+cactusdb 1.23.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -136,7 +136,7 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 | **📁 Folder setup** | Shows where exports and backups are saved, and lets you change it |
 | **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
 | **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below) |
-| **📜 Logs** | cactusdb's log: connections, tables opened, queries, exports and every request with its result. Filter it, show only problems (failures, errors, warnings), newest first or oldest first, and copy what's shown. With `--runas background` or `--logfile` it reads the log file; otherwise the lines since cactusdb started. The crash log is shown below it when it has anything. |
+| **📜 Logs** | Opens the **Logs** tab (see below) |
 | **⬆ Check for update** | Whether a newer cactusdb is out, with the command to download it for every system, each with a copy button (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
@@ -259,10 +259,30 @@ runs), **Edit** it, or **Delete** it. Saved queries are kept in `cactus.conn.db`
 with the connection's password, and are deleted with the connection.
 
 **Exporting saved queries.** Each saved query has a **⤓ Export…** menu: Excel, CSV, JSON,
-XML or **All four formats**. It exports the query's data (every row, not the SQL) to the
-export folder. **⤓ Export all queries…** above the list does the same for every query shown
+XML or **All four formats**. It exports the query's data (every row, not the SQL) to its
+own folder, one per day: `<export folder>/<connection>/queries/<dd.mm.yyyy>/<query
+name>-<dd.mm.yyyy.hh.mm>.<csv|xlsx|json|xml>`, e.g.
+`queries/07.11.2026/cutter_subdiv_code-07.11.2026.14.05.csv` (characters that can't be in a
+file name become `_`; a second export in the same minute gets `_2`). The *Exported files*
+page lists them as type **Saved queries**. **⤓ Export all queries…** above the list does the same for every query shown
 (a filter narrows them down), one file per query and format. The bar above the list shows
 the progress, then a download link for each file and any query that failed.
+
+**Logs.** The **Logs** tab (also **☰ → 📜 Logs**) shows cactusdb's log: connections,
+tables opened, queries, exports, and every request with its result, its duration and the
+session it belongs to (`session=1a2b3c4d`).
+- **Log** or **Crash log**, and **Day**: a new log file starts every day, and the days kept
+  (30) can be picked. The crash log has a file per day too, and only says anything when
+  cactusdb crashed.
+- **Filter** the lines, **Problems only** (failures, errors, warnings), the last 500 to
+  20,000 lines, **Newest first**.
+- **Live** shows new lines as they come in, at the top, highlighted (today's log, every
+  2 seconds, only what's new).
+- **Copy** copies the lines shown; **⤓ Download all (.zip)** downloads every log and crash
+  log file kept, compressed as much as zip can.
+
+Without a log file (in the foreground without `--logfile`) the tab shows the lines since
+cactusdb started, kept in memory.
 
 **Adding and editing connections.** Click **＋ New connection** (in the menu or the sidebar)
 to open the connection dialog: a name, the database type and the connection details. Click
@@ -363,7 +383,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.22.0*), as reported by the running program.
+example *v1.23.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -624,7 +644,7 @@ cactusdb --port 8087 --web yes --exportto ./export
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
 | `--host` | `0.0.0.0` (every network interface) | The address to listen on. By default other computers on your network can use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. Use `127.0.0.1` to allow only this computer, `::` to listen on IPv6 too, or one of this computer's IP addresses to listen on that network only. See [Security](#7-security). |
 | `--runas` | `foreground` | `background` starts the web UI in the background: it keeps running after you close the terminal and logs to `--logfile`. See below. |
-| `--logfile` | `cactusdb.log` next to the program, with `--runas background` | Every action is logged here: connections (never passwords), tables opened, queries, exports, saved connections, and every request with its result. In the foreground, the log goes to the terminal and, if you give `--logfile`, to that file too. |
+| `--logfile` | `cactusdb.log` next to the program, with `--runas background` | Every action is logged here: connections (never passwords), tables opened, queries, exports, saved connections, and every request with its result and session (`session=` and the first 8 characters of its id, so you can follow one browser's requests). In the foreground, the log goes to the terminal and, if you give `--logfile`, to that file too. A new file starts every day: earlier days are renamed to `cactusdb-YYYY-MM-DD.log` and kept for 30 days. |
 | `--version` | | Print the version and exit |
 | `--help` | | List the options |
 
@@ -644,7 +664,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.22.0 is running in the background (process id 48211)
+cactusdb 1.23.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -772,7 +792,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.22.0 is running in container cactusdb
+cactusdb 1.23.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -822,16 +842,20 @@ cactusdb/
 ├── cactusdb(.exe)       the program
 ├── cactus.conn.db       your saved connections and the chosen export folder (an SQLite database)
 ├── cactus.key           the key that encrypts saved usernames and passwords
-├── cactusdb.log         the action log (with --runas background or --logfile)
+├── cactusdb.log         today's action log (with --runas background or --logfile)
+├── cactusdb-2026-11-06.log  the log of an earlier day (kept 30 days)
 ├── cactusdb.pid         the process id of a background cactusdb, while it runs
 ├── cactusdb-8080.running  marks a running web UI (on port 8080); left behind, it tells the
 │                        next start that cactusdb was killed (see Troubleshooting)
-├── cactusdb-crash.log   what Go printed when cactusdb crashed, if it ever did
+├── cactusdb-crash.log   what Go printed when cactusdb crashed, if it ever did (also a
+│                        file per day: cactusdb-crash-YYYY-MM-DD.log)
 └── export/              your exported files, one folder per connection
     └── optimo-prod/     named after the connection
         ├── backup/      database backups (.zip)
         ├── csv/
         ├── json/
+        ├── queries/     exports of saved queries, a folder per day:
+        │   └── 07.11.2026/cutter_subdiv_code-07.11.2026.14.05.csv
         ├── sql/         DDL scripts
         ├── xlsx/        Excel
         └── xml/
@@ -992,7 +1016,7 @@ CACTUSDB_IT=1 go test ./...
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
-| `logs.go` | ☰ → Logs: the log file, or the lines logged since the start, and the crash log |
+| `logs.go`, `logrotate.go` | The Logs tab (live, any day, crash log, .zip of every log); a new log file every day |
 | `termlog.go` | Logging to the terminal without ever holding up a request |
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |

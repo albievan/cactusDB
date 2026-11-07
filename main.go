@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.22.0"
+var version = "1.23.0"
 
 //go:embed web
 var webFS embed.FS
@@ -323,7 +323,7 @@ func main() {
 	var logCopy io.Writer                // the --logfile of a foreground cactusdb
 	if *logFile != "" && childLog == "" {
 		// Foreground with --logfile: log to the terminal and the file.
-		f, err := os.OpenFile(*logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+		f, err := openDailyLog(*logFile)
 		if err != nil {
 			log.Fatalf("cannot open log file: %v", err)
 		}
@@ -367,6 +367,7 @@ func main() {
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("GET /api/info", s.handleInfo)
 	mux.HandleFunc("GET /api/logs", s.handleLogs)
+	mux.HandleFunc("GET /api/logs/zip", s.handleLogsZip)
 	mux.HandleFunc("GET /api/update", s.handleUpdate)
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("POST /api/settings", s.handleSaveSettings)
@@ -416,6 +417,16 @@ func main() {
 			log.SetOutput(io.MultiWriter(term, logCopy))
 		} else {
 			log.SetOutput(term)
+		}
+	}
+	if childLog != "" {
+		// The background copy: its output goes to the log file opened by the
+		// command that started it; log through a file that starts again
+		// every day instead.
+		if dl, err := openDailyLog(childLog); err == nil {
+			log.SetOutput(dl)
+		} else {
+			log.Printf("warning: the log won't start a new file every day: %v", err)
 		}
 	}
 	log.SetOutput(io.MultiWriter(log.Writer(), logMem)) // for ☰ → Logs
@@ -650,20 +661,50 @@ func statusInHeader(h http.Handler) http.Handler {
 	})
 }
 
-// logRequests logs every API call with its result, duration and client.
-// The handlers log what each action did (see logAction).
+// reqLog is what the log lines of one request share: the session it used,
+// set when the handler looks the session up (or connect creates it).
+type reqLog struct{ session string }
+
+type reqLogKey struct{}
+
+// noteSession records the session of request r for its log lines.
+func noteSession(r *http.Request, id string) {
+	if l, ok := r.Context().Value(reqLogKey{}).(*reqLog); ok && id != "" {
+		l.session = id
+	}
+}
+
+// sessionTag is " session=<first 8 characters>" for a request whose session
+// is known. The whole id isn't logged: it works like a password while the
+// session lasts, and ☰ → Logs shows the log.
+func sessionTag(r *http.Request) string {
+	l, ok := r.Context().Value(reqLogKey{}).(*reqLog)
+	if !ok || l.session == "" {
+		return ""
+	}
+	return " session=" + l.session[:min(8, len(l.session))]
+}
+
+// logRequests logs every API call with its result, duration, client and
+// session. The handlers log what each action did (see logAction).
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Progress polls of "export all tables" are not actions; the export
 		// itself is logged.
-		if !strings.HasPrefix(r.URL.Path, "/api/") || (r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/api/exportall/")) {
+		// Nor are the Logs tab's reads: live, it would fill the log with itself.
+		if !strings.HasPrefix(r.URL.Path, "/api/") || (r.Method == "GET" && (strings.HasPrefix(r.URL.Path, "/api/exportall/") || r.URL.Path == "/api/logs")) {
 			h.ServeHTTP(w, r)
 			return
 		}
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: 200}
+		rl := &reqLog{}
+		r = r.WithContext(context.WithValue(r.Context(), reqLogKey{}, rl))
+		if id := r.URL.Query().Get("session"); id != "" { // known before the handler reads the body
+			rl.session = id
+		}
 		h.ServeHTTP(rec, r)
-		log.Printf("%s %s %s -> %d (%s)", clientIP(r), r.Method, r.URL.Path, rec.status, time.Since(start).Round(time.Millisecond))
+		log.Printf("%s%s %s %s -> %d (%s)", clientIP(r), sessionTag(r), r.Method, r.URL.Path, rec.status, time.Since(start).Round(time.Millisecond))
 	})
 }
 
@@ -719,7 +760,7 @@ func clientIP(r *http.Request) string {
 // logAction logs what a request did. SQL is put on one line and shortened;
 // passwords are never logged.
 func logAction(r *http.Request, format string, args ...any) {
-	log.Printf("%s %s", clientIP(r), fmt.Sprintf(format, args...))
+	log.Printf("%s%s %s", clientIP(r), sessionTag(r), fmt.Sprintf(format, args...))
 }
 
 func oneLine(sql string) string {
@@ -757,6 +798,7 @@ func (s *server) session(r *http.Request, id string) (*session, error) {
 	if id == "" {
 		id = r.URL.Query().Get("session")
 	}
+	noteSession(r, id)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ss, ok := s.sessions[id]
@@ -921,7 +963,8 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db,
 		savedID: savedID, connBox: connBox, lastUsed: time.Now()}
 	s.mu.Unlock()
-	logAction(r, "connect %s as %q, session %s, in %s", defaultConnName(p), label, id[:8], time.Since(start).Round(time.Millisecond))
+	noteSession(r, id)
+	logAction(r, "connect %s as %q in %s", defaultConnName(p), label, time.Since(start).Round(time.Millisecond))
 	resp["session"] = id
 	resp["engine"] = p.Engine
 	resp["label"] = label
@@ -1014,9 +1057,10 @@ func (s *server) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		Session string `json:"session"`
 	}
 	readJSON(r, &req)
+	noteSession(r, req.Session)
 	s.mu.Lock()
 	if ss, ok := s.sessions[req.Session]; ok {
-		logAction(r, "disconnect %q, session %.8s", ss.label, req.Session)
+		logAction(r, "disconnect %q", ss.label)
 		s.cancelBatches(req.Session)
 		ss.db.Close()
 		delete(s.sessions, req.Session)
@@ -1089,6 +1133,8 @@ type queryReq struct {
 	Limit   int    `json:"limit"`
 	Format  string `json:"format"`
 	Name    string `json:"name"`
+	// SavedQuery: the export of a saved query, to queries/<date>/ (export.go).
+	SavedQuery bool `json:"savedQuery"`
 }
 
 func (s *server) handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -1178,7 +1224,13 @@ func (s *server) handleExport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("SQL is empty"))
 		return
 	}
-	path, rows, err := exportToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, q, req.Format, req.Name, nil)
+	var path string
+	var rows int
+	if req.SavedQuery {
+		path, rows, err = queryExportToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, q, req.Format, req.Name)
+	} else {
+		path, rows, err = exportToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, q, req.Format, req.Name, nil)
+	}
 	if err != nil {
 		logAction(r, "[%s] export %s FAILED: %v (sql: %s)", ss.label, req.Format, err, oneLine(q))
 		writeErr(w, 400, err)
@@ -1234,16 +1286,24 @@ func (s *server) handleExportDDL(w http.ResponseWriter, r *http.Request) {
 // /api/exports/<connection>/<type>/<file>.
 func downloadURL(path string) string {
 	kindDir := filepath.Dir(path)
+	if dayDir := kindDir; filepath.Base(filepath.Dir(dayDir)) == queriesSubdir { // <conn>/queries/<day>/<file>
+		connDir := filepath.Dir(filepath.Dir(dayDir))
+		return "/api/exports/" + url.PathEscape(filepath.Base(connDir)) + "/" + queriesSubdir + "/" +
+			url.PathEscape(filepath.Base(dayDir)) + "/" + url.PathEscape(filepath.Base(path))
+	}
 	return "/api/exports/" + url.PathEscape(filepath.Base(filepath.Dir(kindDir))) + "/" +
 		url.PathEscape(filepath.Base(kindDir)) + "/" + url.PathEscape(filepath.Base(path))
 }
 
-// handleDownload serves an exported file: <connection>/<type>/<file>, or
-// <type>/<file> for exports made before files were sorted by connection.
+// handleDownload serves an exported file: <connection>/<type>/<file>,
+// <connection>/queries/<day>/<file> (saved queries), or <type>/<file> for
+// exports made before files were sorted by connection.
 func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(r.PathValue("path"), "/")
-	conn := ""
-	if len(parts) == 3 {
+	conn, day := "", ""
+	if len(parts) == 4 && parts[1] == queriesSubdir {
+		conn, day, parts = parts[0], parts[2], []string{queriesSubdir, parts[3]}
+	} else if len(parts) == 3 {
 		conn, parts = parts[0], parts[1:]
 	}
 	if len(parts) != 2 {
@@ -1251,7 +1311,11 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	kind, file := parts[0], parts[1]
-	if !validFileName(file) || !exportSubdirs[kind] || (conn != "" && (!validFileName(conn) || conn != connFolderName(conn))) {
+	if day != "" && (conn == "" || !validFileName(day)) {
+		writeErr(w, 400, errors.New("bad file name"))
+		return
+	}
+	if !validFileName(file) || !(exportSubdirs[kind] || day != "") || (conn != "" && (!validFileName(conn) || conn != connFolderName(conn))) {
 		writeErr(w, 400, errors.New("bad file name"))
 		return
 	}
@@ -1268,7 +1332,11 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	// The newest folder first: the export folder may have been changed since.
 	var path string
 	for _, dir := range s.exportFolders() {
-		if p := filepath.Join(exportSubdir(filepath.Join(dir, conn), kind), file); fileExists(p) {
+		p := filepath.Join(exportSubdir(filepath.Join(dir, conn), kind), file)
+		if day != "" {
+			p = filepath.Join(dir, conn, queriesSubdir, day, file)
+		}
+		if fileExists(p) {
 			path = p
 			break
 		}

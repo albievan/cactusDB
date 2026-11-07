@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.23.0 — 2026-11-07
+
+- **Logs is a tab** of the main page (and ☰ → 📜 Logs opens it), instead of a dialog:
+  - **Live**: new lines appear at the top as they come in, highlighted.
+  - **Crash log**, and a **Day** to view the log of any day kept.
+  - **⤓ Download all (.zip)**: every log and crash log file, at the highest compression.
+- **A new log file every day**: `cactusdb.log` is today's; earlier days become
+  `cactusdb-YYYY-MM-DD.log` (and `cactusdb-crash-YYYY-MM-DD.log`), kept for 30 days.
+- **The session in the log**: every request line and action says `session=` and the first
+  8 characters of the session id (not all of it: it works like a password while it lasts).
+- **Exports of saved queries get their own folder**:
+  `<connection>/queries/<dd.mm.yyyy>/<query name>-<dd.mm.yyyy.hh.mm>.<ext>`, listed on the
+  *Exported files* page as **Saved queries**.
+- Fixed: **Download selected** failed for every file when one of them had been deleted or
+  replaced meanwhile ("compress 179 file(s) FAILED: … no such file or directory"). The
+  missing ones are now left out, and named.
+- Checked on the server in the browser with 1.22.0: saving and deleting a query no longer
+  blocks the connection.
+
 ## 1.22.0 — 2026-11-07
 
 - Fixed: **deleting a saved query (or connection) on a server blocked cactusdb for about five
