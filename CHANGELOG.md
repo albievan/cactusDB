@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.24.0 — 2026-11-07
+
+- **☰ → ⇄ Compare databases** (and a **Compare** tab): compares the structure (DDL), never
+  the data, of a **master** database with any number of others: tables column by column
+  (keys, indexes, foreign keys), views, procedures, functions, triggers, sequences, domains,
+  events, packages.
+  - Every object is shown per database as **missing**, **extra**, **≠ differs** or **✓ same**,
+    coloured; *Differences only*, by type, by name.
+  - Click one to see what differs (`column email missing`, `column name differs: …`) and
+    the two definitions side by side, the differing lines highlighted.
+  - **Script**: per database, the SQL that makes it match the master: drops (optional),
+    `ALTER TABLE` for columns, keys and indexes, creates, and replaces changed views and
+    routines. **Copy** or **⤓ .sql**. cactusdb never runs it.
+  - Tested in the browser on MariaDB: after running the script on the other database,
+    comparing again found every object the same.
+- **Disconnecting clears the screen**: the tables, the query, the data and the definition go,
+  and the main area shows an animated unplugged cable, *Not connected to any database* (also
+  when the page opens).
+
 ## 1.23.0 — 2026-11-07
 
 - **Logs is a tab** of the main page (and ☰ → 📜 Logs opens it), instead of a dialog:
