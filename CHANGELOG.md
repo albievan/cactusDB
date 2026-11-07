@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.25.0 — 2026-11-07
+
+- **Not connected**: the unplugged cable is replaced by the cactusdb logo in a small desert
+  scene. Signals run up the cactus's circuit traces, the rings at their ends send out
+  ripples towards a database that is only a shimmering mirage (with a **?**), and a
+  tumbleweed rolls by. Works in light and dark mode; still with *reduce motion*.
+
 ## 1.24.0 — 2026-11-07
 
 - **☰ → ⇄ Compare databases** (and a **Compare** tab): compares the structure (DDL), never
