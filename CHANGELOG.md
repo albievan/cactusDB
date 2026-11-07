@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.28.0 — 2026-11-07
+
+- **Usage log**: every function used in cactusdb is recorded in the new `usage_events`
+  table of `cactus.conn.db`, with the client's IP address, the session (first 8 characters,
+  as in the log), a page id per browser tab, the connection and its engine.
+  - `server` events: every API call (connect, open table, run query, export, backup,
+    compare, save connection, …) with its result, duration and what it did.
+  - `ui` events: tabs, menu items, buttons, sorting, check boxes, drop-downs and filters
+    in the page, sent in batches. What is typed is never recorded, only which field.
+  - cactusdb has no page to view it: open `cactus.conn.db` with any SQLite tool. The
+    README has the columns and example queries.
+- **GOOGLE_ANALYTICS.md**: the plan for Google Analytics (not built yet) and what to set
+  up in Google Analytics first.
+
 ## 1.27.0 — 2026-11-07
 
 - **Not connected**: the desert scene is busier. Four smaller cactuses (the logo again, some

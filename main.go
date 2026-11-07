@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.27.0"
+var version = "1.28.0"
 
 //go:embed web
 var webFS embed.FS
@@ -357,6 +357,9 @@ func main() {
 	if err := os.MkdirAll(exportDir, 0o755); err != nil {
 		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
 	}
+	if err := startUsageLog(store.db); err != nil {
+		log.Printf("warning: usage isn't recorded: %v", err)
+	}
 	s := &server{store: store, sessions: map[string]*session{}, defaultExportDir: defaultExportDir,
 		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{})}
 	s.setExportFolder(exportDir)
@@ -407,6 +410,7 @@ func main() {
 	mux.HandleFunc("POST /api/queries", s.handleSaveQuery)
 	mux.HandleFunc("DELETE /api/queries/{id}", s.handleDeleteQuery)
 	mux.HandleFunc("POST /api/queries/{id}/delete", s.handleDeleteQuery)
+	mux.HandleFunc("POST /api/usage", s.handleUsage)
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)
@@ -666,7 +670,16 @@ func statusInHeader(h http.Handler) http.Handler {
 
 // reqLog is what the log lines of one request share: the session it used,
 // set when the handler looks the session up (or connect creates it).
-type reqLog struct{ session string }
+type reqLog struct {
+	session string
+
+	// For the usage log (usage.go): the session's connection, and what the
+	// handler logged with logAction.
+	mu                 sync.Mutex
+	connection, engine string
+	details            []string
+	done               bool // recorded: later lines (of a background job) aren't added
+}
 
 type reqLogKey struct{}
 
@@ -674,6 +687,15 @@ type reqLogKey struct{}
 func noteSession(r *http.Request, id string) {
 	if l, ok := r.Context().Value(reqLogKey{}).(*reqLog); ok && id != "" {
 		l.session = id
+	}
+}
+
+// noteConn records the connection of request r's session for the usage log.
+func noteConn(r *http.Request, ss *session) {
+	if l, ok := r.Context().Value(reqLogKey{}).(*reqLog); ok && ss != nil {
+		l.mu.Lock()
+		l.connection, l.engine = ss.label, ss.engine
+		l.mu.Unlock()
 	}
 }
 
@@ -695,7 +717,8 @@ func logRequests(h http.Handler) http.Handler {
 		// Progress polls of "export all tables" are not actions; the export
 		// itself is logged.
 		// Nor are the Logs tab's reads: live, it would fill the log with itself.
-		if !strings.HasPrefix(r.URL.Path, "/api/") || (r.Method == "GET" && (strings.HasPrefix(r.URL.Path, "/api/exportall/") || r.URL.Path == "/api/logs")) {
+		// Nor the page's usage events (see usage.go).
+		if !strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api/usage" || (r.Method == "GET" && (strings.HasPrefix(r.URL.Path, "/api/exportall/") || r.URL.Path == "/api/logs")) {
 			h.ServeHTTP(w, r)
 			return
 		}
@@ -707,7 +730,12 @@ func logRequests(h http.Handler) http.Handler {
 			rl.session = id
 		}
 		h.ServeHTTP(rec, r)
-		log.Printf("%s%s %s %s -> %d (%s)", clientIP(r), sessionTag(r), r.Method, r.URL.Path, rec.status, time.Since(start).Round(time.Millisecond))
+		d := time.Since(start)
+		log.Printf("%s%s %s %s -> %d (%s)", clientIP(r), sessionTag(r), r.Method, r.URL.Path, rec.status, d.Round(time.Millisecond))
+		rl.mu.Lock()
+		rl.done = true
+		rl.mu.Unlock()
+		recordRequest(r, rl, rec.status, d)
 	})
 }
 
@@ -763,7 +791,15 @@ func clientIP(r *http.Request) string {
 // logAction logs what a request did. SQL is put on one line and shortened;
 // passwords are never logged.
 func logAction(r *http.Request, format string, args ...any) {
-	log.Printf("%s%s %s", clientIP(r), sessionTag(r), fmt.Sprintf(format, args...))
+	msg := fmt.Sprintf(format, args...)
+	log.Printf("%s%s %s", clientIP(r), sessionTag(r), msg)
+	if l, ok := r.Context().Value(reqLogKey{}).(*reqLog); ok {
+		l.mu.Lock()
+		if !l.done {
+			l.details = append(l.details, msg)
+		}
+		l.mu.Unlock()
+	}
 }
 
 func oneLine(sql string) string {
@@ -809,6 +845,7 @@ func (s *server) session(r *http.Request, id string) (*session, error) {
 		return nil, errors.New("not connected (session expired) - please connect again")
 	}
 	ss.lastUsed = time.Now()
+	noteConn(r, ss)
 	return ss, nil
 }
 
@@ -965,6 +1002,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db,
 		savedID: savedID, connBox: connBox, lastUsed: time.Now()}
+	noteConn(r, s.sessions[id])
 	s.mu.Unlock()
 	noteSession(r, id)
 	logAction(r, "connect %s as %q in %s", defaultConnName(p), label, time.Since(start).Round(time.Millisecond))
@@ -1063,6 +1101,7 @@ func (s *server) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	noteSession(r, req.Session)
 	s.mu.Lock()
 	if ss, ok := s.sessions[req.Session]; ok {
+		noteConn(r, ss)
 		logAction(r, "disconnect %q", ss.label)
 		s.cancelBatches(req.Session)
 		ss.db.Close()

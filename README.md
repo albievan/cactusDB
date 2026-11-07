@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.27.0
+cactusdb 1.28.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -428,7 +428,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.27.0*), as reported by the running program.
+example *v1.28.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -730,7 +730,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.27.0 is running in the background (process id 48211)
+cactusdb 1.28.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -858,7 +858,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.27.0 is running in container cactusdb
+cactusdb 1.28.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -906,7 +906,8 @@ Next to the program (unless you chose other locations with the options above):
 ```
 cactusdb/
 ├── cactusdb(.exe)       the program
-├── cactus.conn.db       your saved connections and the chosen export folder (an SQLite database)
+├── cactus.conn.db       your saved connections, the chosen export folder and the usage log
+│                        (an SQLite database)
 ├── cactus.key           the key that encrypts saved usernames and passwords
 ├── cactusdb.log         today's action log (with --runas background or --logfile)
 ├── cactusdb-2026-11-06.log  the log of an earlier day (kept 30 days)
@@ -939,6 +940,65 @@ case, point the files somewhere writable:
 ```sh
 cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-exports
 ```
+
+### The usage log: what is used in cactusdb
+
+Every function used in cactusdb is recorded in the **`usage_events`** table of
+`cactus.conn.db`, with the client's IP address and the session. cactusdb has no page to
+show it, by design: to explore it, open `cactus.conn.db` with any SQLite tool (DB Browser
+for SQLite, `sqlite3`, DBeaver, …) or add it as a **SQLite connection** in cactusdb itself.
+
+Two kinds of events are recorded:
+
+- **`server`**: every request the page makes: connecting, opening a table, running a
+  query, an export, a backup, comparing databases, saving a connection… With its HTTP
+  result, how long it took and what it did (the same text as the log: SQL shortened to one
+  line; passwords are never recorded).
+- **`ui`**: what only happens in the page: tabs, menu items, buttons, sorting, check boxes,
+  drop-downs, the filter. Of what you type only *which field* is recorded, never the
+  text (no SQL, passwords or connection details), except the filter boxes and day pickers.
+  The page sends them in batches every few seconds and when it is closed.
+
+| Column | What it holds |
+|---|---|
+| `id` | Increases with every event |
+| `at` | When, in UTC: `2026-11-07 08:15:02.123` |
+| `source` | `server` or `ui` |
+| `function` | What was used: `connect`, `open table`, `run query`, `export`, `compare databases`, `tab: logs`, `menu: compare`, `sort objects: rows`, `set: cmpDrops`, `button: disconnectBtn`, … |
+| `detail` | What it did, e.g. `[shop] query: select * from orders`, the button's label, `on`/`off`, the chosen value |
+| `client_ip` | The browser's IP address (behind a proxy or ingress: the proxy's) |
+| `session_id` | The database session, the first 8 characters as in the log (the whole id works like a password while it lasts); empty before connecting |
+| `page_id` | One browser tab, from opening the page until it is closed or reloaded: groups everything one person did, also before connecting |
+| `connection` | The connection's name; `engine`: its database type |
+| `method`, `path`, `status`, `duration_ms` | The request of a `server` event and its result |
+| `user_agent` | The browser |
+
+Progress polls of exports and comparisons and the Logs tab's live updates aren't
+recorded: they aren't something you did. Events are written in the background, so they
+never slow cactusdb down. The table is never emptied by cactusdb; delete old rows yourself
+if it grows too big, e.g. `DELETE FROM usage_events WHERE at < '2026-01-01'`.
+
+Some questions it answers:
+
+```sql
+-- the most used functions in the last 30 days
+SELECT function, count(*) AS times FROM usage_events
+WHERE at >= datetime('now', '-30 days') GROUP BY function ORDER BY times DESC;
+
+-- who uses cactusdb: per computer, per day
+SELECT date(at) AS day, client_ip, count(DISTINCT page_id) AS visits, count(*) AS events
+FROM usage_events GROUP BY day, client_ip ORDER BY day DESC, events DESC;
+
+-- everything one session did, in order
+SELECT at, source, function, detail FROM usage_events WHERE session_id = 'a98bd9d1' ORDER BY at;
+
+-- slow or failed requests
+SELECT at, function, detail, status, duration_ms FROM usage_events
+WHERE source = 'server' AND (status >= 400 OR duration_ms > 5000) ORDER BY at DESC;
+```
+
+Google Analytics isn't in cactusdb yet: [GOOGLE_ANALYTICS.md](GOOGLE_ANALYTICS.md) is the
+plan for it, and what you need to set up first.
 
 ## 7. Security
 
@@ -982,6 +1042,10 @@ cactusdb --port 8080 --conn-db ~/.cactusdb/cactus.conn.db --exportto ~/cactusdb-
 - cactusdb never writes to your databases (see [Read-only](#read-only)). The only files it
   writes (and, on the *Exported files* page when you confirm, deletes) are `cactus.conn.db`,
   `cactus.key` and the files in the export folder.
+- **The usage log** in `cactus.conn.db` (see *The usage log*) holds the SQL that was run
+  (shortened), table and connection names and IP addresses, but never passwords or a whole
+  session id. It isn't encrypted, so give `cactus.conn.db` to someone else only if they
+  may see that too.
 
 ## 8. Troubleshooting
 
@@ -1084,6 +1148,7 @@ CACTUSDB_IT=1 go test ./...
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
+| `usage.go` | The usage log: every function used, in the `usage_events` table of `cactus.conn.db` |
 | `logs.go`, `logrotate.go` | The Logs tab (live, any day, crash log, .zip of every log); a new log file every day |
 | `termlog.go` | Logging to the terminal without ever holding up a request |
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |

@@ -958,6 +958,8 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+// usage: the events to send, and this tab's id (see "usage" below).
+const usage = { page: Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join(""), q: [], timer: 0 };
 const state = { engines: [], engine: "sqlite", session: null, label: "", objects: [], sel: null, table: null,
   result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
@@ -965,7 +967,7 @@ let pending = 0; // API calls in flight: the header animation speeds up while bu
 async function api(method, url, body, retried = false) {
   // Errors come back as 200 with the status in a header: firewalls that see a
   // 401 or 403 may block this computer from cactusdb for minutes.
-  const opt = { method, headers: { "X-Cactusdb-Errors": "in-header" } };
+  const opt = { method, headers: { "X-Cactusdb-Errors": "in-header", "X-Cactusdb-Page": usage.page } };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   document.body.classList.toggle("busy", ++pending > 0);
   const t0 = performance.now();
@@ -1652,6 +1654,60 @@ async function disconnect(reason = "") {
   if (state.idleNote) { $("status").textContent = "Not connected · " + state.idleNote; toast(state.idleNote); renderHome(); }
   else setNavMenu(true);
 }
+
+// ---- usage: which functions are used ------------------------------------------
+// What is clicked or changed in the page goes to the usage_events table of
+// cactus.conn.db (the API calls are recorded by the server), in batches.
+// Never what is typed: no SQL, passwords or other input, only which field.
+function track(fn, detail = "") {
+  usage.q.push({ fn, detail: String(detail).replace(/\s+/g, " ").trim().slice(0, 300), t: Date.now(), s: state.session || "",
+    c: state.session ? state.label : "", e: state.session ? state.engine : "" });
+  if (usage.q.length >= 25) flushUsage(false);
+  else if (!usage.timer) usage.timer = setTimeout(() => flushUsage(false), 5000);
+}
+function flushUsage(leaving) {
+  clearTimeout(usage.timer); usage.timer = 0;
+  while (usage.q.length) {
+    const now = Date.now();
+    const body = JSON.stringify({ page: usage.page,
+      events: usage.q.splice(0, 50).map((e) => ({ fn: e.fn, detail: e.detail, session: e.s, connection: e.c, engine: e.e, ago: now - e.t })) });
+    if (leaving && navigator.sendBeacon) navigator.sendBeacon("/api/usage", new Blob([body], { type: "application/json" }));
+    else fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => { /* not recorded */ });
+  }
+}
+addEventListener("pagehide", () => flushUsage(true));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushUsage(true); });
+// The name of what was used: menu items, tabs and the like by what they do,
+// other buttons by their id, else their text.
+function usageName(el) {
+  const d = el.dataset || {};
+  for (const [k, label] of [["menu", "menu"], ["tab", "tab"], ["sort", "sort objects"], ["allfmt", "export all"], ["home", "home"],
+    ["engine", "engine"], ["fmt", "export format"], ["pw", "show password"], ["objtab", "object tab"]])
+    if (d[k]) return `${label}: ${d[k]}`;
+  if (el.matches("li[data-name]")) return `object list: ${d.type || "item"}`;
+  if (el.matches("li[data-id]")) return "saved connection";
+  if (el.id) return `button: ${el.id}`;
+  const dlg = el.closest("dialog[id]");
+  const text = (el.getAttribute("aria-label") || el.textContent || el.title || "").replace(/\s+/g, " ").trim().slice(0, 60);
+  return `${dlg ? dlg.id + ": " : ""}${text || el.tagName.toLowerCase()}`;
+}
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest && ev.target.closest("button, a[href], summary, [role=tab], li[data-name], li[data-id]");
+  if (!el || el.disabled) return;
+  const label = (el.title || el.getAttribute("aria-label") || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const name = el.matches("li[data-name]") ? el.dataset.name : label;
+  track(usageName(el), name);
+}, { capture: true });
+document.addEventListener("change", (ev) => {
+  const el = ev.target;
+  if (!el.matches || !el.matches("input, select, textarea")) return;
+  const id = el.id || el.name || el.closest("[id]")?.id || el.type;
+  if (el.type === "checkbox" || el.type === "radio") track(`set: ${id}`, el.checked ? "on" : "off");
+  else if (el.tagName === "SELECT") track(`choose: ${id}`, el.selectedOptions[0]?.textContent || "");
+  else if (/filter|search/i.test(id) || el.type === "search" || el.type === "date") track(`filter: ${id}`, el.value.slice(0, 100));
+  else track(`edit: ${id}`); // what was typed is never recorded
+}, { capture: true });
+track("open page", `${innerWidth}×${innerHeight}, ${matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"}, ${navigator.language}`);
 
 // ---- disconnect when idle ---------------------------------------------------
 // After the idle time (Settings, default 15 minutes) without a click, key or
