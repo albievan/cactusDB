@@ -331,7 +331,13 @@
   .noconn .ask { animation: ask 3.2s ease-in-out infinite; }
   .noconn .sun { animation: sun 8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
   .noconn .tw { animation: roll 12s linear infinite; }
+  .noconn .tw.t2 { animation-duration: 17s; animation-delay: -7s; }
+  .noconn .tw.t3 { animation-duration: 23s; animation-delay: -15s; }
   .noconn .twb { animation: hop .75s ease-in-out infinite alternate; }
+  .noconn .t2 .twb { animation-duration: .6s; }
+  .noconn .t3 .twb { animation-duration: .9s; }
+  .noconn .mini { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 5s ease-in-out infinite; }
+  .noconn .fl { transform-box: fill-box; transform-origin: 50% 100%; animation: nod 2.8s ease-in-out infinite alternate; }
   .noconn .twr { transform-box: fill-box; transform-origin: center; animation: spin 1.1s linear infinite; }
   @keyframes sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
   @keyframes pulseUp { 0% { stroke-dashoffset: 0; opacity: 0; } 8% { opacity: 1; } 46% { opacity: 1; } 50% { stroke-dashoffset: -94; opacity: 0; } 100% { stroke-dashoffset: -94; opacity: 0; } }
@@ -344,9 +350,10 @@
   @keyframes mirage { 0%, 100% { transform: skewX(0) scaleY(1); } 33% { transform: skewX(3deg) scaleY(1.02); } 66% { transform: skewX(-3deg) scaleY(.98); } }
   @keyframes sun { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: .8; transform: scale(1.08); } }
   @keyframes roll { 0% { transform: translateX(520px); } 100% { transform: translateX(-60px); } }
+  @keyframes nod { from { transform: rotate(-7deg); } to { transform: rotate(7deg) scale(1.06); } }
   @keyframes hop { from { transform: translateY(0); } to { transform: translateY(-9px); } }
   @keyframes spin { to { transform: rotate(-360deg); } }
-  @media (prefers-reduced-motion: reduce) { .noconn * { animation: none !important; } .noconn .ripple.a, .noconn .ask { opacity: .7; } .noconn .tw { transform: translateX(330px); } }
+  @media (prefers-reduced-motion: reduce) { .noconn * { animation: none !important; } .noconn .ripple.a, .noconn .ask { opacity: .7; } .noconn .tw { transform: translateX(330px); } .noconn .tw.t2 { transform: translateX(110px); } .noconn .tw.t3 { transform: translateX(405px); } }
   @media (max-width: 900px) { .cmpbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) minmax(260px, 1fr); } .cmpleft { border-right: 0; border-bottom: 1px solid var(--border); } }
   a.btn { display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 13px; }
   a.btn:hover { border-color: var(--accent); }
@@ -2494,15 +2501,49 @@ function showNoConnection() {
   state.result = null;
   $("dataPane").classList.add("offline");
   $("grid").innerHTML = `<div class="placeholder noconn"><div>
-    <svg viewBox="0 0 480 230" role="img" aria-label="The cactusdb cactus alone in the desert, calling out for a database that is not there">
+    <svg viewBox="0 0 480 230" role="img" aria-label="The cactusdb cactus in the desert among small cactuses and flowers, calling out for a database that is not there">
       <defs>
         <linearGradient id="ncFade" gradientUnits="userSpaceOnUse" x1="250" y1="100" x2="364" y2="112">
           <stop offset="0" stop-color="var(--accent)" stop-opacity=".9"/><stop offset=".75" stop-color="var(--accent)" stop-opacity="0"/>
         </linearGradient>
+        <g id="ncCactus" fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+          <g stroke="#8fcbb0"><path d="M160 295V145a37 37 0 0 1 74 0V385l30-13q26-12 26-40V260"/><circle cx="290" cy="243" r="15"/></g>
+          <g stroke="#5a9174"><path d="M97 209V280q0 22 22 31l20 9q23 10 23 34V475a37 37 0 0 0 74 0V430"/><circle cx="97" cy="192" r="15"/></g>
+        </g>
+        <g id="ncFlower">
+          <path d="M0 0q-1.5-5 0-11" fill="none" stroke="#6aa37f" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M0-4q4-3 5 0q-3 2-5 0" fill="#6aa37f"/>
+          <g fill="currentColor"><circle cx="0" cy="-14.8" r="2.3"/><circle cx="2.66" cy="-12.9" r="2.3"/><circle cx="1.65" cy="-9.7" r="2.3"/><circle cx="-1.65" cy="-9.7" r="2.3"/><circle cx="-2.66" cy="-12.9" r="2.3"/></g>
+          <circle cx="0" cy="-12" r="1.5" fill="#8a5a2b"/>
+        </g>
+        <g id="ncWeed" fill="none" stroke="#b08d57" stroke-width="1.6" stroke-linecap="round">
+          <circle r="10"/><path d="M-7-6q7 9 14-2M-8 4q8-11 16 2M-3-9q5 9 1 18M4-8q-8 5-2 17"/>
+        </g>
       </defs>
       <circle class="sun" cx="452" cy="30" r="17" fill="#f3c969"/>
       <path d="M8 200Q120 190 230 200T472 198" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-linecap="round"/>
       <path d="M60 210h26M300 212h40M150 214h14M408 210h22" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
+      <g class="minis">
+      <g transform="translate(98.9 151.5) scale(0.085)" opacity="0.6"><g class="mini" style="animation-delay:-2.2s"><use href="#ncCactus"/></g></g>
+      <g transform="translate(279 147.7) scale(0.11)" opacity="0.8"><g class="mini" style="animation-delay:-4.1s"><use href="#ncCactus"/></g></g>
+      <g transform="translate(31.5 120.2) scale(0.15)" opacity="0.9"><g class="mini" style="animation-delay:-1s"><use href="#ncCactus"/></g></g>
+      <g transform="translate(422.7 112.6) scale(0.17)" opacity="0.9"><g class="mini" style="animation-delay:-3.3s"><use href="#ncCactus"/></g></g>
+      </g>
+      <g class="flowers">
+      <g transform="translate(61.1 139) scale(0.7)"><use class="fl" href="#ncFlower" style="color:#e86f9a;animation-delay:-0.4s"/></g>
+      <g transform="translate(456.2 134) scale(0.75)"><use class="fl" href="#ncFlower" style="color:#f4a340;animation-delay:-1.7s"/></g>
+      <g transform="translate(20 199) scale(1)"><use class="fl" href="#ncFlower" style="color:#f7d154;animation-delay:-0.2s"/></g>
+      <g transform="translate(32 198) scale(0.8)"><use class="fl" href="#ncFlower" style="color:#e86f9a;animation-delay:-1.3s"/></g>
+      <g transform="translate(88 196) scale(0.9)"><use class="fl" href="#ncFlower" style="color:#c58cf0;animation-delay:-2.1s"/></g>
+      <g transform="translate(140 196) scale(1)"><use class="fl" href="#ncFlower" style="color:#f4a340;animation-delay:-0.9s"/></g>
+      <g transform="translate(150 196) scale(0.75)"><use class="fl" href="#ncFlower" style="color:#e86f9a;animation-delay:-2.6s"/></g>
+      <g transform="translate(256 201) scale(0.9)"><use class="fl" href="#ncFlower" style="color:#c58cf0;animation-delay:-1.6s"/></g>
+      <g transform="translate(318 204) scale(0.85)"><use class="fl" href="#ncFlower" style="color:#f7d154;animation-delay:-0.6s"/></g>
+      <g transform="translate(334 204.5) scale(1)"><use class="fl" href="#ncFlower" style="color:#e86f9a;animation-delay:-2.3s"/></g>
+      <g transform="translate(352 204.5) scale(0.8)"><use class="fl" href="#ncFlower" style="color:#f4a340;animation-delay:-1.1s"/></g>
+      <g transform="translate(430 201.5) scale(0.95)"><use class="fl" href="#ncFlower" style="color:#c58cf0;animation-delay:-0.3s"/></g>
+      <g transform="translate(472 198) scale(0.85)"><use class="fl" href="#ncFlower" style="color:#e86f9a;animation-delay:-1.9s"/></g>
+      </g>
       <g class="ghost" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4">
         <ellipse cx="392" cy="96" rx="24" ry="8"/><path d="M368 96v50c0 4.4 10.7 8 24 8s24-3.6 24-8V96"/><path d="M368 121c0 4.4 10.7 8 24 8s24-3.6 24-8"/>
       </g>
@@ -2510,10 +2551,7 @@ function showNoConnection() {
       <path class="beam" d="M250 100L364 112" fill="none" stroke="url(#ncFade)" stroke-width="3" stroke-linecap="round"/>
       <g class="cactus">
         <g transform="translate(128 6) scale(.38)">
-          <g fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
-            <g stroke="#8fcbb0"><path d="M160 295V145a37 37 0 0 1 74 0V385l30-13q26-12 26-40V260"/><circle cx="290" cy="243" r="15"/></g>
-            <g stroke="#5a9174"><path d="M97 209V280q0 22 22 31l20 9q23 10 23 34V475a37 37 0 0 0 74 0V430"/><circle cx="97" cy="192" r="15"/></g>
-          </g>
+          <use href="#ncCactus"/>
           <path class="pulse up" pathLength="100" d="M160 295V145a37 37 0 0 1 74 0V385l30-13q26-12 26-40V260"/>
           <path class="pulse dn" pathLength="100" d="M97 209V280q0 22 22 31l20 9q23 10 23 34V475a37 37 0 0 0 74 0V430"/>
           <circle class="flash" cx="290" cy="243" r="9"/><circle class="flash l" cx="97" cy="192" r="9"/>
@@ -2521,9 +2559,9 @@ function showNoConnection() {
           <circle class="ripple l" cx="97" cy="192" r="22"/><circle class="ripple l b" cx="97" cy="192" r="22"/>
         </g>
       </g>
-      <g class="tw"><g class="twb"><g class="twr" fill="none" stroke="#b08d57" stroke-width="1.6" stroke-linecap="round">
-        <circle cx="0" cy="192" r="10"/><path d="M-7 186q7 9 14-2M-8 196q8-11 16 2M-3 183q5 9 1 18M4 184q-8 5-2 17"/>
-      </g></g></g>
+      <g class="tw t1"><g transform="translate(0 192)"><g class="twb"><g class="twr"><use href="#ncWeed"/></g></g></g></g>
+      <g class="tw t2"><g transform="translate(0 191) scale(.65)"><g class="twb"><g class="twr"><use href="#ncWeed"/></g></g></g></g>
+      <g class="tw t3"><g transform="translate(0 194) scale(.85)"><g class="twb"><g class="twr"><use href="#ncWeed"/></g></g></g></g>
     </svg>
     <h3>Not connected to any database</h3>
     <p>Pick a saved connection on the left, or open <b>☰ Connections</b>.</p>

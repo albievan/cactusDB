@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.27.0 — 2026-11-07
+
+- **Not connected**: the desert scene is busier. Four smaller cactuses (the logo again, some
+  with a blossom on top) sway at their own pace, a dozen desert flowers in pink, orange,
+  purple and yellow nod in the breeze, and three tumbleweeds of different sizes and speeds
+  roll past. The signalling cactus and the mirage database are unchanged.
+
 ## 1.26.0 — 2026-11-07
 
 - **Estimated table sizes**: when the database doesn't report a table's size (Firebird),
