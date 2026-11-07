@@ -309,24 +309,44 @@
   .cmpprog { display: flex; align-items: center; gap: 10px; }
   .cmpprog .obar { width: 180px; height: 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); overflow: hidden; display: inline-block; }
   .cmpprog .obar i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
-  /* Not connected: the data pane shows only an unplugged cable */
+  /* Not connected: the data pane shows only the lonely cactus scene */
   #dataPane.offline { grid-template-rows: 1fr; }
   #dataPane.offline > .grid { grid-row: 1; }
   #dataPane.offline > .editor, #dataPane.offline > #info, #dataPane.offline > #exportNote { display: none; }
   .noconn h3 { margin: 14px 0 4px; font-size: 17px; color: var(--text); }
   .noconn p { margin: 0; }
-  .noconn svg { width: 240px; max-width: 70vw; height: auto; overflow: visible; }
-  .noconn .plug { animation: plugL 2.6s ease-in-out infinite; }
-  .noconn .sock { animation: plugR 2.6s ease-in-out infinite; }
-  .noconn .spark { animation: spark 2.6s ease-in-out infinite; opacity: 0; transform-origin: 120px 60px; }
-  .noconn .ring { animation: ring 2.6s ease-out infinite; transform-origin: 120px 60px; opacity: 0; }
-  .noconn .db { animation: dbfade 2.6s ease-in-out infinite; }
-  @keyframes plugL { 0%, 100% { transform: translateX(-14px); } 45%, 55% { transform: translateX(0); } }
-  @keyframes plugR { 0%, 100% { transform: translateX(14px); } 45%, 55% { transform: translateX(0); } }
-  @keyframes spark { 0%, 40% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.3); } }
-  @keyframes ring { 0%, 55% { opacity: 0; transform: scale(.3); } 60% { opacity: .7; } 100% { opacity: 0; transform: scale(2.2); } }
-  @keyframes dbfade { 0%, 100% { opacity: .35; } 50% { opacity: .8; } }
-  @media (prefers-reduced-motion: reduce) { .noconn .plug, .noconn .sock, .noconn .spark, .noconn .ring, .noconn .db { animation: none; } .noconn .spark { opacity: 1; } }
+  .noconn svg { width: 500px; max-width: 86vw; height: auto; overflow: visible; }
+  .noconn .cactus { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 6s ease-in-out infinite; }
+  .noconn .pulse { fill: none; stroke: #ffe680; stroke-width: 18; stroke-linecap: round; stroke-dasharray: 6 94; opacity: 0; filter: drop-shadow(0 0 6px #ffd43b); }
+  .noconn .pulse.up { animation: pulseUp 3.2s ease-in infinite; }
+  .noconn .pulse.dn { animation: pulseDn 3.2s ease-in infinite 1.6s; }
+  .noconn .flash { fill: #ffe680; opacity: 0; animation: flash 3.2s ease-out infinite; }
+  .noconn .flash.l { animation-delay: 1.6s; }
+  .noconn .ripple { fill: none; stroke: var(--accent); stroke-width: 5; opacity: 0; transform-box: fill-box; transform-origin: center; animation: ripple 3.2s ease-out infinite; }
+  .noconn .ripple.b { animation-delay: .35s; }
+  .noconn .ripple.l { animation-delay: 1.6s; }
+  .noconn .ripple.l.b { animation-delay: 1.95s; }
+  .noconn .beam { stroke-dasharray: 3 9; animation: beam 3.2s linear infinite; }
+  .noconn .ghost { transform-box: fill-box; transform-origin: 50% 100%; animation: ghost 3.2s ease-in-out infinite, mirage 2.4s ease-in-out infinite; }
+  .noconn .ask { animation: ask 3.2s ease-in-out infinite; }
+  .noconn .sun { animation: sun 8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .noconn .tw { animation: roll 12s linear infinite; }
+  .noconn .twb { animation: hop .75s ease-in-out infinite alternate; }
+  .noconn .twr { transform-box: fill-box; transform-origin: center; animation: spin 1.1s linear infinite; }
+  @keyframes sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+  @keyframes pulseUp { 0% { stroke-dashoffset: 0; opacity: 0; } 8% { opacity: 1; } 46% { opacity: 1; } 50% { stroke-dashoffset: -94; opacity: 0; } 100% { stroke-dashoffset: -94; opacity: 0; } }
+  @keyframes pulseDn { 0% { stroke-dashoffset: 0; opacity: 0; } 8% { opacity: 1; } 46% { opacity: 1; } 50% { stroke-dashoffset: 94; opacity: 0; } 100% { stroke-dashoffset: 94; opacity: 0; } }
+  @keyframes flash { 0%, 47% { opacity: 0; } 52% { opacity: .9; } 70%, 100% { opacity: 0; } }
+  @keyframes ripple { 0%, 49% { opacity: 0; transform: scale(1); } 52% { opacity: .8; } 100% { opacity: 0; transform: scale(3.6); } }
+  @keyframes beam { 0%, 50% { stroke-dashoffset: 0; opacity: 0; } 58% { opacity: 1; } 100% { stroke-dashoffset: -48; opacity: 0; } }
+  @keyframes ghost { 0%, 55% { opacity: .25; } 75% { opacity: .55; } 100% { opacity: .25; } }
+  @keyframes ask { 0%, 60% { opacity: 0; transform: translateY(4px); } 75%, 90% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-3px); } }
+  @keyframes mirage { 0%, 100% { transform: skewX(0) scaleY(1); } 33% { transform: skewX(3deg) scaleY(1.02); } 66% { transform: skewX(-3deg) scaleY(.98); } }
+  @keyframes sun { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: .8; transform: scale(1.08); } }
+  @keyframes roll { 0% { transform: translateX(520px); } 100% { transform: translateX(-60px); } }
+  @keyframes hop { from { transform: translateY(0); } to { transform: translateY(-9px); } }
+  @keyframes spin { to { transform: rotate(-360deg); } }
+  @media (prefers-reduced-motion: reduce) { .noconn * { animation: none !important; } .noconn .ripple.a, .noconn .ask { opacity: .7; } .noconn .tw { transform: translateX(330px); } }
   @media (max-width: 900px) { .cmpbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) minmax(260px, 1fr); } .cmpleft { border-right: 0; border-bottom: 1px solid var(--border); } }
   a.btn { display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 13px; }
   a.btn:hover { border-color: var(--accent); }
@@ -2464,29 +2484,43 @@ function clearGrid(msg) {
   $("grid").innerHTML = `<div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>${esc(msg)}</p></div></div>`;
 }
 
-// showNoConnection fills the data pane with an unplugged cable: no database
-// is connected.
+// showNoConnection fills the data pane with the cactusdb cactus alone in the
+// desert, signalling for a database that isn't there: none is connected.
 function showNoConnection() {
   closeExportPanel(false);
   state.result = null;
   $("dataPane").classList.add("offline");
   $("grid").innerHTML = `<div class="placeholder noconn"><div>
-    <svg viewBox="0 0 240 120" role="img" aria-label="Unplugged cable: no database connected">
-      <g class="db" fill="none" stroke="var(--muted)" stroke-width="2">
-        <ellipse cx="214" cy="38" rx="16" ry="6"/><path d="M198 38v44c0 3.3 7.2 6 16 6s16-2.7 16-6V38"/><path d="M198 60c0 3.3 7.2 6 16 6s16-2.7 16-6"/>
+    <svg viewBox="0 0 480 230" role="img" aria-label="The cactusdb cactus alone in the desert, calling out for a database that is not there">
+      <defs>
+        <linearGradient id="ncFade" gradientUnits="userSpaceOnUse" x1="250" y1="100" x2="364" y2="112">
+          <stop offset="0" stop-color="var(--accent)" stop-opacity=".9"/><stop offset=".75" stop-color="var(--accent)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <circle class="sun" cx="452" cy="30" r="17" fill="#f3c969"/>
+      <path d="M8 200Q120 190 230 200T472 198" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M60 210h26M300 212h40M150 214h14M408 210h22" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
+      <g class="ghost" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4">
+        <ellipse cx="392" cy="96" rx="24" ry="8"/><path d="M368 96v50c0 4.4 10.7 8 24 8s24-3.6 24-8V96"/><path d="M368 121c0 4.4 10.7 8 24 8s24-3.6 24-8"/>
       </g>
-      <g class="plug">
-        <path d="M6 60h66" stroke="var(--muted)" stroke-width="5" stroke-linecap="round" fill="none"/>
-        <rect x="70" y="46" width="30" height="28" rx="5" fill="var(--accent)"/>
-        <path d="M100 52h12M100 68h12" stroke="var(--accent-2)" stroke-width="4" stroke-linecap="round"/>
+      <text class="ask" x="392" y="80" text-anchor="middle" font-size="22" font-weight="700" fill="var(--muted)" font-family="system-ui,-apple-system,Segoe UI,sans-serif">?</text>
+      <path class="beam" d="M250 100L364 112" fill="none" stroke="url(#ncFade)" stroke-width="3" stroke-linecap="round"/>
+      <g class="cactus">
+        <g transform="translate(128 6) scale(.38)">
+          <g fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+            <g stroke="#8fcbb0"><path d="M160 295V145a37 37 0 0 1 74 0V385l30-13q26-12 26-40V260"/><circle cx="290" cy="243" r="15"/></g>
+            <g stroke="#5a9174"><path d="M97 209V280q0 22 22 31l20 9q23 10 23 34V475a37 37 0 0 0 74 0V430"/><circle cx="97" cy="192" r="15"/></g>
+          </g>
+          <path class="pulse up" pathLength="100" d="M160 295V145a37 37 0 0 1 74 0V385l30-13q26-12 26-40V260"/>
+          <path class="pulse dn" pathLength="100" d="M97 209V280q0 22 22 31l20 9q23 10 23 34V475a37 37 0 0 0 74 0V430"/>
+          <circle class="flash" cx="290" cy="243" r="9"/><circle class="flash l" cx="97" cy="192" r="9"/>
+          <circle class="ripple a" cx="290" cy="243" r="22"/><circle class="ripple a b" cx="290" cy="243" r="22"/>
+          <circle class="ripple l" cx="97" cy="192" r="22"/><circle class="ripple l b" cx="97" cy="192" r="22"/>
+        </g>
       </g>
-      <g class="sock">
-        <rect x="128" y="44" width="32" height="32" rx="5" fill="var(--panel-2)" stroke="var(--muted)" stroke-width="2"/>
-        <path d="M134 52h6M134 68h6" stroke="var(--muted)" stroke-width="3" stroke-linecap="round"/>
-        <path d="M160 60h38" stroke="var(--muted)" stroke-width="5" stroke-linecap="round" fill="none"/>
-      </g>
-      <circle class="ring" cx="120" cy="60" r="14" fill="none" stroke="var(--danger)" stroke-width="2"/>
-      <path class="spark" d="M120 44l-5 13h8l-5 17" fill="none" stroke="var(--danger)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <g class="tw"><g class="twb"><g class="twr" fill="none" stroke="#b08d57" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="0" cy="192" r="10"/><path d="M-7 186q7 9 14-2M-8 196q8-11 16 2M-3 183q5 9 1 18M4 184q-8 5-2 17"/>
+      </g></g></g>
     </svg>
     <h3>Not connected to any database</h3>
     <p>Pick a saved connection on the left, or open <b>☰ Connections</b>.</p>
