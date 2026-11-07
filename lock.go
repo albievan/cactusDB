@@ -98,15 +98,15 @@ func checkLockPassword(pw string) error {
 // older versions.
 func (s *Store) migrateLocks() error {
 	var n int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('connections') WHERE name = 'lock'`).Scan(&n); err != nil {
+	if err := s.DB().QueryRow(`SELECT COUNT(*) FROM pragma_table_info('connections') WHERE name = 'lock'`).Scan(&n); err != nil {
 		return err
 	}
 	if n == 0 {
-		if _, err := s.db.Exec(`ALTER TABLE connections ADD COLUMN lock TEXT NOT NULL DEFAULT ''`); err != nil {
+		if _, err := s.DB().Exec(`ALTER TABLE connections ADD COLUMN lock TEXT NOT NULL DEFAULT ''`); err != nil {
 			return err
 		}
 	}
-	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS queries (
+	_, err := s.DB().Exec(`CREATE TABLE IF NOT EXISTS queries (
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
 		conn_id    INTEGER NOT NULL,
 		data       TEXT NOT NULL,
@@ -120,7 +120,7 @@ func (s *Store) migrateLocks() error {
 // lockOf returns a saved connection's lock ("" when it has none).
 func (s *Store) lockOf(id int64) (string, error) {
 	var lock string
-	err := s.db.QueryRow(`SELECT lock FROM connections WHERE id = ?`, id).Scan(&lock)
+	err := s.DB().QueryRow(`SELECT lock FROM connections WHERE id = ?`, id).Scan(&lock)
 	return lock, err
 }
 
@@ -128,7 +128,7 @@ func (s *Store) lockOf(id int64) (string, error) {
 // it with its credentials, and the key for its saved queries (nil for a
 // connection without a password).
 func (s *Store) Unlock(id int64, password string) (SavedConn, *secretBox, error) {
-	c, err := scanConn(s.db.QueryRow(`SELECT `+connCols+` FROM connections WHERE id = ?`, id))
+	c, err := scanConn(s.DB().QueryRow(`SELECT `+connCols+` FROM connections WHERE id = ?`, id))
 	if err != nil {
 		return c, nil, err
 	}
@@ -155,7 +155,7 @@ func (s *Store) Unlock(id int64, password string) (SavedConn, *secretBox, error)
 	// Opened with its own password: make sure the superuser can open it too
 	// (connections saved before the superuser password was set).
 	var escrow string
-	if s.db.QueryRow(`SELECT escrow FROM connections WHERE id = ?`, id).Scan(&escrow) == nil && escrow == "" {
+	if s.DB().QueryRow(`SELECT escrow FROM connections WHERE id = ?`, id).Scan(&escrow) == nil && escrow == "" {
 		s.setEscrow(id, password)
 	}
 	return c, box, nil
@@ -176,7 +176,7 @@ func (s *Store) SaveLocked(c SavedConn, password string, oldBox *secretBox) (int
 			return 0, nil, err
 		}
 	}
-	tx, err := s.db.Begin()
+	tx, err := s.DB().Begin()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -254,7 +254,7 @@ func (s *Store) SaveLocked(c SavedConn, password string, oldBox *secretBox) (int
 // password.
 func (s *Store) SaveUnlocked(c SavedConn) (int64, error) {
 	var lock string
-	err := s.db.QueryRow(`SELECT lock FROM connections WHERE name = ?`, c.Name).Scan(&lock)
+	err := s.DB().QueryRow(`SELECT lock FROM connections WHERE name = ?`, c.Name).Scan(&lock)
 	if err == nil && lock != "" {
 		return 0, errLockedSave
 	}
@@ -308,7 +308,7 @@ func (s *Store) openQuery(box *secretBox, data string) (queryData, error) {
 
 // Queries lists a connection's saved queries by name.
 func (s *Store) Queries(connID int64, box *secretBox) ([]SavedQuery, error) {
-	rows, err := s.db.Query(`SELECT id, data, created_at, updated_at FROM queries WHERE conn_id = ?`, connID)
+	rows, err := s.DB().Query(`SELECT id, data, created_at, updated_at FROM queries WHERE conn_id = ?`, connID)
 	if err != nil {
 		return nil, err
 	}
@@ -348,13 +348,13 @@ func (s *Store) SaveQuery(connID int64, box *secretBox, q SavedQuery) (int64, er
 	data := s.sealQuery(box, queryData{Name: q.Name, Description: q.Description, SQL: q.SQL})
 	now := time.Now().Format(time.RFC3339)
 	if q.ID == 0 {
-		res, err := s.db.Exec(`INSERT INTO queries (conn_id, data, created_at, updated_at) VALUES (?, ?, ?, ?)`, connID, data, now, now)
+		res, err := s.DB().Exec(`INSERT INTO queries (conn_id, data, created_at, updated_at) VALUES (?, ?, ?, ?)`, connID, data, now, now)
 		if err != nil {
 			return 0, err
 		}
 		return res.LastInsertId()
 	}
-	res, err := s.db.Exec(`UPDATE queries SET data = ?, updated_at = ? WHERE id = ? AND conn_id = ?`, data, now, q.ID, connID)
+	res, err := s.DB().Exec(`UPDATE queries SET data = ?, updated_at = ? WHERE id = ? AND conn_id = ?`, data, now, q.ID, connID)
 	if err != nil {
 		return 0, err
 	}
@@ -366,7 +366,7 @@ func (s *Store) SaveQuery(connID int64, box *secretBox, q SavedQuery) (int64, er
 
 // DeleteQuery deletes one of the connection's saved queries.
 func (s *Store) DeleteQuery(connID, id int64) error {
-	res, err := s.db.Exec(`DELETE FROM queries WHERE id = ? AND conn_id = ?`, id, connID)
+	res, err := s.DB().Exec(`DELETE FROM queries WHERE id = ? AND conn_id = ?`, id, connID)
 	if err != nil {
 		return err
 	}

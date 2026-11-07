@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.28.0
+cactusdb 1.29.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -140,9 +140,9 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 |---|---|
 | **🔌 Connections** | Your saved connections: **▶** connects, **Edit** changes one, **✕** deletes it |
 | **＋ New connection** | Opens the connection dialog to add a connection |
-| **📁 Folder setup** | Shows where exports and backups are saved, and lets you change it |
+| **📁 Folder setup** | Where exports and backups are saved, and where the connection database is kept; change either |
 | **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
-| **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below) |
+| **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
 | **📜 Logs** | Opens the **Logs** tab (see below) |
 | **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
 | **⬆ Check for update** | Whether a newer cactusdb is out, with the command to download it for every system, each with a copy button (see below) |
@@ -412,6 +412,24 @@ web UI and by command-line exports. **Use default** goes back to the `export` fo
 the program. Files exported before the change can still be downloaded until cactusdb stops.
 `--exportto` on the command line always wins over the saved folder.
 
+**Connection database.** The same dialog shows where `cactus.conn.db` is (saved
+connections, saved queries, settings and the usage log) and can **move** it: type the new
+file, or a folder to put `cactus.conn.db` in, and click **Move database**, then **Yes, move
+it**.
+- The folder is created if it doesn't exist. An existing file is never overwritten.
+- cactusdb copies the database while holding its only connection, so nothing is written
+  in between, checks the copy, uses it straight away and deletes the old file.
+- The key file `cactus.key` goes along when it was next to the database (not when the key
+  comes from `CACTUSDB_PASSPHRASE` or a `--key-file` elsewhere).
+- People using cactusdb keep working. A request that arrives at the very moment of the
+  move may fail; repeat it.
+- The new place is remembered in `cactus.conn.db.location` next to the program and used at
+  the next start, by the web UI and by command-line exports. **Default place** moves it
+  back next to the program and removes that file.
+- `--conn-db` always wins: if cactusdb was started with it, the dialog says so, and you need
+  to change the option to the new place for the next start (for a container: the
+  volume the file is on, see `deploy.sh`).
+
 **Overall progress.** While an export runs, a progress bar below the **Run** button shows
 how far it has got. It stays visible while you open other tables.
 - **Export all tables:** the bar shows the percentage, tables done out of the total, rows
@@ -428,7 +446,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.28.0*), as reported by the running program.
+example *v1.29.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -475,7 +493,11 @@ those objects.
 - **Sorting:** click a column heading above the list (**Name**, **Rows**, **MB**) to sort by
   it; click it again to reverse the order. ▲ is ascending, ▼ descending. Rows and MB start
   with the biggest. The order is remembered in this browser.
-- **⟳** reloads the list after the database has changed.
+- **⟳**, and **↻ Refresh** next to **Disconnect**, refresh the connection and everything
+  of the database: cactusdb closes its unused connections (a firewall or the database server
+  may have cut them), checks a fresh one, and lists every table, view, procedure, function,
+  trigger, sequence… again, with their rows and sizes. The open table or definition is
+  reloaded; if it no longer exists, the selection is cleared.
 - The Objects and Saved connections sections fold open and closed from their heading, and
   cactusdb remembers your choice.
 
@@ -706,7 +728,7 @@ cactusdb --port 8087 --web yes --exportto ./export
 | `--web` | `yes` when no `--dbtype` is given | `--web yes` starts the web UI. It's the default, so `cactusdb --port 8087` does the same. |
 | `--port` | `8080` | The port to open in your browser: `http://localhost:<port>` |
 | `--exportto` | folder `export` next to the cactusdb program | The base folder for exported files: each connection gets a folder in it, with a subfolder for each type (`json`, `csv`, `xlsx`, `xml`, `sql` for DDL and `backup` for backups). See [Where exports go](#where-exports-go). Created automatically if missing. A relative path such as `./export` is relative to the folder you start cactusdb from. |
-| `--conn-db` | `cactus.conn.db` next to the cactusdb program | The file saved connections are stored in |
+| `--conn-db` | `cactus.conn.db` next to the cactusdb program, or where it was moved to (☰ → Folder setup) | The file saved connections, settings and the usage log are stored in |
 | `--key-file` | `cactus.key` next to the connection file | The key that encrypts saved usernames and passwords. Created automatically. Not used when `CACTUSDB_PASSPHRASE` is set. |
 | `--host` | `0.0.0.0` (every network interface) | The address to listen on. By default other computers on your network can use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. Use `127.0.0.1` to allow only this computer, `::` to listen on IPv6 too, or one of this computer's IP addresses to listen on that network only. See [Security](#7-security). |
 | `--runas` | `foreground` | `background` starts the web UI in the background: it keeps running after you close the terminal and logs to `--logfile`. See below. |
@@ -730,7 +752,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.28.0 is running in the background (process id 48211)
+cactusdb 1.29.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -764,6 +786,8 @@ The log looks like this:
 | Environment variable | What it does |
 |----------------------|--------------|
 | `CACTUSDB_DBPASSWORD` | The database password for [command-line exports](#4-exporting-from-the-command-line-no-browser), so you aren't prompted for it. |
+| `CACTUSDB_GA_ID` | The [Google Analytics](GOOGLE_ANALYTICS.md) Measurement ID of this server (`G-…`); wins over ☰ → Settings. |
+| `CACTUSDB_GA_API_SECRET` | The Measurement Protocol API secret, to send command-line runs to Google Analytics; wins over ☰ → Settings. |
 | `CACTUSDB_PASSPHRASE` | Derives the encryption key for saved usernames and passwords from this passphrase instead of using `cactus.key`. Nothing secret is then stored on disk, but you must set the same passphrase every time. On Windows: `set CACTUSDB_PASSPHRASE=…` (Command Prompt) or `$env:CACTUSDB_PASSPHRASE='…'` (PowerShell). |
 
 ### Deploying to Docker, k3s or Kubernetes — `deploy.sh`
@@ -858,7 +882,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.28.0 is running in container cactusdb
+cactusdb 1.29.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -907,7 +931,8 @@ Next to the program (unless you chose other locations with the options above):
 cactusdb/
 ├── cactusdb(.exe)       the program
 ├── cactus.conn.db       your saved connections, the chosen export folder and the usage log
-│                        (an SQLite database)
+│                        (an SQLite database; can be moved: ☰ → Folder setup)
+├── cactus.conn.db.location  where it was moved to, if it was
 ├── cactus.key           the key that encrypts saved usernames and passwords
 ├── cactusdb.log         today's action log (with --runas background or --logfile)
 ├── cactusdb-2026-11-06.log  the log of an earlier day (kept 30 days)
@@ -954,6 +979,11 @@ Two kinds of events are recorded:
   query, an export, a backup, comparing databases, saving a connection… With its HTTP
   result, how long it took and what it did (the same text as the log: SQL shortened to one
   line; passwords are never recorded).
+- **`cli`**: every [command-line](#4-exporting-from-the-command-line-no-browser) export, DDL
+  export, backup and `--showtable`, with what it did, whether it worked (`status` 200 or
+  500, and the error in `detail`), how long it took, and in `user_agent` the cactusdb
+  version, system, user and computer (`client_ip` is `local`). Recorded when there is a
+  connection database (`cactus.conn.db`, or where it was moved to).
 - **`ui`**: what only happens in the page: tabs, menu items, buttons, sorting, check boxes,
   drop-downs, the filter. Of what you type only *which field* is recorded, never the
   text (no SQL, passwords or connection details), except the filter boxes and day pickers.
@@ -963,7 +993,7 @@ Two kinds of events are recorded:
 |---|---|
 | `id` | Increases with every event |
 | `at` | When, in UTC: `2026-11-07 08:15:02.123` |
-| `source` | `server` or `ui` |
+| `source` | `server`, `ui` or `cli` |
 | `function` | What was used: `connect`, `open table`, `run query`, `export`, `compare databases`, `tab: logs`, `menu: compare`, `sort objects: rows`, `set: cmpDrops`, `button: disconnectBtn`, … |
 | `detail` | What it did, e.g. `[shop] query: select * from orders`, the button's label, `on`/`off`, the chosen value |
 | `client_ip` | The browser's IP address (behind a proxy or ingress: the proxy's) |
@@ -975,8 +1005,12 @@ Two kinds of events are recorded:
 
 Progress polls of exports and comparisons and the Logs tab's live updates aren't
 recorded: they aren't something you did. Events are written in the background, so they
-never slow cactusdb down. The table is never emptied by cactusdb; delete old rows yourself
-if it grows too big, e.g. `DELETE FROM usage_events WHERE at < '2026-01-01'`.
+never slow cactusdb down.
+
+**Housekeeping:** ☰ → ⚙ Settings → *Usage log* shows how many events there are and from
+when to when, and deletes the events of a date range: pick the first and last day (days in
+your computer's time zone; leave one empty for "from the first" or "up to the last"),
+click **Delete events**, then **Yes, delete them**. cactusdb never deletes events itself.
 
 Some questions it answers:
 
@@ -997,8 +1031,22 @@ SELECT at, function, detail, status, duration_ms FROM usage_events
 WHERE source = 'server' AND (status >= 400 OR duration_ms > 5000) ORDER BY at DESC;
 ```
 
-Google Analytics isn't in cactusdb yet: [GOOGLE_ANALYTICS.md](GOOGLE_ANALYTICS.md) is the
-plan for it, and what you need to set up first.
+### Google Analytics (opt-in)
+
+Each cactusdb server can also send usage statistics to its own Google Analytics property,
+but only for people who say yes. [GOOGLE_ANALYTICS.md](GOOGLE_ANALYTICS.md) explains what
+is sent and how to set it up. In short:
+
+- Set the server's **Measurement ID** in ☰ → ⚙ Settings (or `CACTUSDB_GA_ID`). Without one,
+  nothing is loaded or sent.
+- Everyone is then asked once, in a bar at the bottom of the page: *May cactusdb send
+  anonymous usage statistics?* Nothing is sent until they click **Yes, send**; they can
+  change it any time in ☰ → ⚙ Settings (*this browser*).
+- Only which functions are used is sent, never data, SQL, names, paths or addresses.
+- When a proxy or firewall blocks Google, cactusdb works exactly the same: Google's script
+  just doesn't arrive, and nothing more is attempted.
+- Command-line runs are sent by the server with an **API secret**, when *Send command-line
+  runs* is switched on; they wait at most 2 seconds for Google.
 
 ## 7. Security
 
@@ -1148,6 +1196,8 @@ CACTUSDB_IT=1 go test ./...
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
+| `dbmove.go` | Moving `cactus.conn.db` (☰ → Folder setup) and finding it again at the next start |
+| `ga.go` | Google Analytics settings, and command-line runs in the usage log and Google Analytics |
 | `usage.go` | The usage log: every function used, in the `usage_events` table of `cactus.conn.db` |
 | `logs.go`, `logrotate.go` | The Logs tab (live, any day, crash log, .zip of every log); a new log file every day |
 | `termlog.go` | Logging to the terminal without ever holding up a request |

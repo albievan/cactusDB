@@ -173,7 +173,7 @@ func TestRunCLISavesConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.db.Close()
+	defer st.DB().Close()
 	path := newShopDB(t)
 	var out bytes.Buffer
 	err = runCLI(context.Background(), cliOptions{ConnParams: ConnParams{Engine: EngineSQLite, Database: path},
@@ -194,7 +194,7 @@ func newTestServer(t *testing.T) *server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { st.db.Close() })
+	t.Cleanup(func() { st.DB().Close() })
 	s := &server{store: st, defaultExportDir: filepath.Join(dir, "export"), sessions: map[string]*session{}}
 	s.setExportFolder(s.defaultExportDir)
 	return s

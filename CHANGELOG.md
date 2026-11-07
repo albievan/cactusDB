@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.29.0 — 2026-11-07
+
+- **Google Analytics, opt-in**: each cactusdb server can have its own Measurement ID
+  (☰ → ⚙ Settings, or `CACTUSDB_GA_ID`). People are asked once; nothing is loaded or sent
+  until they say yes, and they can change it in Settings. Only names of functions and fixed
+  values are sent (engine, format, tab), never data, SQL, names or addresses. When a proxy
+  or firewall blocks Google, cactusdb works the same and stops trying. See
+  GOOGLE_ANALYTICS.md.
+- **Command-line runs are events**: every export, DDL export, backup and `--showtable` from
+  the command line is recorded in the usage log (`source` = `cli`), and sent to Google
+  Analytics with the Measurement Protocol when an API secret is set and *Send command-line
+  runs* is on (waiting at most 2 seconds for Google).
+- **Usage log housekeeping**: ☰ → ⚙ Settings shows how many events there are and deletes
+  the events of a date range.
+- **Move the connection database**: ☰ → 📁 Folder setup can move `cactus.conn.db` (and
+  `cactus.key` next to it) to another folder or file, while cactusdb runs; the folder is
+  created, the copy checked and the old files deleted. The new place is remembered in
+  `cactus.conn.db.location` next to the program for the next start (`--conn-db` still wins).
+- **↻ Refresh** next to Disconnect (and ⟳ above the object list): checks the connection with
+  a fresh one, lists every table, view, procedure, trigger… again, and reloads what is open.
+
 ## 1.28.0 — 2026-11-07
 
 - **Usage log**: every function used in cactusdb is recorded in the new `usage_events`

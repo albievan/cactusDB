@@ -45,7 +45,7 @@ func TestStoreEncryptsCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	var user, pass string
-	st.db.QueryRow(`SELECT username, password FROM connections WHERE id = ?`, id).Scan(&user, &pass)
+	st.DB().QueryRow(`SELECT username, password FROM connections WHERE id = ?`, id).Scan(&user, &pass)
 	if !isSealed(user) || !isSealed(pass) || strings.Contains(user+pass, "unique") {
 		t.Errorf("stored columns are not encrypted: %q %q", user, pass)
 	}
@@ -53,7 +53,7 @@ func TestStoreEncryptsCredentials(t *testing.T) {
 	if err != nil || c.Username != testUser || c.Password != testPass {
 		t.Errorf("round trip failed: %+v %v", c, err)
 	}
-	st.db.Close()
+	st.DB().Close()
 	assertNoPlaintext(t, path)
 
 	if runtime.GOOS != "windows" {
@@ -70,7 +70,7 @@ func TestStoreEncryptsCredentials(t *testing.T) {
 	if list, err := st.List(); err != nil || len(list) != 1 || list[0].Password != testPass {
 		t.Errorf("list after reopen: %+v %v", list, err)
 	}
-	st.db.Close()
+	st.DB().Close()
 
 	// A missing key file is reported, not silently replaced by a new key.
 	if _, err := openStore(path, filepath.Join(dir, "missing.key")); err == nil || !strings.Contains(err.Error(), "missing") {
@@ -114,7 +114,7 @@ func TestStoreMigratesPlaintext(t *testing.T) {
 	if err != nil || c.Username != testUser || c.Password != testPass || c.Host != "127.0.0.1" {
 		t.Errorf("migrated connection: %+v %v", c, err)
 	}
-	st.db.Close()
+	st.DB().Close()
 	assertNoPlaintext(t, path) // VACUUM removed the old plaintext pages too
 }
 
@@ -127,7 +127,7 @@ func TestStorePassphrase(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.Save(SavedConn{Name: "pg", ConnParams: ConnParams{Engine: EnginePostgres, Username: testUser, Password: testPass}})
-	st.db.Close()
+	st.DB().Close()
 	if _, err := os.Stat(keyFile); !os.IsNotExist(err) {
 		t.Errorf("passphrase mode must not write a key file")
 	}
@@ -145,7 +145,7 @@ func TestStorePassphrase(t *testing.T) {
 	if c, err := st.GetByName("pg"); err != nil || c.Password != testPass {
 		t.Errorf("passphrase round trip: %+v %v", c, err)
 	}
-	st.db.Close()
+	st.DB().Close()
 }
 
 func TestSealedValuesAreBoundToTheirField(t *testing.T) {
@@ -167,7 +167,7 @@ func TestAPIKeepsPasswordsServerSide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.db.Close()
+	defer st.DB().Close()
 	s := &server{store: st, sessions: map[string]*session{}}
 	post := func(body string) int64 {
 		rec := httptest.NewRecorder()

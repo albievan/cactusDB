@@ -11,7 +11,7 @@ import (
 
 func TestUsageLog(t *testing.T) {
 	s := newTestServer(t)
-	if err := startUsageLog(s.store.db); err != nil {
+	if err := startUsageLog(s.store); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { usageEvents = nil }()
@@ -42,7 +42,7 @@ func TestUsageLog(t *testing.T) {
 	var rows []row
 	for deadline := time.Now().Add(5 * time.Second); len(rows) < 3 && time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
 		rows = rows[:0]
-		res, err := s.store.db.Query(`SELECT source, function, detail, client_ip, session_id, page_id, connection, engine, user_agent FROM usage_events ORDER BY id`)
+		res, err := s.store.DB().Query(`SELECT source, function, detail, client_ip, session_id, page_id, connection, engine, user_agent FROM usage_events ORDER BY id`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +67,7 @@ func TestUsageLog(t *testing.T) {
 		}
 	}
 	var status, ms int
-	if err := s.store.db.QueryRow(`SELECT status, duration_ms FROM usage_events WHERE source = 'server'`).Scan(&status, &ms); err != nil || status != 200 {
+	if err := s.store.DB().QueryRow(`SELECT status, duration_ms FROM usage_events WHERE source = 'server'`).Scan(&status, &ms); err != nil || status != 200 {
 		t.Errorf("status %d, %v", status, err)
 	}
 }

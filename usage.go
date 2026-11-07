@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -63,13 +65,13 @@ const (
 var usageEvents chan usageEvent
 
 // startUsageLog creates the table and starts the goroutine writing to it.
-func startUsageLog(db *sql.DB) error {
-	if _, err := db.Exec(usageSchema); err != nil {
+func startUsageLog(st *Store) error {
+	if _, err := st.DB().Exec(usageSchema); err != nil {
 		return err
 	}
 	ch := make(chan usageEvent, usageQueue)
 	usageEvents = ch
-	go writeUsage(db, ch)
+	go writeUsage(st, ch)
 	return nil
 }
 
@@ -85,7 +87,7 @@ func recordUsage(ev usageEvent) {
 	}
 }
 
-func writeUsage(db *sql.DB, ch <-chan usageEvent) {
+func writeUsage(st *Store, ch <-chan usageEvent) {
 	failed := false
 	for ev := range ch {
 		batch := []usageEvent{ev}
@@ -98,7 +100,11 @@ func writeUsage(db *sql.DB, ch <-chan usageEvent) {
 				break more
 			}
 		}
-		if err := insertUsage(db, batch); err != nil {
+		err := insertUsage(st.DB(), batch)
+		if err != nil && strings.Contains(err.Error(), "database is closed") {
+			err = insertUsage(st.DB(), batch) // the file was just moved: write to the new one
+		}
+		if err != nil {
 			if !failed { // once, not for every batch
 				log.Printf("warning: the usage log can't be written: %v", err)
 			}
@@ -154,6 +160,7 @@ var usageFunctions = map[string]string{
 	"POST /api/connect":                 "connect",
 	"POST /api/disconnect":              "disconnect",
 	"POST /api/testconn":                "test connection",
+	"POST /api/refresh":                 "refresh connection and objects",
 	"GET /api/objects":                  "list objects",
 	"GET /api/tablestats":               "table rows and sizes",
 	"GET /api/definition":               "show definition",
@@ -181,6 +188,8 @@ var usageFunctions = map[string]string{
 	"POST /api/queries":                 "save query",
 	"DELETE /api/queries/{id}":          "delete saved query",
 	"POST /api/queries/{id}/delete":     "delete saved query",
+	"GET /api/usage/summary":            "usage log summary",
+	"POST /api/usage/delete":            "usage log housekeeping",
 }
 
 // usageSkipped are requests that aren't something the user did: progress
@@ -255,4 +264,93 @@ func (s *server) handleUsage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Housekeeping (☰ → Settings): how many events there are, and deleting
+// those of a date range. Still no way to read the events themselves.
+
+func (s *server) usageSummary() (map[string]any, error) {
+	var n int64
+	var first, last sql.NullString
+	err := s.store.DB().QueryRow(`SELECT COUNT(*), MIN(at), MAX(at) FROM usage_events`).Scan(&n, &first, &last)
+	return map[string]any{"count": n, "first": first.String, "last": last.String}, err
+}
+
+func (s *server) handleUsageSummary(w http.ResponseWriter, r *http.Request) {
+	sum, err := s.usageSummary()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, sum)
+}
+
+// handleUsageDelete deletes the events from "from" up to (not including)
+// "to", both times the page computed from local days; an empty one is
+// open-ended. Only JSON, so other websites can't send it.
+func (s *server) handleUsageDelete(w http.ResponseWriter, r *http.Request) {
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		writeErr(w, 415, errors.New("expected a JSON request"))
+		return
+	}
+	var req struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	bound := func(v string) (string, error) {
+		if v == "" {
+			return "", nil
+		}
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return "", fmt.Errorf("bad date %q", v)
+		}
+		return t.UTC().Format("2006-01-02 15:04:05.000"), nil
+	}
+	from, err := bound(req.From)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	to, err := bound(req.To)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if from != "" && to != "" && from >= to {
+		writeErr(w, 400, errors.New("the first day must be before the last one"))
+		return
+	}
+	q, args := `DELETE FROM usage_events WHERE 1 = 1`, []any{}
+	if from != "" {
+		q, args = q+` AND at >= ?`, append(args, from)
+	}
+	if to != "" {
+		q, args = q+` AND at < ?`, append(args, to)
+	}
+	res, err := s.store.DB().Exec(q, args...)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	n, _ := res.RowsAffected()
+	logAction(r, "usage log: deleted %d event(s) from %s to %s (UTC)", n, orOpen(from), orOpen(to))
+	sum, err := s.usageSummary()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	sum["deleted"] = n
+	writeJSON(w, 200, sum)
+}
+
+func orOpen(v string) string {
+	if v == "" {
+		return "(open)"
+	}
+	return v
 }

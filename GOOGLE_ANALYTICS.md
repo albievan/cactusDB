@@ -1,111 +1,104 @@
-# Google Analytics for cactusdb: the plan
+# Google Analytics in cactusdb
 
-Not built yet. This is how it would work, what it would and wouldn't send, and what
-you need to set up first. The [usage log](README.md#the-usage-log-what-is-used-in-cactusdb)
-in `cactus.conn.db` stays as it is: it has the full detail, on your own server. Google
-Analytics would add charts, trends over months and a view across several cactusdb servers,
-with far less detail.
+cactusdb can send usage statistics to Google Analytics 4: which functions are used, how
+often, with which database types and export formats, and by which cactusdb version. The
+[usage log](README.md#the-usage-log-what-is-used-in-cactusdb) in `cactus.conn.db` keeps
+the full detail on your own server either way; Google Analytics adds charts, trends over
+months and a view over time without running SQL.
 
-## How it would work
+## How it works
 
-1. **Off unless you turn it on.** cactusdb gets a Google Analytics *Measurement ID*
-   (`G-XXXXXXXXXX`) from a startup option or an environment variable:
+- **One Measurement ID per cactusdb server.** Each server gets its own (production, test,
+  …), set in ☰ → ⚙ Settings or with `CACTUSDB_GA_ID` (which wins, e.g. in `deploy.sh`'s
+  `.env`). Without one, nothing is loaded and nothing is sent.
+- **Opt-in, per person.** When a server has an ID, everyone is asked once, in a bar at the
+  bottom of the page: *May cactusdb send anonymous usage statistics to Google Analytics?*
+  - Until they click **Yes, send**, Google's script isn't even loaded.
+  - **No, thanks** is remembered too, and they're not asked again.
+  - Either answer can be changed any time in ☰ → ⚙ Settings → *Send usage statistics from
+    this browser*.
+  - The answer is kept in that browser (for that cactusdb address), so each person
+    decides for themselves.
+- **Blocked Google never matters.** The browser loads Google's script in the background.
+  When a proxy, firewall or ad blocker stops it, or Google doesn't answer within 20
+  seconds, cactusdb stops trying and nothing else changes: no error, no delay, no waiting.
+  The browser itself may note the blocked script in its developer console. Statistics
+  sent while Google is reachable are queued and sent in the background, never holding up
+  a click.
+- **Command-line runs** (`cactusdb --dbtype …`: exports, DDL, backups, `--showtable`) are
+  sent by the server with Google's *Measurement Protocol*, but only:
+  - when *Send command-line runs on this server too* is switched on in ☰ → ⚙ Settings;
+  - and when an **API secret** is set there, or in `CACTUSDB_GA_API_SECRET`.
 
-   ```sh
-   cactusdb --port 8080 --ga-id G-XXXXXXXXXX
-   CACTUSDB_GA_ID=G-XXXXXXXXXX cactusdb --port 8080      # e.g. in deploy.sh's .env
-   ```
+  The run is finished first; cactusdb then waits at most 2 seconds for Google and ignores
+  any error, so the exit code and output never change. A proxy in `HTTPS_PROXY` is used.
+  Command-line runs are always recorded in the usage log as well (`source` = `cli`).
+- **No advertising use:** Google signals and ad personalisation are off, and the consent
+  settings deny every advertising use. Google Analytics 4 doesn't store IP addresses. It
+  does set a cookie (`_ga`), only after the person said yes, to tell browsers apart.
+- The API secret is stored encrypted in `cactus.conn.db`, like saved passwords, and never
+  sent to the page.
 
-   Without one, nothing changes: no Google script is loaded and nothing is sent. The ID
-   isn't a secret: it's visible in every page that uses Google Analytics.
+## What is sent
 
-2. **The page loads Google's tag (`gtag.js`) only when an ID is set.** The server passes
-   the ID to the page with `/api/info`. The script loads in the background; if a firewall
-   or an ad blocker blocks Google, cactusdb works exactly the same and the events are
-   simply not sent.
+| Event | When | Parameters |
+|---|---|---|
+| `page_view` | the page opens, and each tab (a virtual page: `/data`, `/def`, `/logs`, `/compare`, `/files`, `/queries`) | `page_location`, `page_title` |
+| `connect`, `disconnect`, `test_connection` | connecting | `engine`, `result` (`ok`/`failed`), `duration_bucket` |
+| `open_table`, `show_definition`, `run_query`, `table_stats` | browsing | `engine`, `result`, `duration_bucket` |
+| `export`, `export_all`, `export_ddl`, `backup` | exporting | `engine`, `format`, `result`, `duration_bucket` |
+| `compare` | ☰ → Compare databases | `engine`, `databases` (how many), `result` |
+| `save_connection`, `delete_connection`, `save_query`, `delete_saved_query`, `zip_files`, `preview_file`, `delete_files`, `save_settings`, `usage_housekeeping` | the other functions | `result`, `duration_bucket` |
+| `menu_click` | a ☰ menu item | `item` (e.g. `compare`) |
+| `sort`, `object_tab` | sorting the object list, its tabs | `by`, `type` |
+| `ui_click`, `ui_toggle`, `ui_choose` | buttons, check boxes and drop-down lists with a fixed id | `control` (the id, e.g. `cmpDrops`); never the chosen value |
+| `cli_export`, `cli_export_ddl`, `cli_backup`, `cli_show_tables` | command-line runs | `engine`, `format`, `tables_bucket`, `result`, `duration_bucket` |
 
-3. **The same events as the usage log, cleaned of anything internal.** The page already
-   records every function in one place (`track()` in `web/index.html`). That place would
-   also send each event to Google, translated to Google's naming rules (lowercase, `_`,
-   at most 40 characters):
+Every event also has `app_version` (e.g. `1.29.0`).
 
-   | Usage log | Google Analytics event | Parameters |
-   |---|---|---|
-   | page opened | `page_view` | `page_title`: `cactusdb` |
-   | `tab: logs` | `page_view` (a virtual page per tab: `/data`, `/definition`, `/logs`, `/compare`, …) | `page_location` |
-   | `menu: compare` | `menu_click` | `item`: `compare` |
-   | `connect` | `connect` | `engine`: `mariadb`, `result`: `ok` / `failed` |
-   | `open table` | `open_table` | `engine` |
-   | `run query` | `run_query` | `engine`, `result`, `duration_bucket`: `<1s`, `1-10s`, `>10s` |
-   | `export`, `export all tables` | `export` | `format`: `xlsx` / `csv` / `json` / `xml`, `tables_bucket` |
-   | `export DDL`, `backup` | `export_ddl`, `backup` | `engine` |
-   | `compare databases` | `compare` | `databases`: 2, 3, …, `engines` |
-   | `sort objects: rows` | `sort` | `by`: `rows` |
-   | other buttons and check boxes | `ui_click` | `control`: the button's id, e.g. `cmpDrops` |
+**Never sent:** SQL, table, column, connection, host or database names, file paths, IP
+addresses, session ids, usernames, error messages, or anything typed. Google's terms
+forbid sending personal data, and these would also say a lot about your systems.
 
-   Every event also gets `app_version` (e.g. `1.28.0`), so you can see who still runs an
-   old version.
+## Set it up
 
-4. **Never sent to Google:** SQL, table, column or connection names, host names, database
-   names, file paths, IP addresses, session ids, usernames, error messages (they can
-   contain any of these), or anything typed. Google's terms forbid sending personal data,
-   and these also say a lot about your systems. Only the names of functions and fixed
-   values (engine, format, tab) leave the page.
+For **each** cactusdb server:
 
-5. **Privacy settings in the tag:** `allow_google_signals: false` and
-   `allow_ad_personalization_signals: false`, so the data is never used for advertising.
-   Google Analytics 4 doesn't store IP addresses. It does set a cookie (`_ga`) to tell
-   browsers apart.
-
-6. **An opt-out per browser:** ☰ → Settings would get *Send usage statistics to Google
-   Analytics* (on by default when an ID is set, remembered in that browser), and the
-   page would say once that usage statistics are collected. See the consent decision below.
-
-7. **Events from the browser, not the server.** The browser sends straight to Google, so
-   only the computers using cactusdb need internet access, not the server (the k3s node
-   may well have none). Command-line exports (`cactusdb --dbtype …`) don't use a browser,
-   so they wouldn't be counted. They could be, later, with Google's *Measurement Protocol*
-   from the server; that needs an API secret and internet access from the server, so I'd
-   leave it out at first.
-
-## What you need to do
-
-1. **Create a Google Analytics account and property**, if you have none:
-   <https://analytics.google.com> → *Admin* → *Create* → *Property*. Name it e.g.
-   `cactusdb`, set your time zone (e.g. South Africa) and currency, and choose
-   *Business objectives* → *Get baseline reports*.
+1. **Create a property** (once per server, or once in all if you prefer one property with
+   a data stream per server): <https://analytics.google.com> → *Admin* → *Create* →
+   *Property*. Name it e.g. `cactusdb production`, set your time zone and currency, and
+   choose *Business objectives* → *Get baseline reports*.
 2. **Add a web data stream:** *Admin* → *Data streams* → *Add stream* → *Web*.
-   - The *Website URL* is only a label; an internal address such as
-     `http://10.66.1.136:8080` is fine.
-   - Name it e.g. `cactusdb production`.
+   - The *Website URL* is only a label: the server's address, e.g.
+     `http://10.66.1.136:8080`, is fine.
    - Under *Enhanced measurement*, **turn off** *Page changes based on browser history
      events*, *Form interactions*, *Site search* and *Video engagement*: cactusdb sends its
-     own events, and the automatic ones would count wrong or record form fields.
-     *Page views* and *Outbound clicks* can stay on.
-3. **Copy the Measurement ID** (`G-…`, at the top right of the stream) and give it to me,
-   or put it in `.env` as `CACTUSDB_GA_ID`. It isn't secret.
-4. **Register the custom parameters**, or they're collected but don't appear in reports:
+     own events, and those would count wrongly or look at form fields. *Page views*,
+     *Scrolls* and *Outbound clicks* may stay on.
+3. **Copy the Measurement ID** (`G-…`, top right of the stream) into ☰ → ⚙ Settings →
+   *Measurement ID of this cactusdb server* → **Save**. Or set `CACTUSDB_GA_ID=G-…` where
+   cactusdb runs (with `deploy.sh`: in `.env`) and restart it.
+4. **For command-line runs** (optional): in the stream, *Measurement Protocol API secrets*
+   → *Create*, copy the value into ☰ → ⚙ Settings → *API secret* (or
+   `CACTUSDB_GA_API_SECRET`), tick *Send command-line runs on this server too* and **Save**.
+   The server needs to reach `www.google-analytics.com` for this, possibly through
+   `HTTPS_PROXY`.
+5. **Register the parameters**, or they're collected but don't appear in reports:
    *Admin* → *Custom definitions* → *Create custom dimension*, scope *Event*, one each for
-   `engine`, `format`, `item`, `control`, `by`, `result`, `app_version`,
-   `duration_bucket`, `tables_bucket`. Google allows 50 per property.
-5. **Data retention:** *Admin* → *Data collection and modification* → *Data retention* →
-   *14 months* (the default is 2 months for detailed explorations).
-6. **Optional, filter your own testing:** *Admin* → *Data filters* → *Developer traffic*
-   (cactusdb would send `debug_mode` while testing), and an *Internal traffic* rule if you
-   want to leave out your own IP range.
-7. **Check that it works:** after I build it, open cactusdb and watch *Reports* →
-   *Realtime*, or *Admin* → *DebugView* with debug mode on. Events show within seconds
-   there; the normal reports take up to 24–48 hours.
+   `engine`, `format`, `item`, `control`, `by`, `type`, `result`, `app_version`,
+   `duration_bucket`, `tables_bucket`. (`databases` can be a *custom metric*.)
+6. **Data retention:** *Admin* → *Data collection and modification* → *Data retention* →
+   *14 months* (the default is 2).
+7. **Check it:** open cactusdb, answer **Yes, send**, click around, and watch *Reports* →
+   *Realtime* (within a minute). The other reports fill in within 24–48 hours.
 
-## Decisions for you before I build it
+To stop: empty the Measurement ID in ☰ → ⚙ Settings (and unset `CACTUSDB_GA_ID`). Nothing
+is loaded or sent from then on; the answers people gave stay in their browsers in case it
+is switched on again.
 
-- **Consent:** is a notice plus an opt-out in Settings enough (an internal tool, your own
-  staff), or must people opt *in* first? Under POPIA or GDPR, a company policy may require
-  opting in, and then nothing is sent until someone says yes.
-- **Which servers:** one Measurement ID for all cactusdb servers (with a `server`
-  parameter such as `production` / `test` to tell them apart), or a data stream each?
-- **Command-line exports:** leave them out (the plan), or count them from the server with
-  the Measurement Protocol (needs an API secret and internet access from the server)?
-- **Network:** do the computers that use cactusdb reach `www.googletagmanager.com` and
-  `*.google-analytics.com`? If a proxy or firewall blocks them, nothing arrives, and the
-  usage log is then the only record.
+## Network
+
+- Browsers that may send statistics must reach `www.googletagmanager.com` and
+  `*.google-analytics.com` (directly or through their proxy). Where they can't, nothing
+  arrives in Google Analytics, and cactusdb works as usual.
+- The cactusdb server needs to reach `www.google-analytics.com` only for command-line runs.

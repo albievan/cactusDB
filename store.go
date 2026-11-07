@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -24,19 +26,36 @@ type SavedConn struct {
 // passwords are stored encrypted (see crypt.go); the other fields are not
 // secret and stay readable.
 type Store struct {
-	db      *sql.DB
+	cur     atomic.Pointer[sql.DB] // swapped when the file is moved (see dbmove.go)
 	box     *secretBox
 	keyDesc string // where the encryption key came from, for the startup banner
+
+	moveMu  sync.Mutex // one move at a time; guards path and keyFile
+	path    string     // the database file
+	keyFile string     // the key file; "" when the key comes from the passphrase
+}
+
+// DB is the open database.
+func (s *Store) DB() *sql.DB { return s.cur.Load() }
+
+// Path is the database file.
+func (s *Store) Path() string {
+	s.moveMu.Lock()
+	defer s.moveMu.Unlock()
+	return s.path
 }
 
 func openStore(path, keyFile string) (*Store, error) {
-	// secure_delete overwrites freed pages, so replaced plaintext doesn't linger.
-	db, err := sql.Open("sqlite", sqliteURI(path)+"?_pragma=busy_timeout(5000)&_pragma=secure_delete(1)")
+	db, err := sql.Open("sqlite", storeDSN(path))
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
+	s := &Store{path: path}
+	s.cur.Store(db)
+	if os.Getenv(passphraseEnv) == "" {
+		s.keyFile = keyFile
+	}
 	if err := s.init(path, keyFile); err != nil {
 		db.Close()
 		return nil, err
@@ -47,7 +66,7 @@ func openStore(path, keyFile string) (*Store, error) {
 }
 
 func (s *Store) init(path, keyFile string) error {
-	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS connections (
+	_, err := s.DB().Exec(`CREATE TABLE IF NOT EXISTS connections (
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
 		name       TEXT NOT NULL UNIQUE,
 		engine     TEXT NOT NULL,
@@ -116,7 +135,7 @@ func (s *Store) init(path, keyFile string) error {
 // encryptPlaintextRows encrypts credentials saved by cactusdb versions that
 // stored them in plain text, then vacuums so no plaintext copy remains.
 func (s *Store) encryptPlaintextRows() error {
-	rows, err := s.db.Query(`SELECT id, username, password FROM connections
+	rows, err := s.DB().Query(`SELECT id, username, password FROM connections
 		WHERE username NOT LIKE 'enc:v1:%' OR password NOT LIKE 'enc:v1:%'`)
 	if err != nil {
 		return err
@@ -138,7 +157,7 @@ func (s *Store) encryptPlaintextRows() error {
 	if err := rows.Err(); err != nil || len(plain) == 0 {
 		return err
 	}
-	tx, err := s.db.Begin()
+	tx, err := s.DB().Begin()
 	if err != nil {
 		return err
 	}
@@ -157,13 +176,13 @@ func (s *Store) encryptPlaintextRows() error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	_, err = s.db.Exec(`VACUUM`)
+	_, err = s.DB().Exec(`VACUUM`)
 	return err
 }
 
 func (s *Store) meta(key string) (string, error) {
 	var v string
-	err := s.db.QueryRow(`SELECT value FROM meta WHERE key = ?`, key).Scan(&v)
+	err := s.DB().QueryRow(`SELECT value FROM meta WHERE key = ?`, key).Scan(&v)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -171,7 +190,7 @@ func (s *Store) meta(key string) (string, error) {
 }
 
 func (s *Store) setMeta(key, value string) error {
-	_, err := s.db.Exec(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
+	_, err := s.DB().Exec(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 	return err
 }
 
@@ -205,7 +224,7 @@ func hideLocked(c *SavedConn) {
 // List returns all saved connections with decrypted usernames and passwords
 // (blank for connections with their own password: see Unlock).
 func (s *Store) List() ([]SavedConn, error) {
-	rows, err := s.db.Query(`SELECT ` + connCols + ` FROM connections ORDER BY name COLLATE NOCASE`)
+	rows, err := s.DB().Query(`SELECT ` + connCols + ` FROM connections ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +245,7 @@ func (s *Store) List() ([]SavedConn, error) {
 }
 
 func (s *Store) Get(id int64) (SavedConn, error) {
-	c, err := scanConn(s.db.QueryRow(`SELECT `+connCols+` FROM connections WHERE id = ?`, id))
+	c, err := scanConn(s.DB().QueryRow(`SELECT `+connCols+` FROM connections WHERE id = ?`, id))
 	if err != nil {
 		return c, err
 	}
@@ -237,7 +256,7 @@ func (s *Store) Get(id int64) (SavedConn, error) {
 
 // GetByName returns a saved connection by name, or sql.ErrNoRows.
 func (s *Store) GetByName(name string) (SavedConn, error) {
-	c, err := scanConn(s.db.QueryRow(`SELECT `+connCols+` FROM connections WHERE name = ?`, name))
+	c, err := scanConn(s.DB().QueryRow(`SELECT `+connCols+` FROM connections WHERE name = ?`, name))
 	if err != nil {
 		return c, err
 	}
@@ -248,7 +267,7 @@ func (s *Store) GetByName(name string) (SavedConn, error) {
 
 // Save inserts a connection, or replaces the one with the same name.
 func (s *Store) Save(c SavedConn) (int64, error) {
-	_, err := s.db.Exec(`INSERT INTO connections (name, engine, host, port, username, password, database, created_at)
+	_, err := s.DB().Exec(`INSERT INTO connections (name, engine, host, port, username, password, database, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(name) DO UPDATE SET engine = excluded.engine, host = excluded.host, port = excluded.port,
 			username = excluded.username, password = excluded.password, database = excluded.database`,
@@ -258,15 +277,15 @@ func (s *Store) Save(c SavedConn) (int64, error) {
 		return 0, err
 	}
 	var id int64
-	err = s.db.QueryRow(`SELECT id FROM connections WHERE name = ?`, c.Name).Scan(&id)
+	err = s.DB().QueryRow(`SELECT id FROM connections WHERE name = ?`, c.Name).Scan(&id)
 	return id, err
 }
 
 // Delete deletes a saved connection and its saved queries.
 func (s *Store) Delete(id int64) error {
-	if _, err := s.db.Exec(`DELETE FROM queries WHERE conn_id = ?`, id); err != nil {
+	if _, err := s.DB().Exec(`DELETE FROM queries WHERE conn_id = ?`, id); err != nil {
 		return err
 	}
-	_, err := s.db.Exec(`DELETE FROM connections WHERE id = ?`, id)
+	_, err := s.DB().Exec(`DELETE FROM connections WHERE id = ?`, id)
 	return err
 }

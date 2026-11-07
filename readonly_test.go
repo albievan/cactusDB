@@ -81,7 +81,7 @@ func TestSQLiteConnectionIsReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.db.Close()
+	st.DB().Close()
 
 	db, err := openDB(t.Context(), ConnParams{Engine: EngineSQLite, Database: path})
 	if err != nil {

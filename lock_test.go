@@ -68,7 +68,7 @@ func TestConnectionPasswordProtectsCredentialsAndQueries(t *testing.T) {
 	}
 
 	// Nothing readable on disk.
-	st.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
+	st.DB().Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 	files, _ := filepath.Glob(filepath.Join(filepath.Dir(dbPathOf(t, st)), "*"))
 	for _, f := range files {
 		b, _ := os.ReadFile(f)
@@ -86,7 +86,7 @@ func TestConnectionPasswordProtectsCredentialsAndQueries(t *testing.T) {
 	// Deleting the connection deletes its queries.
 	st.Delete(id)
 	var n int
-	st.db.QueryRow(`SELECT COUNT(*) FROM queries`).Scan(&n)
+	st.DB().QueryRow(`SELECT COUNT(*) FROM queries`).Scan(&n)
 	if n != 0 {
 		t.Errorf("%d queries left after deleting the connection", n)
 	}
@@ -94,7 +94,7 @@ func TestConnectionPasswordProtectsCredentialsAndQueries(t *testing.T) {
 
 func dbPathOf(t *testing.T, st *Store) string {
 	var p string
-	if err := st.db.QueryRow(`SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&p); err != nil {
+	if err := st.DB().QueryRow(`SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&p); err != nil {
 		t.Fatal(err)
 	}
 	return p

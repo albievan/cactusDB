@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -79,13 +80,21 @@ func (s *server) exportFolders() []string {
 }
 
 func (s *server) settingsJSON() map[string]any {
-	return map[string]any{
+	out := map[string]any{
+		"version":          version,
 		"exportDir":        s.exportFolder(),
 		"defaultExportDir": s.defaultExportDir,
 		"exportToFlag":     s.exportToFlag, // set when --exportto overrides the saved folder at startup
 		"idleMinutes":      s.idleMinutes(),
+		"dbPath":           s.store.Path(),
+		"defaultDbPath":    s.defaultConnDB,
+		"dbFlag":           s.connDBFlag, // set when started with --conn-db, which wins over a move
 		"defaultIdle":      defaultIdleMinutes,
 	}
+	for k, v := range loadGAConfig(s.store).json() {
+		out[k] = v
+	}
+	return out
 }
 
 func (s *server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +112,12 @@ func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ExportDir   *string `json:"exportDir"`
 		IdleMinutes *int    `json:"idleMinutes"`
+		DBPath      *string `json:"dbPath"` // move the connection database here
+
+		GAID          *string `json:"gaId"`
+		GASecret      *string `json:"gaSecret"` // "" keeps the saved one
+		GAClearSecret *bool   `json:"gaClearSecret"`
+		GACLI         *bool   `json:"gaCli"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
@@ -133,7 +148,35 @@ func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		s.setExportFolder(dir)
 		logAction(r, "export folder set to %s", dir)
 	}
-	writeJSON(w, 200, s.settingsJSON())
+	if req.GAID != nil || req.GASecret != nil || req.GAClearSecret != nil || req.GACLI != nil {
+		if err := saveGASettings(s.store, req.GAID, req.GASecret, req.GAClearSecret, req.GACLI); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		c := loadGAConfig(s.store)
+		logAction(r, "Google Analytics: measurement id %q, API secret set: %v, command-line runs: %v", c.ID, c.Secret != "", c.CLI)
+	}
+	var moved *moveResult
+	if req.DBPath != nil {
+		p, err := checkDBPath(*req.DBPath, s.defaultConnDB)
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if moved, err = s.store.moveTo(r.Context(), p, filepath.Dir(s.defaultConnDB), s.defaultConnDB); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		logAction(r, "connection database moved from %s to %s%s", moved.From, moved.To, keyMoveNote(moved))
+		for _, w := range moved.Warnings {
+			log.Printf("warning: %s", w)
+		}
+	}
+	out := s.settingsJSON()
+	if moved != nil {
+		out["moved"] = map[string]any{"from": moved.From, "to": moved.To, "keyFrom": moved.KeyFrom, "keyTo": moved.KeyTo, "warnings": moved.Warnings}
+	}
+	writeJSON(w, 200, out)
 }
 
 // checkExportDir validates a folder typed in the web UI: a full path (a
@@ -173,4 +216,11 @@ func checkExportDir(in, defaultDir string) (dir, saved string, err error) {
 	f.Close()
 	os.Remove(f.Name())
 	return dir, saved, nil
+}
+
+func keyMoveNote(m *moveResult) string {
+	if m.KeyFrom == "" {
+		return ""
+	}
+	return fmt.Sprintf(", and the key from %s to %s", m.KeyFrom, m.KeyTo)
 }

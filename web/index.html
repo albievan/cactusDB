@@ -481,6 +481,13 @@
   .dresult { margin-top: 12px; padding: 8px 10px; border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
   .dresult.ok { background: var(--accent-soft); color: var(--accent); }
   .dresult.bad { background: var(--danger-soft); color: var(--danger); }
+  .gabanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 10px;
+    max-width: min(760px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 10px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); box-shadow: 0 6px 24px rgba(0, 0, 0, .18); font-size: 13px; }
+  .gabanner[hidden] { display: none; }
+  .gabanner span { flex: 1; }
+  @media (max-width: 640px) { .gabanner { flex-wrap: wrap; } }
+  .edsub { margin: 22px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
   .dresult.busy { background: var(--panel-2); color: var(--muted); }
   button.danger { color: var(--danger); }
   button.danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-soft); }
@@ -535,6 +542,7 @@
       </g>
     </svg>
   </div>
+  <button id="reconnectBtn" class="small" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open">↻ Refresh</button>
   <button id="disconnectBtn" class="small" hidden>Disconnect</button>
   <button id="shutdownBtn" class="small danger" hidden title="Stop this background cactusdb">⏻ Shutdown</button>
 </header>
@@ -553,7 +561,7 @@
       </div>
       <div class="filterrow">
         <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
-        <button id="refreshBtn" class="small" title="Reload the object list" disabled>⟳</button>
+        <button id="refreshBtn" class="small" title="Refresh the connection and reload every table, view, procedure, trigger…" disabled>⟳</button>
         <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in &lt;export folder&gt;/&lt;connection&gt;/sql" disabled>DDL</button>
         <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
       </div>
@@ -823,6 +831,32 @@
       It never disconnects while something is running (a query, an export, a backup), and counts again from when it
       finishes. <b>0</b> means never. The default is <span id="stDefault">15</span> minutes. The setting is saved on
       the cactusdb server and applies to everyone using it.</p>
+
+    <h4 class="edsub">Google Analytics</h4>
+    <p class="hint">Off until a Measurement ID is set, and then still only for the people who say yes in their browser.
+      Only which functions are used is sent (tabs, menu items, connect, export…), never data, SQL, names or addresses.</p>
+    <label for="stGaId">Measurement ID of this cactusdb server</label>
+    <input id="stGaId" spellcheck="false" autocomplete="off" placeholder="G-XXXXXXXXXX (empty: off)">
+    <p class="hint" id="stGaIdNote" hidden></p>
+    <label class="check"><input type="checkbox" id="stGaMe"> Send usage statistics from <b>this browser</b></label>
+    <label for="stGaSecret">API secret, for command-line runs</label>
+    <input id="stGaSecret" type="password" autocomplete="new-password" spellcheck="false">
+    <label class="check"><input type="checkbox" id="stGaClear"> Remove the saved API secret</label>
+    <label class="check"><input type="checkbox" id="stGaCli"> Send command-line runs (<code>cactusdb --dbtype …</code>) on this server too</label>
+    <p class="hint">Command-line runs are sent by the server itself, so it needs to reach Google and an API secret
+      (Admin → Data streams → your stream → Measurement Protocol API secrets). They wait at most 2 seconds for Google.
+      They are always recorded in the usage log.</p>
+
+    <h4 class="edsub">Usage log</h4>
+    <p class="hint" id="stUsageSum">…</p>
+    <div class="row2">
+      <div><label for="stUsFrom">Delete events from</label><input id="stUsFrom" type="date"></div>
+      <div><label for="stUsTo">to (and with)</label><input id="stUsTo" type="date"></div>
+    </div>
+    <p class="hint">Days in this computer's time zone. Leave one empty for "from the first" or "up to the last". This can't be undone.</p>
+    <div id="stUsResult" class="dresult" hidden></div>
+    <div class="dactions"><span class="spacer"></span><button type="button" id="stUsDelete">Delete events</button></div>
+
     <div id="stResult" class="dresult bad" hidden></div>
     <div class="dactions">
       <span class="spacer"></span>
@@ -831,6 +865,13 @@
     </div>
   </form>
 </dialog>
+
+<div id="gaBanner" class="gabanner" role="region" aria-label="Usage statistics" hidden>
+  <span>May cactusdb send <b>anonymous usage statistics</b> to Google Analytics? Only which functions are used, never
+    your data, SQL, names or addresses. You can change this any time in ☰ → Settings.</span>
+  <button type="button" id="gaNo">No, thanks</button>
+  <button type="button" class="primary" id="gaYes">Yes, send</button>
+</div>
 
 <dialog id="driversDialog" class="modal" aria-labelledby="drTitle">
   <form method="dialog">
@@ -873,6 +914,21 @@
       <span class="spacer"></span>
       <button type="button" id="edCancel">Cancel</button>
       <button type="submit" class="primary" id="edSave">Save</button>
+    </div>
+    <h4 class="edsub">Connection database</h4>
+    <p class="hint">Saved connections, saved queries, settings and the usage log are kept in <code id="dbPathShow">…</code>.</p>
+    <label for="dbPath">Move it to</label>
+    <input id="dbPath" spellcheck="false" autocomplete="off">
+    <p class="hint">A full path of the new file, or of a folder to put <code>cactus.conn.db</code> in, e.g. <code id="dbExample"></code>.
+      The folder is created if it doesn't exist; an existing file is never overwritten. The key file (<code>cactus.key</code>) goes along
+      when it is next to the database, and the old files are deleted. cactusdb remembers the new place for the next start
+      (in <code>cactus.conn.db.location</code> next to the program).</p>
+    <p class="hint" id="dbFlagNote" hidden></p>
+    <div id="dbResult" class="dresult" hidden></div>
+    <div class="dactions">
+      <button type="button" id="dbDefault" title="Move it back next to the cactusdb program">Default place</button>
+      <span class="spacer"></span>
+      <button type="button" class="primary" id="dbMove">Move database</button>
     </div>
   </form>
 </dialog>
@@ -984,6 +1040,7 @@ async function api(method, url, body, retried = false) {
   } finally { document.body.classList.toggle("busy", --pending > 0); }
   const data = await res.json().catch(() => ({}));
   const status = +(res.headers.get("X-Cactusdb-Status") || res.status);
+  gaApi(method, url, body, status, performance.now() - t0);
   if (status >= 400 || !res.ok) {
     const err = new Error(data.error || res.statusText || `error ${status}`);
     err.status = status; err.data = data;
@@ -1154,6 +1211,7 @@ function showSettings(st) {
   $("exportDirShow").textContent = st.exportDir;
   $("exportDirShow").title = st.exportDir;
   renderHome();
+  gaApply();
 }
 async function loadSettings() {
   try { showSettings(await api("GET", "/api/settings")); }
@@ -1166,6 +1224,8 @@ function openFolderDialog() {
   $("edFlagNote").textContent = settings.exportToFlag
     ? `cactusdb was started with --exportto ${settings.exportToFlag}. Your choice applies now, but at the next start --exportto wins as long as it is given.` : "";
   $("edResult").hidden = true;
+  showDbPath();
+  $("dbPath").value = ""; $("dbResult").hidden = true; dbMoveArmed(null);
   $("exportDirDialog").showModal();
   $("edPath").select();
 }
@@ -1173,9 +1233,63 @@ function openSettingsDialog() {
   $("stIdle").value = settings.idleMinutes ?? 15;
   $("stDefault").textContent = settings.defaultIdle ?? 15;
   $("stResult").hidden = true;
+  $("stGaId").value = settings.gaId || "";
+  $("stGaId").disabled = !!settings.gaIdEnv;
+  $("stGaIdNote").hidden = !settings.gaIdEnv;
+  $("stGaIdNote").textContent = settings.gaIdEnv ? "Set by $CACTUSDB_GA_ID where cactusdb runs, which wins over this setting." : "";
+  $("stGaMe").checked = gaChoice() === "yes";
+  $("stGaSecret").value = "";
+  $("stGaSecret").placeholder = settings.gaSecretEnv ? "set by $CACTUSDB_GA_API_SECRET" : settings.gaSecretSet ? "saved – leave blank to keep" : "not set";
+  $("stGaSecret").disabled = !!settings.gaSecretEnv;
+  $("stGaClear").checked = false;
+  $("stGaClear").disabled = !settings.gaSecretSet || !!settings.gaSecretEnv;
+  $("stGaCli").checked = !!settings.gaCli;
+  $("stUsFrom").value = $("stUsTo").value = ""; $("stUsResult").hidden = true; usDeleteArmed(false);
+  loadUsageSummary();
   $("settingsDialog").showModal();
   $("stIdle").select();
 }
+// ---- usage log housekeeping: delete the events of a date range ----------------
+function showUsageSummary(u) {
+  $("stUsageSum").textContent = !u.count ? "The usage log is empty."
+    : `${fmtInt(u.count)} event${u.count === 1 ? "" : "s"}, from ${fmtUtc(u.first)} to ${fmtUtc(u.last)}.`;
+}
+const fmtUtc = (v) => { const d = new Date(v.replace(" ", "T") + "Z"); return isNaN(d) ? v : d.toLocaleString(); };
+async function loadUsageSummary() {
+  $("stUsageSum").textContent = "…";
+  try { showUsageSummary(await api("GET", "/api/usage/summary")); } catch (e) { $("stUsageSum").textContent = e.message; }
+}
+// The first click says what will go, the second deletes.
+let usArmed = false;
+function usDeleteArmed(on) {
+  usArmed = on;
+  $("stUsDelete").textContent = on ? "Yes, delete them" : "Delete events";
+  $("stUsDelete").classList.toggle("dangerfill", on);
+}
+$("stUsFrom").addEventListener("input", () => usDeleteArmed(false));
+$("stUsTo").addEventListener("input", () => usDeleteArmed(false));
+$("stUsDelete").addEventListener("click", async () => {
+  const from = $("stUsFrom").value, to = $("stUsTo").value;
+  const box = $("stUsResult");
+  // Local days: from midnight of the first to midnight after the last.
+  const start = from ? new Date(from + "T00:00:00") : null;
+  const end = to ? new Date(to + "T00:00:00") : null;
+  if (end) end.setDate(end.getDate() + 1);
+  if (start && end && start >= end) { box.className = "dresult bad"; box.textContent = "The first day must be on or before the last one."; box.hidden = false; return; }
+  if (!usArmed) {
+    box.className = "dresult busy";
+    box.textContent = !from && !to ? "Delete ALL events of the usage log? Click “Yes, delete them” to go ahead."
+      : `Delete the events ${from ? "from " + start.toLocaleDateString() : "up to"} ${to ? (from ? "to " : "") + new Date(to + "T00:00:00").toLocaleDateString() + " (and with)" : "onwards"}? Click “Yes, delete them” to go ahead.`;
+    box.hidden = false; usDeleteArmed(true); return;
+  }
+  $("stUsDelete").disabled = true;
+  try {
+    const res = await api("POST", "/api/usage/delete", { from: start ? start.toISOString() : "", to: end ? end.toISOString() : "" });
+    showUsageSummary(res);
+    box.className = "dresult ok"; box.textContent = `Deleted ${fmtInt(res.deleted)} event${res.deleted === 1 ? "" : "s"}.`;
+  } catch (e) { box.className = "dresult bad"; box.textContent = e.message; }
+  finally { $("stUsDelete").disabled = false; usDeleteArmed(false); }
+});
 $("stCancel").addEventListener("click", () => $("settingsDialog").close());
 $("stForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -1185,7 +1299,14 @@ $("stForm").addEventListener("submit", async (ev) => {
   }
   $("stSave").disabled = true;
   try {
-    showSettings(await api("POST", "/api/settings", { idleMinutes: n }));
+    const body = { idleMinutes: n, gaCli: $("stGaCli").checked };
+    if (!settings.gaIdEnv) body.gaId = $("stGaId").value.trim();
+    if ($("stGaClear").checked) body.gaClearSecret = true;
+    else if ($("stGaSecret").value.trim()) body.gaSecret = $("stGaSecret").value.trim();
+    showSettings(await api("POST", "/api/settings", body));
+    if ($("stGaMe").checked) gaSetChoice("yes");
+    else if (gaChoice()) gaSetChoice("no"); // an answer given earlier is withdrawn; never asked: still ask
+    gaApply();
     $("settingsDialog").close();
     toast(n ? `Unused connections now disconnect after ${n} minute${n === 1 ? "" : "s"}` : "Connections are never disconnected for being unused");
   } catch (e) {
@@ -1205,6 +1326,57 @@ async function saveExportDir(dir) {
 $("edForm").addEventListener("submit", (ev) => { ev.preventDefault(); saveExportDir($("edPath").value); });
 $("edDefault").addEventListener("click", () => saveExportDir(""));
 $("edCancel").addEventListener("click", () => $("exportDirDialog").close());
+
+// Moving the connection database (cactus.conn.db): the first click says what
+// will happen, the second moves it.
+function showDbPath() {
+  $("dbPathShow").textContent = settings.dbPath || "(unknown)";
+  const def = settings.defaultDbPath || "";
+  $("dbExample").textContent = def ? def.replace(/[^\\/]+[\\/][^\\/]+$/, "") + "cactusdb-data" : "";
+  $("dbDefault").disabled = !def || settings.dbPath === def;
+  $("dbFlagNote").hidden = !settings.dbFlag;
+  $("dbFlagNote").textContent = settings.dbFlag
+    ? `cactusdb was started with --conn-db ${settings.dbFlag}. The move applies now, but at the next start --conn-db wins: change it to the new place (in the service, container or script that starts cactusdb).` : "";
+}
+let dbMoveTarget = null;
+function dbMoveArmed(target) {
+  dbMoveTarget = target;
+  $("dbMove").textContent = target === null ? "Move database" : "Yes, move it";
+  $("dbMove").classList.toggle("dangerfill", target !== null);
+}
+async function moveDb(target) {
+  if (dbMoveTarget !== target) {
+    if (target !== "" && !target.trim()) { $("dbResult").className = "dresult bad"; $("dbResult").textContent = "Enter the new place first."; $("dbResult").hidden = false; return; }
+    $("dbResult").className = "dresult busy";
+    $("dbResult").textContent = `Move the connection database from ${settings.dbPath} to ${target === "" ? settings.defaultDbPath : target}? ` +
+      "Everyone using cactusdb keeps working; a request that arrives at the very moment of the move may fail and need to be repeated. Click “Yes, move it” to go ahead.";
+    $("dbResult").hidden = false;
+    dbMoveArmed(target);
+    return;
+  }
+  $("dbMove").disabled = $("dbDefault").disabled = true;
+  $("dbResult").className = "dresult busy"; $("dbResult").textContent = "Moving…";
+  try {
+    const res = await api("POST", "/api/settings", { dbPath: target });
+    showSettings(res);
+    const m = res.moved;
+    $("dbResult").className = "dresult " + (m.warnings && m.warnings.length ? "bad" : "ok");
+    $("dbResult").textContent = `Moved to ${m.to}.` + (m.keyTo ? ` The key is now ${m.keyTo}.` : "") +
+      (m.warnings && m.warnings.length ? "\n" + m.warnings.join("\n") : "");
+    $("dbPath").value = "";
+    toast("Connection database moved to " + m.to);
+  } catch (e) {
+    $("dbResult").className = "dresult bad"; $("dbResult").textContent = e.message;
+  } finally {
+    dbMoveArmed(null);
+    $("dbMove").disabled = false;
+    showDbPath();
+  }
+}
+$("dbMove").addEventListener("click", () => moveDb($("dbPath").value));
+$("dbDefault").addEventListener("click", () => moveDb(""));
+$("dbPath").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); moveDb($("dbPath").value); } });
+$("dbPath").addEventListener("input", () => { if (dbMoveTarget !== null) { dbMoveArmed(null); $("dbResult").hidden = true; } });
 
 // ---- passwords ----------------------------------------------------------------
 // Every saved connection has its own connection password; the superuser
@@ -1595,7 +1767,7 @@ async function connect(extra = {}) {
     idle.last = Date.now();
     const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
-    $("disconnectBtn").hidden = false;
+    $("disconnectBtn").hidden = false; $("reconnectBtn").hidden = false; $("reconnectBtn").disabled = false;
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false; $("backupBtn").disabled = false;
     setExportAllEnabled(true);
     $("runBtn").disabled = false; $("saveQueryBtn").disabled = false;
@@ -1636,7 +1808,7 @@ async function disconnect(reason = "") {
   state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null; resetTableStats();
   state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
-  $("disconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
+  $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
   renderHome();
@@ -1660,6 +1832,7 @@ async function disconnect(reason = "") {
 // cactus.conn.db (the API calls are recorded by the server), in batches.
 // Never what is typed: no SQL, passwords or other input, only which field.
 function track(fn, detail = "") {
+  gaFromTrack(fn);
   usage.q.push({ fn, detail: String(detail).replace(/\s+/g, " ").trim().slice(0, 300), t: Date.now(), s: state.session || "",
     c: state.session ? state.label : "", e: state.session ? state.engine : "" });
   if (usage.q.length >= 25) flushUsage(false);
@@ -1707,6 +1880,96 @@ document.addEventListener("change", (ev) => {
   else if (/filter|search/i.test(id) || el.type === "search" || el.type === "date") track(`filter: ${id}`, el.value.slice(0, 100));
   else track(`edit: ${id}`); // what was typed is never recorded
 }, { capture: true });
+
+// ---- Google Analytics (opt-in) ------------------------------------------------
+// Only when this server has a Measurement ID (☰ → Settings) and the person
+// said yes in this browser. Google's tag is loaded then, in the background:
+// if a proxy or firewall blocks Google, the script simply never arrives and
+// nothing else changes. Events are only pushed into gtag's queue, which
+// never waits or throws; once the tag is known to be unreachable nothing more
+// is queued. Only names of functions and fixed values are sent (see
+// GOOGLE_ANALYTICS.md), never data, SQL, names, paths or addresses.
+const ga = { id: "", loaded: false, ok: false, dead: false };
+const GA_KEY = "cactusdb.analytics"; // "yes" | "no"; missing: not asked yet
+function gaChoice() { try { return localStorage.getItem(GA_KEY) || ""; } catch (e) { return "no"; } }
+function gaSetChoice(v) { try { localStorage.setItem(GA_KEY, v); } catch (e) { /* not remembered */ } }
+function gaApply() {
+  ga.id = settings.gaId || "";
+  const choice = gaChoice();
+  $("gaBanner").hidden = !ga.id || choice !== "";
+  if (ga.loaded && choice !== "yes") {
+    try { window.gtag("consent", "update", { analytics_storage: "denied" }); } catch (e) { /* ignore */ }
+  }
+  if (ga.id && choice === "yes") gaLoad();
+}
+function gaLoad() {
+  if (ga.loaded || !ga.id) return;
+  ga.loaded = true;
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    gtag("consent", "default", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+    gtag("js", new Date());
+    gtag("config", ga.id, { send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false });
+    const sc = document.createElement("script");
+    sc.async = true;
+    sc.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(ga.id);
+    sc.onload = () => { ga.ok = true; };
+    sc.onerror = () => { ga.dead = true; };                // blocked by a proxy, firewall or ad blocker
+    setTimeout(() => { if (!ga.ok) ga.dead = true; }, 20000); // or never answered
+    document.head.appendChild(sc);
+    gaEvent("page_view", { page_title: "cactusdb", page_location: location.origin + "/" + (state.tab || "data") });
+  } catch (e) { ga.dead = true; }
+}
+function gaEvent(name, params = {}) {
+  if (!ga.loaded || ga.dead || gaChoice() !== "yes") return;
+  try { window.gtag("event", name, { ...params, app_version: settings.version || "" }); } catch (e) { ga.dead = true; }
+}
+$("gaYes").addEventListener("click", () => { gaSetChoice("yes"); gaApply(); });
+$("gaNo").addEventListener("click", () => { gaSetChoice("no"); gaApply(); });
+// The page's own events (see track): only those named by a fixed id or value.
+const gaSafe = (v) => String(v).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 40);
+function gaFromTrack(fn) {
+  const m = /^([a-z ]+): (.+)$/.exec(fn);
+  if (!m) return; // a button named by its text, a dialog's button: not sent
+  const [, kind, v] = m, val = gaSafe(v);
+  switch (kind) {
+    case "tab": gaEvent("page_view", { page_title: "cactusdb " + val, page_location: location.origin + "/" + val }); break;
+    case "menu": gaEvent("menu_click", { item: val }); break;
+    case "sort objects": gaEvent("sort", { by: val }); break;
+    case "object tab": gaEvent("object_tab", { type: val }); break;
+    case "set": gaEvent("ui_toggle", { control: val }); break;
+    case "choose": gaEvent("ui_choose", { control: val }); break; // which list, never the choice (it can be a name)
+    case "button": gaEvent("ui_click", { control: val }); break;
+    case "export all": case "export format": case "home": case "engine":
+      gaEvent("ui_click", { control: gaSafe(kind + "_" + v) }); break;
+  }
+}
+// Requests to the server: what they did, by engine and format only.
+const GA_API = {
+  "POST /api/connect": "connect", "POST /api/testconn": "test_connection", "POST /api/disconnect": "disconnect",
+  "GET /api/select": "open_table", "GET /api/definition": "show_definition", "POST /api/query": "run_query",
+  "GET /api/tablestats": "table_stats", "POST /api/export": "export", "POST /api/exportall": "export_all",
+  "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare",
+  "POST /api/connections": "save_connection", "POST /api/queries": "save_query",
+  "POST /api/files/zip": "zip_files", "POST /api/files/preview": "preview_file", "POST /api/files/delete": "delete_files",
+  "POST /api/settings": "save_settings", "POST /api/usage/delete": "usage_housekeeping",
+};
+function gaApi(method, url, body, status, ms) {
+  if (!ga.loaded || ga.dead) return;
+  let path = url.split("?")[0];
+  if (/^\/api\/connections\/\d+\/delete$/.test(path)) path = "/api/connections/delete";
+  if (/^\/api\/queries\/\d+\/delete$/.test(path)) path = "/api/queries/delete";
+  const name = GA_API[method + " " + path] || { "/api/connections/delete": "delete_connection", "/api/queries/delete": "delete_saved_query" }[path];
+  if (!name) return;
+  const p = { result: status < 400 ? "ok" : "failed", duration_bucket: ms < 1000 ? "<1s" : ms < 10000 ? "1-10s" : ms < 60000 ? "10-60s" : ">60s" };
+  const engine = (body && body.engine) || state.engine;
+  if (engine) p.engine = gaSafe(engine);
+  if (body && body.format) p.format = gaSafe(body.format);
+  if (body && Array.isArray(body.others)) p.databases = body.others.length + 1;
+  gaEvent(name, p);
+}
+
 track("open page", `${innerWidth}×${innerHeight}, ${matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"}, ${navigator.language}`);
 
 // ---- disconnect when idle ---------------------------------------------------
@@ -2015,13 +2278,36 @@ document.querySelectorAll("section.box[data-sec] h2 .toggle").forEach((t) => t.a
 }));
 for (const [sec, c] of Object.entries(loadCollapsed())) setCollapsed(sec, c, false);
 
-$("refreshBtn").addEventListener("click", async () => {
+// Refresh (↻ in the header, ⟳ above the list): the server checks the
+// connection with a fresh one, then every object is listed again; the open
+// table or definition is reloaded, and the selection kept if it still exists.
+async function refreshAll() {
+  if (!state.session) return;
+  const btns = [$("reconnectBtn"), $("refreshBtn")];
+  btns.forEach((b) => { b.disabled = true; });
+  $("reconnectBtn").textContent = "↻ Refreshing…";
   try {
-    const res = await api("GET", "/api/objects?" + new URLSearchParams({ session: state.session }));
-    state.objects = res.objects; resetTableStats(); renderObjects(); toast("Object list refreshed");
-    loadTableStats(true);
+    const session = state.session;
+    const res = await api("POST", "/api/refresh", { session });
+    if (session !== state.session) return;
+    state.objects = res.objects; resetTableStats(); state.defFor = null;
+    const sel = state.sel;
+    if (sel && !state.objects.some((g) => g.type === sel.type && g.items.includes(sel.name))) {
+      state.sel = null; state.table = null; $("tabTitle").textContent = "";
+    }
+    renderObjects(); loadTableStats(true);
+    if (state.sel && state.tab === "def") loadDefinition();
+    if (state.table && state.tab === "data" && state.result && state.result.table === state.table) loadTable(state.table);
+    const n = state.objects.reduce((a, g) => a + g.items.length, 0);
+    toast(`Refreshed: the connection works; ${fmtInt(n)} object${n === 1 ? "" : "s"} reloaded` + (sel && !state.sel ? ` (${sel.name} no longer exists)` : ""));
   } catch (e) { toast(e.message, true); }
-});
+  finally {
+    btns.forEach((b) => { b.disabled = !state.session; });
+    $("reconnectBtn").textContent = "↻ Refresh";
+  }
+}
+$("refreshBtn").addEventListener("click", refreshAll);
+$("reconnectBtn").addEventListener("click", refreshAll);
 
 $("objTree").addEventListener("click", async (ev) => {
   const li = ev.target.closest("li[data-type]");

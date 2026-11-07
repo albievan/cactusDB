@@ -39,11 +39,11 @@ var (
 // migrateSuperuser adds the escrow column to older stores.
 func (s *Store) migrateSuperuser() error {
 	var n int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('connections') WHERE name = 'escrow'`).Scan(&n); err != nil {
+	if err := s.DB().QueryRow(`SELECT COUNT(*) FROM pragma_table_info('connections') WHERE name = 'escrow'`).Scan(&n); err != nil {
 		return err
 	}
 	if n == 0 {
-		_, err := s.db.Exec(`ALTER TABLE connections ADD COLUMN escrow TEXT NOT NULL DEFAULT ''`)
+		_, err := s.DB().Exec(`ALTER TABLE connections ADD COLUMN escrow TEXT NOT NULL DEFAULT ''`)
 		return err
 	}
 	return nil
@@ -196,7 +196,7 @@ func (s *Store) setEscrow(id int64, connPassword string) error {
 	if err != nil || esc == "" {
 		return err
 	}
-	_, err = s.db.Exec(`UPDATE connections SET escrow = ? WHERE id = ?`, esc, id)
+	_, err = s.DB().Exec(`UPDATE connections SET escrow = ? WHERE id = ?`, esc, id)
 	return err
 }
 
@@ -207,7 +207,7 @@ func (s *Store) UnlockAsSuperuser(id int64, superPassword string) (SavedConn, *s
 		return SavedConn{}, nil, err
 	}
 	var lock, escrow string
-	if err := s.db.QueryRow(`SELECT lock, escrow FROM connections WHERE id = ?`, id).Scan(&lock, &escrow); err != nil {
+	if err := s.DB().QueryRow(`SELECT lock, escrow FROM connections WHERE id = ?`, id).Scan(&lock, &escrow); err != nil {
 		return SavedConn{}, nil, err
 	}
 	if lock == "" { // no connection password: nothing to recover

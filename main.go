@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.28.0"
+var version = "1.29.0"
 
 //go:embed web
 var webFS embed.FS
@@ -69,6 +69,9 @@ type server struct {
 	exportDirs       []string // every export folder of this run, for downloads
 	defaultExportDir string   // export/ next to the program
 	exportToFlag     string   // --exportto, which overrides the saved folder
+
+	defaultConnDB string // cactus.conn.db next to the program
+	connDBFlag    string // --conn-db, which overrides a moved database
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -172,8 +175,12 @@ func main() {
 		log.Fatalf("bad export folder %s: %v", *exportTo, err)
 	}
 
+	defaultConnDB := filepath.Join(exeDir(), "cactus.conn.db")
 	if *connDB == "" {
-		*connDB = filepath.Join(exeDir(), "cactus.conn.db")
+		// Moved from the web UI (see dbmove.go)?
+		if *connDB = movedConnDB(exeDir()); *connDB == "" {
+			*connDB = defaultConnDB
+		}
 	}
 	if *keyFile == "" {
 		*keyFile = filepath.Join(filepath.Dir(*connDB), keyFileName)
@@ -185,7 +192,7 @@ func main() {
 			os.Exit(1)
 		}
 		err = superuserCLI(st, *superuser)
-		st.db.Close()
+		st.DB().Close()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "cactusdb:", err)
 			os.Exit(1)
@@ -241,14 +248,14 @@ func main() {
 				fmt.Fprintf(os.Stderr, "cactusdb: warning: the connection won't be saved: cannot open %s: %v\n", *connDB, err)
 				store = nil
 			} else {
-				defer store.db.Close()
+				defer store.DB().Close()
 			}
 		}
 		if !set["exportto"] {
 			st := store
 			if st == nil && fileExists(*connDB) { // --saveconn no: only read the setting
 				if st, err = openStore(*connDB, *keyFile); err == nil {
-					defer st.db.Close()
+					defer st.DB().Close()
 				}
 			}
 			if dir := savedExportDir(st); dir != "" {
@@ -256,7 +263,7 @@ func main() {
 			}
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		err = runCLI(ctx, cliOptions{
+		opts := cliOptions{
 			ConnParams:  ConnParams{Engine: engine, Host: *host, Port: *dbPort, Username: *dbUser, Password: *dbPassword, Database: *dbName},
 			PasswordSet: set["dbpassword"],
 			Tables:      *dbTable,
@@ -268,10 +275,24 @@ func main() {
 			Threads:     *threads,
 			Progress:    term.IsTerminal(int(os.Stdout.Fd())) && enableANSI(os.Stdout),
 			Store:       store,
-		}, os.Stdout)
+		}
+		start := time.Now()
+		err = runCLI(ctx, opts, os.Stdout)
 		stop()
+		// The run goes into the usage log (and Google Analytics when the
+		// server sends command-line runs), if there is a connection database.
+		rec := store
+		if rec == nil && fileExists(*connDB) {
+			if st, e := openStore(*connDB, *keyFile); e == nil {
+				rec = st
+			}
+		}
+		recordCLI(rec, cliRun{o: opts, start: start, err: err, function: cliFunction(opts)})
+		if rec != nil && rec != store {
+			rec.DB().Close()
+		}
 		if store != nil {
-			store.db.Close()
+			store.DB().Close()
 		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "cactusdb:", err)
@@ -357,10 +378,11 @@ func main() {
 	if err := os.MkdirAll(exportDir, 0o755); err != nil {
 		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
 	}
-	if err := startUsageLog(store.db); err != nil {
+	if err := startUsageLog(store); err != nil {
 		log.Printf("warning: usage isn't recorded: %v", err)
 	}
 	s := &server{store: store, sessions: map[string]*session{}, defaultExportDir: defaultExportDir,
+		defaultConnDB: defaultConnDB, connDBFlag: flagValueIf(set["conn-db"], *connDB),
 		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{})}
 	s.setExportFolder(exportDir)
 
@@ -380,6 +402,7 @@ func main() {
 	mux.HandleFunc("POST /api/disconnect", s.handleDisconnect)
 	mux.HandleFunc("POST /api/testconn", s.handleTestConn)
 	mux.HandleFunc("GET /api/objects", s.handleObjects)
+	mux.HandleFunc("POST /api/refresh", s.handleRefresh)
 	mux.HandleFunc("GET /api/tablestats", s.handleTableStats)
 	mux.HandleFunc("GET /api/definition", s.handleDefinition)
 	mux.HandleFunc("GET /api/select", s.handleSelect)
@@ -411,6 +434,8 @@ func main() {
 	mux.HandleFunc("DELETE /api/queries/{id}", s.handleDeleteQuery)
 	mux.HandleFunc("POST /api/queries/{id}/delete", s.handleDeleteQuery)
 	mux.HandleFunc("POST /api/usage", s.handleUsage)
+	mux.HandleFunc("GET /api/usage/summary", s.handleUsageSummary)
+	mux.HandleFunc("POST /api/usage/delete", s.handleUsageDelete)
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)
@@ -518,7 +543,7 @@ func main() {
 		os.Exit(1)
 	}
 	s.release()
-	store.db.Close()
+	store.DB().Close()
 	log.Printf("stopped")
 	stopped()
 	term.flush(2 * time.Second)
@@ -827,6 +852,14 @@ func readJSON(r *http.Request, v any) error {
 	return dec.Decode(v)
 }
 
+// flagValueIf is v when the option was given, else "".
+func flagValueIf(given bool, v string) string {
+	if given {
+		return v
+	}
+	return ""
+}
+
 func newID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
@@ -1109,6 +1142,43 @@ func (s *server) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// handleRefresh refreshes a session's connection and lists its objects
+// again: the pooled connections that aren't in use are closed (a firewall or
+// the database server may have cut them), a fresh one is opened and checked,
+// and the tables, views, procedures, triggers… are read again.
+func (s *server) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Session string `json:"session"`
+	}
+	readJSON(r, &req)
+	ss, err := s.session(r, req.Session)
+	if err != nil {
+		writeErr(w, 401, err)
+		return
+	}
+	start := time.Now()
+	ss.db.SetMaxIdleConns(0) // closes the idle ones
+	ss.db.SetMaxIdleConns(2) // database/sql's default
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	if err := ss.db.PingContext(ctx); err != nil {
+		logAction(r, "[%s] refresh FAILED: %v", ss.label, err)
+		writeErr(w, 502, fmt.Errorf("the database doesn't answer: %w (disconnect and connect again)", err))
+		return
+	}
+	objects, err := listObjects(r.Context(), ss.engine, ss.db)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	n := 0
+	for _, g := range objects {
+		n += len(g.Items)
+	}
+	logAction(r, "[%s] refresh: connection checked, %d object(s) in %s", ss.label, n, time.Since(start).Round(time.Millisecond))
+	writeJSON(w, 200, map[string]any{"objects": objects})
 }
 
 func (s *server) handleObjects(w http.ResponseWriter, r *http.Request) {
