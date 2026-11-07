@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.26.0 — 2026-11-07
+
+- **Estimated table sizes**: when the database doesn't report a table's size (Firebird),
+  the **MB** column now shows rows × row size, marked `≈`, instead of `?`. The row size is
+  the sum of the columns' declared sizes: `varchar(20)` 20 bytes, `int` 4, `datetime` 8,
+  `decimal(p,s)` p/2+1, …; text and blob columns, which have no declared size, count a
+  nominal 256 and 1,024 bytes. The totals under the tabs add them up, marked `≈` too, and
+  the tooltip says which sizes are estimated.
+
 ## 1.25.0 — 2026-11-07
 
 - **Not connected**: the unplugged cable is replaced by the cactusdb logo in a small desert

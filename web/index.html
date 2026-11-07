@@ -1900,17 +1900,20 @@ function fmtMB(bytes) {
 const rowsText = (rows, exact) => rows < 0 ? "? rows" : `${exact ? "" : "≈"}${fmtInt(rows)}`;
 // The columns of the table list: the header says what the number is.
 const rowsCell = (st) => st.rows < 0 ? "?" : `${st.exact ? "" : "≈"}${fmtInt(st.rows)}`;
-const mbCell = (st) => st.bytes == null || st.bytes < 0 ? "?" : fmtMB(st.bytes).replace(" MB", "");
+const mbCell = (st) => st.bytes == null || st.bytes < 0 ? "?" : (st.bytesEstimated ? "≈" : "") + fmtMB(st.bytes).replace(" MB", "");
 const statTitle = (st) => (st.rows < 0 ? "rows unknown" : `${st.exact ? "" : "about "}${fmtInt(st.rows)} rows${st.exact ? "" : " (estimated: counting took too long)"}`) +
-  ", " + (st.bytes < 0 ? "size unknown (the database doesn't report it)" : `${fmtMB(st.bytes)} with indexes`);
+  ", " + (st.bytes < 0 ? "size unknown (the database doesn't report it)"
+    : st.bytesEstimated ? `about ${fmtMB(st.bytes)} (estimated: the database doesn't report the size, so rows × the declared size of the columns)`
+    : `${fmtMB(st.bytes)} with indexes`);
 function renderStatsSummary(cur) {
   const box = $("objStats");
   const show = tstats.total && cur && cur.type === "table";
   box.hidden = !show;
   if (!show) return;
   const t = tstats.total;
-  box.textContent = `${fmtInt(t.tables.length)} tables · ${t.exact ? "" : "≈"}${fmtInt(t.rows)} rows · ${t.bytes < 0 ? "size unknown" : fmtMB(t.bytes)}`;
-  box.title = t.exact ? "Every table was counted exactly" : "≈: the database's estimate, not an exact count; ⟳ # MB counts every table exactly";
+  box.textContent = `${fmtInt(t.tables.length)} tables · ${t.exact ? "" : "≈"}${fmtInt(t.rows)} rows · ${t.bytes < 0 ? "size unknown" : (t.bytesEstimated ? "≈" : "") + fmtMB(t.bytes)}`;
+  box.title = (t.exact ? "Every table was counted exactly" : "≈ rows: the database's estimate, not an exact count; ⟳ # MB counts every table exactly") +
+    (t.bytesEstimated ? "\n≈ MB: the database doesn't report table sizes, so they are estimated as rows × the declared size of the columns (text and blobs count a nominal size)" : "");
 }
 $("objTabs").addEventListener("click", async (ev) => {
   if (!ev.target.closest("button[data-stats]")) return;

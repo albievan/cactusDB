@@ -13,6 +13,8 @@ import (
 // object list. The size and a row estimate come from the database's
 // catalog in one query; the rows are then counted exactly, a few tables at a
 // time, within a time budget: a table not counted in time keeps the estimate.
+// When the database has no size for a table, it is estimated from the rows
+// and the declared sizes of the columns.
 // The quick variant, used when connecting, only counts the tables the catalog
 // has no estimate for, so opening a database doesn't load its server.
 
@@ -26,7 +28,10 @@ type tableStat struct {
 	Name  string `json:"name"`
 	Rows  int64  `json:"rows"`  // -1 when unknown
 	Exact bool   `json:"exact"` // Rows was counted, not estimated
-	Bytes int64  `json:"bytes"` // data and indexes; -1 when the engine doesn't say
+	Bytes int64  `json:"bytes"` // data and indexes; -1 when unknown
+	// BytesEstimated: the database doesn't report the size, so Bytes is
+	// rows × the sum of the columns' declared sizes (see rowsize.go).
+	BytesEstimated bool `json:"bytesEstimated,omitempty"`
 }
 
 // tableSizeQuery returns name, estimated rows and bytes per table.
@@ -85,6 +90,7 @@ func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string,
 	if quick {
 		budget = quickStatsBudget
 	}
+	parent := ctx
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	queue := make(chan int)
@@ -109,7 +115,36 @@ func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string,
 	}
 	close(queue)
 	wg.Wait()
+	estCtx, estCancel := context.WithTimeout(parent, quickStatsBudget) // a budget of its own
+	defer estCancel()
+	estimateSizes(estCtx, engine, db, out)
 	return out
+}
+
+// estimateSizes fills in the size of the tables the database didn't report
+// one for, as rows × row size, a few tables at a time within ctx.
+func estimateSizes(ctx context.Context, engine string, db *sql.DB, out []tableStat) {
+	queue := make(chan int)
+	var wg sync.WaitGroup
+	for range tableStatsThreads {
+		wg.Go(func() {
+			for i := range queue {
+				if rb, err := rowBytes(ctx, engine, db, out[i].Name); err == nil && rb > 0 {
+					out[i].Bytes, out[i].BytesEstimated = out[i].Rows*rb, true
+				}
+			}
+		})
+	}
+	for i := range out {
+		if ctx.Err() != nil {
+			break
+		}
+		if out[i].Bytes < 0 && out[i].Rows >= 0 {
+			queue <- i
+		}
+	}
+	close(queue)
+	wg.Wait()
 }
 
 func (s *server) handleTableStats(w http.ResponseWriter, r *http.Request) {
@@ -137,13 +172,14 @@ func (s *server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 	quick := r.URL.Query().Get("quick") == "1"
 	stats := tableStats(r.Context(), ss.engine, ss.db, tables, quick)
 	var rows, bytes int64
-	exact, sized := true, false
+	exact, sized, bytesEst := true, false, false
 	for _, t := range stats {
 		if t.Rows > 0 {
 			rows += t.Rows
 		}
 		if t.Bytes >= 0 {
 			bytes, sized = bytes+t.Bytes, true
+			bytesEst = bytesEst || t.BytesEstimated
 		}
 		exact = exact && t.Exact
 	}
@@ -155,5 +191,5 @@ func (s *server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 		how = "estimated"
 	}
 	logAction(r, "[%s] table sizes of %d table(s) %s in %s", ss.label, len(stats), how, time.Since(start).Round(time.Millisecond))
-	writeJSON(w, 200, map[string]any{"tables": stats, "rows": rows, "exact": exact, "bytes": bytes})
+	writeJSON(w, 200, map[string]any{"tables": stats, "rows": rows, "exact": exact, "bytes": bytes, "bytesEstimated": bytesEst})
 }

@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.25.0
+cactusdb 1.26.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -427,7 +427,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.25.0*), as reported by the running program.
+example *v1.26.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -446,8 +446,29 @@ those objects.
   no estimate for (SQLite, Firebird) are counted, for up to 10 seconds.
 - **⟳ # MB**, next to the Tables tab, counts the rows of every table exactly and measures
   the sizes again: four tables at a time, for up to 30 seconds; a table that takes longer
-  keeps the estimate, marked `≈`. Sizes come from the database's catalog; Firebird
-  doesn't keep one per table, so it shows `?`.
+  keeps the estimate, marked `≈`. Sizes come from the database's catalog.
+- **Estimated sizes:** when the database doesn't report a table's size (Firebird keeps
+  none per table), it is estimated as **rows × row size**, marked `≈`. The row size is the
+  sum of the declared sizes of the columns, e.g. `name varchar(20)`, `surname varchar(20)`,
+  `age int`, `dateofbirth datetime`, `id` (auto-increment int) and `photo blob` make
+  20 + 20 + 4 + 8 + 4 + 1,024 = 1,080 bytes a row:
+
+  | Column type | Bytes |
+  |---|---|
+  | `char(n)`, `varchar(n)`, `binary(n)` | n (`nchar`/`nvarchar`: 2 × n) |
+  | `tinyint`, `boolean`, `bit` | 1 |
+  | `smallint` | 2 |
+  | `int`, `integer`, `real`, `date` | 4 |
+  | `bigint`, `double`, `datetime`, `timestamp`, `time` | 8 |
+  | `decimal(p,s)`, `numeric(p,s)` | p / 2 + 1 |
+  | `uuid`, `uniqueidentifier` | 16 |
+  | `text`, `clob`, `json`, `varchar(max)`, `blob sub_type text` | 256 (nominal) |
+  | `blob`, `bytea`, `image`, `varbinary(max)` | 1,024 (nominal) |
+  | anything else (e.g. a Firebird domain) | 8 |
+
+  Computed columns aren't stored and count 0. Text and blob columns have no declared
+  size, so the estimate can be well off for tables that hold large documents or images.
+  Hover over a table to see whether its size is measured or estimated.
 - Long names wrap at `_`, so the whole name is always visible. The open table is
   highlighted in the list, and its name is shown next to the tabs.
 - **Sorting:** click a column heading above the list (**Name**, **Rows**, **MB**) to sort by
@@ -708,7 +729,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.25.0 is running in the background (process id 48211)
+cactusdb 1.26.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -836,7 +857,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.25.0 is running in container cactusdb
+cactusdb 1.26.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -1048,6 +1069,7 @@ CACTUSDB_IT=1 go test ./...
 | `sys_windows.go`, `sys_other.go` | Platform specifics: detaching from the terminal, console colours |
 | `db.go` | Connecting, listing columns, running queries |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
+| `tablestats.go`, `rowsize.go` | Rows and size of every table; the size estimated as rows × the columns' declared sizes when the database doesn't report it |
 | `readonly.go` | The read-only query check |
 | `export.go` | Excel / JSON / XML / CSV export |
 | `store.go` | Saved connections and settings (`cactus.conn.db`) |
