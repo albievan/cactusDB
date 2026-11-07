@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.23.0"
+var version = "1.24.0"
 
 //go:embed web
 var webFS embed.FS
@@ -74,6 +74,7 @@ type server struct {
 	sessions map[string]*session
 	batches  map[string]*webBatch    // "export all tables" jobs, by id
 	zips     map[string]*preparedZip // compressed downloads of the Exported files page, by id
+	compares map[string]*compareJob  // ☰ → Compare databases, by id (compare.go)
 
 	throttle lockThrottle // slows down guessing connection passwords
 
@@ -391,6 +392,8 @@ func main() {
 	mux.HandleFunc("GET /api/files/zip/{id}", s.handleDownloadZip)
 	mux.HandleFunc("POST /api/files/preview", s.handlePreviewFile)
 	mux.HandleFunc("POST /api/files/delete", s.handleDeleteFiles)
+	mux.HandleFunc("POST /api/compare", s.handleCompare)
+	mux.HandleFunc("GET /api/compare/{job}", s.handleCompareStatus)
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)

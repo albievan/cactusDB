@@ -252,6 +252,82 @@
   #logsPane .filesbar select { width: auto; }
   .lginfo { padding: 4px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
   .lginfo .live { color: var(--accent); font-weight: 600; }
+  /* ☰ → Compare databases */
+  :root { --c-miss: #b3261e; --c-miss-bg: #fbe9e7; --c-extra: #1d5fa8; --c-extra-bg: #e3edf9; --c-diff: #8a5a00; --c-diff-bg: #fdf1d6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-miss: #f2867c; --c-miss-bg: #3a1f1d; --c-extra: #8ab8f0; --c-extra-bg: #1c2a3b; --c-diff: #f0c060; --c-diff-bg: #3a3018; } }
+  #comparePane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
+  #comparePane[hidden] { display: none; }
+  #comparePane .filesbar select { width: auto; max-width: 260px; }
+  .cmpothers { display: flex; flex-wrap: wrap; gap: 4px; }
+  .cmpothers label { white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; cursor: pointer; background: var(--panel); }
+  .cmpothers label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .cmpothers input { margin: 0; }
+  .cmpothers .none { font-size: 12px; color: var(--muted); }
+  .cmpbody { display: grid; grid-template-columns: minmax(320px, 5fr) minmax(0, 6fr); min-height: 0; }
+  .cmpbody[hidden] { display: none; }
+  .cmpbody > div { min-height: 0; display: grid; grid-template-rows: auto 1fr; }
+  .cmpleft { border-right: 1px solid var(--border); }
+  .cmpbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--panel-2); font-size: 12px; }
+  .cmpbar input[type=search] { flex: 1; min-width: 120px; padding: 3px 8px; }
+  .cmpbar select { width: auto; padding: 2px 6px; }
+  .cmpscroll { overflow: auto; min-height: 0; }
+  table.cmp { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.cmp th { position: sticky; top: 0; background: var(--panel-2); text-align: left; font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; z-index: 1; }
+  table.cmp th.db { text-align: center; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  table.cmp td { padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.cmp td.oname { font-family: var(--mono); overflow-wrap: anywhere; }
+  table.cmp td.otype { color: var(--muted); white-space: nowrap; }
+  table.cmp tr { cursor: pointer; }
+  table.cmp tr:hover td { background: var(--row-hover); }
+  table.cmp tr.on td { background: var(--accent-soft); }
+  table.cmp tr.grp td { background: var(--panel-2); font-weight: 600; cursor: default; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+  td.st { text-align: center; white-space: nowrap; font-size: 11.5px; }
+  .st span, .stchip { display: inline-block; padding: 1px 7px; border-radius: 999px; font-weight: 600; font-size: 11px; }
+  .st-same { color: var(--accent); }
+  .st-diff { color: var(--c-diff); background: var(--c-diff-bg); }
+  .st-missing { color: var(--c-miss); background: var(--c-miss-bg); }
+  .st-extra { color: var(--c-extra); background: var(--c-extra-bg); }
+  .st-present, .st-absent { color: var(--muted); }
+  td.st.sel span { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cmpsum { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .cmpsum .t { font-weight: 600; }
+  .cmpright .cmpscroll { padding: 0; }
+  .cmpnotes { margin: 0; padding: 8px 12px 8px 28px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .cmpnotes li { margin: 2px 0; overflow-wrap: anywhere; }
+  .cmpmsg { padding: 14px; color: var(--muted); font-size: 13px; }
+  table.dif { border-collapse: collapse; width: 100%; font: 12px/1.45 var(--mono); table-layout: fixed; }
+  table.dif th { position: sticky; top: 0; background: var(--panel-2); font: 600 12px system-ui, sans-serif; text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  table.dif td { padding: 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; border-right: 1px solid var(--border); }
+  table.dif td.ln { width: 3.2em; color: var(--muted); text-align: right; padding: 0 6px; user-select: none; }
+  table.dif td.add { background: var(--c-miss-bg); }
+  table.dif td.del { background: var(--c-extra-bg); }
+  table.dif td.chg { background: var(--c-diff-bg); }
+  table.dif td.gap { background: repeating-linear-gradient(45deg, transparent 0 4px, var(--panel-2) 4px 8px); }
+  pre.cmpscript { margin: 0; padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre; overflow: auto; background: var(--panel-2); min-height: 0; }
+  pre.cmpscript .c { color: var(--muted); }
+  pre.cmpscript .w { color: var(--c-miss); font-weight: 600; }
+  .cmpprog { display: flex; align-items: center; gap: 10px; }
+  .cmpprog .obar { width: 180px; height: 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); overflow: hidden; display: inline-block; }
+  .cmpprog .obar i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+  /* Not connected: the data pane shows only an unplugged cable */
+  #dataPane.offline { grid-template-rows: 1fr; }
+  #dataPane.offline > .grid { grid-row: 1; }
+  #dataPane.offline > .editor, #dataPane.offline > #info, #dataPane.offline > #exportNote { display: none; }
+  .noconn h3 { margin: 14px 0 4px; font-size: 17px; color: var(--text); }
+  .noconn p { margin: 0; }
+  .noconn svg { width: 240px; max-width: 70vw; height: auto; overflow: visible; }
+  .noconn .plug { animation: plugL 2.6s ease-in-out infinite; }
+  .noconn .sock { animation: plugR 2.6s ease-in-out infinite; }
+  .noconn .spark { animation: spark 2.6s ease-in-out infinite; opacity: 0; transform-origin: 120px 60px; }
+  .noconn .ring { animation: ring 2.6s ease-out infinite; transform-origin: 120px 60px; opacity: 0; }
+  .noconn .db { animation: dbfade 2.6s ease-in-out infinite; }
+  @keyframes plugL { 0%, 100% { transform: translateX(-14px); } 45%, 55% { transform: translateX(0); } }
+  @keyframes plugR { 0%, 100% { transform: translateX(14px); } 45%, 55% { transform: translateX(0); } }
+  @keyframes spark { 0%, 40% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.3); } }
+  @keyframes ring { 0%, 55% { opacity: 0; transform: scale(.3); } 60% { opacity: .7; } 100% { opacity: 0; transform: scale(2.2); } }
+  @keyframes dbfade { 0%, 100% { opacity: .35; } 50% { opacity: .8; } }
+  @media (prefers-reduced-motion: reduce) { .noconn .plug, .noconn .sock, .noconn .spark, .noconn .ring, .noconn .db { animation: none; } .noconn .spark { opacity: 1; } }
+  @media (max-width: 900px) { .cmpbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) minmax(260px, 1fr); } .cmpleft { border-right: 0; border-bottom: 1px solid var(--border); } }
   a.btn { display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 13px; }
   a.btn:hover { border-color: var(--accent); }
   #filesPane { display: grid; grid-template-rows: auto auto 1fr auto; background: var(--panel); }
@@ -468,6 +544,7 @@
       <button data-menu="drivers" title="The databases cactusdb supports and their drivers">🧩 Drivers</button>
       <button data-menu="settings" title="When to disconnect an unused connection">⚙ Settings</button>
       <button data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request">📜 Logs</button>
+      <button data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences">⇄ Compare databases</button>
       <button data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system">⬆ Check for update<span class="updot" id="updateDot" hidden></span></button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
@@ -533,6 +610,7 @@
       <button data-tab="queries" id="queriesTab" hidden title="Queries saved for this connection">Saved queries</button>
       <button data-tab="files" title="Download exported files, compressed">Exported files</button>
       <button data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
+      <button data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
       <span class="title" id="tabTitle"></span>
     </div>
     <div class="pane" id="dataPane">
@@ -620,6 +698,42 @@
       </div>
       <div class="lginfo" id="lgSub"></div>
       <pre id="lgText" class="lgtext" tabindex="0">…</pre>
+    </div>
+    <div class="pane" id="comparePane" hidden>
+      <div class="filesbar">
+        <label class="flabel" for="cmpMaster">Master</label>
+        <select id="cmpMaster" title="The database the others are compared with: the scripts make them match it"></select>
+        <span class="flabel">Compare with</span>
+        <div class="cmpothers" id="cmpOthers" role="group" aria-label="Databases to compare with the master"></div>
+        <label class="check" title="The scripts also drop tables, columns, views, procedures… that the master doesn't have"><input type="checkbox" id="cmpDrops" checked> Drop what the master doesn't have</label>
+        <span class="spacer"></span>
+        <button class="primary" id="cmpRun" title="Read the structure of every chosen database and compare it with the master's (no data is compared)">Compare</button>
+      </div>
+      <div class="lginfo" id="cmpSub">Choose the master database, then the databases to compare with it. Only the structure (DDL) is compared, never the data.</div>
+      <div class="cmpbody" id="cmpBody" hidden>
+        <div class="cmpleft">
+          <div class="cmpbar">
+            <select id="cmpShow" aria-label="Which objects"><option value="diff" selected>Differences only</option><option value="all">All objects</option></select>
+            <select id="cmpType" aria-label="Object type"><option value="">All types</option></select>
+            <input id="cmpFilter" type="search" placeholder="Filter by name…" spellcheck="false" autocomplete="off" aria-label="Filter by name">
+          </div>
+          <div class="cmpscroll" id="cmpMatrix"></div>
+        </div>
+        <div class="cmpright">
+          <div class="cmpbar">
+            <label for="cmpTarget">Database</label>
+            <select id="cmpTarget"></select>
+            <div class="ftypes" role="group" aria-label="Show">
+              <button class="on" data-cmpview="diff" title="The selected object: the master's definition beside this database's, differences highlighted">Differences</button>
+              <button data-cmpview="script" title="The script that makes this database's structure match the master's">Script</button>
+            </div>
+            <span class="spacer"></span>
+            <button class="small" id="cmpCopy" title="Copy the script">Copy</button>
+            <button class="small" id="cmpSave" title="Download the script as a .sql file">⤓ .sql</button>
+          </div>
+          <div class="cmpscroll" id="cmpDetail"></div>
+        </div>
+      </div>
     </div>
     <div class="pane" id="defPane" hidden>
       <div class="defbar">
@@ -1119,6 +1233,7 @@ const UNLOCK_WORDS = {
   connect: (n) => ({ title: `Connect to “${n}”`, text: `“${n}” is protected by its connection password. Enter it to connect.`, ok: "Connect" }),
   edit: (n) => ({ title: `Edit “${n}”`, text: `Enter the connection password of “${n}” to unlock it for editing.`, ok: "Unlock to edit" }),
   delete: (n) => ({ title: `Delete “${n}”?`, text: `Enter the connection password of “${n}” to delete it and its saved queries.`, ok: "Delete" }),
+  compare: (n) => ({ title: `Compare “${n}”`, text: `“${n}” is protected by its connection password. Enter it to read its structure.`, ok: "Unlock" }),
 };
 async function withUnlock(c, fn, action = "connect", first = null) {
   let creds = first || credsFor(c.id);
@@ -1150,6 +1265,7 @@ async function loadSaved() {
       ? await api("POST", "/api/superuser/reveal", { superPassword: superPw }).catch((e) => { superPw = null; throw e; })
       : await api("GET", "/api/connections");
     state.saved = list;
+    if (!$("comparePane").hidden) renderCmpPick();
     $("savedSub").textContent = "· " + list.length;
     $("superBar").hidden = !superPw;
     $("superBtn").classList.toggle("on", !!superPw);
@@ -1408,6 +1524,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "settings": setNavMenu(false); openSettingsDialog(); break;
     case "update": setNavMenu(false); openUpdateDialog(); break;
     case "logs": setNavMenu(false); showTab("logs"); break;
+    case "compare": setNavMenu(false); showTab("compare"); break;
   }
 });
 document.addEventListener("click", (ev) => {
@@ -1499,8 +1616,12 @@ async function disconnect(reason = "") {
   clearDef("Select an object on the left to see its definition.");
   $("tabTitle").textContent = "";
   setExportEnabled(false); setInfo("");
-  clearGrid("Connect to a database, then pick a table on the left.");
-  if (!$("queriesPane").hidden) showTab("data");
+  // Nothing of the database stays on screen: its tables, the query, the
+  // statistics; the data pane shows that nothing is connected.
+  $("sql").value = ""; $("objStats").hidden = true; $("objStats").innerHTML = ""; $("exportNote").hidden = true;
+  showNoConnection();
+  if (state.tab === "def" || state.tab === "queries") showTab("data");
+  if (!$("comparePane").hidden) renderCmpPick();
   if (state.idleNote) { $("status").textContent = "Not connected · " + state.idleNote; toast(state.idleNote); renderHome(); }
   else setNavMenu(true);
 }
@@ -2180,6 +2301,8 @@ function showTab(tab) {
   $("defPane").hidden = tab !== "def";
   $("filesPane").hidden = tab !== "files";
   $("logsPane").hidden = tab !== "logs";
+  $("comparePane").hidden = tab !== "compare";
+  if (tab === "compare") openCompare();
   if (tab === "logs") openLogs(); else stopLive();
   $("queriesPane").hidden = tab !== "queries";
   if (tab === "queries") loadQueries();
@@ -2337,7 +2460,37 @@ function showResult(res) {
 function clearGrid(msg) {
   closeExportPanel(false);
   state.result = null;
+  $("dataPane").classList.remove("offline");
   $("grid").innerHTML = `<div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>${esc(msg)}</p></div></div>`;
+}
+
+// showNoConnection fills the data pane with an unplugged cable: no database
+// is connected.
+function showNoConnection() {
+  closeExportPanel(false);
+  state.result = null;
+  $("dataPane").classList.add("offline");
+  $("grid").innerHTML = `<div class="placeholder noconn"><div>
+    <svg viewBox="0 0 240 120" role="img" aria-label="Unplugged cable: no database connected">
+      <g class="db" fill="none" stroke="var(--muted)" stroke-width="2">
+        <ellipse cx="214" cy="38" rx="16" ry="6"/><path d="M198 38v44c0 3.3 7.2 6 16 6s16-2.7 16-6V38"/><path d="M198 60c0 3.3 7.2 6 16 6s16-2.7 16-6"/>
+      </g>
+      <g class="plug">
+        <path d="M6 60h66" stroke="var(--muted)" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <rect x="70" y="46" width="30" height="28" rx="5" fill="var(--accent)"/>
+        <path d="M100 52h12M100 68h12" stroke="var(--accent-2)" stroke-width="4" stroke-linecap="round"/>
+      </g>
+      <g class="sock">
+        <rect x="128" y="44" width="32" height="32" rx="5" fill="var(--panel-2)" stroke="var(--muted)" stroke-width="2"/>
+        <path d="M134 52h6M134 68h6" stroke="var(--muted)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M160 60h38" stroke="var(--muted)" stroke-width="5" stroke-linecap="round" fill="none"/>
+      </g>
+      <circle class="ring" cx="120" cy="60" r="14" fill="none" stroke="var(--danger)" stroke-width="2"/>
+      <path class="spark" d="M120 44l-5 13h8l-5 17" fill="none" stroke="var(--danger)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h3>Not connected to any database</h3>
+    <p>Pick a saved connection on the left, or open <b>☰ Connections</b>.</p>
+  </div></div>`;
 }
 
 function renderGrid() {
@@ -2757,6 +2910,240 @@ $("sdConfirm").addEventListener("click", async () => {
   }
 });
 
+// ---- ☰ → Compare databases -----------------------------------------------------
+// The master and the databases to compare are saved connections (unlocked
+// with their connection password) or the open connection. The server reads
+// every object's definition (the structure only, never the data), compares
+// them and makes, per database, a script that would make it match the
+// master. The script is only shown and downloaded: cactusdb never runs it.
+const cmpst = { result: null, sel: -1, target: 0, view: "diff", running: false };
+const CMP_LABEL = { same: "✓ same", diff: "≠ differs", missing: "missing", extra: "extra", absent: "", present: "exists" };
+const CMP_TEXT = { same: "is the same as the master's", diff: "differs from the master's", missing: "is missing here (only the master has it)",
+  extra: "isn't in the master", absent: "is in neither", present: "exists (another kind of database: not compared)" };
+
+function cmpSources() {
+  const list = [];
+  if (state.session) list.push({ value: "session", label: `${state.label} (open connection)` });
+  for (const c of state.saved || []) list.push({ value: String(c.id), label: c.name, title: [c.engine, c.host, c.database].filter(Boolean).join(" · ") });
+  return list;
+}
+function openCompare() { renderCmpPick(); }
+function renderCmpPick() {
+  const list = cmpSources(), m = $("cmpMaster"), prev = m.value;
+  m.innerHTML = list.length ? list.map((x) => `<option value="${esc(x.value)}" title="${esc(x.title || "")}">${esc(x.label)}</option>`).join("")
+    : `<option value="">No saved connections yet</option>`;
+  if (list.some((x) => x.value === prev)) m.value = prev;
+  const ticked = new Set([...$("cmpOthers").querySelectorAll("input:checked")].map((i) => i.value));
+  const others = list.filter((x) => x.value !== m.value);
+  $("cmpOthers").innerHTML = others.length
+    ? others.map((x) => `<label title="${esc(x.title || "")}"><input type="checkbox" value="${esc(x.value)}"${ticked.has(x.value) ? " checked" : ""}>${esc(x.label)}</label>`).join("")
+    : `<span class="none">Save another connection to compare with (☰ → New connection)</span>`;
+}
+$("cmpMaster").addEventListener("change", renderCmpPick);
+
+// cmpSource returns what the server needs to open one database, asking for
+// its connection password when it is protected and not yet unlocked.
+async function cmpSource(value) {
+  if (value === "session") return state.session ? { session: state.session } : null;
+  const c = (state.saved || []).find((x) => String(x.id) === value);
+  if (!c) return null;
+  let creds = credsFor(c.id);
+  if (c.locked && !creds.lockPassword && !creds.superPassword) {
+    const ok = await withUnlock(c, (cr) => { creds = cr; return api("POST", `/api/connections/${c.id}/unlock`, cr); }, "compare");
+    if (!ok) return null;
+  }
+  return { savedId: c.id, ...creds };
+}
+
+$("cmpRun").addEventListener("click", async () => {
+  if (cmpst.running) return;
+  const mv = $("cmpMaster").value;
+  const ov = [...$("cmpOthers").querySelectorAll("input:checked")].map((i) => i.value);
+  if (!mv) { toast("Choose the master database", true); return; }
+  if (!ov.length) { toast("Tick at least one database to compare with the master", true); return; }
+  const btn = $("cmpRun");
+  cmpst.running = true; btn.disabled = true; btn.textContent = "Comparing…";
+  try {
+    const master = await cmpSource(mv);
+    if (!master) return;
+    const others = [];
+    for (const v of ov) { const src = await cmpSource(v); if (!src) return; others.push(src); }
+    $("cmpSub").textContent = "Connecting to the databases…";
+    const { job } = await api("POST", "/api/compare", { master, others, drops: $("cmpDrops").checked });
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 700));
+      const st = await api("GET", "/api/compare/" + encodeURIComponent(job));
+      if (st.finished) {
+        if (st.error) throw new Error(st.error);
+        showCompare(st.result);
+        break;
+      }
+      const pct = st.total ? Math.floor(100 * st.done / st.total) : 0;
+      $("cmpSub").innerHTML = `<span class="cmpprog"><span class="obar"><i style="width:${pct}%"></i></span>Reading the structure: ${fmtInt(st.done)} of ${st.total ? fmtInt(st.total) : "…"} objects` +
+        (st.reading && st.reading.length ? ` · still reading ${st.reading.map((x) => "<b>" + esc(x) + "</b>").join(", ")}` : "") + `</span>`;
+    }
+  } catch (e) {
+    toast(e.message, true);
+    $("cmpSub").textContent = "The comparison failed: " + e.message;
+  } finally {
+    cmpst.running = false; btn.disabled = false; btn.textContent = "Compare";
+  }
+});
+
+function cmpIsDiff(o) { return o.cells.some((c) => c.status === "diff" || c.status === "missing" || c.status === "extra"); }
+
+function showCompare(res) {
+  cmpst.result = res; cmpst.target = 0;
+  cmpst.sel = res.objects.findIndex(cmpIsDiff);
+  const parts = res.targets.map((t) => {
+    const n = t.counts || {};
+    const bits = [["missing", "missing"], ["extra", "extra"], ["diff", "differ"], ["same", "same"]]
+      .filter(([k]) => n[k]).map(([k, w]) => `<span class="stchip st-${k}">${fmtInt(n[k])} ${w}</span>`);
+    return `<b>${esc(t.label)}</b>${t.comparable ? "" : ` (${esc(t.engine)}: names only)`} ${bits.join(" ") || "nothing to compare"}`;
+  });
+  $("cmpSub").innerHTML = `Master <b>${esc(res.master.label)}</b> (${esc(res.master.engine)}) · ${fmtInt(res.objects.length)} objects compared in ${res.seconds.toFixed(1)} s · ` + parts.join(" · ");
+  const types = [...new Set(res.objects.map((o) => o.type))];
+  $("cmpType").innerHTML = `<option value="">All types</option>` + types.map((t) => `<option value="${esc(t)}">${esc(cmpTypeLabel(t))}</option>`).join("");
+  $("cmpTarget").innerHTML = res.targets.map((t, i) => `<option value="${i}">${esc(t.label)}</option>`).join("");
+  $("cmpShow").value = res.objects.some(cmpIsDiff) ? "diff" : "all";
+  $("cmpBody").hidden = false;
+  renderCmpMatrix(); renderCmpDetail();
+}
+
+const CMP_TYPES = { table: "Tables", view: "Views", matview: "Materialized views", procedure: "Procedures", function: "Functions",
+  package: "Packages", trigger: "Triggers", sequence: "Sequences", domain: "Domains", exception: "Exceptions", event: "Events", index: "Indexes", synonym: "Synonyms" };
+function cmpTypeLabel(t) { return CMP_TYPES[t] || t; }
+
+function renderCmpMatrix() {
+  const res = cmpst.result;
+  if (!res) return;
+  const show = $("cmpShow").value, type = $("cmpType").value;
+  const words = $("cmpFilter").value.toLowerCase().split(/\s+/).filter(Boolean);
+  let html = `<table class="cmp"><thead><tr><th>Object</th>` +
+    res.targets.map((t, i) => `<th class="db" title="${esc(t.label)}">${esc(t.label)}</th>`).join("") + `</tr></thead><tbody>`;
+  let lastType = "", shown = 0;
+  res.objects.forEach((o, i) => {
+    if (show === "diff" && !cmpIsDiff(o)) return;
+    if (type && o.type !== type) return;
+    if (words.length && !words.every((w) => o.name.toLowerCase().includes(w))) return;
+    if (o.type !== lastType) { html += `<tr class="grp"><td colspan="${res.targets.length + 1}">${esc(cmpTypeLabel(o.type))}</td></tr>`; lastType = o.type; }
+    shown++;
+    html += `<tr data-i="${i}"${i === cmpst.sel ? ` class="on"` : ""}><td class="oname">${esc(o.name)}</td>` +
+      o.cells.map((c, t) => `<td class="st${i === cmpst.sel && t === cmpst.target ? " sel" : ""}" data-t="${t}" title="${esc(o.name)} ${esc(CMP_TEXT[c.status] || "")} in ${esc(res.targets[t].label)}"><span class="st-${c.status}">${CMP_LABEL[c.status] ?? c.status}</span></td>`).join("") + `</tr>`;
+  });
+  html += `</tbody></table>`;
+  if (!shown) html = `<p class="cmpmsg">${show === "diff" && !res.objects.some(cmpIsDiff)
+    ? "✓ No differences: every database has the same structure as the master." : "No object matches."}</p>`;
+  $("cmpMatrix").innerHTML = html;
+}
+$("cmpShow").addEventListener("change", renderCmpMatrix);
+$("cmpType").addEventListener("change", renderCmpMatrix);
+$("cmpFilter").addEventListener("input", renderCmpMatrix);
+$("cmpMatrix").addEventListener("click", (ev) => {
+  const tr = ev.target.closest("tr[data-i]");
+  if (!tr) return;
+  cmpst.sel = +tr.dataset.i;
+  const td = ev.target.closest("td[data-t]");
+  const o = cmpst.result.objects[cmpst.sel];
+  if (td) cmpst.target = +td.dataset.t;
+  else if (!["diff", "missing", "extra"].includes(o.cells[cmpst.target].status)) {
+    // The name was clicked: show a database where the object differs.
+    const t = o.cells.findIndex((c) => ["diff", "missing", "extra"].includes(c.status));
+    if (t >= 0) cmpst.target = t;
+  }
+  $("cmpTarget").value = String(cmpst.target);
+  setCmpView("diff");
+  renderCmpMatrix();
+});
+$("cmpTarget").addEventListener("change", () => { cmpst.target = +$("cmpTarget").value; renderCmpMatrix(); renderCmpDetail(); });
+function setCmpView(v) {
+  cmpst.view = v;
+  document.querySelectorAll("[data-cmpview]").forEach((b) => b.classList.toggle("on", b.dataset.cmpview === v));
+  renderCmpDetail();
+}
+document.querySelectorAll("[data-cmpview]").forEach((b) => b.addEventListener("click", () => setCmpView(b.dataset.cmpview)));
+
+function renderCmpDetail() {
+  const res = cmpst.result;
+  if (!res) return;
+  const t = res.targets[cmpst.target];
+  $("cmpCopy").hidden = $("cmpSave").hidden = cmpst.view !== "script";
+  if (cmpst.view === "script") {
+    $("cmpDetail").innerHTML = `<pre class="cmpscript">${t.script.split("\n").map((l) =>
+      /^\s*--.*WARNING/.test(l) ? `<span class="w">${esc(l)}</span>` : /^\s*--/.test(l) ? `<span class="c">${esc(l)}</span>` : esc(l)).join("\n")}</pre>`;
+    return;
+  }
+  const o = res.objects[cmpst.sel];
+  if (!o) { $("cmpDetail").innerHTML = `<p class="cmpmsg">Click an object on the left to see its differences.</p>`; return; }
+  const c = o.cells[cmpst.target], m = o.master;
+  let html = `<div class="cmpsum"><span><span class="t">${esc(cmpTypeLabel(o.type).replace(/s$/, "").replace(/xe$/, "x"))} ${esc(o.name)}</span> ${esc(CMP_TEXT[c.status] || "")} in <b>${esc(t.label)}</b></span> <span class="stchip st-${c.status}">${CMP_LABEL[c.status] || c.status}</span></div>`;
+  if (c.notes && c.notes.length) html += `<ul class="cmpnotes">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>`;
+  const errs = [m && m.error ? `master: ${m.error}` : "", c.error ? `${t.label}: ${c.error}` : ""].filter(Boolean);
+  if (errs.length) html += `<p class="cmpmsg">⚠ The definition couldn't be read: ${esc(errs.join("; "))}</p>`;
+  const left = m ? m.def || "" : "", right = c.status === "same" ? c.def || left : c.def || "";
+  if (c.status === "present") html += `<p class="cmpmsg">${esc(t.label)} is another kind of database (${esc(t.engine)}), so only the names are compared.</p>`;
+  else html += cmpDiffTable(left, right, res.master.label, t.label, c.status);
+  $("cmpDetail").innerHTML = html;
+}
+
+// lineDiff lines up two texts line by line (longest common subsequence,
+// ignoring spacing): rows of [left line, right line, kind].
+function lineDiff(a, b) {
+  const A = a === "" ? [] : a.split("\n"), B = b === "" ? [] : b.split("\n");
+  const n = A.length, m = B.length, norm = (x) => x.trim().replace(/\s+/g, " ");
+  const NA = A.map(norm), NB = B.map(norm);
+  const rows = [];
+  if (n * m > 4e6) { // too big to line up: side by side
+    for (let i = 0; i < Math.max(n, m); i++) rows.push([i < n ? i : -1, i < m ? i : -1, NA[i] === NB[i] ? "same" : "chg"]);
+    return { A, B, rows };
+  }
+  const w = m + 1, dp = new Uint32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    dp[i * w + j] = NA[i] === NB[j] ? dp[(i + 1) * w + j + 1] + 1 : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+  let i = 0, j = 0, L = [], R = [];
+  const flush = () => { // a block of changed lines: pair them up
+    for (let k = 0; k < Math.max(L.length, R.length); k++)
+      rows.push([k < L.length ? L[k] : -1, k < R.length ? R[k] : -1, k < L.length && k < R.length ? "chg" : k < L.length ? "add" : "del"]);
+    L = []; R = [];
+  };
+  while (i < n || j < m) {
+    if (i < n && j < m && NA[i] === NB[j]) { flush(); rows.push([i++, j++, "same"]); }
+    else if (j >= m || (i < n && dp[(i + 1) * w + j] >= dp[i * w + j + 1])) L.push(i++);
+    else R.push(j++);
+  }
+  flush();
+  return { A, B, rows };
+}
+
+function cmpDiffTable(left, right, lname, rname, status) {
+  const { A, B, rows } = lineDiff(left, right);
+  const cell = (lines, k, cls) => k < 0 ? `<td class="ln"></td><td class="gap"></td>` : `<td class="ln">${k + 1}</td><td class="${cls}">${esc(lines[k]) || " "}</td>`;
+  let html = `<table class="dif"><colgroup><col style="width:3.2em"><col><col style="width:3.2em"><col></colgroup><thead><tr><th colspan="2">Master: ${esc(lname)}</th><th colspan="2">${esc(rname)}</th></tr></thead><tbody>`;
+  if (status === "missing") html += `<tr><td></td><td></td><td></td><td class="cmpmsg">Not in this database</td></tr>`;
+  if (status === "extra") html += `<tr><td></td><td class="cmpmsg">Not in the master</td><td></td><td></td></tr>`;
+  for (const [l, r, k] of rows) {
+    const lc = k === "chg" ? "chg" : k === "add" ? "add" : "", rc = k === "chg" ? "chg" : k === "del" ? "del" : "";
+    html += `<tr>${cell(A, l, lc)}${cell(B, r, rc)}</tr>`;
+  }
+  return html + `</tbody></table>`;
+}
+
+$("cmpCopy").addEventListener("click", async () => {
+  const t = cmpst.result && cmpst.result.targets[cmpst.target];
+  if (t && await copyText(t.script)) toast("Script copied");
+});
+$("cmpSave").addEventListener("click", () => {
+  const res = cmpst.result, t = res && res.targets[cmpst.target];
+  if (!t) return;
+  const safe = (x) => x.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "db";
+  const d = new Date(), p = (x) => String(x).padStart(2, "0");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([t.script], { type: "application/sql" }));
+  a.download = `${safe(t.label)}-match-${safe(res.master.label)}-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.sql`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+});
+
 // ---- init ----------------------------------------------------------------
 $("engines").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-engine]");
@@ -2764,6 +3151,7 @@ $("engines").addEventListener("click", (ev) => {
 });
 
 (async function init() {
+  showNoConnection();
   try { state.engines = await api("GET", "/api/engines"); } catch (e) { toast(e.message, true); }
   selectEngine("sqlite");
   loadSaved();

@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.23.0
+cactusdb 1.24.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -125,7 +125,9 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 
 The left sidebar shows the **objects** of the database you're connected to. While you're
 not connected it shows your **saved connections** instead, each with a **▶** button to
-connect, a **＋ New connection** button and the export folder.
+connect, a **＋ New connection** button and the export folder. Disconnecting clears
+everything of the database from the screen (its tables, the query, the data, the
+definition), and the main area shows an unplugged cable: *Not connected to any database*.
 
 The **☰ Connections** menu at the bottom of the sidebar has these items:
 
@@ -137,6 +139,7 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 | **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
 | **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below) |
 | **📜 Logs** | Opens the **Logs** tab (see below) |
+| **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
 | **⬆ Check for update** | Whether a newer cactusdb is out, with the command to download it for every system, each with a copy button (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
@@ -284,6 +287,43 @@ session it belongs to (`session=1a2b3c4d`).
 Without a log file (in the foreground without `--logfile`) the tab shows the lines since
 cactusdb started, kept in memory.
 
+<a id="compare-databases"></a>
+**Compare databases.** **☰ → ⇄ Compare databases** (or the **Compare** tab) compares the
+*structure* of databases, never their data: tables (column by column, with their keys,
+indexes and foreign keys), views, procedures, functions, triggers, sequences/generators,
+domains, events, packages…
+1. Choose the **Master**: a saved connection, or the one you're connected to.
+2. Tick the databases to **Compare with**, any number of them. A protected connection asks
+   for its connection password (or the superuser password).
+3. Click **Compare**. cactusdb reads every object of every database at the same time; the bar
+   shows how far it is.
+
+The result has one column per database and one row per object, coloured: **missing** (red:
+only the master has it), **extra** (blue: the master doesn't have it), **≠ differs** (amber)
+and **✓ same**. *Differences only* (the default) hides what is the same everywhere; filter by
+type or name. Click an object (or one of its cells) to see, on the right, what differs (e.g.
+`column email missing`, `column name differs: master varchar(100) / here varchar(50)`) and
+the master's definition beside that database's, line by line, the differing lines
+highlighted.
+
+**Script** shows, per database, the SQL that makes its structure match the master's;
+**Copy** or **⤓ .sql** to take it. It drops what the master doesn't have (untick *Drop what
+the master doesn't have* to keep those), alters tables (adds, drops and changes columns,
+keys and indexes; MySQL/MariaDB put a new column where the master has it), creates what is
+missing, and replaces views, procedures, functions and triggers that differ (`CREATE OR
+ALTER` on Firebird and SQL Server, `CREATE OR REPLACE` on PostgreSQL, drop and create
+elsewhere). Dropping a table or column is marked `WARNING`, as its data goes with it. What
+can't be done safely is left as a comment to do by hand: a changed sequence (it would lose
+its current value), a changed domain, a column change SQLite can't make, a default that SQL
+Server keeps as a constraint.
+
+cactusdb never runs the script, it stays read-only: read it, take a backup, then run it with
+your own tool (mysql, psql, sqlcmd, isql…). Whitespace and things that aren't structure are
+not differences: MySQL's next `AUTO_INCREMENT` value, the `DEFINER` user, the database's own
+name in a view, a sequence's current value, and the order of columns. Only databases of the
+same kind are compared object by object (MySQL and MariaDB count as one); with another kind
+only the names are compared, and no script is made.
+
 **Adding and editing connections.** Click **＋ New connection** (in the menu or the sidebar)
 to open the connection dialog: a name, the database type and the connection details. Click
 **Test connection** to check them before saving. cactusdb connects, reports the server
@@ -383,7 +423,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.23.0*), as reported by the running program.
+example *v1.24.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -664,7 +704,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.23.0 is running in the background (process id 48211)
+cactusdb 1.24.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -792,7 +832,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.23.0 is running in container cactusdb
+cactusdb 1.24.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)
@@ -1016,6 +1056,7 @@ CACTUSDB_IT=1 go test ./...
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
+| `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
 | `logs.go`, `logrotate.go` | The Logs tab (live, any day, crash log, .zip of every log); a new log file every day |
 | `termlog.go` | Logging to the terminal without ever holding up a request |
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |
