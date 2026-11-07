@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.31.0 — 2026-11-07
+
+- **Not connected: day and night**: the sky of the desert scene follows the system's light
+  or dark mode. In light mode the sun is animated (a glowing core and slowly turning,
+  shimmering rays); in dark mode it becomes a crescent moon that rocks gently, with a soft
+  glow, twinkling stars and now and then a shooting star. With *reduce motion* it stays
+  still.
+
 ## 1.30.0 — 2026-11-07
 
 - **Install an update from the browser**: ☰ → ⬆ Check for update → **Install and restart**.

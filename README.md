@@ -102,7 +102,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.30.0
+cactusdb 1.31.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -131,7 +131,10 @@ definition), and the main area shows *Not connected to any database* with a smal
 scene: the cactusdb cactus sends signals up its two circuit-trace arms, the rings at their
 ends call out, and the signal fizzles before it reaches a database that is only a mirage.
 Around it smaller cactuses sway, some with a blossom on top, desert flowers nod in the
-breeze and tumbleweeds of different sizes roll past. With *reduce motion* switched on in the system settings
+breeze and tumbleweeds of different sizes roll past. The sky follows the light or dark mode
+of your system: in light mode the sun glows with slowly turning rays, in dark mode it
+becomes a crescent moon that rocks gently among twinkling stars, with now and then a
+shooting star. With *reduce motion* switched on in the system settings
 the scene stays still.
 
 The **☰ Connections** menu at the bottom of the sidebar has these items:
@@ -493,7 +496,7 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.30.0*), as reported by the running program.
+example *v1.31.0*), as reported by the running program.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -799,7 +802,7 @@ CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a
 cactusdb --port 8087 --runas background
 ```
 ```
-cactusdb 1.30.0 is running in the background (process id 48211)
+cactusdb 1.31.0 is running in the background (process id 48211)
   open http://localhost:8087
   open http://192.168.1.20:8087
   log file: /home/me/cactusdb/cactusdb.log
@@ -929,7 +932,7 @@ they survive upgrades and re-creating the container.
 ./deploy-container.sh status | logs | restart | down
 ```
 ```
-cactusdb 1.30.0 is running in container cactusdb
+cactusdb 1.31.0 is running in container cactusdb
   open http://localhost:8087
   open http://192.168.1.20:8087
   saved connections: /srv/cactusdb/conn/cactus.conn.db (key: /srv/cactusdb/conn/cactus.key)

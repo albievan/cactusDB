@@ -329,7 +329,23 @@
   .noconn .beam { stroke-dasharray: 3 9; animation: beam 3.2s linear infinite; }
   .noconn .ghost { transform-box: fill-box; transform-origin: 50% 100%; animation: ghost 3.2s ease-in-out infinite, mirage 2.4s ease-in-out infinite; }
   .noconn .ask { animation: ask 3.2s ease-in-out infinite; }
-  .noconn .sun { animation: sun 8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  /* The sky follows the system's light or dark mode: an animated sun by day, a moon and stars at night. */
+  .noconn .sun { animation: sun 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .noconn .sunglow { opacity: .18; transform-box: fill-box; transform-origin: center; animation: glow 6s ease-in-out infinite; }
+  .noconn .rays { animation: rays 24s linear infinite; }
+  .noconn .rays path { animation: ray 3s ease-in-out infinite alternate; }
+  .noconn .rays path:nth-child(even) { animation-delay: -1.5s; }
+  .noconn .sky-night { display: none; }
+  .noconn .moon { transform-box: fill-box; transform-origin: center; animation: rock 9s ease-in-out infinite; }
+  .noconn .moonglow { opacity: .12; transform-box: fill-box; transform-origin: center; animation: glow 7s ease-in-out infinite; }
+  .noconn .star { transform-box: fill-box; transform-origin: center; animation: twinkle 3.4s ease-in-out infinite; }
+  .noconn .meteor { stroke-dasharray: 30 100; stroke-dashoffset: 30; opacity: 0; animation: meteor 11s ease-in infinite 3s; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .noconn .sky-day { display: none; }
+    :root:not([data-theme="light"]) .noconn .sky-night { display: inline; }
+  }
+  :root[data-theme="dark"] .noconn .sky-day { display: none; }
+  :root[data-theme="dark"] .noconn .sky-night { display: inline; }
   .noconn .tw { animation: roll 12s linear infinite; }
   .noconn .tw.t2 { animation-duration: 17s; animation-delay: -7s; }
   .noconn .tw.t3 { animation-duration: 23s; animation-delay: -15s; }
@@ -348,12 +364,18 @@
   @keyframes ghost { 0%, 55% { opacity: .25; } 75% { opacity: .55; } 100% { opacity: .25; } }
   @keyframes ask { 0%, 60% { opacity: 0; transform: translateY(4px); } 75%, 90% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-3px); } }
   @keyframes mirage { 0%, 100% { transform: skewX(0) scaleY(1); } 33% { transform: skewX(3deg) scaleY(1.02); } 66% { transform: skewX(-3deg) scaleY(.98); } }
-  @keyframes sun { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: .8; transform: scale(1.08); } }
+  @keyframes sun { 0%, 100% { opacity: .7; transform: scale(1); } 50% { opacity: .95; transform: scale(1.06); } }
+  @keyframes glow { 0%, 100% { transform: scale(.9); } 50% { transform: scale(1.25); } }
+  @keyframes rays { to { transform: rotate(360deg); } }
+  @keyframes ray { from { opacity: .45; } to { opacity: .95; } }
+  @keyframes rock { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg) translateY(-1.5px); } }
+  @keyframes twinkle { 0%, 100% { opacity: .25; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
+  @keyframes meteor { 0% { stroke-dashoffset: 30; opacity: 0; } 2% { opacity: .9; } 9% { stroke-dashoffset: -100; opacity: 0; } 100% { stroke-dashoffset: -100; opacity: 0; } }
   @keyframes roll { 0% { transform: translateX(520px); } 100% { transform: translateX(-60px); } }
   @keyframes nod { from { transform: rotate(-7deg); } to { transform: rotate(7deg) scale(1.06); } }
   @keyframes hop { from { transform: translateY(0); } to { transform: translateY(-9px); } }
   @keyframes spin { to { transform: rotate(-360deg); } }
-  @media (prefers-reduced-motion: reduce) { .noconn * { animation: none !important; } .noconn .ripple.a, .noconn .ask { opacity: .7; } .noconn .tw { transform: translateX(330px); } .noconn .tw.t2 { transform: translateX(110px); } .noconn .tw.t3 { transform: translateX(405px); } }
+  @media (prefers-reduced-motion: reduce) { .noconn * { animation: none !important; } .noconn .ripple.a, .noconn .ask { opacity: .7; } .noconn .star { opacity: .7; } .noconn .tw { transform: translateX(330px); } .noconn .tw.t2 { transform: translateX(110px); } .noconn .tw.t3 { transform: translateX(405px); } }
   @media (max-width: 900px) { .cmpbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) minmax(260px, 1fr); } .cmpleft { border-right: 0; border-bottom: 1px solid var(--border); } }
   a.btn { display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 13px; }
   a.btn:hover { border-color: var(--accent); }
@@ -2879,7 +2901,31 @@ function showNoConnection() {
           <circle r="10"/><path d="M-7-6q7 9 14-2M-8 4q8-11 16 2M-3-9q5 9 1 18M4-8q-8 5-2 17"/>
         </g>
       </defs>
-      <circle class="sun" cx="452" cy="30" r="17" fill="#f3c969"/>
+      <g class="sky-day" transform="translate(446 32)">
+        <circle class="sunglow" r="24" fill="#f3c969"/>
+        <g class="rays" stroke="#f3c969" stroke-width="2.6" stroke-linecap="round"><path d="M0-22v-6" transform="rotate(0)"/><path d="M0-22v-6" transform="rotate(30)"/><path d="M0-22v-6" transform="rotate(60)"/><path d="M0-22v-6" transform="rotate(90)"/><path d="M0-22v-6" transform="rotate(120)"/><path d="M0-22v-6" transform="rotate(150)"/><path d="M0-22v-6" transform="rotate(180)"/><path d="M0-22v-6" transform="rotate(210)"/><path d="M0-22v-6" transform="rotate(240)"/><path d="M0-22v-6" transform="rotate(270)"/><path d="M0-22v-6" transform="rotate(300)"/><path d="M0-22v-6" transform="rotate(330)"/></g>
+        <circle class="sun" r="17" fill="#f3c969"/>
+      </g>
+      <g class="sky-night">
+        <g fill="#f4ecc8">
+          <path class="star" d="M30 20l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z"/>
+          <circle class="star" cx="78" cy="46" r="1.3" style="animation-delay:-1.2s"/>
+          <circle class="star" cx="104" cy="16" r="1" style="animation-delay:-2.5s"/>
+          <path class="star" d="M272 14l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" style="animation-delay:-0.7s"/>
+          <circle class="star" cx="318" cy="42" r="1.2" style="animation-delay:-3.1s"/>
+          <circle class="star" cx="356" cy="12" r="1" style="animation-delay:-1.8s"/>
+          <path class="star" d="M410 58l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z" style="animation-delay:-2.2s"/>
+          <circle class="star" cx="16" cy="64" r="1" style="animation-delay:-0.4s"/>
+        </g>
+        <path class="meteor" d="M330 8l-34 14" stroke="#f4ecc8" stroke-width="1.6" stroke-linecap="round" fill="none" pathLength="100"/>
+        <g transform="translate(446 32)">
+          <circle class="moonglow" r="24" fill="#f4ecc8"/>
+          <g class="moon">
+            <path d="M5.5-15.5A16.5 16.5 0 1 0 15.5 6 A13 13 0 1 1 5.5-15.5z" fill="#f4ecc8"/>
+            <g fill="#d9cfa6"><circle cx="-6" cy="-3" r="2.4"/><circle cx="-2" cy="7" r="1.6"/><circle cx="-10" cy="5" r="1.2"/></g>
+          </g>
+        </g>
+      </g>
       <path d="M8 200Q120 190 230 200T472 198" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-linecap="round"/>
       <path d="M60 210h26M300 212h40M150 214h14M408 210h22" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
       <g class="minis">
