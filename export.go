@@ -56,15 +56,40 @@ func exportSubdir(dir, ext string) string {
 	return filepath.Join(dir, ext)
 }
 
+// queriesSubdir is the folder of a connection's export folder that saved
+// queries are exported to, a subfolder per day: queries/<dd.mm.yyyy>/.
+const queriesSubdir = "queries"
+
+// queryExportToDir exports the data of the saved query name to
+// <dir>/queries/<dd.mm.yyyy>/<name>-<dd.mm.yyyy.hh.mm>.<ext>.
+func queryExportToDir(ctx context.Context, dir, engine string, db *sql.DB, q, format, name string) (path string, rows int, err error) {
+	ext, ok := exportFormats[format]
+	if !ok {
+		return "", 0, fmt.Errorf("unknown export format %q", format)
+	}
+	now := time.Now()
+	clean := strings.Trim(unsafeFileChars.ReplaceAllString(name, "_"), "_.")
+	if clean == "" {
+		clean = "query"
+	}
+	return writeExportFileAt(filepath.Join(dir, queriesSubdir, now.Format("02.01.2006")), clean+"-"+now.Format("02.01.2006.15.04"), ext,
+		func(w io.Writer) (int, error) { return export(ctx, w, engine, db, q, format, name, nil) })
+}
+
 // writeExportFile creates <name>_<date>-<time>.<ext> in the ext subfolder of
 // dir with what write produces, via a temporary file so a failed export
 // leaves nothing behind.
 func writeExportFile(dir, name, ext string, write func(io.Writer) (int, error)) (path string, n int, err error) {
-	dir = exportSubdir(dir, ext)
+	base := unsafeFileChars.ReplaceAllString(name, "_") + "_" + time.Now().Format("20060102-150405")
+	return writeExportFileAt(exportSubdir(dir, ext), base, ext, write)
+}
+
+// writeExportFileAt creates <base>.<ext> in dir, or <base>_2.<ext> and so on
+// when that exists.
+func writeExportFileAt(dir, base, ext string, write func(io.Writer) (int, error)) (path string, n int, err error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", 0, err
 	}
-	base := unsafeFileChars.ReplaceAllString(name, "_") + "_" + time.Now().Format("20060102-150405")
 	path = filepath.Join(dir, base+"."+ext)
 	for i := 2; fileExists(path); i++ {
 		path = filepath.Join(dir, fmt.Sprintf("%s_%d.%s", base, i, ext))

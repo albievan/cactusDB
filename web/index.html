@@ -246,7 +246,14 @@
   .tabs .title:empty { display: none; }
   .pane { min-height: 0; min-width: 0; }
   #dataPane { display: grid; grid-template-rows: auto auto auto 1fr; }
-  #dataPane[hidden], #defPane[hidden], #filesPane[hidden] { display: none; }
+  #dataPane[hidden], #defPane[hidden], #filesPane[hidden], #logsPane[hidden] { display: none; }
+  #logsPane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
+  #logsPane .filesbar input[type=search] { flex: 1; min-width: 220px; }
+  #logsPane .filesbar select { width: auto; }
+  .lginfo { padding: 4px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+  .lginfo .live { color: var(--accent); font-weight: 600; }
+  a.btn { display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 13px; }
+  a.btn:hover { border-color: var(--accent); }
   #filesPane { display: grid; grid-template-rows: auto auto 1fr auto; background: var(--panel); }
   .filesbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
   .filesbar .spacer { flex: 1; }
@@ -338,15 +345,10 @@
   dialog.modal::backdrop { background: rgba(0,0,0,.35); }
   dialog.modal h3 { margin: 0 0 6px; font-size: 16px; }
   dialog.modal.wide { width: min(640px, calc(100vw - 32px)); }
-  dialog.modal.logs { width: min(1100px, calc(100vw - 32px)); }
-  .lgbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 8px; }
-  .lgbar input[type=search] { flex: 1; min-width: 200px; }
-  .lgbar select { width: auto; }
-  .lgtext { font-family: var(--mono); font-size: 11.5px; line-height: 1.45; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px 10px; margin: 0; height: min(60vh, 560px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lgtext { font-family: var(--mono); font-size: 11.5px; line-height: 1.45; background: var(--panel-2);
+    padding: 8px 12px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 0; }
   .lgtext .bad { color: var(--danger); }
-  #lgCrash { margin-top: 8px; font-size: 12px; }
-  #lgCrash .lgtext { height: 200px; margin-top: 6px; }
+  .lgtext .new { background: var(--accent-soft); }
   /* Check for update: one row per system, with a small copy button. */
   .upstatus { font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); margin: 6px 0 4px; }
   .upstatus.new { background: var(--accent-soft); border-color: var(--accent); }
@@ -530,6 +532,7 @@
       <button data-tab="def">Definition</button>
       <button data-tab="queries" id="queriesTab" hidden title="Queries saved for this connection">Saved queries</button>
       <button data-tab="files" title="Download exported files, compressed">Exported files</button>
+      <button data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <span class="title" id="tabTitle"></span>
     </div>
     <div class="pane" id="dataPane">
@@ -596,6 +599,27 @@
       <div class="exportnote" id="fNote" hidden></div>
       <div class="ftable" id="fTable"></div>
       <div class="ffoot" id="fFoot"></div>
+    </div>
+    <div class="pane" id="logsPane" hidden>
+      <div class="filesbar">
+        <div class="ftypes" role="group" aria-label="Which log">
+          <button class="on" data-lgkind="log" title="Every action and request">Log</button>
+          <button data-lgkind="crash" title="Fatal errors of cactusdb, when it crashed">Crash log</button>
+        </div>
+        <label class="flabel" for="lgDay">Day</label>
+        <select id="lgDay" title="The log of one day: a new file starts every day"></select>
+        <input id="lgFilter" type="search" placeholder="Filter, e.g. FAILED, session=1a2b3c4d, a table or an IP address" spellcheck="false" autocomplete="off" aria-label="Filter the log lines">
+        <label class="check"><input type="checkbox" id="lgErrors"> Problems only</label>
+        <select id="lgLines" aria-label="How many lines"><option value="500">Last 500 lines</option><option value="1000" selected>Last 1,000</option><option value="5000">Last 5,000</option><option value="20000">Last 20,000</option></select>
+        <label class="check"><input type="checkbox" id="lgNewest" checked> Newest first</label>
+        <label class="check" title="Show new lines as they come in, newest at the top (today's log)"><input type="checkbox" id="lgLive"> Live</label>
+        <span class="spacer"></span>
+        <button class="small" id="lgRefresh" title="Reload">⟳</button>
+        <button id="lgCopy" title="Copy the lines shown">Copy</button>
+        <a class="btn" id="lgZip" href="/api/logs/zip?errors=in-header" download title="Every log and crash log file, of every day kept, in one .zip (highest compression)">⤓ Download all (.zip)</a>
+      </div>
+      <div class="lginfo" id="lgSub"></div>
+      <pre id="lgText" class="lgtext" tabindex="0">…</pre>
     </div>
     <div class="pane" id="defPane" hidden>
       <div class="defbar">
@@ -673,26 +697,6 @@
     <p class="hint">The databases cactusdb can connect to. Every driver is compiled into cactusdb: nothing to download or install.</p>
     <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
     <div class="dactions"><span class="spacer"></span><button type="submit" class="primary">Close</button></div>
-  </form>
-</dialog>
-
-<dialog id="logsDialog" class="modal logs" aria-labelledby="lgTitle">
-  <form method="dialog">
-    <h3 id="lgTitle">Logs<span class="sub" id="lgSub"></span></h3>
-    <div class="lgbar">
-      <input id="lgFilter" type="search" placeholder="Filter, e.g. FAILED, a table or an IP address" spellcheck="false" autocomplete="off" aria-label="Filter the log lines">
-      <label class="check"><input type="checkbox" id="lgErrors"> Problems only</label>
-      <select id="lgLines" aria-label="How many lines"><option value="500">Last 500 lines</option><option value="1000" selected>Last 1,000</option><option value="5000">Last 5,000</option><option value="20000">Last 20,000</option></select>
-      <label class="check"><input type="checkbox" id="lgNewest" checked> Newest first</label>
-    </div>
-    <pre id="lgText" class="lgtext" tabindex="0">…</pre>
-    <details id="lgCrash" hidden><summary>Crash log <span id="lgCrashPath"></span></summary><pre id="lgCrashText" class="lgtext"></pre></details>
-    <div class="dactions">
-      <button type="button" id="lgRefresh">Refresh</button>
-      <button type="button" id="lgCopy" title="Copy the lines shown">Copy</button>
-      <span class="spacer"></span>
-      <button type="submit" class="primary">Close</button>
-    </div>
   </form>
 </dialog>
 
@@ -1403,7 +1407,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "drivers": setNavMenu(false); $("driversDialog").showModal(); break;
     case "settings": setNavMenu(false); openSettingsDialog(); break;
     case "update": setNavMenu(false); openUpdateDialog(); break;
-    case "logs": setNavMenu(false); openLogs(); break;
+    case "logs": setNavMenu(false); showTab("logs"); break;
   }
 });
 document.addEventListener("click", (ev) => {
@@ -1573,7 +1577,7 @@ async function exportQueries(list, fmt) {
       if (session !== state.session) break; // disconnected
       note.innerHTML = `<span class="spin"></span>Exporting ${i + 1} of ${jobs.length}: <b>${esc(q.name)}</b> as ${FMT_NAMES[f]}…`;
       try {
-        const r = await api("POST", "/api/export", { session, sql: q.sql, format: f, name: q.name });
+        const r = await api("POST", "/api/export", { session, sql: q.sql, format: f, name: q.name, savedQuery: true });
         done.push({ q, f, r });
       } catch (e) { failed.push({ q, f, e }); }
     }
@@ -1867,7 +1871,7 @@ function highlightName(name, terms) {
   }
   return out + (open ? "</mark>" : "");
 }
-const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup" };
+const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup", queries: "Saved queries" };
 // A file is its connection folder, type and name ("" connection: exported
 // before files were sorted by connection).
 const fileKey = (f) => f.conn + "/" + f.kind + "/" + f.name;
@@ -2059,7 +2063,9 @@ async function downloadFiles(chosen) {
     const saved = res.size ? Math.max(0, Math.round((1 - res.zipSize / res.size) * 100)) : 0;
     note.innerHTML = `Compressed ${res.files} file${res.files === 1 ? "" : "s"}: ${fmtSize(res.size)} → <b>${fmtSize(res.zipSize)}</b> (${saved}% smaller) · ` +
       `<a href="${esc(res.download)}" download="${esc(res.name)}">${esc(res.name)}</a> <span class="fsel">(link valid for 15 minutes)</span>` +
+      (res.missing && res.missing.length ? `<br><span class="err">${res.missing.length} file${res.missing.length === 1 ? " was" : "s were"} no longer there and left out: ${esc(res.missing.slice(0, 5).join(", "))}${res.missing.length > 5 ? "…" : ""}</span>` : "") +
       `<button class="clearnote" data-act="close-fnote" title="Clear">Clear</button>`;
+    if (res.missing && res.missing.length) loadFiles();
     // Only now, with the .zip complete, does the download start.
     const a = document.createElement("a");
     a.href = res.download; a.download = res.name;
@@ -2145,7 +2151,7 @@ async function previewFile(f) {
         break;
       case "text": {
         let text = p.text;
-        if (f.kind === "json" && !p.truncated) { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* show as is */ } }
+        if ((f.kind === "json" || /\.json$/.test(f.name)) && !p.truncated) { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* show as is */ } }
         $("fpBody").innerHTML = `<pre>${esc(text)}</pre>`;
         foot = p.truncated ? "Showing the first 256 KB" : "";
         break;
@@ -2173,6 +2179,8 @@ function showTab(tab) {
   $("dataPane").hidden = tab !== "data";
   $("defPane").hidden = tab !== "def";
   $("filesPane").hidden = tab !== "files";
+  $("logsPane").hidden = tab !== "logs";
+  if (tab === "logs") openLogs(); else stopLive();
   $("queriesPane").hidden = tab !== "queries";
   if (tab === "queries") loadQueries();
   if (tab === "def") loadDefinition();
@@ -2522,35 +2530,94 @@ $("exportNote").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-act=close-export]")) closeExportPanel(true);
 });
 
-// ---- logs (☰ → Logs) ----------------------------------------------------------
-const logs = { lines: [], shown: [] };
+// ---- logs (the Logs tab) -----------------------------------------------------
+// Today's log or the log of another day, or the crash log. Live asks every
+// 2 s for the lines added since ("after"), newest at the top.
+const logs = { lines: [], shown: [], kind: "log", day: "", end: 0, fresh: 0, timer: null, busy: false };
 const LOG_PROBLEM = /FAILED|ERROR|error|warning|panic|fatal|-> [45]\d\d|dropped|SIGHUP|SIGPIPE|stopping|stopped/;
+const LIVE_MS = 2000;
+function logQuery(extra) {
+  return "/api/logs?" + new URLSearchParams({ kind: logs.kind, date: logs.day, lines: $("lgLines").value, ...extra });
+}
+function showLogInfo(r) {
+  const where = r.source === "file" ? r.path : "kept in memory since cactusdb started (it has no log file: start it with --runas background or --logfile to keep one, a new file every day)";
+  const live = $("lgLive").checked ? ` · <span class="live">● live</span>, updated ${new Date().toLocaleTimeString()}` : "";
+  $("lgSub").innerHTML = `${logs.kind === "crash" ? "Crash log" : "Log"} of ${r.date === r.today ? "today" : esc(r.date)} · ${esc(where)} · ${logs.lines.length.toLocaleString()} lines${live}`;
+}
+function fillDays(r) {
+  const days = (logs.kind === "crash" ? r.crashDays : r.days) || [];
+  if (!days.includes(r.today)) days.unshift(r.today);
+  logs.today = r.today;
+  const cur = logs.day || r.today;
+  $("lgDay").innerHTML = days.map((d) => `<option value="${d}"${d === cur ? " selected" : ""}>${d === r.today ? "Today" : d}</option>`).join("");
+}
 async function loadLogs() {
+  if (logs.busy) return;
+  logs.busy = true;
   $("lgText").textContent = "Loading…";
   try {
-    const r = await api("GET", "/api/logs?" + new URLSearchParams({ lines: $("lgLines").value }));
-    logs.lines = r.lines || [];
-    $("lgSub").textContent = r.source === "file" ? ` · ${r.path}` : " · since cactusdb started (it has no log file: start it with --runas background or --logfile to keep one)";
-    const c = r.crash || {};
-    $("lgCrash").hidden = !(c.lines && c.lines.length);
-    $("lgCrashPath").textContent = c.path ? `(${c.path})` : "";
-    $("lgCrashText").textContent = (c.lines || []).join("\n");
-    renderLogs();
+    const r = await api("GET", logQuery({}));
+    logs.lines = r.lines || []; logs.end = r.end || 0; logs.fresh = 0;
+    fillDays(r); renderLogs(); showLogInfo(r);
   } catch (e) { $("lgText").textContent = "Could not load the log: " + e.message; }
+  finally { logs.busy = false; }
+}
+async function pollLogs() {
+  if (logs.busy || $("logsPane").hidden) return;
+  logs.busy = true;
+  try {
+    const r = await api("GET", logQuery({ after: logs.end }));
+    if (r.append) {
+      logs.fresh = (r.lines || []).length;
+      if (logs.fresh) logs.lines = logs.lines.concat(r.lines).slice(-Number($("lgLines").value));
+    } else { logs.lines = r.lines || []; logs.fresh = 0; } // a new day or file: start again
+    logs.end = r.end || 0;
+    if (logs.fresh || !r.append) renderLogs();
+    showLogInfo(r);
+  } catch (e) { /* try again at the next tick */ }
+  finally { logs.busy = false; }
 }
 function renderLogs() {
-  const f = $("lgFilter").value.toLowerCase(), probs = $("lgErrors").checked;
-  let ls = logs.lines.filter((l) => (!f || l.toLowerCase().includes(f)) && (!probs || LOG_PROBLEM.test(l)));
-  if ($("lgNewest").checked) ls = ls.slice().reverse();
-  logs.shown = ls;
-  $("lgText").innerHTML = ls.length ? ls.map((l) => LOG_PROBLEM.test(l) ? `<span class="bad">${esc(l)}</span>` : esc(l)).join("\n")
-    : (logs.lines.length ? "No line matches." : "The log is empty.");
-  $("lgText").scrollTop = $("lgNewest").checked ? 0 : $("lgText").scrollHeight;
+  // A crash report reads top to bottom: never reversed.
+  const f = $("lgFilter").value.toLowerCase(), probs = $("lgErrors").checked, newest = $("lgNewest").checked && logs.kind !== "crash";
+  const firstNew = logs.lines.length - logs.fresh;
+  let ls = logs.lines.map((l, i) => [l, i >= firstNew])
+    .filter(([l]) => (!f || l.toLowerCase().includes(f)) && (!probs || LOG_PROBLEM.test(l)));
+  if (newest) ls = ls.reverse();
+  logs.shown = ls.map(([l]) => l);
+  $("lgText").innerHTML = ls.length
+    ? ls.map(([l, isNew]) => `<span class="${LOG_PROBLEM.test(l) ? "bad" : ""}${isNew ? " new" : ""}">${esc(l)}</span>`).join("\n")
+    : (logs.lines.length ? "No line matches." : logs.kind === "crash" ? "The crash log is empty: cactusdb hasn't crashed." : "The log is empty.");
+  $("lgText").scrollTop = newest ? 0 : $("lgText").scrollHeight;
 }
-function openLogs() { $("logsDialog").showModal(); loadLogs(); }
-$("lgRefresh").addEventListener("click", loadLogs);
-$("lgLines").addEventListener("change", loadLogs);
-for (const id of ["lgFilter", "lgErrors", "lgNewest"]) $(id).addEventListener("input", renderLogs);
+function startLive() {
+  stopLive();
+  if (!$("lgLive").checked || $("logsPane").hidden) return;
+  logs.timer = setInterval(pollLogs, LIVE_MS);
+}
+function stopLive() { clearInterval(logs.timer); logs.timer = null; }
+async function openLogs() { await loadLogs(); startLive(); }
+$("logsPane").querySelector(".ftypes").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-lgkind]");
+  if (!b || b.dataset.lgkind === logs.kind) return;
+  logs.kind = b.dataset.lgkind; logs.day = "";
+  $("logsPane").querySelectorAll("[data-lgkind]").forEach((x) => x.classList.toggle("on", x === b));
+  openLogs();
+});
+$("lgDay").addEventListener("change", () => {
+  logs.day = $("lgDay").value === logs.today ? "" : $("lgDay").value;
+  if (logs.day) { $("lgLive").checked = false; $("lgNewest").disabled = false; } // live is for today
+  openLogs();
+});
+$("lgLive").addEventListener("change", () => {
+  const on = $("lgLive").checked;
+  if (on) { $("lgNewest").checked = true; logs.day = ""; } // the latest event at the top
+  $("lgNewest").disabled = on;
+  openLogs();
+});
+$("lgRefresh").addEventListener("click", openLogs);
+$("lgLines").addEventListener("change", openLogs);
+for (const id of ["lgFilter", "lgErrors", "lgNewest"]) $(id).addEventListener("input", () => { logs.fresh = 0; renderLogs(); });
 $("lgCopy").addEventListener("click", async () => {
   if (await copyText(logs.shown.join("\n"))) toast(`Copied ${logs.shown.length.toLocaleString()} line${logs.shown.length === 1 ? "" : "s"}`);
   else toast("Copy failed – select the lines and copy them manually", true);

@@ -27,6 +27,13 @@ const crashLogName = "cactusdb-crash.log"
 // normally) and the function to call on a normal stop.
 func trackRun(dir string, port int) (previous string, stopped func()) {
 	crashPath := filepath.Join(dir, crashLogName)
+	marker := filepath.Join(dir, fmt.Sprintf("cactusdb-%d.running", port))
+	if b, err := os.ReadFile(marker); err == nil {
+		previous = previousRun(string(b), crashPath)
+	}
+	// Only now: a crash of the previous run, before midnight, is found above.
+	rotateIfOld(crashPath)
+	go rotateCrashLogDaily(crashPath)
 	if f, err := os.OpenFile(crashPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600); err != nil {
 		log.Printf("warning: cannot open %s: %v", crashPath, err)
 	} else if err := debug.SetCrashOutput(f, debug.CrashOptions{}); err != nil {
@@ -35,10 +42,6 @@ func trackRun(dir string, port int) (previous string, stopped func()) {
 		f.Close() // SetCrashOutput keeps its own copy
 	}
 
-	marker := filepath.Join(dir, fmt.Sprintf("cactusdb-%d.running", port))
-	if b, err := os.ReadFile(marker); err == nil {
-		previous = previousRun(string(b), crashPath)
-	}
 	run := fmt.Sprintf("pid=%d\nstarted=%s\nversion=%s\n", os.Getpid(), processStart.Format(time.RFC3339Nano), version)
 	if err := os.WriteFile(marker, []byte(run), 0o600); err != nil {
 		log.Printf("warning: cannot write %s: %v", marker, err)

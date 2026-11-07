@@ -35,6 +35,7 @@ func startBackground(logFile, probeURL string, urls []string) error {
 	if err := os.MkdirAll(filepath.Dir(logFile), 0o755); err != nil {
 		return err
 	}
+	rotateIfOld(logFile) // a log from an earlier day becomes cactusdb-<day>.log (logrotate.go)
 	f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
 		return fmt.Errorf("cannot open log file: %w", err)
