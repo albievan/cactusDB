@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.22.0 — 2026-11-07
+
+- Fixed: **deleting a saved query (or connection) on a server blocked cactusdb for about five
+  minutes**, like the 403s fixed in 1.21.0: the same firewall or intrusion-prevention device
+  blocks a computer from the port after an HTTP DELETE request. Tested on the server in the
+  browser: connecting, opening and recounting tables, the Definition tab, saved queries
+  (save, edit, run), exports, Export all, previews and downloads leave it alone; only the
+  DELETE set it off. The web UI now deletes with POST (`…/delete`); the DELETE routes remain
+  for scripts.
+- **Export saved queries**: **⤓ Export…** on each saved query, and **⤓ Export all queries…**
+  above the list, export the queries' data (all rows) as Excel, CSV, JSON, XML or all four.
+- **ALL** next to the four *Export all tables* icons exports every table in all four formats.
+- **☰ → 📜 Logs** shows cactusdb's log (the log file, or the lines since it started), with a
+  filter, *Problems only*, and the crash log.
+- Fixed: an Excel export failed when the query or table name started or ended with `'`, e.g. a
+  saved query called `code <> ''` (Excel forbids it in a sheet name). `History` is renamed too.
+
 ## 1.21.0 — 2026-11-07
 
 - Fixed: **on a server, tables, connecting and saving queries stopped working for about five
