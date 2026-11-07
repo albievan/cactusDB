@@ -34,7 +34,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.21.0"
+var version = "1.22.0"
 
 //go:embed web
 var webFS embed.FS
@@ -82,6 +82,8 @@ type server struct {
 	stopOnce   sync.Once
 
 	previousRun string // how the previous run ended, when it didn't stop normally (crash.go)
+	logPath     string // the log file shown by ☰ → Logs; "" = only the lines in memory (logs.go)
+	crashPath   string
 }
 
 func main() {
@@ -364,6 +366,7 @@ func main() {
 	mux.HandleFunc("GET /api/engines", s.handleEngines)
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("GET /api/info", s.handleInfo)
+	mux.HandleFunc("GET /api/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/update", s.handleUpdate)
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("POST /api/settings", s.handleSaveSettings)
@@ -390,12 +393,16 @@ func main() {
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)
+	// The web UI deletes with POST: some firewalls block a computer from the
+	// port for minutes after an HTTP DELETE (see statusInHeader).
+	mux.HandleFunc("POST /api/connections/{id}/delete", s.handleDeleteConn)
 	mux.HandleFunc("POST /api/connections/{id}/unlock", s.handleUnlockConn)
 	mux.HandleFunc("GET /api/superuser", s.handleSuperuserStatus)
 	mux.HandleFunc("POST /api/superuser/reveal", s.handleSuperuserReveal)
 	mux.HandleFunc("GET /api/queries", s.handleListQueries)
 	mux.HandleFunc("POST /api/queries", s.handleSaveQuery)
 	mux.HandleFunc("DELETE /api/queries/{id}", s.handleDeleteQuery)
+	mux.HandleFunc("POST /api/queries/{id}/delete", s.handleDeleteQuery)
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)
@@ -411,6 +418,12 @@ func main() {
 			log.SetOutput(term)
 		}
 	}
+	log.SetOutput(io.MultiWriter(log.Writer(), logMem)) // for ☰ → Logs
+	s.logPath = childLog
+	if s.logPath == "" {
+		s.logPath = *logFile
+	}
+	s.crashPath = filepath.Join(filepath.Dir(*connDB), crashLogName)
 	// IdleTimeout closes a browser's idle keep-alive connection before a
 	// firewall, VPN or NAT between it and cactusdb silently drops it: the
 	// browser would otherwise send the next request into a dead connection
@@ -595,8 +608,8 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// Some firewalls and intrusion-prevention devices take an HTTP 401 or 403 for
-// an attack and block the client from the port for minutes, open connections
+// Some firewalls and intrusion-prevention devices take an HTTP 403 (or an
+// HTTP DELETE request) for an attack and block the client from the port for minutes, open connections
 // included: one locked connection or expired session then made cactusdb on a
 // server unreachable from that computer. The web UI therefore asks (with the
 // header below, or errors=in-header in a download link) for errors as a 200

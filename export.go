@@ -263,13 +263,16 @@ func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, 
 	return n, err
 }
 
-// sheetName makes a valid Excel worksheet name (max 31 chars, no []:*?/\).
+// sheetName makes a valid Excel worksheet name: at most 31 characters, none
+// of []:*?/\, no ' at either end (a saved query can be called "code <> ”"),
+// and not History, which Excel keeps for itself.
 func sheetName(name string) string {
 	s := regexp.MustCompile(`[\[\]:*?/\\]`).ReplaceAllString(name, "_")
+	s = strings.Trim(s, "' ")
 	if r := []rune(s); len(r) > 31 {
-		s = string(r[:31])
+		s = strings.TrimRight(string(r[:31]), "' ")
 	}
-	if s == "" {
+	if s == "" || strings.EqualFold(s, "History") {
 		s = "Data"
 	}
 	return s

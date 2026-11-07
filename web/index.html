@@ -101,7 +101,9 @@
   .qdesc { white-space: normal !important; color: var(--muted); font-size: 12px; }
   .qsql { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 380px !important; }
   .qacts { white-space: nowrap; width: 1%; }
-  .qacts button { margin-left: 4px; }
+  .qacts button, .qacts select { margin-left: 4px; }
+  select.qexpsel { font-size: 12px; padding: 3px 6px; width: auto; }
+  #qNote { margin: 0; }
   section.box { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   section.box h2 {
     font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
@@ -336,6 +338,15 @@
   dialog.modal::backdrop { background: rgba(0,0,0,.35); }
   dialog.modal h3 { margin: 0 0 6px; font-size: 16px; }
   dialog.modal.wide { width: min(640px, calc(100vw - 32px)); }
+  dialog.modal.logs { width: min(1100px, calc(100vw - 32px)); }
+  .lgbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 8px; }
+  .lgbar input[type=search] { flex: 1; min-width: 200px; }
+  .lgbar select { width: auto; }
+  .lgtext { font-family: var(--mono); font-size: 11.5px; line-height: 1.45; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin: 0; height: min(60vh, 560px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lgtext .bad { color: var(--danger); }
+  #lgCrash { margin-top: 8px; font-size: 12px; }
+  #lgCrash .lgtext { height: 200px; margin-top: 6px; }
   /* Check for update: one row per system, with a small copy button. */
   .upstatus { font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); margin: 6px 0 4px; }
   .upstatus.new { background: var(--accent-soft); border-color: var(--accent); }
@@ -433,6 +444,7 @@
         <button data-allfmt="csv" title="Export all tables to CSV, one file per table" aria-label="Export all tables to CSV" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#0e7490"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">CSV</text></svg></button>
         <button data-allfmt="json" title="Export all tables to JSON, one file per table" aria-label="Export all tables to JSON" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#b45309"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">JSON</text></svg></button>
         <button data-allfmt="xml" title="Export all tables to XML, one file per table" aria-label="Export all tables to XML" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#7c3aed"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XML</text></svg></button>
+        <button data-allfmt="all" title="Export all tables to Excel, CSV, JSON and XML in one go, one file per table and format" aria-label="Export all tables to all four formats" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#475569"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">ALL</text></svg></button>
       </div>
       <div class="filterrow">
         <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
@@ -453,6 +465,7 @@
       <button data-menu="folder" title="Choose where exports and backups are saved">📁 Folder setup</button>
       <button data-menu="drivers" title="The databases cactusdb supports and their drivers">🧩 Drivers</button>
       <button data-menu="settings" title="When to disconnect an unused connection">⚙ Settings</button>
+      <button data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request">📜 Logs</button>
       <button data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system">⬆ Check for update<span class="updot" id="updateDot" hidden></span></button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
@@ -559,8 +572,10 @@
         <span class="flabel">Saved queries</span><span class="fsel" id="qConn"></span>
         <input id="qFilter" type="search" placeholder="Filter by name or description…" spellcheck="false" autocomplete="off">
         <span class="spacer"></span>
+        <select id="qExportAll" class="qexpsel" title="Export the data (every row, not the SQL) of all saved queries shown, one file per query and format, to the export folder" aria-label="Export the data of all saved queries"><option value="">⤓ Export all queries…</option><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option><option value="json">JSON</option><option value="xml">XML</option><option value="all">All four formats</option></select>
         <button class="primary" id="qNew" title="Save the query in the editor">+ Save current query</button>
       </div>
+      <div class="exportnote" id="qNote" hidden></div>
       <div class="ftable" id="qTable"></div>
     </div>
     <div class="pane" id="filesPane" hidden>
@@ -658,6 +673,26 @@
     <p class="hint">The databases cactusdb can connect to. Every driver is compiled into cactusdb: nothing to download or install.</p>
     <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
     <div class="dactions"><span class="spacer"></span><button type="submit" class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="logsDialog" class="modal logs" aria-labelledby="lgTitle">
+  <form method="dialog">
+    <h3 id="lgTitle">Logs<span class="sub" id="lgSub"></span></h3>
+    <div class="lgbar">
+      <input id="lgFilter" type="search" placeholder="Filter, e.g. FAILED, a table or an IP address" spellcheck="false" autocomplete="off" aria-label="Filter the log lines">
+      <label class="check"><input type="checkbox" id="lgErrors"> Problems only</label>
+      <select id="lgLines" aria-label="How many lines"><option value="500">Last 500 lines</option><option value="1000" selected>Last 1,000</option><option value="5000">Last 5,000</option><option value="20000">Last 20,000</option></select>
+      <label class="check"><input type="checkbox" id="lgNewest" checked> Newest first</label>
+    </div>
+    <pre id="lgText" class="lgtext" tabindex="0">…</pre>
+    <details id="lgCrash" hidden><summary>Crash log <span id="lgCrashPath"></span></summary><pre id="lgCrashText" class="lgtext"></pre></details>
+    <div class="dactions">
+      <button type="button" id="lgRefresh">Refresh</button>
+      <button type="button" id="lgCopy" title="Copy the lines shown">Copy</button>
+      <span class="spacer"></span>
+      <button type="submit" class="primary">Close</button>
+    </div>
   </form>
 </dialog>
 
@@ -1186,7 +1221,7 @@ async function deleteConnection(c) {
   } else if (!confirm(what)) return;
   try {
     // Exactly the password typed to confirm, not one remembered from earlier.
-    await withUnlock(c, (cr) => api("DELETE", "/api/connections/" + c.id, cr), "delete", creds);
+    await withUnlock(c, (cr) => api("POST", "/api/connections/" + c.id + "/delete", cr), "delete", creds);
     delete unlocks[c.id];
     toast(`Deleted “${c.name}”`);
   } catch (e) { toast(e.message, true); }
@@ -1368,6 +1403,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "drivers": setNavMenu(false); $("driversDialog").showModal(); break;
     case "settings": setNavMenu(false); openSettingsDialog(); break;
     case "update": setNavMenu(false); openUpdateDialog(); break;
+    case "logs": setNavMenu(false); openLogs(); break;
   }
 });
 document.addEventListener("click", (ev) => {
@@ -1492,6 +1528,7 @@ async function loadQueries() {
     renderQueries();
   } catch (e) { toast(e.message, true); }
 }
+const Q_EXPORT_OPTS = `<option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option><option value="json">JSON</option><option value="xml">XML</option><option value="all">All four formats</option>`;
 function renderQueries() {
   $("qConn").textContent = state.label ? "· " + state.label : "";
   $("qNew").disabled = !queries.saved;
@@ -1513,10 +1550,56 @@ function renderQueries() {
       <td class="qdesc">${esc(x.description || "")}</td>
       <td class="qsql" title="${esc(x.sql)}">${esc(x.sql.replace(/\s+/g, " "))}</td>
       <td class="fdate">${esc(fmtDate(x.updated))}</td>
-      <td class="qacts"><button class="small primary" data-qact="run" title="Open in the editor and run">▶ Run</button><button class="small" data-qact="edit">Edit</button><button class="small danger" data-qact="del" title="Delete (asks first)">Delete</button></td>
+      <td class="qacts"><select class="small qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select><button class="small primary" data-qact="run" title="Open in the editor and run">▶ Run</button><button class="small" data-qact="edit">Edit</button><button class="small danger" data-qact="del" title="Delete (asks first)">Delete</button></td>
     </tr>`).join("") : `<tr><td colspan="5" class="fnomatch">No saved query matches.</td></tr>`) + `</tbody></table>`;
 }
 $("qFilter").addEventListener("input", () => { queries.q = $("qFilter").value; renderQueries(); });
+
+// Exporting the data of saved queries: one file per query and format, in the
+// export folder, one after the other. The note above the list shows progress
+// and then a download link for each file.
+const FMT_NAMES = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML" };
+async function exportQueries(list, fmt) {
+  const fmts = fmt === "all" ? ["xlsx", "csv", "json", "xml"] : [fmt];
+  const jobs = list.flatMap((q) => fmts.map((f) => ({ q, f })));
+  if (!jobs.length || overall.running) return;
+  const note = $("qNote"), session = state.session, done = [], failed = [];
+  const t0 = Date.now();
+  overall.running = true; // not disconnected for being idle meanwhile
+  $("qExportAll").disabled = true;
+  note.hidden = false;
+  try {
+    for (const [i, { q, f }] of jobs.entries()) {
+      if (session !== state.session) break; // disconnected
+      note.innerHTML = `<span class="spin"></span>Exporting ${i + 1} of ${jobs.length}: <b>${esc(q.name)}</b> as ${FMT_NAMES[f]}…`;
+      try {
+        const r = await api("POST", "/api/export", { session, sql: q.sql, format: f, name: q.name });
+        done.push({ q, f, r });
+      } catch (e) { failed.push({ q, f, e }); }
+    }
+  } finally { overall.running = false; $("qExportAll").disabled = false; }
+  const rows = done.reduce((n, d) => n + d.r.rows, 0);
+  note.innerHTML = `${failed.length ? "⚠" : "✔"} Exported ${done.length} file${done.length === 1 ? "" : "s"} (${rows.toLocaleString()} rows) in ${fmtDuration(Date.now() - t0)}` +
+    (done.length ? ` to <code>${esc(done[0].r.folder.replace(/[\\/][^\\/]+$/, ""))}</code>:` : "") +
+    done.map((d) => ` <a href="${esc(dlLink(d.r.download))}" download title="${esc(d.r.path)}">${esc(d.q.name)} · ${FMT_NAMES[d.f]}</a>`).join(" ·") +
+    failed.map((x) => `<br><span class="err">✘ ${esc(x.q.name)} (${FMT_NAMES[x.f]}): ${esc(x.e.message)}</span>`).join("") +
+    `<button class="clearnote" data-act="close-qnote" title="Clear the export status">Clear</button>`;
+  toast(failed.length ? `${failed.length} export${failed.length === 1 ? "" : "s"} failed` : `Exported ${done.length} file${done.length === 1 ? "" : "s"}`, failed.length > 0);
+}
+$("qExportAll").addEventListener("change", () => {
+  const fmt = $("qExportAll").value; $("qExportAll").value = "";
+  const q = queries.q.toLowerCase();
+  const vis = queries.list.filter((x) => !q || x.name.toLowerCase().includes(q) || (x.description || "").toLowerCase().includes(q));
+  if (fmt) exportQueries(vis, fmt);
+});
+$("qTable").addEventListener("change", (ev) => {
+  const sel = ev.target.closest("select[data-qexp]");
+  if (!sel) return;
+  const fmt = sel.value; sel.value = "";
+  const x = queries.list.find((q) => q.id === +sel.closest("tr").dataset.qid);
+  if (x && fmt) exportQueries([x], fmt);
+});
+$("qNote").addEventListener("click", (ev) => { if (ev.target.closest("[data-act=close-qnote]")) $("qNote").hidden = true; });
 $("qTable").addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-qact]");
   if (!b) return;
@@ -1529,7 +1612,7 @@ $("qTable").addEventListener("click", async (ev) => {
     openQueryDialog(x);
   } else if (confirm(`Delete the saved query “${x.name}”?`)) {
     try {
-      await api("DELETE", `/api/queries/${x.id}?` + new URLSearchParams({ session: state.session }));
+      await api("POST", `/api/queries/${x.id}/delete?` + new URLSearchParams({ session: state.session }));
       toast(`Deleted “${x.name}”`); loadQueries();
     } catch (e) { toast(e.message, true); }
   }
@@ -2349,7 +2432,18 @@ function setExportAllEnabled(on) {
   document.querySelectorAll("[data-allfmt]").forEach((b) => (b.disabled = !on));
 }
 
-document.querySelectorAll("[data-allfmt]").forEach((b) => b.addEventListener("click", () => exportAll(b.dataset.allfmt)));
+document.querySelectorAll("[data-allfmt]").forEach((b) => b.addEventListener("click", () =>
+  b.dataset.allfmt === "all" ? exportAllFormats() : exportAll(b.dataset.allfmt)));
+
+// The ALL button: every table in each of the four formats, one after the other.
+async function exportAllFormats() {
+  const session = state.session;
+  for (const f of ["xlsx", "csv", "json", "xml"]) {
+    if (session !== state.session || state.stopped) return;
+    if (!await exportAll(f)) return; // failed: the toast says why
+  }
+  toast("Exported every table as Excel, CSV, JSON and XML");
+}
 
 async function exportAll(fmt) {
   setExportAllEnabled(false);
@@ -2369,13 +2463,14 @@ async function exportAll(fmt) {
       if (state.stopped) return; // cactusdb was shut down from this page
       if (st.done) {
         const failed = st.tables.filter((t) => t.state === "failed").length;
-        toast(failed ? `${failed} of ${st.tables.length} exports failed` : `Exported ${st.tables.length} tables`, failed > 0);
-        break;
+        toast(failed ? `${failed} of ${st.tables.length} exports failed` : `Exported ${st.tables.length} tables as ${FMT_NAMES[fmt]}`, failed > 0);
+        return failed === 0;
       }
       await new Promise((r) => setTimeout(r, 500));
     }
   } catch (e) {
     if (!state.stopped) { toast("Export failed: " + e.message, true); showOverall(100, `<span class="err">✘ Export failed</span>`, "fail"); }
+    return false;
   } finally { overall.running = false; setExportAllEnabled(!!state.session); }
 }
 
@@ -2425,6 +2520,40 @@ function renderExportAll(st) {
 
 $("exportNote").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-act=close-export]")) closeExportPanel(true);
+});
+
+// ---- logs (☰ → Logs) ----------------------------------------------------------
+const logs = { lines: [], shown: [] };
+const LOG_PROBLEM = /FAILED|ERROR|error|warning|panic|fatal|-> [45]\d\d|dropped|SIGHUP|SIGPIPE|stopping|stopped/;
+async function loadLogs() {
+  $("lgText").textContent = "Loading…";
+  try {
+    const r = await api("GET", "/api/logs?" + new URLSearchParams({ lines: $("lgLines").value }));
+    logs.lines = r.lines || [];
+    $("lgSub").textContent = r.source === "file" ? ` · ${r.path}` : " · since cactusdb started (it has no log file: start it with --runas background or --logfile to keep one)";
+    const c = r.crash || {};
+    $("lgCrash").hidden = !(c.lines && c.lines.length);
+    $("lgCrashPath").textContent = c.path ? `(${c.path})` : "";
+    $("lgCrashText").textContent = (c.lines || []).join("\n");
+    renderLogs();
+  } catch (e) { $("lgText").textContent = "Could not load the log: " + e.message; }
+}
+function renderLogs() {
+  const f = $("lgFilter").value.toLowerCase(), probs = $("lgErrors").checked;
+  let ls = logs.lines.filter((l) => (!f || l.toLowerCase().includes(f)) && (!probs || LOG_PROBLEM.test(l)));
+  if ($("lgNewest").checked) ls = ls.slice().reverse();
+  logs.shown = ls;
+  $("lgText").innerHTML = ls.length ? ls.map((l) => LOG_PROBLEM.test(l) ? `<span class="bad">${esc(l)}</span>` : esc(l)).join("\n")
+    : (logs.lines.length ? "No line matches." : "The log is empty.");
+  $("lgText").scrollTop = $("lgNewest").checked ? 0 : $("lgText").scrollHeight;
+}
+function openLogs() { $("logsDialog").showModal(); loadLogs(); }
+$("lgRefresh").addEventListener("click", loadLogs);
+$("lgLines").addEventListener("change", loadLogs);
+for (const id of ["lgFilter", "lgErrors", "lgNewest"]) $(id).addEventListener("input", renderLogs);
+$("lgCopy").addEventListener("click", async () => {
+  if (await copyText(logs.shown.join("\n"))) toast(`Copied ${logs.shown.length.toLocaleString()} line${logs.shown.length === 1 ? "" : "s"}`);
+  else toast("Copy failed – select the lines and copy them manually", true);
 });
 
 // ---- check for update -------------------------------------------------------
