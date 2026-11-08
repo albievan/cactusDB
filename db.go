@@ -84,6 +84,11 @@ type engineInfo struct {
 	// Backend: reached through backend.go rather than a database/sql driver.
 	Backend bool `json:"backend,omitempty"`
 	File    bool `json:"file,omitempty"` // a database file instead of a server
+	// NeedsDB: it can't connect without the database (a file, path or
+	// service name), so it's never saved without one. ListsDBs: the
+	// connection form can list the server's databases (databases.go).
+	NeedsDB  bool `json:"needsDB,omitempty"`
+	ListsDBs bool `json:"listsDBs,omitempty"`
 
 	// The connection form: a label "" hides that field.
 	FileLabel   string `json:"fileLabel,omitempty"`
@@ -115,15 +120,15 @@ var engines = []engineInfo{
 	{ID: EngineSQLite, Name: "SQLite", Group: "Relational", File: true, FileLabel: "SQLite database file", FileHint: "/path/to/database.db"},
 	{ID: EngineMySQL, Name: "MySQL", Group: "Relational", DefaultPort: 3306},
 	{ID: EngineMariaDB, Name: "MariaDB", Group: "Relational", DefaultPort: 3306},
-	{ID: EngineFirebird, Name: "Firebird", Group: "Relational", DefaultPort: 3050, DefaultUser: "SYSDBA",
+	{ID: EngineFirebird, Name: "Firebird", Group: "Relational", DefaultPort: 3050, DefaultUser: "SYSDBA", NeedsDB: true,
 		DBLabel: "Database path or alias", DBHint: "/var/lib/firebird/data/employee.fdb"},
 	{ID: EngineMSSQL, Name: "SQL Server", Group: "Relational", DefaultPort: 1433, HostHint: "server or server\\INSTANCE",
 		DBHint: "database name (blank = login default)", OptionsHint: "e.g. encrypt=true&ApplicationIntent=ReadOnly"},
 	{ID: EnginePostgres, Name: "PostgreSQL", Group: "Relational", DefaultPort: 5432, DefaultUser: "postgres",
 		DBHint: "database name (blank = same as username)", OptionsHint: "e.g. sslmode=require"},
-	{ID: EngineOracle, Name: "Oracle", Group: "Relational", DefaultPort: 1521, DBLabel: "Service name", DBHint: "e.g. FREEPDB1 or ORCL",
+	{ID: EngineOracle, Name: "Oracle", Group: "Relational", DefaultPort: 1521, NeedsDB: true, DBLabel: "Service name", DBHint: "e.g. FREEPDB1 or ORCL",
 		OptionsHint: "e.g. schema=HR (default: the user's own), sid=ORCL, ssl=true", NoBackup: true, NoCompare: true},
-	{ID: EngineInformix, Name: "Informix", Group: "Relational", DefaultPort: 27017, Backend: true, DefaultUser: "informix",
+	{ID: EngineInformix, Name: "Informix", Group: "Relational", DefaultPort: 27017, Backend: true, DefaultUser: "informix", NeedsDB: true,
 		HostLabel: "Wire listener host", DBHint: "database name, e.g. stores_demo", OptionsHint: "e.g. authSource=admin&tls=true",
 		Help:     "Through the Informix wire listener (MongoDB API) with SQL passthrough on: security.sql.passthrough=true in its properties file.",
 		NoBackup: true, NoCompare: true},
@@ -204,6 +209,8 @@ func init() {
 		}
 		e.Language = cmp.Or(e.Language, "SQL")
 		e.QueryHint = cmp.Or(e.QueryHint, sqlQueryHint)
+		e.NeedsDB = e.NeedsDB || e.File
+		e.ListsDBs = canListDatabases(e.ID)
 	}
 }
 

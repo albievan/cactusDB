@@ -110,7 +110,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.33.0
+cactusdb 1.34.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -157,7 +157,7 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 | **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
 | **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
 | **📜 Logs** | Opens the **Logs** tab (see below) |
-| **🐳 DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection (see [Deploying a database as a container](#db-containers)) |
+| **🐳 DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection. Each deployed container has a page with its settings and its CPU, memory and storage use, and start, stop, restart, delete and purge (see [Deploying a database as a container](#db-containers)) |
 | **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
 | **⬆ Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
 
@@ -198,6 +198,13 @@ the connection dialog, opened by **＋ New connection** or **Edit**, never in th
    `key=value&key=value`. They are saved with the connection but not encrypted, so secrets
    go in the password field.
 
+   The **database** can be picked instead of typed: **☰ List databases** next to the field
+   connects and lists the server's databases (MySQL, MariaDB, PostgreSQL and its family,
+   SQL Server, Azure SQL, MongoDB, Cosmos DB, Couchbase buckets, Cassandra keyspaces, Neo4j,
+   Redis, Athena, BigQuery datasets). **Test connection** and **Save** do it too when no
+   database is filled in; press **Save** again to save without one. Types that can't
+   connect without their database never save or connect without it: SQLite and Access (the
+   file), Firebird (the path or alias), Oracle (the service name) and Informix.
 3. *(Optional)* Click **Test connection** to check the details first.
 4. Click **Connect** to connect without saving, or give it a name and a **connection
    password** (at least 6 characters, typed twice) and click **Save** to remember it,
@@ -277,6 +284,10 @@ what will happen first: which file is replaced and the command cactusdb restarts
    disconnected.
 5. It starts the new version **with the options it was started with** (see below). The page
    waits for it and reloads itself.
+
+A page that is open while cactusdb is upgraded some other way (from another browser, or by
+replacing the program on the server) notices within about 20 seconds and reloads itself,
+or, while a dialog is open, offers **Reload**.
 
 The options come from the connection database. Every time the web UI starts, cactusdb saves
 how it was started in the `startup_options` table of `cactus.conn.db`, one row per port:
@@ -652,10 +663,36 @@ containers cactusdb deployed, and a form:
 **Deploy** downloads the image (unless it's already there), starts the container and
 connects until the database answers, showing each step. Then **Add as connection…** opens
 the New connection dialog filled in (type, host, port, user, password, database): give it
-a connection password and save it. The list of deployed containers has **Add connection**,
-**Logs** (the last 300 lines) and **Remove**. Remove asks first and removes the container
-(Docker) or the deployment, service and secret (Kubernetes); the data folder, volume or
-volume claim is kept.
+a connection password and save it. The list of deployed containers has **View**, **Add
+connection**, **Logs** (the last 300 lines) and **Remove**. Remove asks first and removes
+the container (Docker) or the deployment, service and secret (Kubernetes); the data
+folder, volume or volume claim is kept.
+
+<a id="container-page"></a>
+**A container's page.** **View** (or its name) opens the page of a deployed container:
+
+- **Usage**, measured again every 5 seconds: **CPU** (percent of one core, as `docker
+  stats` counts it, with the cores it can use), **memory** (used, of its limit or of all
+  Docker's memory) and **storage**: the database files (measured inside the container, at
+  most once a minute), what the container wrote besides them, the image, the volume
+  claim's size (Kubernetes) and the disk and network I/O. On Kubernetes CPU and memory come
+  from `kubectl top`, which needs the cluster's metrics-server.
+- **Settings**: the image and its ID, state and health, when it was created and started,
+  the restart policy and restarts, the ports, the data folder or volume, the command, the
+  limits and labels; on Kubernetes the namespace, replicas, service, volume claim and pods
+  (node, IP, restarts).
+- **Environment**: its variables; passwords, keys and tokens are hidden.
+- One compact row of buttons: **▶ Start**, **■ Stop**, **↻ Restart**, **🗑 Delete** and
+  **☠ Purge**. On Kubernetes, stop scales the deployment to 0 and start back to 1. Each
+  asks first and needs the superuser password. **Delete** is Remove: the data stays.
+  **Purge** removes everything about the container and can't be undone: the container, its
+  data folder and every file in it (or its volume or volume claim) and its image, unless
+  another container uses that image. It lists what it will remove and wants the container's
+  name typed. It refuses a data folder that is a disk's root or a folder just below it, the
+  home folder, or a folder holding cactusdb. On Kubernetes a short-lived pod on the node
+  deletes a `hostPath` folder (the pod must be running, so cactusdb knows the node); the
+  nodes remove the unused image themselves.
+- **Logs**, and **Add connection**.
 
 - Passwords never appear on a command line: docker gets them from its environment, and on
   Kubernetes they are in a Secret (`<name>-credentials`) sent to `kubectl apply` on stdin.
@@ -1259,10 +1296,11 @@ is sent and how to set it up. In short:
   superuser password. `startup_options` holds the names of `CACTUSDB_…` variables, never
   their values.
 - **Deploying database containers** (☰ → DB container deployment) runs `docker` or
-  `kubectl` on the cactusdb server, so deploying, removing and reading container logs need
-  the superuser password (wrong ones are slowed down like the others). Without a superuser
-  password nobody can deploy. cactusdb only lists, removes and reads the logs of containers
-  it deployed itself (labelled `com.cactusdb.managed`, or `app.kubernetes.io/managed-by=cactusdb`).
+  `kubectl` on the cactusdb server, so deploying, starting, stopping, restarting, deleting,
+  purging and reading container logs need the superuser password (wrong ones are slowed
+  down like the others). Looking at a container's settings and usage doesn't; its
+  passwords are hidden there. Without a superuser password nobody can deploy. cactusdb only
+  lists, manages and reads the logs of containers it deployed itself (labelled `com.cactusdb.managed`, or `app.kubernetes.io/managed-by=cactusdb`).
   Database passwords reach Docker through the environment and Kubernetes through a Secret,
   never a command line, and are not kept by cactusdb.
 - **The usage log** in `cactus.conn.db` (see *The usage log*) holds the SQL that was run
@@ -1393,6 +1431,8 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `eng_http.go`, `eng_couchbase.go`, `eng_cosmos.go`, `eng_weaviate.go`, `eng_bigquery.go`, `eng_athena.go` | The databases reached through an HTTPS API (BigQuery's Google sign-in, Athena's AWS Signature Version 4) |
 | `jet.go`, `eng_access.go` | Reading Microsoft Access files, and the SQL subset that queries them |
 | `containers.go` | ☰ → DB container deployment: finding Docker and Kubernetes, the catalogue of database images, deploying with `docker run` or `kubectl apply`, and the list, logs and removal of what it deployed |
+| `containers_manage.go` | A deployed container's page: its settings and CPU, memory and storage use, and start, stop, restart, delete and purge |
+| `databases.go` | The connection form's list of the server's databases, and the types that need a database |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `tablestats.go`, `rowsize.go` | Rows and size of every table; the size estimated as rows × the columns' declared sizes when the database doesn't report it |
 | `readonly.go` | The read-only query check |

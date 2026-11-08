@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.33.0"
+var version = "1.34.0"
 
 //go:embed web
 var webFS embed.FS
@@ -398,7 +398,12 @@ func main() {
 
 	static, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
-	mux.Handle("GET /", http.FileServerFS(static))
+	// no-cache: after an upgrade the browser must load the new page, not keep the old one.
+	files := http.FileServerFS(static)
+	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		files.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("GET /api/engines", s.handleEngines)
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("GET /api/info", s.handleInfo)
@@ -414,6 +419,7 @@ func main() {
 	mux.HandleFunc("POST /api/connect", s.handleConnect)
 	mux.HandleFunc("POST /api/disconnect", s.handleDisconnect)
 	mux.HandleFunc("POST /api/testconn", s.handleTestConn)
+	mux.HandleFunc("POST /api/databases", s.handleDatabases)
 	mux.HandleFunc("GET /api/objects", s.handleObjects)
 	mux.HandleFunc("POST /api/refresh", s.handleRefresh)
 	mux.HandleFunc("GET /api/tablestats", s.handleTableStats)
@@ -451,6 +457,8 @@ func main() {
 	mux.HandleFunc("GET /api/containers/deploy/{job}", s.handleContainerJob)
 	mux.HandleFunc("POST /api/containers/logs", s.handleContainerLogs)
 	mux.HandleFunc("POST /api/containers/remove", s.handleContainerRemove)
+	mux.HandleFunc("POST /api/containers/inspect", s.handleContainerInspect)
+	mux.HandleFunc("POST /api/containers/action", s.handleContainerAction)
 	mux.HandleFunc("POST /api/usage", s.handleUsage)
 	mux.HandleFunc("GET /api/usage/summary", s.handleUsageSummary)
 	mux.HandleFunc("POST /api/usage/delete", s.handleUsageDelete)
@@ -1040,6 +1048,10 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 400, err)
 			return
 		}
+		if err := needsDatabase(p); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
 	}
 	start := time.Now()
 	db, err := openDB(r.Context(), p)
@@ -1115,8 +1127,13 @@ func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer db.Close()
+	// Without a database, the form offers the server's databases to pick from.
+	var dbs []string
+	if strings.TrimSpace(p.Database) == "" && canListDatabases(p.Engine) {
+		dbs, _ = listDatabases(r.Context(), p.Engine, db)
+	}
 	groups, err := listObjects(r.Context(), dialect(p.Engine), db)
-	if err != nil {
+	if err != nil && dbs == nil {
 		logAction(r, "test connection FAILED %s: %v", defaultConnName(p), err)
 		writeErr(w, 400, fmt.Errorf("connected, but listing tables failed: %w", err))
 		return
@@ -1132,7 +1149,7 @@ func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 		ver += pgvectorNote(r.Context(), db)
 	}
 	logAction(r, "test connection OK %s (%s, %d tables)", defaultConnName(p), ver, tables)
-	writeJSON(w, 200, map[string]any{"version": ver, "tables": tables, "tablesLabel": tablesLabel, "elapsedMs": time.Since(start).Milliseconds()})
+	writeJSON(w, 200, map[string]any{"version": ver, "tables": tables, "tablesLabel": tablesLabel, "elapsedMs": time.Since(start).Milliseconds(), "databases": dbs})
 }
 
 // serverVersion describes the database server, e.g. "MariaDB 11.8.3", or
@@ -1614,6 +1631,10 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 	}
 	if c.Engine == "" {
 		writeErr(w, 400, errors.New("engine is required"))
+		return
+	}
+	if err := needsDatabase(c.ConnParams); err != nil {
+		writeErr(w, 400, err)
 		return
 	}
 	var oldBox *secretBox

@@ -1171,21 +1171,25 @@ type ctrTarget struct {
 	Namespace     string `json:"namespace"`
 	SuperPassword string `json:"superPassword"`
 	Lines         int    `json:"lines"`
+	Action        string `json:"action"`  // start, stop, restart, delete, purge
+	Confirm       string `json:"confirm"` // purge: the container's name, typed again
 }
 
-// target finds a container cactusdb deployed: it never touches others.
-func (s *server) ctrTarget(w http.ResponseWriter, r *http.Request, what string) (ctrTarget, *ctrRuntime, bool) {
+// target finds a container cactusdb deployed: it never touches others. Only
+// looking at it (super false) works without the superuser password.
+func (s *server) ctrTarget(w http.ResponseWriter, r *http.Request, what string, super bool) (ctrTarget, *ctrRuntime, deployedCtr, bool) {
 	var t ctrTarget
+	var none deployedCtr
 	if err := readJSON(r, &t); err != nil {
 		writeErr(w, 400, err)
-		return t, nil, false
+		return t, nil, none, false
 	}
 	if !ctrNameRe.MatchString(t.Name) || (t.Runtime == "kubernetes" && !ctrNameRe.MatchString(t.Namespace)) {
 		writeErr(w, 400, errors.New("not a container cactusdb deployed"))
-		return t, nil, false
+		return t, nil, none, false
 	}
-	if !s.superuserOK(w, r, t.SuperPassword, what) {
-		return t, nil, false
+	if super && !s.superuserOK(w, r, t.SuperPassword, what) {
+		return t, nil, none, false
 	}
 	var rt *ctrRuntime
 	var list []deployedCtr
@@ -1201,27 +1205,27 @@ func (s *server) ctrTarget(w http.ResponseWriter, r *http.Request, what string) 
 		}
 	default:
 		writeErr(w, 400, errors.New("unknown runtime"))
-		return t, nil, false
+		return t, nil, none, false
 	}
 	if !rt.OK {
 		writeErr(w, 409, fmt.Errorf("%s: %s", rt.Name, rt.Error))
-		return t, nil, false
+		return t, nil, none, false
 	}
 	if err != nil {
 		writeErr(w, 502, err)
-		return t, nil, false
+		return t, nil, none, false
 	}
 	for _, c := range list {
 		if c.Name == t.Name && c.Namespace == t.Namespace {
-			return t, rt, true
+			return t, rt, c, true
 		}
 	}
 	writeErr(w, 404, fmt.Errorf("%s isn't a container cactusdb deployed", t.Name))
-	return t, nil, false
+	return t, nil, none, false
 }
 
 func (s *server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
-	t, rt, ok := s.ctrTarget(w, r, "read container logs")
+	t, rt, _, ok := s.ctrTarget(w, r, "read container logs", true)
 	if !ok {
 		return
 	}
@@ -1251,19 +1255,13 @@ func (s *server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
 // service and secret (kubernetes). The data folder, volume or volume claim
 // stays: deploying again with the same folder finds the databases.
 func (s *server) handleContainerRemove(w http.ResponseWriter, r *http.Request) {
-	t, rt, ok := s.ctrTarget(w, r, "remove a database container")
+	t, rt, _, ok := s.ctrTarget(w, r, "remove a database container", true)
 	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
-	var err error
-	if t.Runtime == "docker" {
-		_, err = runTool(ctx, toolCmd(ctx, rt.tool, "rm", "-f", t.Name), nil)
-	} else {
-		_, err = runTool(ctx, toolCmd(ctx, rt.tool, "delete", "deployment,service,secret", "-n", t.Namespace,
-			"-l", "app.kubernetes.io/managed-by=cactusdb,app.kubernetes.io/instance="+t.Name, "--wait=false"), nil)
-	}
+	err := deleteCtr(ctx, rt, t)
 	if err != nil {
 		logAction(r, "removing container %s FAILED: %v", t.Name, err)
 		writeErr(w, 502, err)

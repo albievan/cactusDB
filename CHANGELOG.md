@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.34.0 — 2026-11-08
+
+- **A deployed container's page** (☰ → 🐳 DB container deployment → **View**, or click its
+  name):
+  - **Usage**, refreshed every 5 seconds: CPU (percent of one core, with the cores it can
+    use), memory (used, of its limit or Docker's memory) and storage (the database files,
+    what the container wrote besides them, the image, the volume claim's size, disk and
+    network I/O). Kubernetes: from `kubectl top` when the cluster has metrics-server.
+  - **Settings**: image and image ID, state and health, created and started, restart policy
+    and restarts, ports, data folder or volume, command, limits and labels; on Kubernetes the
+    namespace, replicas, service, volume claim and pods. **Environment** variables, with
+    passwords, keys and tokens hidden.
+  - One compact button row: **Start**, **Stop**, **Restart**, **Delete** (the data stays) and
+    **Purge**, each asking first and needing the superuser password. Purge removes
+    everything: the container, its data folder and files or its volume (claim) and, when no
+    other container uses it, its image; it lists what goes, wants the name typed, and
+    refuses a data folder at a disk's root, one level below it, the home folder or one
+    holding cactusdb. On Kubernetes, stop and start scale the deployment, and a short pod on
+    the node deletes a `hostPath` data folder.
+  - **Logs** and **Add connection** there too.
+- **New connection: the server's databases.** **☰ List databases** next to the Database
+  field lists them (MySQL, MariaDB, the PostgreSQL family, SQL Server, Azure SQL, MongoDB,
+  Cosmos DB, Couchbase, Cassandra, Neo4j, Redis, Athena, BigQuery) to pick one. Test
+  connection and Save do it too when the field is empty; Save again saves without one.
+- **A database is required where the type can't do without one**: SQLite and Access (the
+  file), Firebird (path or alias), Oracle (service name) and Informix. The form marks it
+  *(required)*, and neither the form nor the server saves or connects without it.
+- **The page reloads after an upgrade.** Installing an update could leave the page on
+  "Installing…" when the new version started before the page saw it restarting; it now
+  reloads. A page open while cactusdb is upgraded some other way (another browser, the
+  program replaced on the server) notices within 20 seconds and reloads, or offers
+  **Reload** while a dialog is open. The page is served with `Cache-Control: no-cache`, so
+  the browser always loads the new one.
+
 ## 1.33.0 — 2026-11-08
 
 - **DB container deployment** (☰ → 🐳 DB container deployment): when the cactusdb server has
