@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.36.2 — 2026-11-08
+
+- **Saved connections are grouped by the type of database** (Firebird, MariaDB, SQL Server…,
+  each heading with how many there are) and sorted by name, in the menu and in the sidebar.
+- Hovering over a saved connection shows a hint with its **whole name** (which the list may
+  cut off), its type and, for the superuser, where it connects to.
+- README: the menu items are named as they are now, without the old emoji.
+
 ## 1.36.1 — 2026-11-08
 
 - The top bar shows the type of the connected database (e.g. *PostgreSQL*, *Firebird*) in a

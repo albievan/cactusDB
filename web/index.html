@@ -184,6 +184,10 @@
   .dlock { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); }
   .dlock[hidden] { display: none; }
   #savedList .lock { font-size: 11px; margin-left: 4px; }
+  /* Saved connections grouped by the type of database. */
+  ul.list li.group { cursor: default; padding: 8px 8px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+  ul.list li.group:hover { background: none; }
+  ul.list li.group .cnt { font-weight: 400; margin-left: 4px; }
   #savedList .det { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   textarea.mono { font-family: var(--mono); font-size: 12px; }
   #queriesPane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); }
@@ -1893,15 +1897,24 @@ async function loadSaved() {
     renderHome();
   } catch (e) { toast(e.message, true); }
 }
+// savedRows lists the saved connections grouped by the type of database
+// (sorted by its name, then by the connections' names), each group headed by
+// the type and how many there are.
 function savedRows(list) {
-    return list.length ? list.map((c) => {
+    const name = (c) => engineInfo(c.engine).name;
+    const sorted = [...list].sort((a, b) => name(a).localeCompare(name(b)) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    return sorted.length ? sorted.map((c, i) => {
+      const head = i === 0 || name(sorted[i - 1]) !== name(c)
+        ? `<li class="group">${esc(name(c))} <span class="cnt">${sorted.filter((x) => name(x) === name(c)).length}</span></li>` : "";
       const lock = c.locked ? `<span class="lock" title="Protected by its own connection password">🔒</span>`
         : `<span class="lock" title="No connection password yet: Edit to set one">🔓</span>`;
       const where = isFileEngine(c.engine) ? c.database
         : `${c.username ? c.username + "@" : ""}${c.host || ""}${c.port ? ":" + c.port : ""}${c.database ? " / " + c.database : ""}`;
       const det = superPw ? `<span class="det" title="${esc(where)}">${esc(where)}${c.needsOwnPassword ? " · open once with its own password" : ""}</span>` : "";
-      return `
-      <li data-id="${c.id}" title="Click to connect">
+      // The hint shows the whole name, which the list may cut off.
+      const hint = [c.name, name(c) + (superPw && where ? " · " + where : ""), "Click to connect"].join("\n");
+      return head + `
+      <li data-id="${c.id}" title="${esc(hint)}">
         <span class="tag" title="${esc(engineInfo(c.engine).name)}">${esc(c.engine)}</span>
         <span class="name">${esc(c.name)}${lock}${det}</span>
         <button class="btn btn-sm btn-outline-primary go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button>

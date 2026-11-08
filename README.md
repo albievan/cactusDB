@@ -112,14 +112,14 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.36.1
+cactusdb 1.36.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
   driver SQL Server      github.com/microsoft/go-mssqldb v1.11.2 (bundled)
   driver PostgreSQL, …   github.com/jackc/pgx/v5 v5.11.0 (bundled)
   driver Oracle          github.com/sijms/go-ora/v2 v2.9.0 (bundled)
-  …                      (one line per driver: see 🧩 Drivers)
+  …                      (one line per driver: see Drivers)
   saved connections: /home/me/cactusdb/cactus.conn.db (credentials encrypted with key file /home/me/cactusdb/cactus.key)
   export folder:     /home/me/cactusdb/export
   open http://localhost:8080
@@ -137,7 +137,7 @@ cactusdb, and press **Ctrl+C** in it to stop the app.
 
 The left sidebar shows the **objects** of the database you're connected to. While you're
 not connected it shows your **saved connections** instead, each with a **▶** button to
-connect, a **＋ New connection** button and the export folder. Disconnecting clears
+connect, a **New connection** button and the export folder. Disconnecting clears
 everything of the database from the screen (its tables, the query, the data, the
 definition), and the main area shows *Not connected to any database* with a small desert
 scene: the cactusdb cactus sends signals up its two circuit-trace arms, the rings at their
@@ -153,21 +153,21 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 
 | Menu item | What it does |
 |---|---|
-| **🔌 Connections** | Your saved connections: **▶** connects, **Edit** changes one, **✕** deletes it |
-| **＋ New connection** | Opens the connection dialog to add a connection |
-| **📁 Folder setup** | Where exports and backups are saved, and where the connection database is kept; change either |
-| **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
-| **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
-| **📜 Logs** | Opens the **Logs** tab (see below) |
-| **🐳 DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection. Each deployed container has a page with its settings and its CPU, memory and storage use, and start, stop, restart, delete and purge (see [Deploying a database as a container](#db-containers)) |
-| **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
-| **⇢ Migrate database** | Copies a database, structure and data, with its views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB (see [Migrating a database](#migrate)) |
-| **⬆ Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
+| **Connections** | Your saved connections, grouped by the type of database: **▶** connects, **Edit** changes one, the bin icon deletes it |
+| **New connection** | Opens the connection dialog to add a connection |
+| **Folder setup** | Where exports and backups are saved, and where the connection database is kept; change either |
+| **Drivers** | The databases cactusdb supports, and the version of each built-in driver |
+| **Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
+| **Logs** | Opens the **Logs** tab (see below) |
+| **DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection. Each deployed container has a page with its settings and its CPU, memory and storage use, and start, stop, restart, delete and purge (see [Deploying a database as a container](#db-containers)) |
+| **Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
+| **Migrate database** | Copies a database, structure and data, with its views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB (see [Migrating a database](#migrate)) |
+| **Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
-the connection dialog, opened by **＋ New connection** or **Edit**, never in the sidebar.
+the connection dialog, opened by **New connection** or **Edit**, never in the sidebar.
 
-1. **Click ＋ New connection** and choose the database type. The list is grouped into
+1. **Click New connection** and choose the database type. The list is grouped into
    *Relational*, *Cloud*, *NoSQL* and *Vector*, and the form changes with the type: its
    labels and hints, and only the fields that type uses.
 2. **Fill in the connection details:**
@@ -230,9 +230,11 @@ the connection dialog, opened by **＋ New connection** or **Edit**, never in th
    [Where exports go](#where-exports-go)). A bar shows the full path with a **Download** link.
    **Clear** removes that bar again.
 
-**Saved connections** appear under **🔌 Connections** in the menu, and in the sidebar while
-you're not connected. Click **▶** (or the name) to connect, **Edit** to change it, or **✕**
-to delete it. 🔒 marks a connection protected by its own password,
+**Saved connections** appear under **Connections** in the menu, and in the sidebar while
+you're not connected, grouped by the type of database (Firebird, MariaDB, SQL Server…, each
+with how many there are) and sorted by name. Hovering over one shows its whole name, which
+the list may cut off. Click **▶** (or the name) to connect, **Edit** to change it, or the
+bin icon to delete it. 🔒 marks a connection protected by its own password,
 🔓 one saved by an older cactusdb or by the command line that has none yet (**Edit** it to
 set one).
 
@@ -253,13 +255,13 @@ is forgotten quietly; *Wrong connection password* only appears after you typed o
 **Disconnecting when idle.** When nobody clicks, types or scrolls for **15 minutes**,
 cactusdb disconnects from the database, and the sidebar says so. It never disconnects while
 something is running (a query, an export, *Export all*, a backup); the time starts again
-when that finishes. Change the time in **☰ → ⚙ Settings** (0 = never). The setting is saved
+when that finishes. Change the time in **☰ → Settings** (0 = never). The setting is saved
 in `cactus.conn.db` on the cactusdb server and applies to everyone using it. The server
 also closes connections of pages that were closed, a little after the same time.
 
 **Checking for an update.** When the page opens, cactusdb checks whether a newer version is
 out. When one is, a dot appears on the **☰ Connections** button, and the cactusdb log says so
-at startup. **☰ → ⬆ Check for update** shows the version you have and the latest one, and the
+at startup. **☰ → Check for update** shows the version you have and the latest one, and the
 command that downloads cactusdb for each system:
 
 - the setup scripts for **Linux and macOS** (`setup.sh`) and **Windows** (`setup.ps1`), which
@@ -373,7 +375,7 @@ page lists them as type **Saved queries**. **⤓ Export all queries…** above t
 (a filter narrows them down), one file per query and format. The bar above the list shows
 the progress, then a download link for each file and any query that failed.
 
-**Logs.** The **Logs** tab (also **☰ → 📜 Logs**) shows cactusdb's log: connections,
+**Logs.** The **Logs** tab (also **☰ → Logs**) shows cactusdb's log: connections,
 tables opened, queries, exports, and every request with its result, its duration and the
 session it belongs to (`session=1a2b3c4d`).
 - **Log** or **Crash log**, and **Day**: a new log file starts every day, and the days kept
@@ -390,7 +392,7 @@ Without a log file (in the foreground without `--logfile`) the tab shows the lin
 cactusdb started, kept in memory.
 
 <a id="compare-databases"></a>
-**Compare databases.** **☰ → ⇄ Compare databases** (or the **Compare** tab) compares the
+**Compare databases.** **☰ → Compare databases** (or the **Compare** tab) compares the
 *structure* of databases, never their data: tables (column by column, with their keys,
 indexes and foreign keys), views, procedures, functions, triggers, sequences/generators,
 domains, events, packages…
@@ -427,7 +429,7 @@ same kind are compared object by object (MySQL and MariaDB count as one); with a
 only the names are compared, and no script is made.
 
 <a id="migrate"></a>
-**Migrating a database.** **☰ → ⇢ Migrate database** (or the **Migrate** tab) copies a
+**Migrating a database.** **☰ → Migrate database** (or the **Migrate** tab) copies a
 database to a **new** database of another type, e.g. Firebird to MariaDB, SQL Server to
 PostgreSQL or MySQL to SQLite:
 1. **From:** the source, a saved connection or the one you're connected to (any SQL
@@ -482,7 +484,7 @@ what is left to do by hand); **🔌 Add as connection** opens the connection dia
 for the new database. If it stops (or you click **■ Stop**), the new database is left as it
 is: delete it before migrating again.
 
-**Adding and editing connections.** Click **＋ New connection** (in the menu or the sidebar)
+**Adding and editing connections.** Click **New connection** (in the menu or the sidebar)
 to open the connection dialog: a name, the database type and the connection details. Click
 **Test connection** to check them before saving. cactusdb connects, reports the server
 version and the number of tables (or the exact error), and disconnects again. Nothing is
@@ -557,7 +559,7 @@ The prepared `.zip` can be downloaded again for 15 minutes. After that, or when 
 stops, it's deleted from the server's temporary folder. Your exports themselves are never
 changed.
 
-**Export folder.** **📁 Folder setup** in the menu (or **Change** in the sidebar while you're
+**Export folder.** **Folder setup** in the menu (or **Change** in the sidebar while you're
 not connected) shows where exports are saved, and lets you type another folder: a full path on the computer cactusdb runs on (a
 leading `~` means your home folder). cactusdb creates it if needed, checks it can write
 there, and saves the choice in `cactus.conn.db`, so it's used again after a restart, by the
@@ -706,7 +708,7 @@ for SQL databases with their own DDL; for the others, export the data and the DD
 <a id="db-containers"></a>
 ### Deploying a database as a container
 
-**☰ → 🐳 DB container deployment** starts a new database server as a container on the
+**☰ → DB container deployment** starts a new database server as a container on the
 computer cactusdb runs on, when it has **Docker** (Docker CE or Docker Desktop) or
 **Kubernetes** (k8s, k3s, with `kubectl`). The dialog shows what it found, the database
 containers cactusdb deployed, and a form:
@@ -727,7 +729,7 @@ containers cactusdb deployed, and a form:
 connects until the database answers, showing each step. Then **Add as connection…** opens
 the New connection dialog filled in (type, host, port, user, password, database): give it
 a connection password and save it. Each deployed container in the list has one compact
-group of buttons (hover one for what it does): **👁 View**, **🔌 Add connection**, **📜 Logs**
+group of buttons (hover one for what it does): **👁 View**, **🔌 Add connection**, **Logs**
 (the last 300 lines) and **🗑 Remove**. Remove asks first (click it again) and removes the
 container (Docker) or the deployment, service and secret (Kubernetes); the data folder,
 volume or volume claim is kept.
@@ -759,7 +761,7 @@ containers** opens the list again and **✕ Close** closes the page and its tab.
   home folder, or a folder holding cactusdb. On Kubernetes a short-lived pod on the node
   deletes a `hostPath` folder (the pod must be running, so cactusdb knows the node); the
   nodes remove the unused image themselves.
-- **📜 Logs**, **🔌 Add connection** and **⟳ Refresh**.
+- **Logs**, **🔌 Add connection** and **⟳ Refresh**.
 
 - Passwords never appear on a command line: docker gets them from its environment, and on
   Kubernetes they are in a Secret (`<name>-credentials`) sent to `kubectl apply` on stdin.
@@ -1275,7 +1277,7 @@ Progress polls of exports and comparisons and the Logs tab's live updates aren't
 recorded: they aren't something you did. Events are written in the background, so they
 never slow cactusdb down.
 
-**Housekeeping:** ☰ → ⚙ Settings → *Usage log* shows how many events there are and from
+**Housekeeping:** ☰ → Settings → *Usage log* shows how many events there are and from
 when to when, and deletes the events of a date range: pick the first and last day (days in
 your computer's time zone; leave one empty for "from the first" or "up to the last"),
 click **Delete events**, then **Yes, delete them**. cactusdb never deletes events itself.
@@ -1305,11 +1307,11 @@ Each cactusdb server can also send usage statistics to its own Google Analytics 
 but only for people who say yes. [GOOGLE_ANALYTICS.md](GOOGLE_ANALYTICS.md) explains what
 is sent and how to set it up. In short:
 
-- Set the server's **Measurement ID** in ☰ → ⚙ Settings (or `CACTUSDB_GA_ID`). Without one,
+- Set the server's **Measurement ID** in ☰ → Settings (or `CACTUSDB_GA_ID`). Without one,
   nothing is loaded or sent.
 - Everyone is then asked once, in a bar at the bottom of the page: *May cactusdb send
   anonymous usage statistics?* Nothing is sent until they click **Yes, send**; they can
-  change it any time in ☰ → ⚙ Settings (*this browser*).
+  change it any time in ☰ → Settings (*this browser*).
 - Only which functions are used is sent, never data, SQL, names, paths or addresses.
 - When a proxy or firewall blocks Google, cactusdb works exactly the same: Google's script
   just doesn't arrive, and nothing more is attempted.
@@ -1389,7 +1391,7 @@ is sent and how to set it up. In short:
 | In a container (Docker, `deploy.sh`): `dial tcp [::1]:3050: connect: connection refused` (or `127.0.0.1`) | Inside a container, `localhost` is the container itself, not your computer. Use the host **`host.docker.internal`**: it reaches the computer running Docker, and database containers that publish their port there (for example Firebird on 3050). For another server, use its name or IP address. cactusdb says this in the error message too. Containers started by `deploy.sh` or `deploy-container.sh` before 1.13.2 lack this name: run `--install` (or `up`) again. |
 | On a server, tables (or connecting, or saving a query) sometimes don't load for about five minutes, then work again, while a cactusdb on your own computer always works with the same database | A firewall or intrusion-prevention device between your computer and the server blocks you from cactusdb's port for a few minutes when it sees an HTTP **403** reply (it takes it for someone guessing passwords) or an HTTP **DELETE** request. Before 1.21.0 cactusdb answered 403 every time the page opened a protected connection, and to a wrong connection password. Update to 1.22.0 or later: the web UI then receives every error as 200 with the real status in the `X-Cactusdb-Status` header (1.21.0), and deletes with POST instead of DELETE (1.22.0). To see whether you're blocked, try another port on the same server (SSH, a web server): if that works but cactusdb's port doesn't, it's the block, and it passes by itself. |
 | On a server, connecting is quick but a table stays at *Loading …* and the request times out, then later cactusdb doesn't answer at all, with nothing in `cactusdb-crash.log` | Before 1.20.0, cactusdb wrote every request to the terminal it was started in, and waited for the terminal to take it. When that terminal stopped reading, an SSH session whose VPN or network dropped, or a terminal paused or scrolled back, the output filled up after about a hundred requests and every request then waited: the page still loaded, but tables didn't. When SSH finally closed the dead session, the hangup signal (SIGHUP) stopped cactusdb on the spot, without a crash. Since 1.20.0 the terminal can't hold up a request (log lines it doesn't take are dropped and counted), and cactusdb keeps running when its terminal closes. For a server, start it with **`--runas background`** anyway, or as a service: it then logs to `cactusdb.log` and needs no terminal at all. If a later start says the port is in use, cactusdb names the copy that's still running. |
-| Connecting to a cactusdb on a server works sometimes, and sometimes not, while a cactusdb on your own computer always works | Before 1.17.0 cactusdb kept every session's database connections open until it stopped: a closed or reloaded browser tab left its connections behind, and idle connections were cut by the database server (`wait_timeout`), a firewall or the VPN, so the next request on one failed. A server that runs for days collected them until the database's connection limit, shared with its other applications, was reached. cactusdb now closes database connections idle for a minute, disconnects after the idle time of ⚙ Settings (default 15 minutes), ends the session when the page is closed, and retries a connect that got no answer. The log shows how long each connect took (`connect … in 120ms`), and a failed connect shows the database's exact error. |
+| Connecting to a cactusdb on a server works sometimes, and sometimes not, while a cactusdb on your own computer always works | Before 1.17.0 cactusdb kept every session's database connections open until it stopped: a closed or reloaded browser tab left its connections behind, and idle connections were cut by the database server (`wait_timeout`), a firewall or the VPN, so the next request on one failed. A server that runs for days collected them until the database's connection limit, shared with its other applications, was reached. cactusdb now closes database connections idle for a minute, disconnects after the idle time of Settings (default 15 minutes), ends the session when the page is closed, and retries a connect that got no answer. The log shows how long each connect took (`connect … in 120ms`), and a failed connect shows the database's exact error. |
 | *cactusdb was restarted: the previous cactusdb … stopped without shutting down* | The previous cactusdb was killed rather than stopped with Ctrl+C or Shutdown, most often by the system for lack of memory. Since 1.15.0 Excel exports use far less memory (exporting four large tables at once used to need hundreds of MB). Give the server or container more memory, or export fewer tables at once. |
 | *No answer from cactusdb at … (the browser reports “Failed to fetch”)* | The browser got no answer at all, and the message says what cactusdb was doing, after how long, and what it found when it checked:<br>• **"cactusdb is running … cut on the way"**: a firewall, proxy, VPN or Wi-Fi drop between your computer and the server closed the connection. Since 1.14.1 cactusdb closes idle connections itself after 20 seconds, before such devices drop them silently, and the page retries a read-only request once. If long requests still fail after the same number of seconds, that device has a time limit: have it raised, or narrow the query.<br>• **"doesn't answer now either"**: cactusdb stopped or crashed (look at its log or start it again), or the network to the server is down. When you start it again it says why the previous run ended, in its terminal and on the page: *crashed: …* (the details are in `cactusdb-crash.log` next to the connection file), or *stopped without shutting down*, which means it was killed: most often by the system because the server ran out of memory (on Linux, `dmesg | grep -i -E 'killed process|out of memory'` shows it; in a container, raise its memory limit), or the server or container restarted.<br>• **"was restarted meanwhile"**: reload the page and connect again.<br>An internal error inside cactusdb no longer cuts the connection: it's shown as *internal error in cactusdb…*, with the details in the log. |
 | A saved connection asks for a password I don't have | Since 1.14 every saved connection has its own connection password. If you forgot it, the superuser can open it (🛡), provided a superuser password was set before the connection's password and the connection has been opened since. Otherwise delete it (✕) and save it again. |
@@ -1449,7 +1451,7 @@ Not every type was tried against a live server of that kind. They were all check
 the protocol's own test cases or a stand-in server, and real servers were used for Redis
 and for Access files. Please report anything that doesn't work.
 
-All drivers are built into cactusdb and listed under **🧩 Drivers** in the menu. Unlike tools such
+All drivers are built into cactusdb and listed under **Drivers** in the menu. Unlike tools such
 as DBeaver, there is nothing to download, and no client library (libmysqlclient,
 fbclient.dll, libpq, Oracle Instant Client, ODBC drivers, cloud SDKs, …) needs to be installed.
 
