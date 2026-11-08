@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.36.1 — 2026-11-08
+
+- The top bar shows the type of the connected database (e.g. *PostgreSQL*, *Firebird*) in a
+  label with a database icon next to *read-only*; it goes away on disconnect.
+
 ## 1.36.0 — 2026-11-08
 
 - **The interface is built with Bootstrap 5.3.8** (the latest stable release) and **Bootstrap

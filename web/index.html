@@ -129,7 +129,8 @@
   .bname { display: flex; flex-direction: column; line-height: 1.05; }
   .bver { font-size: 10px; font-weight: 500; letter-spacing: .3px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
   .bver:empty { display: none; }
-  header .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; }
+  header .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; flex: none; }
+  #engineBadge { color: var(--text) !important; }
   header .status { color: var(--muted); font-size: 13px; flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Data-in-transit animation in the free space of the header. */
   header .flow { flex: 1; min-width: 60px; height: 34px; align-self: center;
@@ -672,6 +673,7 @@
 <header>
   <h1 class="brand"><img src="cactusdb.svg" alt="" width="28" height="28"><span class="bname">cactusdb<small class="bver" id="appVersion"></small></span></h1>
   <span class="badge rounded-pill text-success-emphasis bg-success-subtle border border-success" title="INSERT, UPDATE, DELETE and schema changes are blocked">read-only</span>
+  <span class="badge rounded-pill text-secondary-emphasis bg-secondary-subtle border" id="engineBadge" hidden><i class="bi bi-database" aria-hidden="true"></i> <span id="engineName"></span></span>
   <div class="status" id="status">Not connected</div>
   <div class="flow" aria-hidden="true">
     <svg viewBox="0 0 400 36" preserveAspectRatio="none">
@@ -2282,6 +2284,10 @@ async function connect(extra = {}) {
     $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${main.items.length} ${esc(main.label.toLowerCase())}`;
     $("disconnectBtn").hidden = false; $("reconnectBtn").hidden = false; $("reconnectBtn").disabled = false;
     const eng = engineInfo(res.engine);
+    // The type of the database, next to "read-only".
+    $("engineName").textContent = eng.name;
+    $("engineBadge").title = `Connected to a ${eng.name} database`;
+    $("engineBadge").hidden = false;
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
     $("backupBtn").disabled = !!eng.noBackup;
     $("backupBtn").title = eng.noBackup ? `A backup as an SQL script isn't available for ${eng.name}: use Export all and DDL` : backupTitle;
@@ -2326,6 +2332,7 @@ async function disconnect(reason = "") {
   state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null; resetTableStats();
   state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
+  $("engineBadge").hidden = true;
   $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";

@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.36.0
+cactusdb 1.36.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -601,7 +601,9 @@ While cactusdb is working (connecting, running a query, exporting), the animated
 stream in the top bar speeds up.
 
 The version of the cactusdb you're using is shown under its name in the top bar (for
-example *v1.31.0*), as reported by the running program.
+example *v1.31.0*), as reported by the running program. Next to the *read-only* label, a
+second label shows the type of the database you're connected to (for example *PostgreSQL*
+or *Firebird*); it goes away when you disconnect.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
