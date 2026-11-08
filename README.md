@@ -149,7 +149,7 @@ becomes a crescent moon that rocks gently among twinkling stars, with now and th
 shooting star. With *reduce motion* switched on in the system settings
 the scene stays still.
 
-The **☰ Connections** menu at the bottom of the sidebar has these items:
+The **Connections** menu at the bottom of the sidebar has these items:
 
 | Menu item | What it does |
 |---|---|
@@ -201,7 +201,7 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
    `key=value&key=value`. They are saved with the connection but not encrypted, so secrets
    go in the password field.
 
-   The **database** can be picked instead of typed: **☰ List databases** next to the field
+   The **database** can be picked instead of typed: **List databases** next to the field
    connects and lists the server's databases (MySQL, MariaDB, PostgreSQL and its family,
    SQL Server, Azure SQL, MongoDB, Cosmos DB, Couchbase buckets, Cassandra keyspaces, Neo4j,
    Redis, Athena, BigQuery datasets). **Test connection** and **Save** do it too when no
@@ -260,7 +260,7 @@ in `cactus.conn.db` on the cactusdb server and applies to everyone using it. The
 also closes connections of pages that were closed, a little after the same time.
 
 **Checking for an update.** When the page opens, cactusdb checks whether a newer version is
-out. When one is, a dot appears on the **☰ Connections** button, and the cactusdb log says so
+out. When one is, a dot appears on the **Connections** button, and the cactusdb log says so
 at startup. **☰ → Check for update** shows the version you have and the latest one, and the
 command that downloads cactusdb for each system:
 
@@ -361,17 +361,17 @@ be saved: cactusdb checks it with the same rules as running a query, so `INSERT`
 `UPDATE`, `DELETE`, schema changes and several statements at once are refused.
 
 The **Saved queries** tab, shown while you're connected, lists the connection's queries.
-Filter them by name or description, then **▶ Run** a query (it opens in the editor and
+Filter them by name or description, then **Run** a query (it opens in the editor and
 runs), **Edit** it, or **Delete** it. Saved queries are kept in `cactus.conn.db`, encrypted
 with the connection's password, and are deleted with the connection.
 
-**Exporting saved queries.** Each saved query has a **⤓ Export…** menu: Excel, CSV, JSON,
+**Exporting saved queries.** Each saved query has a **Export…** menu: Excel, CSV, JSON,
 XML or **All four formats**. It exports the query's data (every row, not the SQL) to its
 own folder, one per day: `<export folder>/<connection>/queries/<dd.mm.yyyy>/<query
 name>-<dd.mm.yyyy.hh.mm>.<csv|xlsx|json|xml>`, e.g.
 `queries/07.11.2026/cutter_subdiv_code-07.11.2026.14.05.csv` (characters that can't be in a
 file name become `_`; a second export in the same minute gets `_2`). The *Exported files*
-page lists them as type **Saved queries**. **⤓ Export all queries…** above the list does the same for every query shown
+page lists them as type **Saved queries**. **Export all queries…** above the list does the same for every query shown
 (a filter narrows them down), one file per query and format. The bar above the list shows
 the progress, then a download link for each file and any query that failed.
 
@@ -385,7 +385,7 @@ session it belongs to (`session=1a2b3c4d`).
   20,000 lines, **Newest first**.
 - **Live** shows new lines as they come in, at the top, highlighted (today's log, every
   2 seconds, only what's new).
-- **Copy** copies the lines shown; **⤓ Download all (.zip)** downloads every log and crash
+- **Copy** copies the lines shown; **Download all (.zip)** downloads every log and crash
   log file kept, compressed as much as zip can.
 
 Without a log file (in the foreground without `--logfile`) the tab shows the lines since
@@ -411,7 +411,7 @@ the master's definition beside that database's, line by line, the differing line
 highlighted.
 
 **Script** shows, per database, the SQL that makes its structure match the master's;
-**Copy** or **⤓ .sql** to take it. It drops what the master doesn't have (untick *Drop what
+**Copy** or **.sql** to take it. It drops what the master doesn't have (untick *Drop what
 the master doesn't have* to keep those), alters tables (adds, drops and changes columns,
 keys and indexes; MySQL/MariaDB put a new column where the master has it), creates what is
 missing, and replaces views, procedures, functions and triggers that differ (`CREATE OR
@@ -436,7 +436,7 @@ PostgreSQL or MySQL to SQLite:
    database: SQLite, MySQL, MariaDB, PostgreSQL and its relatives, SQL Server, Azure SQL,
    Firebird, Oracle, Access, Informix).
 2. **To:** the type of the new database (MariaDB, MySQL, PostgreSQL, SQL Server, SQLite or
-   Firebird), the server (a saved connection to it, e.g. one you deployed with ☰ → 🐳 DB
+   Firebird), the server (a saved connection to it, e.g. one you deployed with ☰ → DB
    container deployment) and the **new database's name**: for SQLite a full path on the
    cactusdb server, for Firebird a path on the Firebird server.
 3. **What to migrate:** the tables always, and ticked: their **rows**, the **sequences**,
@@ -479,9 +479,9 @@ cactusdb creates the database (refusing one that already exists), then:
 The page shows the progress, then every object with its result: **✓ done**, **check** (made,
 but read its notes), **by hand** (not made: its source is shown), **✘ failed** (with the
 database's error) or **skipped**. Click one to see its source beside what was made of it.
-**⤓ Script** downloads the SQL of the migration (what was run, and at the end, as comments,
-what is left to do by hand); **🔌 Add as connection** opens the connection dialog filled in
-for the new database. If it stops (or you click **■ Stop**), the new database is left as it
+**Script** downloads the SQL of the migration (what was run, and at the end, as comments,
+what is left to do by hand); **Add as connection** opens the connection dialog filled in
+for the new database. If it stops (or you click **Stop**), the new database is left as it
 is: delete it before migrating again.
 
 **Adding and editing connections.** Click **New connection** (in the menu or the sidebar)
@@ -652,7 +652,7 @@ those objects.
 - **Sorting:** click a column heading above the list (**Name**, **Rows**, **MB**) to sort by
   it; click it again to reverse the order. ▲ is ascending, ▼ descending. Rows and MB start
   with the biggest. The order is remembered in this browser.
-- **⟳**, and **↻ Refresh** next to **Disconnect**, refresh the connection and everything
+- **⟳**, and **Refresh** next to **Disconnect**, refresh the connection and everything
   of the database: cactusdb closes its unused connections (a firewall or the database server
   may have cut them), checks a fresh one, and lists every table, view, procedure, function,
   trigger, sequence… again, with their rows and sizes. The open table or definition is
@@ -729,16 +729,16 @@ containers cactusdb deployed, and a form:
 connects until the database answers, showing each step. Then **Add as connection…** opens
 the New connection dialog filled in (type, host, port, user, password, database): give it
 a connection password and save it. Each deployed container in the list has one compact
-group of buttons (hover one for what it does): **👁 View**, **🔌 Add connection**, **Logs**
-(the last 300 lines) and **🗑 Remove**. Remove asks first (click it again) and removes the
+group of buttons (hover one for what it does): **View**, **Add connection**, **Logs**
+(the last 300 lines) and **Remove**. Remove asks first (click it again) and removes the
 container (Docker) or the deployment, service and secret (Kubernetes); the data folder,
 volume or volume claim is kept.
 
 <a id="container-page"></a>
-**A container's page.** **👁 View** (or its name) opens the page of a deployed container in
+**A container's page.** **View** (or its name) opens the page of a deployed container in
 the main area, under its own **Container · name** tab beside Data, Logs and Compare, not as
-a dialog. Other tabs can be used meanwhile (it stops measuring while hidden); **☰ All
-containers** opens the list again and **✕ Close** closes the page and its tab. It shows:
+a dialog. Other tabs can be used meanwhile (it stops measuring while hidden); **All
+containers** opens the list again and **Close** closes the page and its tab. It shows:
 
 - **Usage**, measured again every 5 seconds: **CPU** (percent of one core, as `docker
   stats` counts it, with the cores it can use), **memory** (used, of its limit or of all
@@ -751,8 +751,8 @@ containers** opens the list again and **✕ Close** closes the page and its tab.
   limits and labels; on Kubernetes the namespace, replicas, service, volume claim and pods
   (node, IP, restarts).
 - **Environment**: its variables; passwords, keys and tokens are hidden.
-- One compact row of buttons: **▶ Start**, **■ Stop**, **↻ Restart**, **🗑 Delete** and
-  **☠ Purge**. On Kubernetes, stop scales the deployment to 0 and start back to 1. Each
+- One compact row of buttons: **Start**, **Stop**, **Restart**, **Delete** and
+  **Purge**. On Kubernetes, stop scales the deployment to 0 and start back to 1. Each
   asks first and needs the superuser password. **Delete** is Remove: the data stays.
   **Purge** removes everything about the container and can't be undone: the container, its
   data folder and every file in it (or its volume or volume claim) and its image, unless
@@ -761,7 +761,7 @@ containers** opens the list again and **✕ Close** closes the page and its tab.
   home folder, or a folder holding cactusdb. On Kubernetes a short-lived pod on the node
   deletes a `hostPath` folder (the pod must be running, so cactusdb knows the node); the
   nodes remove the unused image themselves.
-- **Logs**, **🔌 Add connection** and **⟳ Refresh**.
+- **Logs**, **Add connection** and **⟳ Refresh**.
 
 - Passwords never appear on a command line: docker gets them from its environment, and on
   Kubernetes they are in a Secret (`<name>-credentials`) sent to `kubectl apply` on stdin.
