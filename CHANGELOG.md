@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.34.1 — 2026-11-08
+
+- **A container's page is a page, not a dialog**: **View** opens it in the main area under
+  its own **Container · name** tab, beside Data, Logs and Compare. It measures every 5
+  seconds only while shown; **☰ All containers** opens the list and **✕ Close** closes the
+  tab (and forgets the superuser password typed there).
+- **The buttons beside each deployed container are one compact group with icons**: 👁 View,
+  🔌 Add connection, 📜 Logs and 🗑 Remove, each with a hint. The page's own Add connection,
+  Logs and Refresh are grouped the same way.
+
 ## 1.34.0 — 2026-11-08
 
 - **A deployed container's page** (☰ → 🐳 DB container deployment → **View**, or click its

@@ -110,7 +110,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.34.0
+cactusdb 1.34.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -663,13 +663,17 @@ containers cactusdb deployed, and a form:
 **Deploy** downloads the image (unless it's already there), starts the container and
 connects until the database answers, showing each step. Then **Add as connection…** opens
 the New connection dialog filled in (type, host, port, user, password, database): give it
-a connection password and save it. The list of deployed containers has **View**, **Add
-connection**, **Logs** (the last 300 lines) and **Remove**. Remove asks first and removes
-the container (Docker) or the deployment, service and secret (Kubernetes); the data
-folder, volume or volume claim is kept.
+a connection password and save it. Each deployed container in the list has one compact
+group of buttons (hover one for what it does): **👁 View**, **🔌 Add connection**, **📜 Logs**
+(the last 300 lines) and **🗑 Remove**. Remove asks first (click it again) and removes the
+container (Docker) or the deployment, service and secret (Kubernetes); the data folder,
+volume or volume claim is kept.
 
 <a id="container-page"></a>
-**A container's page.** **View** (or its name) opens the page of a deployed container:
+**A container's page.** **👁 View** (or its name) opens the page of a deployed container in
+the main area, under its own **Container · name** tab beside Data, Logs and Compare, not as
+a dialog. Other tabs can be used meanwhile (it stops measuring while hidden); **☰ All
+containers** opens the list again and **✕ Close** closes the page and its tab. It shows:
 
 - **Usage**, measured again every 5 seconds: **CPU** (percent of one core, as `docker
   stats` counts it, with the cores it can use), **memory** (used, of its limit or of all
@@ -692,7 +696,7 @@ folder, volume or volume claim is kept.
   home folder, or a folder holding cactusdb. On Kubernetes a short-lived pod on the node
   deletes a `hostPath` folder (the pod must be running, so cactusdb knows the node); the
   nodes remove the unused image themselves.
-- **Logs**, and **Add connection**.
+- **📜 Logs**, **🔌 Add connection** and **⟳ Refresh**.
 
 - Passwords never appear on a command line: docker gets them from its environment, and on
   Kubernetes they are in a Secret (`<name>-credentials`) sent to `kubectl apply` on stdin.

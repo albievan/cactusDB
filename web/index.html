@@ -537,10 +537,15 @@
   ul.ctlist li .st { font-size: 11px; border-radius: 4px; padding: 0 5px; background: var(--panel-2); color: var(--muted); }
   ul.ctlist li .st.running { background: var(--accent-soft); color: var(--accent); }
   ul.ctlist li .st.exited, ul.ctlist li .st.dead { background: var(--danger-soft); color: var(--danger); }
-  ul.ctlist li .acts { margin-left: auto; display: flex; gap: 6px; }
   ul.ctlist li .name b.cvopen { cursor: pointer; text-decoration: underline dotted; }
   .cvhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .cvhead h3 { margin: 0; }
+  .cvhead h2 { margin: 0; font-size: 18px; font-family: var(--mono); overflow-wrap: anywhere; }
+  /* The container's page: a pane of its own, scrolling as a whole. */
+  #ctrPane { overflow-y: auto; background: var(--panel); }
+  #ctrPane[hidden] { display: none; }
+  .cvpage { padding: 16px 20px 24px; max-width: 1100px; }
+  .cvpage .cvask { max-width: 560px; }
+  .cvpage pre.ctlog { max-height: 50vh; }
   .cvhead .st { font-size: 12px; border-radius: 4px; padding: 1px 6px; background: var(--panel-2); color: var(--muted); }
   .cvhead .st.running { background: var(--accent-soft); color: var(--accent); }
   .cvhead .st.exited, .cvhead .st.dead, .cvhead .st.stopped { background: var(--danger-soft); color: var(--danger); }
@@ -550,6 +555,8 @@
   .btngroup button:first-child { border-radius: 6px 0 0 6px; }
   .btngroup button:last-child { border-radius: 0 6px 6px 0; }
   .btngroup button:hover:not(:disabled), .btngroup button:focus-visible { position: relative; z-index: 1; }
+  .dactions .btngroup { margin-left: 0; }
+  .btngroup.icons button { padding: 3px 8px; font-size: 13px; line-height: 1.3; }
   .cvusage { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   @media (max-width: 640px) { .cvusage { grid-template-columns: 1fr; } }
   .cvusage .tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--panel-2); min-width: 0; }
@@ -725,6 +732,7 @@
       <button data-tab="files" title="Download exported files, compressed">Exported files</button>
       <button data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <button data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
+      <button data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
       <span class="title" id="tabTitle"></span>
     </div>
     <div class="pane" id="dataPane">
@@ -857,6 +865,51 @@
       </div>
       <pre id="defSrc">Select an object on the left to see its definition.</pre>
     </div>
+    <div class="pane" id="ctrPane" hidden>
+      <div class="cvpage">
+        <div class="cvhead">
+          <h2 id="cvTitle">Container</h2><span class="st" id="cvState"></span>
+          <span class="btngroup" id="cvActs" role="group" aria-label="Container actions">
+            <button type="button" data-cv="start" title="Start the container (needs the superuser password)">▶ Start</button>
+            <button type="button" data-cv="stop" title="Stop the container; it keeps its settings and data (needs the superuser password)">■ Stop</button>
+            <button type="button" data-cv="restart" title="Stop and start the container again (needs the superuser password)">↻ Restart</button>
+            <button type="button" data-cv="delete" class="danger" title="Remove the container; its data folder or volume is kept (needs the superuser password)">🗑 Delete</button>
+            <button type="button" data-cv="purge" class="danger" title="Remove the container, its data folder or volume and its image: everything (needs the superuser password)">☠ Purge</button>
+          </span>
+        </div>
+        <p class="hint" id="cvSub"></p>
+        <div class="cvask" id="cvAsk" hidden>
+          <div id="cvAskText"></div>
+          <div id="cvConfirmWrap" hidden><label for="cvConfirm" id="cvConfirmLabel">Type the container's name to confirm</label>
+            <input id="cvConfirm" spellcheck="false" autocomplete="off"></div>
+          <label for="cvSuper">Superuser password</label>
+          <input id="cvSuper" type="password" autocomplete="off">
+          <div class="dactions"><span class="spacer"></span>
+            <button type="button" id="cvAskCancel">Cancel</button>
+            <button type="button" class="primary" id="cvAskGo">OK</button></div>
+        </div>
+        <div id="cvResult" class="dresult" hidden></div>
+        <h4 class="edsub">Usage <span class="hint" id="cvChecked"></span></h4>
+        <div class="cvusage">
+          <div class="tile"><div class="lbl">CPU</div><div class="val" id="cvCpu">–</div><div class="bar"><i id="cvCpuBar"></i></div><div class="sub" id="cvCpuSub"></div></div>
+          <div class="tile"><div class="lbl">Memory</div><div class="val" id="cvMem">–</div><div class="bar"><i id="cvMemBar"></i></div><div class="sub" id="cvMemSub"></div></div>
+          <div class="tile"><div class="lbl">Storage</div><div class="val" id="cvDisk">–</div><div class="bar"><i id="cvDiskBar"></i></div><div class="sub" id="cvDiskSub"></div></div>
+        </div>
+        <p class="hint" id="cvNotes" hidden></p>
+        <h4 class="edsub">Settings</h4>
+        <table class="cvset" id="cvSettings"></table>
+        <h4 class="edsub">Environment</h4>
+        <table class="cvset" id="cvEnv"></table>
+        <div id="cvLogsWrap" hidden><h4 class="edsub">Log</h4><pre class="ctlog" id="cvLogs"></pre></div>
+        <div class="dactions">
+          <span class="btngroup" role="group" aria-label="More">
+            <button type="button" id="cvConn" title="Open the New connection dialog filled in for this database">🔌 Add connection</button><button type="button" id="cvLogBtn" title="The container's last 300 log lines (needs the superuser password)">📜 Logs</button><button type="button" id="cvRefresh" title="Measure again now (it refreshes every 5 seconds)">⟳ Refresh</button></span>
+          <span class="spacer"></span>
+          <span class="btngroup" role="group" aria-label="Page">
+            <button type="button" id="cvBack" title="The list of deployed containers">☰ All containers</button><button type="button" id="cvClose" title="Close this page and its tab">✕ Close</button></span>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 <dialog id="connDialog" class="modal" aria-labelledby="dTitle">
@@ -977,52 +1030,6 @@
   </form>
 </dialog>
 
-<dialog id="ctvDialog" class="modal wide ctr" aria-labelledby="cvTitle">
-  <form method="dialog" id="cvForm">
-    <div class="cvhead">
-      <h3 id="cvTitle">Container</h3><span class="st" id="cvState"></span>
-      <span class="btngroup" id="cvActs" role="group" aria-label="Container actions">
-        <button type="button" data-cv="start" title="Start the container (needs the superuser password)">▶ Start</button>
-        <button type="button" data-cv="stop" title="Stop the container; it keeps its settings and data (needs the superuser password)">■ Stop</button>
-        <button type="button" data-cv="restart" title="Stop and start the container again (needs the superuser password)">↻ Restart</button>
-        <button type="button" data-cv="delete" class="danger" title="Remove the container; its data folder or volume is kept (needs the superuser password)">🗑 Delete</button>
-        <button type="button" data-cv="purge" class="danger" title="Remove the container, its data folder or volume and its image: everything (needs the superuser password)">☠ Purge</button>
-      </span>
-    </div>
-    <p class="hint" id="cvSub"></p>
-    <div class="cvask" id="cvAsk" hidden>
-      <div id="cvAskText"></div>
-      <div id="cvConfirmWrap" hidden><label for="cvConfirm" id="cvConfirmLabel">Type the container's name to confirm</label>
-        <input id="cvConfirm" spellcheck="false" autocomplete="off"></div>
-      <label for="cvSuper">Superuser password</label>
-      <input id="cvSuper" type="password" autocomplete="off">
-      <div class="dactions"><span class="spacer"></span>
-        <button type="button" id="cvAskCancel">Cancel</button>
-        <button type="button" class="primary" id="cvAskGo">OK</button></div>
-    </div>
-    <div id="cvResult" class="dresult" hidden></div>
-    <h4 class="edsub">Usage <span class="hint" id="cvChecked"></span></h4>
-    <div class="cvusage">
-      <div class="tile"><div class="lbl">CPU</div><div class="val" id="cvCpu">–</div><div class="bar"><i id="cvCpuBar"></i></div><div class="sub" id="cvCpuSub"></div></div>
-      <div class="tile"><div class="lbl">Memory</div><div class="val" id="cvMem">–</div><div class="bar"><i id="cvMemBar"></i></div><div class="sub" id="cvMemSub"></div></div>
-      <div class="tile"><div class="lbl">Storage</div><div class="val" id="cvDisk">–</div><div class="bar"><i id="cvDiskBar"></i></div><div class="sub" id="cvDiskSub"></div></div>
-    </div>
-    <p class="hint" id="cvNotes" hidden></p>
-    <h4 class="edsub">Settings</h4>
-    <table class="cvset" id="cvSettings"></table>
-    <h4 class="edsub">Environment</h4>
-    <table class="cvset" id="cvEnv"></table>
-    <div id="cvLogsWrap" hidden><h4 class="edsub">Log</h4><pre class="ctlog" id="cvLogs"></pre></div>
-    <div class="dactions">
-      <button type="button" id="cvConn" title="Open the New connection dialog filled in for this database">Add connection</button>
-      <button type="button" id="cvLogBtn" title="The container's last 300 log lines (needs the superuser password)">Logs</button>
-      <button type="button" id="cvRefresh" title="Measure again now (it refreshes every 5 seconds)">⟳ Refresh</button>
-      <span class="spacer"></span>
-      <button type="button" id="cvBack">← All containers</button>
-      <button type="button" class="primary" id="cvClose">Close</button>
-    </div>
-  </form>
-</dialog>
 
 <dialog id="settingsDialog" class="modal" aria-labelledby="stTitle">
   <form method="dialog" id="stForm">
@@ -2998,6 +3005,8 @@ function showTab(tab) {
   if (tab === "queries") loadQueries();
   if (tab === "def") loadDefinition();
   if (tab === "files") loadFiles();
+  $("ctrPane").hidden = tab !== "container";
+  if (tab === "container") cvLoad(); else cvPause();
 }
 
 async function loadDefinition() {
@@ -4163,10 +4172,7 @@ function ctrRenderList() {
     const key = `${c.runtime}/${c.namespace || ""}/${c.name}`;
     return `<li data-i="${i}"><span class="name"><b class="cvopen" data-ct="view" title="Open this container's page">${esc(c.name)}</b> <span class="meta">${esc(specName(c.spec))} · ${c.runtime === "docker" ? "Docker" : "Kubernetes, namespace " + esc(c.namespace)}${c.port ? " · port " + c.port : ""}</span></span>
       <span class="st ${esc(c.state)}" title="${esc(c.status)}">${esc(c.state)}</span>
-      <span class="acts"><button type="button" class="small" data-ct="view" title="Settings, CPU, memory and storage; start, stop, restart, delete or purge">View</button>
-      <button type="button" class="small" data-ct="conn" ${c.engine ? "" : "disabled"} title="Open the New connection dialog filled in for this database">Add connection</button>
-      <button type="button" class="small" data-ct="logs" title="The container's last 300 log lines (needs the superuser password)">Logs</button>
-      <button type="button" class="small danger" data-ct="remove" title="Remove the container; its data folder or volume is kept (needs the superuser password)">${ctr.removeArmed === key ? "Yes, remove it" : "Remove"}</button></span></li>`;
+      <span class="btngroup icons" role="group" aria-label="${esc(c.name)}"><button type="button" data-ct="view" title="View: its settings, CPU, memory and storage; start, stop, restart, delete or purge it" aria-label="View">👁</button><button type="button" data-ct="conn" ${c.engine ? "" : "disabled"} title="Add connection: the New connection dialog filled in for this database" aria-label="Add connection">🔌</button><button type="button" data-ct="logs" title="Logs: the container's last 300 log lines (needs the superuser password)" aria-label="Logs">📜</button><button type="button" class="danger" data-ct="remove" title="${ctr.removeArmed === key ? "Click again to remove it" : "Remove the container; its data folder or volume is kept (needs the superuser password)"}" aria-label="${ctr.removeArmed === key ? "Yes, remove it" : "Remove"}">${ctr.removeArmed === key ? "🗑 Yes, remove it" : "🗑"}</button></span></li>`;
   }).join("");
 }
 function ctrResult(cls, text) {
@@ -4352,8 +4358,9 @@ $("ctList").addEventListener("click", async (ev) => {
 });
 
 // ---- a deployed container's page ------------------------------------------------
-// Its settings and what it uses (refreshed every 5 seconds while open), with
-// start, stop, restart, delete and purge (containers_manage.go).
+// The Container tab: its settings and what it uses (refreshed every 5 seconds
+// while the tab is shown), with start, stop, restart, delete and purge
+// (containers_manage.go).
 const cv = { c: null, d: null, timer: 0, seq: 0, ask: "" };
 const cvBody = (extra) => ({ runtime: cv.c.runtime, name: cv.c.name, namespace: cv.c.namespace || "", ...extra });
 
@@ -4361,7 +4368,7 @@ function openCtrView(c) {
   cv.c = c; cv.d = null; cv.ask = "";
   const su = $("ctSuper").value; // typed in the list already
   if ($("ctrDialog").open) $("ctrDialog").close();
-  $("cvSuper").value = su;
+  if (su) $("cvSuper").value = su;
   $("cvTitle").textContent = c.name;
   $("cvState").textContent = c.state; $("cvState").className = "st " + c.state;
   $("cvSub").textContent = "Loading…";
@@ -4369,8 +4376,22 @@ function openCtrView(c) {
   for (const k of ["Cpu", "Mem", "Disk"]) { $("cv" + k).textContent = "–"; $("cv" + k + "Sub").textContent = ""; $("cv" + k + "Bar").style.width = "0"; }
   $("cvAsk").hidden = true; $("cvLogsWrap").hidden = true; cvResult();
   $("cvConn").disabled = !c.engine;
-  if (!$("ctvDialog").open) $("ctvDialog").showModal();
-  cvLoad();
+  $("ctrTab").textContent = "Container · " + c.name;
+  $("ctrTab").hidden = false;
+  if (state.tab === "container") cvLoad(); else showTab("container");
+  $("ctrPane").scrollTop = 0;
+}
+const cvShown = () => !!cv.c && !$("ctrPane").hidden;
+// cvPause stops the refreshing while another tab is shown.
+function cvPause() { clearTimeout(cv.timer); cv.seq++; }
+// cvCloseView closes the page and its tab, forgetting the password typed.
+function cvCloseView() {
+  cvPause();
+  cv.c = cv.d = null; cv.ask = ""; cv.busy = false;
+  $("cvSuper").value = $("cvConfirm").value = "";
+  $("cvAsk").hidden = true; $("cvAskGo").hidden = false;
+  $("ctrTab").hidden = true;
+  if (state.tab === "container") showTab("data");
 }
 function cvResult(cls, text) {
   $("cvResult").hidden = !cls;
@@ -4379,18 +4400,18 @@ function cvResult(cls, text) {
 }
 async function cvLoad() {
   clearTimeout(cv.timer);
-  if (!cv.c || !$("ctvDialog").open) return;
+  if (!cvShown()) return;
   const seq = ++cv.seq;
   try {
     const d = await api("POST", "/api/containers/inspect", cvBody());
-    if (seq !== cv.seq || !$("ctvDialog").open) return;
+    if (seq !== cv.seq || !cvShown()) return;
     cv.d = d;
     cvRender(d);
   } catch (e) {
     if (seq !== cv.seq) return;
     $("cvSub").textContent = "✘ " + e.message;
   }
-  if ($("ctvDialog").open) cv.timer = setTimeout(cvLoad, 5000);
+  if (seq === cv.seq && cvShown()) cv.timer = setTimeout(cvLoad, 5000);
 }
 function cvBar(id, frac) {
   const f = Math.max(0, Math.min(1, frac || 0));
@@ -4467,7 +4488,7 @@ async function cvDo(action) {
     if (action === "delete" || action === "purge") {
       toast(action === "delete" ? `Deleted ${name}; its data was kept` : `Purged ${name}`);
       const su = $("cvSuper").value;
-      $("ctvDialog").close();
+      cvCloseView();
       await openContainers();
       $("ctSuper").value = su;
       ctrResult("ok", action === "purge" ? `✔ Purged ${name}:\n• ` + (r.done || []).join("\n• ") : `✔ Deleted ${name}; its data folder or volume was kept.`);
@@ -4487,18 +4508,15 @@ $("cvActs").addEventListener("click", (ev) => {
 $("cvAskGo").addEventListener("click", () => cv.ask && cvDo(cv.ask));
 $("cvAskCancel").addEventListener("click", () => { $("cvAsk").hidden = true; cv.ask = ""; });
 for (const id of ["cvSuper", "cvConfirm"]) $(id).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); cv.ask && cvDo(cv.ask); } });
-$("cvForm").addEventListener("submit", (ev) => ev.preventDefault());
 $("cvRefresh").addEventListener("click", () => cvLoad());
-$("cvClose").addEventListener("click", () => $("ctvDialog").close());
+$("cvClose").addEventListener("click", cvCloseView);
 $("cvBack").addEventListener("click", async () => {
   const su = $("cvSuper").value;
-  $("ctvDialog").close();
   await openContainers();
-  $("ctSuper").value = su;
+  if (su) $("ctSuper").value = su;
 });
 $("cvConn").addEventListener("click", () => {
   const c = cv.c, sp = (ctr.info?.catalog || []).find((s) => s.id === c.spec) || {};
-  $("ctvDialog").close();
   ctrAddConn(c.name, c.engine, { host: c.runtime === "kubernetes" ? "" : "localhost", port: c.port, username: sp.user || "", database: sp.id === "firebird" ? "" : sp.db || "" }, "");
 });
 $("cvLogBtn").addEventListener("click", async () => {
@@ -4512,11 +4530,6 @@ $("cvLogBtn").addEventListener("click", async () => {
     $("cvLogsWrap").scrollIntoView({ block: "nearest" });
     cvResult();
   } catch (e) { cvResult("bad", "✘ " + e.message); } finally { $("cvLogBtn").disabled = false; }
-});
-$("ctvDialog").addEventListener("close", () => {
-  clearTimeout(cv.timer); cv.seq++;
-  $("cvSuper").value = $("cvConfirm").value = "";
-  $("cvAsk").hidden = true; $("cvAskGo").hidden = false; cv.ask = ""; cv.busy = false;
 });
 </script>
 </body>
