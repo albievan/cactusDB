@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.33.0 — 2026-11-08
+
+- **DB container deployment** (☰ → 🐳 DB container deployment): when the cactusdb server has
+  Docker (Docker CE or Docker Desktop) or Kubernetes (k8s, k3s), deploy a database server as
+  a container: SQL Server 2022, PostgreSQL 17 (also with pgvector), MySQL 8.4, MariaDB 11.4,
+  Oracle Database 23ai Free, Firebird 5, MongoDB 8.0, Redis 7.4, Neo4j 5, Cassandra 5.0,
+  CockroachDB 24.3 or Weaviate 1.28.
+  - Choose where the database files go (a folder on the server or node, or a volume), the
+    port, the image tag, the administrator password and, where the image allows, the user
+    and database; on Kubernetes the namespace, a LoadBalancer or NodePort service and the
+    volume size.
+  - Deploying shows each step and waits until the database accepts connections; then
+    **Add as connection…** fills in the New connection dialog.
+  - The containers cactusdb deployed are listed with Add connection, Logs and Remove (the
+    data is kept).
+  - Deploying, removing and reading logs need the superuser password. Passwords reach
+    docker through its environment and Kubernetes through a Secret, never a command line.
+
 ## 1.32.0 — 2026-11-08
 
 - **18 more database types**, grouped in the New connection dialog as *Relational*,

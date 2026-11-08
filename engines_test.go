@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -527,5 +528,123 @@ func TestPgvectorDSN(t *testing.T) {
 	rs := postgresDSN(ConnParams{Engine: EngineRedshift, Host: "c"}, nil)
 	if !strings.Contains(rs, "c:5439") || strings.Contains(rs, "default_transaction_read_only") {
 		t.Error(rs)
+	}
+}
+
+func TestContainerDeployChecks(t *testing.T) {
+	sp, _ := specByID("mssql")
+	ok := deployReq{Runtime: "docker", Spec: "mssql", Name: "cdb-mssql", Port: 1433, Password: "Str0ng!pass"}
+	if err := ok.check(sp); err != nil {
+		t.Fatalf("valid request refused: %v", err)
+	}
+	if ok.Image != sp.Image || ok.Username != "sa" {
+		t.Errorf("defaults not filled: %+v", ok)
+	}
+	bad := []deployReq{
+		{Runtime: "docker", Name: "Bad_Name", Port: 1433, Password: "Str0ng!pass"},
+		{Runtime: "docker", Name: "cdb", Port: 1433, Password: "weakpass"},
+		{Runtime: "docker", Name: "cdb", Port: 0, Password: "Str0ng!pass"},
+		{Runtime: "docker", Name: "cdb", Port: 1433, Password: "Str0ng!pass", Image: "--privileged"},
+		{Runtime: "docker", Name: "cdb", Port: 1433, Password: "Str0ng!pass", DataDir: "relative/dir"},
+		{Runtime: "docker", Name: "cdb", Port: 1433, Password: "Str0ng!pass", DataDir: "/"},
+		{Runtime: "kubernetes", Name: "cdb", Port: 1433, Password: "Str0ng!pass", ServiceType: "NodePort"},
+		{Runtime: "kubernetes", Name: "cdb", Port: 1433, Password: "Str0ng!pass", Storage: "lots"},
+	}
+	for i, d := range bad {
+		if err := d.check(sp); err == nil {
+			t.Errorf("bad request %d accepted: %+v", i, d)
+		}
+	}
+	pg, _ := specByID("postgres")
+	d := deployReq{Runtime: "docker", Name: "pg", Port: 5432, Password: "x", Username: "app; drop", Database: "db"}
+	if d.check(pg) == nil {
+		t.Error("a username with ; was accepted")
+	}
+	cr, _ := specByID("cockroachdb")
+	d = deployReq{Runtime: "docker", Name: "crdb", Port: 26257, Password: "ignored"}
+	if err := d.check(cr); err != nil || d.Password != "" || d.Database != "defaultdb" {
+		t.Errorf("cockroachdb: %v %+v", err, d)
+	}
+	for _, s := range containerCatalog {
+		if s.env == nil || s.Image == "" || s.Port == 0 || s.DataPath == "" || engineByID(s.Engine) == nil {
+			t.Errorf("catalogue entry %s is incomplete", s.ID)
+		}
+	}
+}
+
+func TestDockerRunArgsKeepPasswordsOut(t *testing.T) {
+	sp, _ := specByID("mssql")
+	d := deployReq{Runtime: "docker", Spec: "mssql", Name: "cdb-mssql", Port: 14330, Password: "Str0ng!secret", DataDir: "/srv/data/mssql"}
+	if err := d.check(sp); err != nil {
+		t.Fatal(err)
+	}
+	args := strings.Join(dockerRunArgs(sp, d), " ")
+	if strings.Contains(args, "Str0ng!secret") {
+		t.Fatalf("the password is on the command line: %s", args)
+	}
+	for _, want := range []string{"-p 127.0.0.1:14330:1433", "-v /srv/data/mssql:/var/opt/mssql", "-e MSSQL_SA_PASSWORD ", "-e ACCEPT_EULA=Y", "--label " + ctrLabel + "=true"} {
+		if !strings.Contains(args+" ", want) {
+			t.Errorf("missing %q in %s", want, args)
+		}
+	}
+	if env := secretEnv(sp, d); len(env) != 1 || env[0] != "MSSQL_SA_PASSWORD=Str0ng!secret" {
+		t.Errorf("secret env = %v", env)
+	}
+	d.Public, d.DataDir = true, ""
+	args = strings.Join(dockerRunArgs(sp, d), " ")
+	if !strings.Contains(args, "-p 14330:1433") || !strings.Contains(args, "-v cdb-mssql-data:/var/opt/mssql") {
+		t.Errorf("public/volume args wrong: %s", args)
+	}
+}
+
+func TestKubeManifest(t *testing.T) {
+	sp, _ := specByID("mssql")
+	d := deployReq{Runtime: "kubernetes", Spec: "mssql", Name: "cdb-mssql", Port: 31433, Password: "Str0ng!secret", ServiceType: "NodePort", DataDir: "/srv/mssql"}
+	if err := d.check(sp); err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Items []map[string]any
+	}
+	if err := json.Unmarshal(kubeManifest(sp, d), &m); err != nil {
+		t.Fatal(err)
+	}
+	kinds := []string{}
+	for _, it := range m.Items {
+		kinds = append(kinds, it["kind"].(string))
+	}
+	if got := strings.Join(kinds, ","); got != "Namespace,Secret,Deployment,Service" {
+		t.Errorf("kinds = %s", got)
+	}
+	raw := string(kubeManifest(sp, d))
+	// The password is only in the Secret, which the deployment refers to.
+	if strings.Count(raw, "Str0ng!secret") != 1 || !strings.Contains(raw, `"secretKeyRef"`) {
+		t.Errorf("password not kept in the secret only:\n%s", raw)
+	}
+	for _, want := range []string{`"nodePort": 31433`, `"type": "DirectoryOrCreate"`, `"fsGroup": 10001`, `"chown"`, `"namespace": "cactusdb"`} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("manifest lacks %s", want)
+		}
+	}
+	d = deployReq{Runtime: "kubernetes", Spec: "redis", Name: "r", Port: 6379, Password: "pw"}
+	rs, _ := specByID("redis")
+	if err := d.check(rs); err != nil {
+		t.Fatal(err)
+	}
+	raw = string(kubeManifest(rs, d))
+	if !strings.Contains(raw, `"PersistentVolumeClaim"`) || !strings.Contains(raw, `"storage": "10Gi"`) || !strings.Contains(raw, `"LoadBalancer"`) {
+		t.Errorf("redis manifest:\n%s", raw)
+	}
+}
+
+func TestPortFree(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skip(err)
+	}
+	defer l.Close()
+	port := l.Addr().(*net.TCPAddr).Port
+	if portFree(port, false) || portFree(port, true) {
+		t.Errorf("port %d is in use but looks free", port)
 	}
 }

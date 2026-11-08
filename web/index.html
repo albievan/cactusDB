@@ -519,6 +519,21 @@
   .gabanner[hidden] { display: none; }
   .gabanner span { flex: 1; }
   @media (max-width: 640px) { .gabanner { flex-wrap: wrap; } }
+  dialog.modal.ctr { width: min(760px, calc(100vw - 32px)); }
+  .row2.half { grid-template-columns: 1fr 1fr; }
+  ul.ctrt { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+  ul.ctrt li { padding: 2px 0; }
+  ul.ctrt .ok { color: var(--accent); font-weight: 600; }
+  ul.ctrt .no { color: var(--muted); }
+  pre.ctlog { margin: 10px 0 0; max-height: 220px; overflow: auto; padding: 8px 10px; border-radius: 6px; background: var(--panel-2);
+    font: 11.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  ul.ctlist li { flex-wrap: wrap; gap: 6px; cursor: default; }
+  ul.ctlist li button { display: inline-block; }
+  ul.ctlist li .meta { margin-left: 0; }
+  ul.ctlist li .st { font-size: 11px; border-radius: 4px; padding: 0 5px; background: var(--panel-2); color: var(--muted); }
+  ul.ctlist li .st.running { background: var(--accent-soft); color: var(--accent); }
+  ul.ctlist li .st.exited, ul.ctlist li .st.dead { background: var(--danger-soft); color: var(--danger); }
+  ul.ctlist li .acts { margin-left: auto; display: flex; gap: 6px; }
   .edsub { margin: 22px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
   .dresult.busy { background: var(--panel-2); color: var(--muted); }
   button.danger { color: var(--danger); }
@@ -611,6 +626,7 @@
       <button data-menu="drivers" title="The databases cactusdb supports and their drivers">🧩 Drivers</button>
       <button data-menu="settings" title="When to disconnect an unused connection">⚙ Settings</button>
       <button data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request">📜 Logs</button>
+      <button data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes">🐳 DB container deployment</button>
       <button data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences">⇄ Compare databases</button>
       <button data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system">⬆ Check for update<span class="updot" id="updateDot" hidden></span></button>
     </nav>
@@ -861,6 +877,70 @@
       <button type="button" id="dCancel">Cancel</button>
       <button type="button" id="dConnect" title="Connect with these details, without saving them">Connect</button>
       <button type="button" class="primary" id="dSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="ctrDialog" class="modal wide ctr" aria-labelledby="ctTitle">
+  <form method="dialog" id="ctForm">
+    <h3 id="ctTitle">DB container deployment</h3>
+    <p class="hint">Deploy a database server as a container on the Docker (Docker CE or Docker Desktop) or Kubernetes
+      (k8s, k3s) of the computer cactusdb runs on. Only the superuser can deploy and remove containers or read their logs.</p>
+    <ul class="ctrt" id="ctRuntimes"><li>Looking for Docker and Kubernetes…</li></ul>
+
+    <div id="ctDeploy" hidden>
+      <h4 class="edsub">Deploy a database</h4>
+      <div class="row2 half">
+        <div><label for="ctSpec">Database</label><select id="ctSpec"></select></div>
+        <div><label for="ctRuntime">Deploy to</label><select id="ctRuntime"></select></div>
+      </div>
+      <p class="hint" id="ctNote" hidden></p>
+      <div class="row2 half">
+        <div><label for="ctName">Container name</label><input id="ctName" spellcheck="false" autocomplete="off"></div>
+        <div><label for="ctPort" id="ctPortLabel">Port on this computer</label><input id="ctPort" type="number" min="1" max="65535"></div>
+      </div>
+      <label for="ctImage">Image</label>
+      <input id="ctImage" spellcheck="false" autocomplete="off">
+      <label for="ctData" id="ctDataLabel">Folder for the database files</label>
+      <input id="ctData" spellcheck="false" autocomplete="off">
+      <p class="hint" id="ctDataHint"></p>
+      <label class="check" id="ctPublicWrap"><input type="checkbox" id="ctPublic"> Reachable from other computers (otherwise only from this one)</label>
+      <div id="ctKube" hidden>
+        <div class="row2 half">
+          <div><label for="ctNs">Namespace</label><input id="ctNs" value="cactusdb" spellcheck="false" autocomplete="off"></div>
+          <div><label for="ctSvc">Service type</label><select id="ctSvc"><option value="LoadBalancer">LoadBalancer</option><option value="NodePort">NodePort (port 30000–32767)</option></select></div>
+        </div>
+        <div id="ctStorageWrap"><label for="ctStorage">Volume size, when no folder is given</label><input id="ctStorage" value="10Gi" spellcheck="false"></div>
+      </div>
+      <div class="row2 half">
+        <div id="ctUserWrap"><label for="ctUser">Username</label><input id="ctUser" spellcheck="false" autocomplete="off"></div>
+        <div id="ctDbWrap"><label for="ctDb" id="ctDbLabel">Database to create</label><input id="ctDb" spellcheck="false" autocomplete="off"></div>
+      </div>
+      <div id="ctPassWrap">
+        <div class="row2 half">
+          <div><label for="ctPass" id="ctPassLabel">Password</label><span class="pwwrap"><input id="ctPass" type="password" autocomplete="new-password"><button type="button" class="eye" data-pw="ctPass" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span></div>
+          <div><label for="ctPass2">Confirm password</label><input id="ctPass2" type="password" autocomplete="new-password"></div>
+        </div>
+        <p class="hint" id="ctPassHint"></p>
+      </div>
+      <label for="ctSuper">Superuser password</label>
+      <input id="ctSuper" type="password" autocomplete="off">
+      <div id="ctResult" class="dresult" hidden></div>
+      <pre class="ctlog" id="ctLog" hidden></pre>
+      <div class="dactions">
+        <span class="spacer"></span>
+        <button type="button" id="ctAddConn" hidden title="Open the New connection dialog filled in for this database">Add as connection…</button>
+        <button type="button" class="primary" id="ctGo">Deploy</button>
+      </div>
+    </div>
+
+    <h4 class="edsub">Deployed by cactusdb</h4>
+    <ul class="list ctlist" id="ctList"><li class="empty">…</li></ul>
+    <div id="ctLogsWrap" hidden><p class="hint" id="ctLogsTitle"></p><pre class="ctlog" id="ctLogs"></pre></div>
+    <div class="dactions">
+      <button type="button" id="ctRefresh" title="Look for Docker and Kubernetes and list the containers again">⟳ Refresh</button>
+      <span class="spacer"></span>
+      <button type="button" class="primary" id="ctClose">Close</button>
     </div>
   </form>
 </dialog>
@@ -1814,6 +1894,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "update": setNavMenu(false); openUpdateDialog(); break;
     case "logs": setNavMenu(false); showTab("logs"); break;
     case "compare": setNavMenu(false); showTab("compare"); break;
+    case "containers": setNavMenu(false); openContainers(); break;
   }
 });
 document.addEventListener("click", (ev) => {
@@ -3853,6 +3934,241 @@ $("engines").addEventListener("click", (ev) => {
       `<li title="${esc(d.module)} – compiled into cactusdb, no download needed"><span class="ok">✔</span><span class="name">${esc(d.engines)}</span><span class="ver">${esc(d.version)}</span></li>`).join("");
   }).catch(() => {});
 })();
+
+// ---- ☰ → DB container deployment ---------------------------------------------
+// Deploys a database server as a container on the Docker or Kubernetes of the
+// computer cactusdb runs on (containers.go), then fills in a new connection.
+const ctr = { info: null, job: null, timer: 0, lastDeploy: null, removeArmed: "" };
+const ctrSpec = () => (ctr.info?.catalog || []).find((c) => c.id === $("ctSpec").value);
+const ctrKube = () => $("ctRuntime").value === "kubernetes";
+
+async function openContainers() {
+  if (!$("ctrDialog").open) $("ctrDialog").showModal();
+  await loadContainers();
+}
+async function loadContainers() {
+  $("ctRuntimes").innerHTML = "<li>Looking for Docker and Kubernetes…</li>";
+  $("ctList").innerHTML = '<li class="empty">…</li>';
+  let info;
+  try { info = await api("GET", "/api/containers"); } catch (e) {
+    $("ctRuntimes").innerHTML = `<li class="no">${esc(e.message)}</li>`; $("ctList").innerHTML = ""; return;
+  }
+  const first = !ctr.info;
+  ctr.info = info;
+  $("ctRuntimes").innerHTML = info.runtimes.map((r) => r.ok
+    ? `<li><span class="ok">✔ ${esc(r.name)}</span> ${esc(r.version || "")}${r.context ? ` · context <b>${esc(r.context)}</b>` : ""}</li>`
+    : `<li class="no">✘ ${esc(r.id === "docker" ? "Docker" : "Kubernetes")}: ${esc(r.error || "not found")}</li>`).join("");
+  const ok = info.runtimes.filter((r) => r.ok);
+  if (!ok.length) {
+    $("ctRuntimes").insertAdjacentHTML("beforeend", "<li>Install Docker (Docker CE or Docker Desktop) or Kubernetes (k8s or k3s, with kubectl) on the cactusdb server to deploy database containers, then press ⟳ Refresh.</li>");
+  }
+  $("ctDeploy").hidden = !ok.length;
+  if (ok.length) {
+    const keepRt = $("ctRuntime").value;
+    $("ctRuntime").innerHTML = ok.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}${r.context ? " – " + esc(r.context) : ""}</option>`).join("");
+    if (ok.some((r) => r.id === keepRt)) $("ctRuntime").value = keepRt;
+    if (first || !$("ctSpec").options.length) {
+      $("ctSpec").innerHTML = info.catalog.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+      ctrSpecChanged();
+    } else ctrRuntimeChanged();
+    if (!info.superuserSet) ctrResult("bad", "Only the superuser can deploy containers, and no superuser password is set yet. Set one on the cactusdb server with:\ncactusdb --superuser set");
+  }
+  ctrRenderList();
+}
+function ctrRenderList() {
+  const info = ctr.info, list = info?.deployed || [];
+  const errs = (info?.listErrors || []).map((e) => `<li class="empty">${esc(e)}</li>`).join("");
+  if (!list.length) { $("ctList").innerHTML = errs + '<li class="empty">No database containers deployed by cactusdb yet.</li>'; return; }
+  const specName = (id) => (info.catalog.find((c) => c.id === id) || {}).name || id || "?";
+  $("ctList").innerHTML = errs + list.map((c, i) => {
+    const key = `${c.runtime}/${c.namespace || ""}/${c.name}`;
+    return `<li data-i="${i}"><span class="name"><b>${esc(c.name)}</b> <span class="meta">${esc(specName(c.spec))} · ${c.runtime === "docker" ? "Docker" : "Kubernetes, namespace " + esc(c.namespace)}${c.port ? " · port " + c.port : ""}</span></span>
+      <span class="st ${esc(c.state)}" title="${esc(c.status)}">${esc(c.state)}</span>
+      <span class="acts"><button type="button" class="small" data-ct="conn" ${c.engine ? "" : "disabled"} title="Open the New connection dialog filled in for this database">Add connection</button>
+      <button type="button" class="small" data-ct="logs" title="The container's last 300 log lines (needs the superuser password)">Logs</button>
+      <button type="button" class="small danger" data-ct="remove" title="Remove the container; its data folder or volume is kept (needs the superuser password)">${ctr.removeArmed === key ? "Yes, remove it" : "Remove"}</button></span></li>`;
+  }).join("");
+}
+function ctrResult(cls, text) {
+  $("ctResult").hidden = !cls;
+  $("ctResult").className = "dresult " + (cls || "");
+  $("ctResult").textContent = text || "";
+}
+function ctrUniqueName(base) {
+  const taken = new Set((ctr.info?.deployed || []).map((c) => c.name));
+  let n = base, i = 2;
+  while (taken.has(n)) n = `${base}-${i++}`;
+  return n;
+}
+function ctrSpecChanged() {
+  const sp = ctrSpec();
+  if (!sp) return;
+  $("ctImage").value = sp.image;
+  $("ctPort").value = sp.port;
+  $("ctName").value = ctrUniqueName("cdb-" + sp.id);
+  $("ctUserWrap").hidden = !sp.user;
+  $("ctUser").value = sp.user || "";
+  $("ctUser").readOnly = !sp.userEditable;
+  $("ctDbWrap").hidden = !sp.db && !sp.dbEditable;
+  $("ctDb").value = sp.db || "";
+  $("ctDb").readOnly = !sp.dbEditable;
+  $("ctDbLabel").textContent = sp.dbLabel || (sp.dbEditable ? "Database to create" : "Database");
+  $("ctPassWrap").hidden = !!sp.noPassword;
+  $("ctPassLabel").textContent = sp.passLabel || "Password";
+  $("ctPass").value = $("ctPass2").value = "";
+  $("ctPassHint").textContent = sp.passRule === "mssql" ? "At least 8 characters with three of: uppercase, lowercase, digits and symbols."
+    : sp.passRule === "min8" ? "At least 8 characters." : "";
+  $("ctPassHint").hidden = !$("ctPassHint").textContent;
+  const note = [sp.note, sp.memoryMB ? `Needs at least ${sp.memoryMB / 1024} GB of memory.` : ""].filter(Boolean).join(" ");
+  $("ctNote").textContent = note; $("ctNote").hidden = !note;
+  ctrRuntimeChanged();
+}
+function ctrRuntimeChanged() {
+  const sp = ctrSpec(), kube = ctrKube(), node = kube && $("ctSvc").value === "NodePort";
+  $("ctKube").hidden = !kube;
+  $("ctPublicWrap").style.display = kube ? "none" : ""; // .check's display:flex beats [hidden]
+  $("ctPortLabel").textContent = !kube ? "Port on this computer" : node ? "NodePort" : "Service port";
+  const port = +$("ctPort").value;
+  if (sp) {
+    if (node && (port < 30000 || port > 32767)) $("ctPort").value = 30000 + (sp.port % 2768);
+    else if (!node && (!port || port >= 30000)) $("ctPort").value = sp.port;
+  }
+  const ex = (ctr.info?.exampleDir || "/srv/cactusdb-data/NAME").replace("NAME", $("ctName").value || "NAME");
+  $("ctDataLabel").textContent = kube ? "Folder for the database files, on the node" : "Folder for the database files, on the cactusdb server";
+  $("ctData").placeholder = kube ? `empty: a volume claim · e.g. /srv/cactusdb-data/${$("ctName").value || "NAME"}` : `empty: a Docker volume · e.g. ${ex}`;
+  $("ctDataHint").textContent = kube
+    ? "A folder on the node the pod runs on (hostPath), created if missing. Leave it empty for a volume claim of the cluster's default storage class."
+    : "A full path; it's created if missing, and a folder that already has database files is used as it is. Leave it empty to keep the files in a Docker volume called <name>-data.";
+  $("ctStorageWrap").hidden = !!$("ctData").value.trim();
+}
+$("ctSpec").addEventListener("change", ctrSpecChanged);
+$("ctRuntime").addEventListener("change", ctrRuntimeChanged);
+$("ctSvc").addEventListener("change", ctrRuntimeChanged);
+$("ctName").addEventListener("input", ctrRuntimeChanged);
+$("ctData").addEventListener("input", ctrRuntimeChanged);
+$("ctRefresh").addEventListener("click", () => { $("ctLogsWrap").hidden = true; loadContainers(); });
+$("ctClose").addEventListener("click", () => $("ctrDialog").close());
+// Enter in a field mustn't close the dialog (it's a method="dialog" form).
+$("ctForm").addEventListener("submit", (ev) => ev.preventDefault());
+$("ctrDialog").addEventListener("close", () => {
+  $("ctSuper").value = $("ctPass").value = $("ctPass2").value = "";
+  allowShowPassword("ctPass", true);
+});
+
+$("ctGo").addEventListener("click", async () => {
+  const sp = ctrSpec();
+  if (!sp) return;
+  if (!sp.noPassword && $("ctPass").value !== $("ctPass2").value) { ctrResult("bad", "The two passwords are different."); return; }
+  if (!$("ctSuper").value) { ctrResult("bad", "Enter the superuser password."); $("ctSuper").focus(); return; }
+  const kube = ctrKube();
+  const body = {
+    runtime: $("ctRuntime").value, spec: sp.id, name: $("ctName").value.trim(), image: $("ctImage").value.trim(),
+    port: +$("ctPort").value, public: !kube && $("ctPublic").checked, dataDir: $("ctData").value.trim(),
+    username: $("ctUser").value.trim(), password: sp.noPassword ? "" : $("ctPass").value, database: $("ctDb").value.trim(),
+    namespace: kube ? $("ctNs").value.trim() : "", serviceType: kube ? $("ctSvc").value : "", storage: kube ? $("ctStorage").value.trim() : "",
+    superPassword: $("ctSuper").value,
+  };
+  $("ctGo").disabled = true; $("ctAddConn").hidden = true;
+  ctrResult("busy", "Starting…");
+  try {
+    const r = await api("POST", "/api/containers/deploy", body);
+    ctr.lastDeploy = { name: body.name, password: body.password, spec: sp };
+    ctr.job = r.job;
+    $("ctLog").hidden = false; $("ctLog").textContent = "";
+    ctrPoll();
+  } catch (e) {
+    ctrResult("bad", "✘ " + e.message);
+    $("ctGo").disabled = false;
+  }
+});
+async function ctrPoll() {
+  clearTimeout(ctr.timer);
+  if (!ctr.job) return;
+  let j;
+  try { j = await api("GET", "/api/containers/deploy/" + ctr.job); } catch (e) {
+    ctrResult("bad", "✘ " + e.message); $("ctGo").disabled = false; return;
+  }
+  const log = $("ctLog"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+  log.textContent = (j.lines || []).join("\n");
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  const secs = Math.round((Date.now() - new Date(j.started)) / 1000);
+  if (j.state === "running") {
+    ctrResult("busy", `${j.step || "Working"}… (${secs} s)`);
+    ctr.timer = setTimeout(ctrPoll, 1500);
+    return;
+  }
+  ctr.job = null;
+  $("ctGo").disabled = false;
+  if (j.state === "ready") {
+    ctr.lastDeploy.conn = j.conn;
+    const c = j.conn;
+    ctrResult("ok", `✔ ${j.name} is running and accepts connections at ${c.host}:${c.port}${c.username ? ", user " + c.username : ""}${c.database ? ", database " + c.database : ""}.\nAdd it as a connection to open it in cactusdb.`);
+    $("ctAddConn").hidden = false;
+  } else {
+    ctrResult("bad", "✘ " + (j.error || "the deployment failed"));
+  }
+  loadContainersList();
+}
+// loadContainersList refreshes only the list (the form keeps what was typed).
+async function loadContainersList() {
+  try { ctr.info = { ...ctr.info, ...(await api("GET", "/api/containers")) }; } catch { return; }
+  ctrRenderList();
+}
+// ctrAddConn opens the New connection dialog filled in for a deployed database.
+function ctrAddConn(name, engine, conn, password) {
+  $("ctrDialog").close();
+  openConnDialog(null);
+  $("dEngine").value = engine;
+  dlgEngine(false);
+  $("dName").value = name;
+  $("dHost").value = conn.host || "localhost";
+  if (conn.port) $("dPort").value = conn.port;
+  $("dUser").value = conn.username || "";
+  $("dPass").value = password || "";
+  $("dDb").value = conn.database || "";
+  dlgResult();
+  $("dLock").focus();
+}
+$("ctAddConn").addEventListener("click", () => {
+  const d = ctr.lastDeploy;
+  if (d && d.conn) ctrAddConn(d.name, d.conn.engine, d.conn, d.password);
+});
+$("ctList").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-ct]");
+  if (!b) return;
+  const c = ctr.info.deployed[+b.closest("li").dataset.i];
+  const key = `${c.runtime}/${c.namespace || ""}/${c.name}`;
+  if (b.dataset.ct === "conn") {
+    const sp = ctr.info.catalog.find((s) => s.id === c.spec) || {};
+    let host = "localhost";
+    if (c.runtime === "kubernetes") host = "";
+    ctrAddConn(c.name, c.engine, { host, port: c.port, username: sp.user || "", database: sp.id === "firebird" ? "" : sp.db || "" }, "");
+    return;
+  }
+  const su = $("ctSuper").value;
+  if (!su) { ctrResult("bad", "Enter the superuser password above first."); $("ctDeploy").hidden || $("ctSuper").focus(); return; }
+  const body = { runtime: c.runtime, name: c.name, namespace: c.namespace || "", superPassword: su };
+  if (b.dataset.ct === "logs") {
+    b.disabled = true;
+    try {
+      const r = await api("POST", "/api/containers/logs", body);
+      $("ctLogsTitle").textContent = `Last log lines of ${c.name}:`;
+      $("ctLogs").textContent = r.logs || "(no log lines)";
+      $("ctLogsWrap").hidden = false;
+      $("ctLogs").scrollTop = $("ctLogs").scrollHeight;
+    } catch (e) { ctrResult("bad", "✘ " + e.message); } finally { b.disabled = false; }
+    return;
+  }
+  // Remove: the first click asks, the second removes.
+  if (ctr.removeArmed !== key) { ctr.removeArmed = key; ctrRenderList(); return; }
+  ctr.removeArmed = "";
+  b.disabled = true;
+  try {
+    await api("POST", "/api/containers/remove", body);
+    toast(`Removed ${c.name}; its data was kept`);
+  } catch (e) { ctrResult("bad", "✘ " + e.message); }
+  loadContainersList();
+});
 </script>
 </body>
 </html>

@@ -110,7 +110,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.32.0
+cactusdb 1.33.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -157,6 +157,7 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 | **🧩 Drivers** | The databases cactusdb supports, and the version of each built-in driver |
 | **⚙ Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
 | **📜 Logs** | Opens the **Logs** tab (see below) |
+| **🐳 DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection (see [Deploying a database as a container](#db-containers)) |
 | **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
 | **⬆ Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
 
@@ -627,6 +628,46 @@ documents in the order the fields appear; nested documents and arrays are shown 
 The **Definition** of a collection, key group, label or container lists its fields and
 their types from a sample, with its indexes and options. **Backup** and **Compare** are
 for SQL databases with their own DDL; for the others, export the data and the DDL.
+
+<a id="db-containers"></a>
+### Deploying a database as a container
+
+**☰ → 🐳 DB container deployment** starts a new database server as a container on the
+computer cactusdb runs on, when it has **Docker** (Docker CE or Docker Desktop) or
+**Kubernetes** (k8s, k3s, with `kubectl`). The dialog shows what it found, the database
+containers cactusdb deployed, and a form:
+
+| Field | |
+|-------|---|
+| Database | SQL Server 2022 (Developer), PostgreSQL 17, PostgreSQL 17 + pgvector, MySQL 8.4, MariaDB 11.4, Oracle Database 23ai Free, Firebird 5, MongoDB 8.0, Redis 7.4, Neo4j 5, Apache Cassandra 5.0, CockroachDB 24.3, Weaviate 1.28 |
+| Deploy to | Docker, or the Kubernetes cluster of `kubectl`'s current context (shown) |
+| Container name, port | The port on this computer (Docker), or of the Kubernetes service: a *LoadBalancer*, or a *NodePort* (30000–32767) |
+| Image | Filled in; change the tag for another version |
+| Folder for the database files | Where the database keeps its files: a folder on the cactusdb server (Docker) or on the node (Kubernetes, `hostPath`), created if missing. A folder that already holds database files is used as it is, so a removed container can be deployed again with its data. Empty: a Docker volume `<name>-data`, or a Kubernetes volume claim of the size you give |
+| Username, database | Where the image lets you choose them (PostgreSQL, MongoDB, MySQL/MariaDB database, Firebird file…); otherwise shown (`sa`, `system`/`FREEPDB1`, `SYSDBA`, `neo4j`…) |
+| Password | The administrator password, with the database's rules (SQL Server: 8+ characters, three of upper, lower, digits, symbols). Cassandra and CockroachDB (insecure mode) have none. For Weaviate it is the API key |
+| Reachable from other computers | Docker only: otherwise the port is published on 127.0.0.1 only |
+| Superuser password | Needed to deploy (see [Superuser](#superuser)) |
+
+**Deploy** downloads the image (unless it's already there), starts the container and
+connects until the database answers, showing each step. Then **Add as connection…** opens
+the New connection dialog filled in (type, host, port, user, password, database): give it
+a connection password and save it. The list of deployed containers has **Add connection**,
+**Logs** (the last 300 lines) and **Remove**. Remove asks first and removes the container
+(Docker) or the deployment, service and secret (Kubernetes); the data folder, volume or
+volume claim is kept.
+
+- Passwords never appear on a command line: docker gets them from its environment, and on
+  Kubernetes they are in a Secret (`<name>-credentials`) sent to `kubectl apply` on stdin.
+- cactusdb finds `docker` and `kubectl` (or `k3s kubectl`) on the PATH and in the usual
+  install folders. On Linux the user cactusdb runs as must be allowed to use Docker (the
+  `docker` group) or have a kubeconfig.
+- SQL Server and Oracle run as their own user: a new data folder is given to that user
+  (or made writable), and on Kubernetes an init container sets its owner.
+- The images are the vendors' (Microsoft's SQL Server Developer edition, which is for
+  development and testing; Oracle Free from `gvenzl/oracle-free`). SQL Server, Oracle and
+  Cassandra need about 2 GB of memory.
+- cactusdb itself stays read-only: it creates the server, never writes into its databases.
 
 ### Export formats
 
@@ -1217,6 +1258,13 @@ is sent and how to set it up. In short:
   start it. A file sent from the browser (for a server without internet access) needs the
   superuser password. `startup_options` holds the names of `CACTUSDB_…` variables, never
   their values.
+- **Deploying database containers** (☰ → DB container deployment) runs `docker` or
+  `kubectl` on the cactusdb server, so deploying, removing and reading container logs need
+  the superuser password (wrong ones are slowed down like the others). Without a superuser
+  password nobody can deploy. cactusdb only lists, removes and reads the logs of containers
+  it deployed itself (labelled `com.cactusdb.managed`, or `app.kubernetes.io/managed-by=cactusdb`).
+  Database passwords reach Docker through the environment and Kubernetes through a Secret,
+  never a command line, and are not kept by cactusdb.
 - **The usage log** in `cactus.conn.db` (see *The usage log*) holds the SQL that was run
   (shortened), table and connection names and IP addresses, but never passwords or a whole
   session id. It isn't encrypted, so give `cactus.conn.db` to someone else only if they
@@ -1344,6 +1392,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `eng_cassandra.go`, `eng_redis.go`, `eng_neo4j.go` | Cassandra, Redis, Neo4j |
 | `eng_http.go`, `eng_couchbase.go`, `eng_cosmos.go`, `eng_weaviate.go`, `eng_bigquery.go`, `eng_athena.go` | The databases reached through an HTTPS API (BigQuery's Google sign-in, Athena's AWS Signature Version 4) |
 | `jet.go`, `eng_access.go` | Reading Microsoft Access files, and the SQL subset that queries them |
+| `containers.go` | ☰ → DB container deployment: finding Docker and Kubernetes, the catalogue of database images, deploying with `docker run` or `kubectl apply`, and the list, logs and removal of what it deployed |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `tablestats.go`, `rowsize.go` | Rows and size of every table; the size estimated as rows × the columns' declared sizes when the database doesn't report it |
 | `readonly.go` | The read-only query check |
