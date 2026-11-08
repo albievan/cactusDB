@@ -16,8 +16,8 @@ func TestParseCLIValues(t *testing.T) {
 			t.Errorf("parseEngine(%q) = %q, %v", in, got, err)
 		}
 	}
-	if _, err := parseEngine("oracle"); err == nil {
-		t.Error("oracle accepted")
+	if _, err := parseEngine("db2"); err == nil {
+		t.Error("db2 accepted")
 	}
 	for in, want := range map[string]string{"excel": "xlsx", "XLSX": "xlsx", "csv": "csv", "json": "json", "xml": "xml"} {
 		if got, err := parseExportFormat(in); err != nil || got != want {

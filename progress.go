@@ -107,7 +107,7 @@ func runExports(ctx context.Context, o cliOptions, db *sql.DB, targets []tableRe
 			fmt.Fprintf(out, "  %-30s %9d rows  %s\n", j.table.name, j.rows.Load(), j.path)
 		}
 	}
-	b := startExportBatch(ctx, o.Engine, db, o.ExportDir, o.Format, targets, threads, finished)
+	b := startExportBatch(ctx, dialect(o.Engine), db, o.ExportDir, o.Format, targets, threads, finished)
 	stopDraw := func() {}
 	if o.Progress {
 		stopDraw = drawProgress(out, b.jobs)
@@ -179,6 +179,13 @@ func runExportJob(ctx context.Context, engine string, db *sql.DB, dir, format st
 // countRows counts the rows of a table, through the same read-only path as
 // every other query.
 func countRows(ctx context.Context, engine string, db *sql.DB, table string) (int64, error) {
+	if b := backendOf(db); b != nil {
+		n, err := b.Count(ctx, table)
+		if err == nil && n < 0 {
+			err = fmt.Errorf("no row count")
+		}
+		return n, err
+	}
 	var n int64 = -1
 	err := streamQuery(ctx, engine, db, "SELECT COUNT(*) FROM "+quoteObject(engine, table), func([]string) error { return nil },
 		func(row []any) (bool, error) {

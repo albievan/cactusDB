@@ -132,7 +132,19 @@ func objectQueries(engine string) []objectQuery {
 // by type. Groups the server doesn't support (e.g. packages before
 // Firebird 3) come back empty.
 func listObjects(ctx context.Context, engine string, db *sql.DB) ([]ObjectGroup, error) {
+	if b := backendOf(db); b != nil {
+		return b.Objects(ctx)
+	}
+	if engine == EngineOracle {
+		return oracleObjects(ctx, db)
+	}
 	qs := objectQueries(engine)
+	switch flavorOf(db) {
+	case EngineRedshift:
+		qs = redshiftObjectQueries()
+	case EngineCockroach:
+		qs = cockroachObjectQueries()
+	}
 	if qs == nil {
 		return nil, fmt.Errorf("unsupported engine %q", engine)
 	}
@@ -157,8 +169,25 @@ func listObjects(ctx context.Context, engine string, db *sql.DB) ([]ObjectGroup,
 
 // objectDefinition returns the source / DDL of one object.
 func objectDefinition(ctx context.Context, engine string, db *sql.DB, typ, name string) (string, error) {
+	if b := backendOf(db); b != nil {
+		return b.Definition(ctx, typ, name)
+	}
 	var src string
 	var err error
+	switch {
+	case flavorOf(db) == EngineRedshift:
+		src, err = redshiftDefinition(ctx, db, typ, name)
+	case flavorOf(db) == EngineCockroach:
+		src, err = cockroachDefinition(ctx, db, typ, name)
+	case engine == EngineOracle:
+		src, err = oracleDefinition(ctx, db, typ, name)
+	}
+	if src != "" || err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("%s %s not found", typ, name)
+		}
+		return src, err
+	}
 	switch engine {
 	case EngineSQLite:
 		err = db.QueryRowContext(ctx, `SELECT sql FROM sqlite_master WHERE type = ? AND name = ?`, typ, name).Scan(&src)

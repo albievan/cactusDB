@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -20,12 +22,15 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/microsoft/go-mssqldb"
 	_ "github.com/nakagami/firebirdsql"
+	_ "github.com/sijms/go-ora/v2"
 	_ "modernc.org/sqlite"
 )
 
-// ConnParams describes how to reach a database. For SQLite only Database
-// (the file path) is used. For SQL Server, Host may name an instance
-// (host\INSTANCE).
+// ConnParams describes how to reach a database. For file databases (SQLite,
+// Access) only Database (the file path) is used. For SQL Server, Host may
+// name an instance (host\INSTANCE). Options holds extra settings as
+// key=value pairs (e.g. an Athena workgroup); never secrets, which go in
+// Password, the only field stored encrypted besides Username.
 type ConnParams struct {
 	Engine   string `json:"engine"`
 	Host     string `json:"host"`
@@ -33,6 +38,7 @@ type ConnParams struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Database string `json:"database"`
+	Options  string `json:"options"`
 }
 
 const (
@@ -42,15 +48,189 @@ const (
 	EngineFirebird = "firebird"
 	EngineMSSQL    = "mssql"
 	EnginePostgres = "postgres"
+	EngineOracle   = "oracle"
+
+	// PostgreSQL and SQL Server compatible: their SQL and catalog are those of
+	// the dialect (see engineInfo.Dialect).
+	EngineCockroach = "cockroachdb"
+	EngineRedshift  = "redshift"
+	EngineAzurePG   = "azurepg"
+	EngineHorizonDB = "horizondb"
+	EnginePgvector  = "pgvector"
+	EngineAzureSQL  = "azuresql"
+
+	// Reached through a backend (backend.go).
+	EngineInformix  = "informix"
+	EngineAccess    = "access"
+	EngineBigQuery  = "bigquery"
+	EngineAthena    = "athena"
+	EngineMongoDB   = "mongodb"
+	EngineCosmosDB  = "cosmosdb"
+	EngineCouchbase = "couchbase"
+	EngineCassandra = "cassandra"
+	EngineRedis     = "redis"
+	EngineNeo4j     = "neo4j"
+	EngineWeaviate  = "weaviate"
 )
 
-var engines = []map[string]any{
-	{"id": EngineSQLite, "name": "SQLite", "defaultPort": 0},
-	{"id": EngineMySQL, "name": "MySQL", "defaultPort": 3306},
-	{"id": EngineMariaDB, "name": "MariaDB", "defaultPort": 3306},
-	{"id": EngineFirebird, "name": "Firebird", "defaultPort": 3050},
-	{"id": EngineMSSQL, "name": "SQL Server", "defaultPort": 1433},
-	{"id": EnginePostgres, "name": "PostgreSQL", "defaultPort": 5432},
+// engineInfo describes a database type and its connection form.
+type engineInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Group       string `json:"group"` // the heading in the list of database types
+	DefaultPort int    `json:"defaultPort"`
+	// Dialect is the engine whose SQL and catalog it shares ("": its own).
+	Dialect string `json:"dialect,omitempty"`
+	// Backend: reached through backend.go rather than a database/sql driver.
+	Backend bool `json:"backend,omitempty"`
+	File    bool `json:"file,omitempty"` // a database file instead of a server
+
+	// The connection form: a label "" hides that field.
+	FileLabel   string `json:"fileLabel,omitempty"`
+	FileHint    string `json:"fileHint,omitempty"`
+	HostLabel   string `json:"hostLabel,omitempty"`
+	HostHint    string `json:"hostHint,omitempty"`
+	PortLabel   string `json:"portLabel,omitempty"`
+	UserLabel   string `json:"userLabel,omitempty"`
+	DefaultUser string `json:"defaultUser,omitempty"`
+	PassLabel   string `json:"passLabel,omitempty"`
+	PassHint    string `json:"passHint,omitempty"`
+	DBLabel     string `json:"dbLabel,omitempty"`
+	DBHint      string `json:"dbHint,omitempty"`
+	OptionsHint string `json:"optionsHint,omitempty"` // "" hides Options
+	Help        string `json:"help,omitempty"`        // a line under the form
+
+	Language  string `json:"language"`  // the query language, e.g. SQL, CQL, Cypher
+	QueryHint string `json:"queryHint"` // the query box's placeholder
+	// What it can't do: back up as SQL INSERTs, compare structures.
+	NoBackup  bool `json:"noBackup,omitempty"`
+	NoCompare bool `json:"noCompare,omitempty"`
+}
+
+const (
+	sqlQueryHint = "Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"
+)
+
+var engines = []engineInfo{
+	{ID: EngineSQLite, Name: "SQLite", Group: "Relational", File: true, FileLabel: "SQLite database file", FileHint: "/path/to/database.db"},
+	{ID: EngineMySQL, Name: "MySQL", Group: "Relational", DefaultPort: 3306},
+	{ID: EngineMariaDB, Name: "MariaDB", Group: "Relational", DefaultPort: 3306},
+	{ID: EngineFirebird, Name: "Firebird", Group: "Relational", DefaultPort: 3050, DefaultUser: "SYSDBA",
+		DBLabel: "Database path or alias", DBHint: "/var/lib/firebird/data/employee.fdb"},
+	{ID: EngineMSSQL, Name: "SQL Server", Group: "Relational", DefaultPort: 1433, HostHint: "server or server\\INSTANCE",
+		DBHint: "database name (blank = login default)", OptionsHint: "e.g. encrypt=true&ApplicationIntent=ReadOnly"},
+	{ID: EnginePostgres, Name: "PostgreSQL", Group: "Relational", DefaultPort: 5432, DefaultUser: "postgres",
+		DBHint: "database name (blank = same as username)", OptionsHint: "e.g. sslmode=require"},
+	{ID: EngineOracle, Name: "Oracle", Group: "Relational", DefaultPort: 1521, DBLabel: "Service name", DBHint: "e.g. FREEPDB1 or ORCL",
+		OptionsHint: "e.g. schema=HR (default: the user's own), sid=ORCL, ssl=true", NoBackup: true, NoCompare: true},
+	{ID: EngineInformix, Name: "Informix", Group: "Relational", DefaultPort: 27017, Backend: true, DefaultUser: "informix",
+		HostLabel: "Wire listener host", DBHint: "database name, e.g. stores_demo", OptionsHint: "e.g. authSource=admin&tls=true",
+		Help:     "Through the Informix wire listener (MongoDB API) with SQL passthrough on: security.sql.passthrough=true in its properties file.",
+		NoBackup: true, NoCompare: true},
+	{ID: EngineAccess, Name: "Microsoft Access", Group: "Relational", File: true, Backend: true,
+		FileLabel: "Access database file (.mdb or .accdb)", FileHint: "/path/to/database.accdb",
+		Help:     "Read directly from the file: no Access or ODBC driver needed. Password-protected (encrypted) files can't be opened.",
+		Language: "SQL", QueryHint: "Select a table, or write SELECT * | columns FROM table [WHERE column = value] [ORDER BY column]",
+		NoBackup: true, NoCompare: true},
+	{ID: EngineCockroach, Name: "CockroachDB", Group: "Relational", DefaultPort: 26257, Dialect: EnginePostgres, DefaultUser: "root",
+		DBHint: "database name, e.g. defaultdb", OptionsHint: "e.g. sslmode=verify-full&options=--cluster=my-cluster-123", NoBackup: true},
+
+	{ID: EngineAzureSQL, Name: "Azure SQL Database (Hyperscale)", Group: "Cloud", DefaultPort: 1433, Dialect: EngineMSSQL,
+		HostHint: "myserver.database.windows.net", DBHint: "database name",
+		OptionsHint: "connects with ApplicationIntent=ReadOnly (a read replica when there is one); e.g. ApplicationIntent=ReadWrite"},
+	{ID: EngineAzurePG, Name: "Azure Database for PostgreSQL", Group: "Cloud", DefaultPort: 5432, Dialect: EnginePostgres,
+		HostHint: "myserver.postgres.database.azure.com", DBHint: "database name, e.g. postgres", OptionsHint: "sslmode=require is the default"},
+	{ID: EngineHorizonDB, Name: "Azure HorizonDB", Group: "Cloud", DefaultPort: 5432, Dialect: EnginePostgres,
+		HostHint: "the cluster's endpoint", DBHint: "database name, e.g. postgres", OptionsHint: "sslmode=require is the default"},
+	{ID: EngineRedshift, Name: "Amazon Redshift", Group: "Cloud", DefaultPort: 5439, Dialect: EnginePostgres,
+		HostHint: "cluster.xxxx.region.redshift.amazonaws.com", DBHint: "database name, e.g. dev", OptionsHint: "sslmode=require is the default",
+		NoBackup: true, NoCompare: true},
+	{ID: EngineAthena, Name: "Amazon Athena", Group: "Cloud", Backend: true, HostLabel: "AWS region", HostHint: "e.g. eu-west-1",
+		PortLabel: "-", UserLabel: "Access key ID", PassLabel: "Secret access key", PassHint: "secret key (a session token after a space)",
+		DBLabel: "Database", DBHint: "blank = every database of the catalog",
+		OptionsHint: "workgroup=primary&output=s3://bucket/athena-results/&catalog=AwsDataCatalog",
+		Help:        "Queries run in the workgroup and write their results to its S3 output location (or the one in Options). Athena bills the data each query scans.",
+		Language:    "SQL", QueryHint: "Select a table, or write a SELECT query (Athena SQL) and press Ctrl+Enter", NoBackup: true, NoCompare: true},
+	{ID: EngineBigQuery, Name: "Google BigQuery", Group: "Cloud", Backend: true, HostLabel: "Project ID", HostHint: "my-project",
+		PortLabel: "-", UserLabel: "-", PassLabel: "Service account key (JSON)", PassHint: "paste the key file's JSON, or its path on the server",
+		DBLabel: "Dataset", DBHint: "blank = every dataset of the project", OptionsHint: "e.g. location=EU&maxbytes=10000000000",
+		Help:     "BigQuery bills the data each query scans; set maxbytes in Options to cap a query. Every query is checked with a dry run first: only SELECT runs.",
+		Language: "SQL", QueryHint: "Select a table, or write a SELECT query (GoogleSQL) and press Ctrl+Enter", NoBackup: true, NoCompare: true},
+
+	{ID: EngineMongoDB, Name: "MongoDB", Group: "NoSQL", DefaultPort: 27017, Backend: true,
+		HostHint: "host, or a mongodb+srv:// or mongodb:// URI", DBHint: "database name", OptionsHint: "e.g. authSource=admin&tls=true&replicaSet=rs0",
+		Language: "MongoDB", QueryHint: "Select a collection, or write db.collection.find({ field: \"value\" }).sort({ _id: -1 }) or .aggregate([...]) and press Ctrl+Enter",
+		NoBackup: true, NoCompare: true},
+	{ID: EngineCosmosDB, Name: "Azure Cosmos DB", Group: "NoSQL", Backend: true, HostLabel: "Account endpoint",
+		HostHint: "https://myaccount.documents.azure.com:443/", PortLabel: "-", UserLabel: "-", PassLabel: "Account key",
+		PassHint: "a read-only key is best", DBHint: "blank = every database",
+		Help:     "The NoSQL API. For Cosmos DB's MongoDB, Cassandra or PostgreSQL APIs use those database types.",
+		Language: "SQL", QueryHint: "Select a container, or write -- container: db.container, then SELECT * FROM c WHERE c.field = 'x'",
+		NoBackup: true, NoCompare: true},
+	{ID: EngineCouchbase, Name: "Couchbase", Group: "NoSQL", DefaultPort: 8093, Backend: true, PortLabel: "Query port",
+		HostHint: "host of a query node", DBLabel: "Bucket", DBHint: "blank = every bucket", OptionsHint: "e.g. tls=true (port 18093)",
+		Language: "SQL++", QueryHint: "Select a collection, or write a SELECT (SQL++) query and press Ctrl+Enter", NoBackup: true, NoCompare: true},
+	{ID: EngineCassandra, Name: "Apache Cassandra", Group: "NoSQL", DefaultPort: 9042, Backend: true, DefaultUser: "cassandra",
+		HostHint: "host, or several: host1,host2", DBLabel: "Keyspace", DBHint: "blank = every keyspace",
+		OptionsHint: "e.g. consistency=LOCAL_QUORUM&dc=dc1&tls=true",
+		Language:    "CQL", QueryHint: "Select a table, or write a SELECT (CQL) query and press Ctrl+Enter", NoBackup: true, NoCompare: true},
+	{ID: EngineRedis, Name: "Redis", Group: "NoSQL", DefaultPort: 6379, Backend: true, UserLabel: "Username (ACL, optional)",
+		DBLabel: "Database number", DBHint: "0", OptionsHint: "e.g. tls=true",
+		Language: "Redis", QueryHint: "Select a key group, or write a read command, e.g. SCAN MATCH user:* or HGETALL user:1, and press Ctrl+Enter",
+		NoBackup: true, NoCompare: true},
+	{ID: EngineNeo4j, Name: "Neo4j", Group: "NoSQL", DefaultPort: 7687, Backend: true, DefaultUser: "neo4j",
+		HostHint: "host, or a neo4j+s:// URI", DBHint: "blank = the default database", OptionsHint: "e.g. tls=true",
+		Language: "Cypher", QueryHint: "Select a label, or write a Cypher query, e.g. MATCH (n:Person) RETURN n LIMIT 100, and press Ctrl+Enter",
+		NoBackup: true, NoCompare: true},
+
+	{ID: EnginePgvector, Name: "PostgreSQL + pgvector", Group: "Vector", DefaultPort: 5432, Dialect: EnginePostgres, DefaultUser: "postgres",
+		DBHint: "database name (blank = same as username)", OptionsHint: "e.g. sslmode=require"},
+	{ID: EngineWeaviate, Name: "Weaviate", Group: "Vector", DefaultPort: 8080, Backend: true,
+		HostHint: "host, or https://cluster.weaviate.cloud", UserLabel: "-", PassLabel: "API key (optional)", DBLabel: "-",
+		Language: "GraphQL", QueryHint: "Select a collection, or write a GraphQL Get, e.g. { Get { Article(limit: 10) { title } } }, and press Ctrl+Enter",
+		NoBackup: true, NoCompare: true},
+}
+
+func init() {
+	for i := range engines {
+		e := &engines[i]
+		if !e.File {
+			e.HostLabel = cmp.Or(e.HostLabel, "Host")
+			e.PortLabel = cmp.Or(e.PortLabel, "Port")
+			e.UserLabel = cmp.Or(e.UserLabel, "Username")
+			e.PassLabel = cmp.Or(e.PassLabel, "Password")
+			e.DBLabel = cmp.Or(e.DBLabel, "Database")
+			e.DBHint = cmp.Or(e.DBHint, "database name")
+		}
+		e.Language = cmp.Or(e.Language, "SQL")
+		e.QueryHint = cmp.Or(e.QueryHint, sqlQueryHint)
+	}
+}
+
+func engineByID(id string) *engineInfo {
+	for i := range engines {
+		if engines[i].ID == id {
+			return &engines[i]
+		}
+	}
+	return nil
+}
+
+// dialect is the engine whose SQL and catalog id uses: PostgreSQL for
+// CockroachDB, Redshift…, SQL Server for Azure SQL, else id itself.
+func dialect(id string) string {
+	if e := engineByID(id); e != nil && e.Dialect != "" {
+		return e.Dialect
+	}
+	return id
+}
+
+// engineName is the display name of an engine.
+func engineName(id string) string {
+	if e := engineByID(id); e != nil {
+		return e.Name
+	}
+	return id
 }
 
 // driverModules maps each engine to the Go module that implements it. All of
@@ -60,8 +240,15 @@ var driverModules = []struct{ Engines, Module string }{
 	{"SQLite", "modernc.org/sqlite"},
 	{"MySQL, MariaDB", "github.com/go-sql-driver/mysql"},
 	{"Firebird", "github.com/nakagami/firebirdsql"},
-	{"SQL Server", "github.com/microsoft/go-mssqldb"},
-	{"PostgreSQL", "github.com/jackc/pgx/v5"},
+	{"SQL Server, Azure SQL Database", "github.com/microsoft/go-mssqldb"},
+	{"PostgreSQL, pgvector, CockroachDB, Amazon Redshift, Azure Database for PostgreSQL, Azure HorizonDB", "github.com/jackc/pgx/v5"},
+	{"Oracle", "github.com/sijms/go-ora/v2"},
+	{"MongoDB, Informix (wire listener)", "go.mongodb.org/mongo-driver/v2"},
+	{"Apache Cassandra", "github.com/apache/cassandra-gocql-driver/v2"},
+	{"Redis", "github.com/redis/go-redis/v9"},
+	{"Neo4j", "github.com/neo4j/neo4j-go-driver/v5"},
+	{"Microsoft Access", "built into cactusdb (reads .mdb/.accdb files)"},
+	{"Google BigQuery, Amazon Athena, Azure Cosmos DB, Couchbase, Weaviate", "built into cactusdb (their HTTPS APIs)"},
 }
 
 func driverInfo() []map[string]string {
@@ -77,6 +264,9 @@ func driverInfo() []map[string]string {
 		if v == "" {
 			v = "built in"
 		}
+		if strings.HasPrefix(d.Module, "built into") {
+			v = "-"
+		}
 		out = append(out, map[string]string{"engines": d.Engines, "module": d.Module, "version": v, "status": "bundled"})
 	}
 	return out
@@ -85,6 +275,7 @@ func driverInfo() []map[string]string {
 // openDB opens and pings a database for the given parameters.
 func openDB(ctx context.Context, p ConnParams) (*sql.DB, error) {
 	var driver, dsn string
+	opts := parseOptions(p.Options)
 	switch p.Engine {
 	case EngineSQLite:
 		if p.Database == "" {
@@ -140,13 +331,23 @@ func openDB(ctx context.Context, p ConnParams) (*sql.DB, error) {
 		}
 		driver = "firebirdsql"
 		dsn = u.String()
-	case EngineMSSQL:
+	case EngineMSSQL, EngineAzureSQL:
 		driver = "sqlserver"
-		dsn = mssqlDSN(p)
-	case EnginePostgres:
+		dsn = mssqlDSN(p, opts)
+	case EnginePostgres, EngineCockroach, EngineRedshift, EngineAzurePG, EngineHorizonDB, EnginePgvector:
 		driver = "pgx"
-		dsn = postgresDSN(p)
+		dsn = postgresDSN(p, opts)
+	case EngineOracle:
+		driver = "oracle"
+		dsn = oracleDSN(p, opts)
 	default:
+		if open := backendOpeners[p.Engine]; open != nil {
+			b, err := open(ctx, p, opts)
+			if err != nil {
+				return nil, err
+			}
+			return openBackend(ctx, b)
+		}
 		return nil, fmt.Errorf("unsupported engine %q", p.Engine)
 	}
 
@@ -154,7 +355,29 @@ func openDB(ctx context.Context, p ConnParams) (*sql.DB, error) {
 	if p.Engine == EngineSQLite {
 		maxConns = 1
 	}
-	return openAndPing(ctx, driver, dsn, maxConns)
+	db, err := openAndPing(ctx, driver, dsn, maxConns)
+	if err == nil && p.Engine != dialect(p.Engine) {
+		dbFlavors.Store(db, p.Engine)
+	}
+	if err == nil && p.Engine == EngineOracle && opts["schema"] != "" {
+		oracleSchemas.Store(db, strings.ToUpper(opts["schema"]))
+	}
+	return db, err
+}
+
+// backendOpeners connects to the engines reached through a backend.
+var backendOpeners = map[string]func(ctx context.Context, p ConnParams, opts map[string]string) (backend, error){}
+
+// dbFlavors remembers the engine of a database opened with the driver of its
+// dialect (e.g. Redshift with PostgreSQL's), for the few differences.
+var dbFlavors sync.Map
+
+// flavorOf returns the engine db was opened for ("" when it is its dialect).
+func flavorOf(db *sql.DB) string {
+	if v, ok := dbFlavors.Load(db); ok {
+		return v.(string)
+	}
+	return ""
 }
 
 func openAndPing(ctx context.Context, driver, dsn string, maxConns int) (*sql.DB, error) {
@@ -191,7 +414,7 @@ func sqliteURI(path string) string {
 
 // mssqlDSN builds a sqlserver:// URL. "host\INSTANCE" connects to a named
 // instance (resolved by SQL Browser unless a port is given).
-func mssqlDSN(p ConnParams) string {
+func mssqlDSN(p ConnParams, opts map[string]string) string {
 	host, instance, _ := strings.Cut(p.Host, `\`)
 	if host == "" {
 		host = "localhost"
@@ -202,9 +425,20 @@ func mssqlDSN(p ConnParams) string {
 	}
 	q.Set("app name", "cactusdb")
 	q.Set("dial timeout", "10")
-	// Most servers use self-signed certificates; accept them like SSMS's
-	// "Trust server certificate" option.
-	q.Set("TrustServerCertificate", "true")
+	if p.Engine == EngineAzureSQL {
+		// Azure always encrypts, with a trusted certificate. ReadOnly
+		// connects to a read replica of Hyperscale or Business Critical
+		// when there is one (the primary otherwise).
+		q.Set("encrypt", "true")
+		q.Set("applicationintent", "ReadOnly")
+	} else {
+		// Most servers use self-signed certificates; accept them like SSMS's
+		// "Trust server certificate" option.
+		q.Set("trustservercertificate", "true")
+	}
+	for k, v := range opts {
+		q.Set(k, v)
+	}
 	u := url.URL{Scheme: "sqlserver", User: url.UserPassword(p.Username, p.Password), RawQuery: q.Encode()}
 	switch {
 	case instance != "" && p.Port == 0:
@@ -219,15 +453,28 @@ func mssqlDSN(p ConnParams) string {
 
 // postgresDSN builds a postgres:// URL. Every session starts read-only
 // (default_transaction_read_only), which in PostgreSQL also blocks DDL.
-func postgresDSN(p ConnParams) string {
+func postgresDSN(p ConnParams, opts map[string]string) string {
 	q := url.Values{}
-	q.Set("application_name", "cactusdb")
 	q.Set("connect_timeout", "10")
-	q.Set("default_transaction_read_only", "on")
+	switch p.Engine {
+	case EngineRedshift:
+		// Redshift refuses unknown startup parameters: its queries run in a
+		// READ ONLY transaction (streamRows) instead.
+		q.Set("sslmode", "require")
+	case EngineAzurePG, EngineHorizonDB:
+		q.Set("sslmode", "require")
+		fallthrough
+	default:
+		q.Set("application_name", "cactusdb")
+		q.Set("default_transaction_read_only", "on")
+	}
+	for k, v := range opts {
+		q.Set(k, v)
+	}
 	u := url.URL{
 		Scheme:   "postgres",
 		User:     url.UserPassword(p.Username, p.Password),
-		Host:     hostPort(p.Host, p.Port, 5432),
+		Host:     hostPort(p.Host, p.Port, cmp.Or(engineByID(p.Engine).DefaultPort, 5432)),
 		Path:     "/" + p.Database,
 		RawQuery: q.Encode(),
 	}
@@ -277,6 +524,14 @@ func listColumns(ctx context.Context, engine string, db *sql.DB, table string) (
 			return nil, err
 		}
 		return scanStrings(rows)
+	case EngineOracle:
+		owner, tab := oracleSplit(table)
+		rows, err := db.QueryContext(ctx, `SELECT column_name FROM all_tab_columns
+			WHERE owner = NVL(:1, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND table_name = :2 ORDER BY column_id`, owner, tab)
+		if err != nil {
+			return nil, err
+		}
+		return scanStrings(rows)
 	case EngineMSSQL:
 		rows, err := db.QueryContext(ctx, `SELECT c.name FROM sys.columns c
 			JOIN sys.objects o ON o.object_id = c.object_id
@@ -292,6 +547,9 @@ func listColumns(ctx context.Context, engine string, db *sql.DB, table string) (
 
 // buildSelect builds "SELECT <every column> FROM <table>" with engine quoting.
 func buildSelect(ctx context.Context, engine string, db *sql.DB, table string) (string, error) {
+	if b := backendOf(db); b != nil {
+		return b.SelectFor(ctx, table)
+	}
 	cols, err := listColumns(ctx, engine, db, table)
 	if err != nil {
 		return "", err
@@ -309,7 +567,7 @@ func buildSelect(ctx context.Context, engine string, db *sql.DB, table string) (
 // quoteObject quotes a table or view name. SQL Server and PostgreSQL objects
 // are listed as "schema.name" and quoted as [schema].[name] / "schema"."name".
 func quoteObject(engine, name string) string {
-	if engine == EngineMSSQL || engine == EnginePostgres {
+	if engine == EngineMSSQL || engine == EnginePostgres || engine == EngineOracle {
 		if schema, obj, ok := strings.Cut(name, "."); ok {
 			return quoteIdent(engine, schema) + "." + quoteIdent(engine, obj)
 		}
@@ -377,10 +635,24 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 	}
 	var rows *sql.Rows
 	var err error
-	if engine == EngineSQLite {
-		// The SQLite connection itself is opened read-only (mode=ro, query_only).
+	switch {
+	case engine == EngineSQLite || backendOf(db) != nil:
+		// The SQLite connection itself is opened read-only (mode=ro,
+		// query_only); a backend only reads.
 		rows, err = db.QueryContext(ctx, q)
-	} else {
+	case engine == EngineOracle:
+		// go-ora refuses TxOptions.ReadOnly: the transaction is made read-only
+		// with its first statement, and rolled back like the others.
+		var tx *sql.Tx
+		if tx, err = db.BeginTx(ctx, nil); err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err = tx.ExecContext(ctx, "SET TRANSACTION READ ONLY"); err != nil {
+			return err
+		}
+		rows, err = tx.QueryContext(ctx, q)
+	default:
 		// SQL Server has no READ ONLY transactions, but its DML and DDL are
 		// transactional, so the unconditional rollback below undoes them.
 		opts := &sql.TxOptions{ReadOnly: engine != EngineMSSQL}

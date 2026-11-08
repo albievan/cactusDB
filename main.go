@@ -5,6 +5,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -34,13 +35,14 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.31.0"
+var version = "1.32.0"
 
 //go:embed web
 var webFS embed.FS
 
 type session struct {
-	engine string
+	engine string // the dialect: its SQL and catalog (see dialect)
+	flavor string // the database type it was opened as, e.g. cockroachdb
 	label  string
 	dbName string // short database name, for DDL file names
 	folder string // its folder in the export folder: the connection name
@@ -51,6 +53,9 @@ type session struct {
 
 	lastUsed time.Time // the last request, for closing forgotten sessions; guarded by server.mu
 }
+
+// kind is the database type the session was opened as (e.g. cockroachdb).
+func (ss *session) kind() string { return cmp.Or(ss.flavor, ss.engine) }
 
 // exportDir is where this connection's exports go: <export folder>/<connection>.
 func (ss *session) exportDir(base string) string {
@@ -100,10 +105,11 @@ func main() {
 	connDB := flag.String("conn-db", "", "SQLite file used to store saved connections (default: cactus.conn.db next to the binary)")
 	keyFile := flag.String("key-file", "", "key used to encrypt saved usernames/passwords (default: cactus.key next to the connection file; ignored when $"+passphraseEnv+" is set)")
 	exportTo := flag.String("exportto", "", "folder exports are written to (default: ./export next to the binary)")
-	dbType := flag.String("dbtype", "", "command-line export: sqlite, mysql, mariadb, firebird, mssql or postgres")
+	dbType := flag.String("dbtype", "", "command-line export: the database type: "+engineIDs())
 	dbUser := flag.String("user", "", "command-line export: database user name")
 	dbPassword := flag.String("dbpassword", "", "command-line export: database password (prompted for when omitted, or set $"+dbPasswordEnv+")")
-	dbName := flag.String("dbname", "", "command-line export: database name (SQLite/Firebird: the database file)")
+	dbName := flag.String("dbname", "", "command-line export: database name (SQLite/Access/Firebird: the database file; Oracle: the service name; BigQuery: the dataset…)")
+	dbOptions := flag.String("dboptions", "", "command-line export: extra connection settings as key=value&key=value, e.g. workgroup=primary for Athena")
 	dbPort := flag.Int("dbport", 0, "command-line export: database server port (default: the engine's standard port)")
 	dbTable := flag.String("dbtable", "", "command-line export: table to export, several separated by commas, or all")
 	showTable := flag.String("showtable", "", "command-line: all lists the tables and views; a table name prints its definition")
@@ -117,7 +123,7 @@ func main() {
 	logFile := flag.String("logfile", "", "web UI: file every action is logged to (default with --runas background: cactusdb.log next to the binary)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "cactusdb %s - browse and export SQLite, MySQL, MariaDB, Firebird, SQL Server and PostgreSQL databases\n\n", version)
+		fmt.Fprintf(os.Stderr, "cactusdb %s - browse and export relational, cloud, NoSQL and vector databases, read-only\n\n", version)
 		fmt.Fprintf(os.Stderr, "Usage:\n"+
 			"  cactusdb --port 8080 [--web yes]                    start the web UI\n"+
 			"  cactusdb --port 8080 --runas background             start the web UI in the background\n"+
@@ -234,13 +240,14 @@ func main() {
 		if err != nil {
 			fatalUsage(err.Error())
 		}
-		if *dbName == "" {
+		einfo := engineByID(engine)
+		if *dbName == "" && !einfo.Backend && einfo.Dialect == "" || *dbName == "" && einfo.File {
 			fatalUsage("--dbname is required")
 		}
-		if engine != EngineSQLite && *dbUser == "" {
+		if !einfo.File && !einfo.Backend && *dbUser == "" {
 			fatalUsage("--user is required")
 		}
-		if engine == EngineSQLite {
+		if einfo.File {
 			if abs, err := filepath.Abs(*dbName); err == nil {
 				*dbName = abs // saved connections must work from any folder
 			}
@@ -267,7 +274,7 @@ func main() {
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		opts := cliOptions{
-			ConnParams:  ConnParams{Engine: engine, Host: *host, Port: *dbPort, Username: *dbUser, Password: *dbPassword, Database: *dbName},
+			ConnParams:  ConnParams{Engine: engine, Host: *host, Port: *dbPort, Username: *dbUser, Password: *dbPassword, Database: *dbName, Options: *dbOptions},
 			PasswordSet: set["dbpassword"],
 			Tables:      *dbTable,
 			Show:        *showTable,
@@ -304,7 +311,7 @@ func main() {
 		return
 	}
 
-	for _, f := range []string{"user", "dbpassword", "dbname", "dbport", "exportas", "threads", "saveconn"} {
+	for _, f := range []string{"user", "dbpassword", "dbname", "dbport", "dboptions", "exportas", "threads", "saveconn"} {
 		if set[f] {
 			fatalUsage("--" + f + " is for command-line export and needs --dbtype")
 		}
@@ -751,7 +758,7 @@ func noteSession(r *http.Request, id string) {
 func noteConn(r *http.Request, ss *session) {
 	if l, ok := r.Context().Value(reqLogKey{}).(*reqLog); ok && ss != nil {
 		l.mu.Lock()
-		l.connection, l.engine = ss.label, ss.engine
+		l.connection, l.engine = ss.label, ss.kind()
 		l.mu.Unlock()
 	}
 }
@@ -1036,7 +1043,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, fmt.Errorf("connection failed: %w", explainConnErr(p, err)))
 		return
 	}
-	objects, err := listObjects(r.Context(), p.Engine, db)
+	objects, err := listObjects(r.Context(), dialect(p.Engine), db)
 	if err != nil {
 		db.Close()
 		writeErr(w, 400, fmt.Errorf("connected, but listing tables failed: %w", err))
@@ -1065,7 +1072,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	id := newID()
 	s.mu.Lock()
-	s.sessions[id] = &session{engine: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db,
+	s.sessions[id] = &session{engine: dialect(p.Engine), flavor: p.Engine, label: label, dbName: ddlFileName(p), folder: folder, db: db,
 		savedID: savedID, connBox: connBox, lastUsed: time.Now()}
 	noteConn(r, s.sessions[id])
 	s.mu.Unlock()
@@ -1103,27 +1110,36 @@ func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer db.Close()
-	groups, err := listObjects(r.Context(), p.Engine, db)
+	groups, err := listObjects(r.Context(), dialect(p.Engine), db)
 	if err != nil {
 		logAction(r, "test connection FAILED %s: %v", defaultConnName(p), err)
 		writeErr(w, 400, fmt.Errorf("connected, but listing tables failed: %w", err))
 		return
 	}
-	tables := 0
+	tables, tablesLabel := 0, "tables"
 	for _, g := range groups {
 		if g.Type == ObjTable {
-			tables = len(g.Items)
+			tables, tablesLabel = len(g.Items), g.Label
 		}
 	}
 	ver := serverVersion(r.Context(), p.Engine, db)
+	if p.Engine == EnginePgvector {
+		ver += pgvectorNote(r.Context(), db)
+	}
 	logAction(r, "test connection OK %s (%s, %d tables)", defaultConnName(p), ver, tables)
-	writeJSON(w, 200, map[string]any{"version": ver, "tables": tables, "elapsedMs": time.Since(start).Milliseconds()})
+	writeJSON(w, 200, map[string]any{"version": ver, "tables": tables, "tablesLabel": tablesLabel, "elapsedMs": time.Since(start).Milliseconds()})
 }
 
 // serverVersion describes the database server, e.g. "MariaDB 11.8.3", or
 // returns "" if it can't be read.
 func serverVersion(ctx context.Context, engine string, db *sql.DB) string {
+	if b := backendOf(db); b != nil {
+		return b.Version(ctx)
+	}
+	flavor := engine
+	engine = dialect(engine)
 	q := map[string]string{
+		EngineOracle:   `SELECT banner FROM v$version WHERE ROWNUM = 1`,
 		EngineSQLite:   `SELECT 'SQLite ' || sqlite_version()`,
 		EngineMySQL:    `SELECT VERSION()`,
 		EngineMariaDB:  `SELECT VERSION()`,
@@ -1140,6 +1156,14 @@ func serverVersion(ctx context.Context, engine string, db *sql.DB) string {
 	switch engine {
 	case EnginePostgres:
 		ver = strings.SplitN(ver, ",", 2)[0]
+		switch flavor {
+		case EngineCockroach: // "CockroachDB CCL v24.3.1 (aarch64-…)"
+			ver, _, _ = strings.Cut(v.String, " (")
+		case EngineRedshift: // "PostgreSQL 8.0.2 on i686-pc-linux-gnu, …, Redshift 1.0.77467"
+			if i := strings.Index(v.String, "Redshift "); i >= 0 {
+				ver = strings.TrimSpace(v.String[i:])
+			}
+		}
 	case EngineMySQL, EngineMariaDB:
 		// "11.8.9-MariaDB-ubu2404" or "9.1.0"; both drivers report either.
 		if num, _, _ := strings.Cut(ver, "-"); strings.Contains(ver, "MariaDB") {
@@ -1152,10 +1176,20 @@ func serverVersion(ctx context.Context, engine string, db *sql.DB) string {
 }
 
 func defaultConnName(p ConnParams) string {
-	if p.Engine == EngineSQLite {
-		return "sqlite: " + p.Database
+	if e := engineByID(p.Engine); e != nil && e.File {
+		return p.Engine + ": " + p.Database
 	}
-	return fmt.Sprintf("%s: %s@%s/%s", p.Engine, p.Username, hostPort(p.Host, p.Port, 0), p.Database)
+	where := hostPort(p.Host, p.Port, 0)
+	if p.Port == 0 {
+		where = p.Host // a region, project or URL
+	}
+	if p.Username != "" {
+		where = p.Username + "@" + where
+	}
+	if p.Database != "" {
+		where += "/" + p.Database
+	}
+	return p.Engine + ": " + where
 }
 
 func (s *server) handleDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -1509,6 +1543,7 @@ type savedConnInfo struct {
 	Port        int    `json:"port"`
 	Username    string `json:"username"`
 	Database    string `json:"database"`
+	Options     string `json:"options"`
 	HasPassword bool   `json:"hasPassword"`
 	Locked      bool   `json:"locked"` // has its own connection password; username shown only after unlocking
 	Created     string `json:"created"`
@@ -1523,7 +1558,7 @@ func (s *server) handleListConns(w http.ResponseWriter, r *http.Request) {
 	out := make([]savedConnInfo, len(list))
 	for i, c := range list {
 		out[i] = savedConnInfo{ID: c.ID, Name: c.Name, Engine: c.Engine, Host: c.Host, Port: c.Port,
-			Username: c.Username, Database: c.Database, HasPassword: c.Password != "", Locked: c.Lock != "", Created: c.Created}
+			Username: c.Username, Database: c.Database, Options: c.Options, HasPassword: c.Password != "", Locked: c.Lock != "", Created: c.Created}
 	}
 	writeJSON(w, 200, out)
 }
@@ -1549,7 +1584,7 @@ func (s *server) handleUnlockConn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, savedConnInfo{ID: c.ID, Name: c.Name, Engine: c.Engine, Host: c.Host, Port: c.Port,
-		Username: c.Username, Database: c.Database, HasPassword: c.Password != "", Locked: c.Lock != "", Created: c.Created})
+		Username: c.Username, Database: c.Database, Options: c.Options, HasPassword: c.Password != "", Locked: c.Lock != "", Created: c.Created})
 }
 
 // handleSaveConn saves a connection with its own connection password: a new

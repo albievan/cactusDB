@@ -371,7 +371,7 @@ func connFolderName(name string) string {
 // database file's name for SQLite and Firebird files, else host-database.
 func unnamedConnFolder(p ConnParams) string {
 	name := ddlFileName(p)
-	if p.Engine != EngineSQLite && p.Host != "" {
+	if e := engineByID(p.Engine); (e == nil || !e.File) && p.Host != "" {
 		name = p.Host + "-" + name
 	}
 	return connFolderName(name)

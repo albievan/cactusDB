@@ -45,13 +45,29 @@ var engineAliases = map[string]string{
 	"firebird": EngineFirebird, "fb": EngineFirebird,
 	"mssql": EngineMSSQL, "sqlserver": EngineMSSQL,
 	"postgres": EnginePostgres, "postgresql": EnginePostgres, "pg": EnginePostgres,
+	"oracle": EngineOracle, "informix": EngineInformix, "access": EngineAccess, "msaccess": EngineAccess,
+	"cockroachdb": EngineCockroach, "cockroach": EngineCockroach, "crdb": EngineCockroach,
+	"azuresql": EngineAzureSQL, "hyperscale": EngineAzureSQL, "azurepg": EngineAzurePG, "azurepostgres": EngineAzurePG,
+	"horizondb": EngineHorizonDB, "redshift": EngineRedshift, "athena": EngineAthena, "bigquery": EngineBigQuery, "bq": EngineBigQuery,
+	"mongodb": EngineMongoDB, "mongo": EngineMongoDB, "cosmosdb": EngineCosmosDB, "cosmos": EngineCosmosDB,
+	"couchbase": EngineCouchbase, "cassandra": EngineCassandra, "redis": EngineRedis, "neo4j": EngineNeo4j,
+	"pgvector": EnginePgvector, "weaviate": EngineWeaviate,
+}
+
+// engineIDs lists the engine ids, for messages.
+func engineIDs() string {
+	ids := make([]string, len(engines))
+	for i, e := range engines {
+		ids[i] = e.ID
+	}
+	return strings.Join(ids, ", ")
 }
 
 func parseEngine(s string) (string, error) {
 	if e, ok := engineAliases[strings.ToLower(strings.TrimSpace(s))]; ok {
 		return e, nil
 	}
-	return "", fmt.Errorf("unknown --dbtype %q (use sqlite, mysql, mariadb, firebird, mssql or postgres)", s)
+	return "", fmt.Errorf("unknown --dbtype %q (use %s)", s, engineIDs())
 }
 
 // parseExportFormat maps --exportas to an export format; excel means xlsx.
@@ -82,7 +98,10 @@ func parseYesNo(s string) (on, given bool, err error) {
 // runCLI connects, then shows and/or exports the requested tables. Progress
 // goes to out; the password prompt goes to the terminal.
 func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
-	if o.Engine != EngineSQLite && !o.PasswordSet {
+	if e := engineByID(o.Engine); e != nil && e.NoBackup && o.Backup {
+		return fmt.Errorf("--backup isn't available for %s: export the tables with --dbtable all instead", e.Name)
+	}
+	if !engineByID(o.Engine).File && !o.PasswordSet {
 		if pw, ok := os.LookupEnv(dbPasswordEnv); ok {
 			o.Password = pw
 		} else {
@@ -109,7 +128,7 @@ func runCLI(ctx context.Context, o cliOptions, out io.Writer) error {
 			fmt.Fprintf(out, "Connection saved as %q\n", name)
 		}
 	}
-	groups, err := listObjects(ctx, o.Engine, db)
+	groups, err := listObjects(ctx, dialect(o.Engine), db)
 	if err != nil {
 		return fmt.Errorf("connected, but listing tables failed: %w", err)
 	}
@@ -205,7 +224,7 @@ func exportDDL(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGro
 			fmt.Fprintf(out, "\r\x1b[2KWriting DDL: %d/%d objects", done, len(targets))
 		}
 	}
-	path, n, err := exportDDLToDir(ctx, o.ExportDir, o.Engine, db, defaultConnName(o.ConnParams), ddlFileName(o.ConnParams), targets, progress)
+	path, n, err := exportDDLToDir(ctx, o.ExportDir, dialect(o.Engine), db, defaultConnName(o.ConnParams), ddlFileName(o.ConnParams), targets, progress)
 	if o.Progress {
 		fmt.Fprint(out, "\r\x1b[2K")
 	}
@@ -223,7 +242,7 @@ func exportDDL(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGro
 // extension for SQLite and Firebird paths.
 func ddlFileName(p ConnParams) string {
 	name := p.Database
-	if p.Engine == EngineSQLite || p.Engine == EngineFirebird {
+	if p.Engine == EngineSQLite || p.Engine == EngineFirebird || p.Engine == EngineAccess {
 		name = strings.TrimSuffix(filepath.Base(strings.ReplaceAll(name, "\\", "/")), filepath.Ext(name))
 	}
 	if name == "" {
@@ -293,7 +312,7 @@ func showTables(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGr
 	if err != nil {
 		return err
 	}
-	src, err := objectDefinition(ctx, o.Engine, db, t.typ, t.name)
+	src, err := objectDefinition(ctx, dialect(o.Engine), db, t.typ, t.name)
 	if err != nil {
 		return err
 	}
@@ -304,7 +323,7 @@ func showTables(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGr
 // cliConnName is the name a command-line connection is saved under:
 // cli-<host>, or cli-<file name> for SQLite.
 func cliConnName(p ConnParams) string {
-	if p.Engine == EngineSQLite {
+	if e := engineByID(p.Engine); e != nil && e.File {
 		return "cli-" + filepath.Base(p.Database)
 	}
 	host := p.Host
@@ -315,10 +334,8 @@ func cliConnName(p ConnParams) string {
 }
 
 func defaultPort(engine string) int {
-	for _, e := range engines {
-		if e["id"] == engine {
-			return e["defaultPort"].(int)
-		}
+	if e := engineByID(engine); e != nil {
+		return e.DefaultPort
 	}
 	return 0
 }

@@ -256,7 +256,7 @@ func (s *server) handleUsage(w http.ResponseWriter, r *http.Request) {
 			conn, engine := e.Connection, e.Engine
 			s.mu.Lock()
 			if ss, ok := s.sessions[e.Session]; ok {
-				conn, engine = ss.label, ss.engine
+				conn, engine = ss.label, ss.kind()
 			}
 			s.mu.Unlock()
 			ago := time.Duration(min(max(e.Ago, 0), 600000)) * time.Millisecond

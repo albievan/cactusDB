@@ -19,5 +19,11 @@ licenses:
   github.com/nakagami/firebirdsql  MIT
   github.com/microsoft/go-mssqldb  BSD-3-Clause
   github.com/jackc/pgx/v5          MIT
+  github.com/sijms/go-ora/v2       MIT
+  go.mongodb.org/mongo-driver/v2   Apache-2.0
+  github.com/apache/cassandra-gocql-driver/v2  Apache-2.0
+  github.com/redis/go-redis/v9     BSD-2-Clause
+  github.com/neo4j/neo4j-go-driver/v5  Apache-2.0
+  golang.org/x/text                BSD-3-Clause
   github.com/xuri/excelize/v2      BSD-3-Clause
   golang.org/x/term                BSD-3-Clause

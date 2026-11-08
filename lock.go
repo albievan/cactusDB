@@ -106,6 +106,15 @@ func (s *Store) migrateLocks() error {
 			return err
 		}
 	}
+	// options: extra connection settings (ConnParams.Options), since 1.32.0.
+	if err := s.DB().QueryRow(`SELECT COUNT(*) FROM pragma_table_info('connections') WHERE name = 'options'`).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		if _, err := s.DB().Exec(`ALTER TABLE connections ADD COLUMN options TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
 	_, err := s.DB().Exec(`CREATE TABLE IF NOT EXISTS queries (
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
 		conn_id    INTEGER NOT NULL,
@@ -219,8 +228,8 @@ func (s *Store) SaveLocked(c SavedConn, password string, oldBox *secretBox) (int
 	pw := s.box.seal("password", box.seal("password", c.Password))
 	now := time.Now().Format(time.RFC3339)
 	if c.ID == 0 {
-		res, err := tx.Exec(`INSERT INTO connections (name, engine, host, port, username, password, database, created_at, lock)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, c.Name, c.Engine, c.Host, c.Port, user, pw, c.Database, now, lock.String())
+		res, err := tx.Exec(`INSERT INTO connections (name, engine, host, port, username, password, database, created_at, lock, options)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, c.Name, c.Engine, c.Host, c.Port, user, pw, c.Database, now, lock.String(), c.Options)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -229,7 +238,7 @@ func (s *Store) SaveLocked(c SavedConn, password string, oldBox *secretBox) (int
 		}
 	} else {
 		if _, err := tx.Exec(`UPDATE connections SET name = ?, engine = ?, host = ?, port = ?, username = ?, password = ?,
-			database = ?, lock = ? WHERE id = ?`, c.Name, c.Engine, c.Host, c.Port, user, pw, c.Database, lock.String(), c.ID); err != nil {
+			database = ?, lock = ?, options = ? WHERE id = ?`, c.Name, c.Engine, c.Host, c.Port, user, pw, c.Database, lock.String(), c.Options, c.ID); err != nil {
 			return 0, nil, err
 		}
 		if box != oldBox { // a new key: seal the saved queries again

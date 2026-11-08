@@ -295,7 +295,7 @@ func (s *server) handleSuperuserReveal(w http.ResponseWriter, r *http.Request) {
 	for _, l := range list {
 		c, _, err := s.store.UnlockAsSuperuser(l.ID, req.SuperPassword)
 		i := info{savedConnInfo: savedConnInfo{ID: l.ID, Name: l.Name, Engine: l.Engine, Host: l.Host, Port: l.Port,
-			Database: l.Database, Locked: l.Lock != "", Created: l.Created}}
+			Database: l.Database, Options: l.Options, Locked: l.Lock != "", Created: l.Created}}
 		if err == nil {
 			i.Username, i.HasPassword = c.Username, c.Password != ""
 		} else {

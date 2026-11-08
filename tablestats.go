@@ -35,8 +35,19 @@ type tableStat struct {
 }
 
 // tableSizeQuery returns name, estimated rows and bytes per table.
-func tableSizeQuery(engine string) string {
+func tableSizeQuery(engine string, db *sql.DB) string {
+	switch flavorOf(db) {
+	case EngineRedshift:
+		return `SELECT "schema" || '.' || "table", COALESCE(tbl_rows, -1)::bigint, COALESCE(size, 0)::bigint * 1048576 FROM svv_table_info`
+	case EngineCockroach:
+		return "" // counted
+	}
+	if backendOf(db) != nil {
+		return ""
+	}
 	switch engine {
+	case EngineOracle:
+		return oracleSizeQuery
 	case EngineMySQL, EngineMariaDB:
 		return `SELECT table_name, COALESCE(table_rows, -1), COALESCE(data_length, 0) + COALESCE(index_length, 0)
 			FROM information_schema.tables WHERE table_schema = DATABASE()`
@@ -65,7 +76,7 @@ func tableStats(ctx context.Context, engine string, db *sql.DB, tables []string,
 		out[i] = tableStat{Name: t, Rows: -1, Bytes: -1}
 		idx[t] = i
 	}
-	if q := tableSizeQuery(engine); q != "" {
+	if q := tableSizeQuery(engine, db); q != "" {
 		if rows, err := db.QueryContext(ctx, q); err == nil {
 			for rows.Next() {
 				var name string

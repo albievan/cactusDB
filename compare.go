@@ -109,10 +109,18 @@ func (s *server) openCompareSource(w http.ResponseWriter, r *http.Request, src c
 			writeErr(w, 401, err)
 			return nil, false
 		}
+		if e := engineByID(ss.kind()); e != nil && e.NoCompare {
+			writeErr(w, 400, fmt.Errorf("%s: %s databases can't be compared", ss.label, e.Name))
+			return nil, false
+		}
 		return &compareDB{label: ss.label, engine: ss.engine, db: ss.db}, true
 	}
 	c, _, ok := s.unlockConnAs(w, r, src.SavedID, src.LockPassword, src.SuperPassword)
 	if !ok {
+		return nil, false
+	}
+	if e := engineByID(c.Engine); e != nil && e.NoCompare {
+		writeErr(w, 400, fmt.Errorf("%s: %s databases can't be compared", c.Name, e.Name))
 		return nil, false
 	}
 	db, err := openDB(r.Context(), c.ConnParams)
@@ -120,7 +128,7 @@ func (s *server) openCompareSource(w http.ResponseWriter, r *http.Request, src c
 		writeErr(w, 400, fmt.Errorf("%s: connection failed: %w", c.Name, explainConnErr(c.ConnParams, err)))
 		return nil, false
 	}
-	return &compareDB{label: c.Name, engine: c.Engine, db: db, close: true}, true
+	return &compareDB{label: c.Name, engine: dialect(c.Engine), db: db, close: true}, true
 }
 
 func (s *server) handleCompare(w http.ResponseWriter, r *http.Request) {

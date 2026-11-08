@@ -44,6 +44,15 @@ var errReadOnly = errors.New("cactusdb is read-only: only SELECT queries are all
 
 // checkReadOnly returns an error unless q is a single read-only statement.
 func checkReadOnly(engine, q string) error {
+	if isBackend(engine) {
+		return nil // each backend checks its own queries (backend.CheckReadOnly)
+	}
+	return checkSQL(engine, q)
+}
+
+// checkSQL is checkReadOnly for SQL, also of the backends that take SQL
+// (BigQuery, Athena, Informix…): engine only picks the quoting rules.
+func checkSQL(engine, q string) error {
 	code := stripLiterals(engine, q)
 	code = strings.TrimSpace(code)
 	// Allow one trailing semicolon, but not multiple statements.

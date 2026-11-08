@@ -17,7 +17,7 @@ func TestMSSQLDSN(t *testing.T) {
 		{ConnParams{}, "localhost:1433", ""},
 	}
 	for _, c := range cases {
-		u, err := url.Parse(mssqlDSN(c.p))
+		u, err := url.Parse(mssqlDSN(c.p, nil))
 		if err != nil {
 			t.Fatalf("%+v: %v", c.p, err)
 		}

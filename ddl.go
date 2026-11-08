@@ -116,7 +116,7 @@ func writeScript(ctx context.Context, w io.Writer, engine string, db *sql.DB, ti
 		var src string
 		var err error
 		if t.typ == ObjTable {
-			later := deferredFKs(engine)
+			later := deferredFKs(engine) && !ownDDL(db)
 			src, err = tableDefinition(ctx, engine, db, t.name, !later)
 			if err == nil && later {
 				var more []string
@@ -136,7 +136,11 @@ func writeScript(ctx context.Context, w io.Writer, engine string, db *sql.DB, ti
 			progress(i + 1)
 			continue
 		}
-		bw.WriteString(terminate(engine, t.typ, src))
+		if backendOf(db) != nil { // not SQL: as it is
+			bw.WriteString(src + "\n")
+		} else {
+			bw.WriteString(terminate(engine, t.typ, src))
+		}
 		n++
 		progress(i + 1)
 	}

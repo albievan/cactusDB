@@ -16,6 +16,9 @@ import (
 // indexes. With fks the foreign keys are included too; without, the caller
 // adds foreignKeyDDL later, once every referenced table exists.
 func tableDefinition(ctx context.Context, engine string, db *sql.DB, table string, fks bool) (string, error) {
+	if ownDDL(db) {
+		return objectDefinition(ctx, engine, db, ObjTable, table)
+	}
 	var src string
 	var err error
 	switch engine {
@@ -48,6 +51,13 @@ func tableDefinition(ctx context.Context, engine string, db *sql.DB, table strin
 		}
 	}
 	return src, nil
+}
+
+// ownDDL: the database writes its tables' DDL itself (SHOW CREATE TABLE
+// of CockroachDB, Redshift's SHOW TABLE) or is a backend.
+func ownDDL(db *sql.DB) bool {
+	f := flavorOf(db)
+	return backendOf(db) != nil || f == EngineCockroach || f == EngineRedshift
 }
 
 // deferredFKs reports whether a DDL script should add an engine's foreign

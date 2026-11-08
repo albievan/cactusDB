@@ -486,7 +486,7 @@ func backupCLI(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGro
 			fmt.Fprintf(out, "\r\x1b[2KBacking up %s: %s rows", table, groupDigits(rows))
 		}
 	}
-	res, err := backupToDir(ctx, o.ExportDir, o.Engine, db, defaultConnName(o.ConnParams), ddlFileName(o.ConnParams), groups, progress)
+	res, err := backupToDir(ctx, o.ExportDir, dialect(o.Engine), db, defaultConnName(o.ConnParams), ddlFileName(o.ConnParams), groups, progress)
 	if o.Progress {
 		fmt.Fprint(out, "\r\x1b[2K")
 	}
@@ -514,6 +514,10 @@ func (s *server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	ss, err := s.session(r, req.Session)
 	if err != nil {
 		writeErr(w, 401, err)
+		return
+	}
+	if e := engineByID(ss.kind()); e != nil && e.NoBackup {
+		writeErr(w, 400, fmt.Errorf("a backup as an SQL script isn't available for %s: export the tables (Export all) and the definitions (DDL) instead", e.Name))
 		return
 	}
 	groups, err := listObjects(r.Context(), ss.engine, ss.db)

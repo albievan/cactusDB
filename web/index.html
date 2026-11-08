@@ -151,6 +151,7 @@
   .pwwrap .eye[aria-pressed="true"] .slash { display: inline; }
   .actions { display: flex; gap: 8px; margin-top: 12px; }
   .actions .primary { flex: 1; }
+  .row2.single { grid-template-columns: 1fr; }
   .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
   .engines button { padding: 6px 2px; font-size: 12px; }
   .engines button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
@@ -819,21 +820,32 @@
     <label for="dEngine">Database type</label>
     <select id="dEngine"></select>
     <div id="dFileFields">
-      <label for="dFile">SQLite database file</label>
+      <label for="dFile" id="dFileLabel">SQLite database file</label>
       <input id="dFile" placeholder="/path/to/database.db" spellcheck="false">
     </div>
     <div id="dServerFields">
-      <div class="row2">
-        <div><label for="dHost">Host</label><input id="dHost" value="localhost" spellcheck="false"></div>
-        <div><label for="dPort">Port</label><input id="dPort" type="number" min="0" max="65535"></div>
+      <div class="row2" id="dHostRow">
+        <div><label for="dHost" id="dHostLabel">Host</label><input id="dHost" value="localhost" spellcheck="false"></div>
+        <div id="dPortWrap"><label for="dPort" id="dPortLabel">Port</label><input id="dPort" type="number" min="0" max="65535"></div>
       </div>
-      <label for="dUser">Username</label>
-      <input id="dUser" autocomplete="off" spellcheck="false">
-      <label for="dPass">Password</label>
-      <span class="pwwrap"><input id="dPass" type="password" autocomplete="new-password"><button type="button" class="eye" data-pw="dPass" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
-      <label for="dDb" id="dDbLabel">Database</label>
-      <input id="dDb" spellcheck="false">
+      <div id="dUserWrap">
+        <label for="dUser" id="dUserLabel">Username</label>
+        <input id="dUser" autocomplete="off" spellcheck="false">
+      </div>
+      <div id="dPassWrap">
+        <label for="dPass" id="dPassLabel">Password</label>
+        <span class="pwwrap"><input id="dPass" type="password" autocomplete="new-password"><button type="button" class="eye" data-pw="dPass" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
+      </div>
+      <div id="dDbWrap">
+        <label for="dDb" id="dDbLabel">Database</label>
+        <input id="dDb" spellcheck="false">
+      </div>
+      <div id="dOptsWrap">
+        <label for="dOpts">Options <span class="hint-inline">key=value&amp;key=value, optional</span></label>
+        <input id="dOpts" spellcheck="false">
+      </div>
     </div>
+    <p class="hint" id="dHelp" hidden></p>
     <div class="dlock" id="dLockWrap">
       <label for="dLock" id="dLockLabel">Connection password</label>
       <input id="dLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
@@ -995,7 +1007,7 @@
     <input id="sqName" maxlength="100" placeholder="e.g. Open orders" autocomplete="off">
     <label for="sqDesc">Description</label>
     <textarea id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
-    <label for="sqSql">Query <span class="hint-inline">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
+    <label for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
     <textarea id="sqSql" rows="8" spellcheck="false" class="mono"></textarea>
     <div id="sqResult" class="dresult bad" hidden></div>
     <div class="dactions">
@@ -1055,6 +1067,9 @@
 const $ = (id) => document.getElementById(id);
 // usage: the events to send, and this tab's id (see "usage" below).
 const usage = { page: Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join(""), q: [], timer: 0 };
+// The query box's and Backup button's texts for SQL databases (each engine
+// has its own query hint: engineInfo().queryHint).
+const sqlHint = document.getElementById("sql").placeholder, backupTitle = document.getElementById("backupBtn").title;
 const state = { engines: [], engine: "sqlite", session: null, label: "", objects: [], sel: null, table: null,
   result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
@@ -1181,7 +1196,7 @@ function renderEngines() {
 function selectEngine(id, keepPort) {
   state.engine = id;
   renderEngines();
-  const isFile = id === "sqlite";
+  const isFile = isFileEngine(id);
   $("fileFields").hidden = !isFile;
   $("serverFields").hidden = isFile;
   const eng = state.engines.find((e) => e.id === id);
@@ -1196,7 +1211,7 @@ function selectEngine(id, keepPort) {
 }
 
 function formParams() {
-  const isFile = state.engine === "sqlite";
+  const isFile = isFileEngine(state.engine);
   return {
     engine: state.engine,
     host: isFile ? "" : $("host").value.trim(),
@@ -1211,7 +1226,7 @@ function formParams() {
 // empty and asks the server to reuse the stored one (state.formSavedId).
 function fillForm(c) {
   selectEngine(c.engine, true);
-  if (c.engine === "sqlite") { $("dbFile").value = c.database; }
+  if (isFileEngine(c.engine)) { $("dbFile").value = c.database; }
   else {
     $("host").value = c.host; $("port").value = c.port || "";
     $("user").value = c.username; $("dbName").value = c.database;
@@ -1517,12 +1532,12 @@ function savedRows(list) {
     return list.length ? list.map((c) => {
       const lock = c.locked ? `<span class="lock" title="Protected by its own connection password">🔒</span>`
         : `<span class="lock" title="No connection password yet: Edit to set one">🔓</span>`;
-      const where = c.engine === "sqlite" ? c.database
+      const where = isFileEngine(c.engine) ? c.database
         : `${c.username ? c.username + "@" : ""}${c.host || ""}${c.port ? ":" + c.port : ""}${c.database ? " / " + c.database : ""}`;
       const det = superPw ? `<span class="det" title="${esc(where)}">${esc(where)}${c.needsOwnPassword ? " · open once with its own password" : ""}</span>` : "";
       return `
       <li data-id="${c.id}" title="Click to connect">
-        <span class="tag">${esc(c.engine)}</span>
+        <span class="tag" title="${esc(engineInfo(c.engine).name)}">${esc(c.engine)}</span>
         <span class="name">${esc(c.name)}${lock}${det}</span>
         <button class="small go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}">▶</button>
         <button class="small" data-act="edit" title="Edit and test this connection">Edit</button>
@@ -1634,31 +1649,63 @@ $("saveOnlyBtn").addEventListener("click", async () => {
 // the stored one (keepPassword / keepPasswordOf).
 const dlg = { editId: 0, hasPassword: false, locked: false, creds: {}, tested: null };
 
+// engineInfo describes a database type: its form's labels (a label "-"
+// hides the field), query language and what it can't do (server's engines).
+const engineInfo = (id) => state.engines.find((e) => e.id === id) || { id, name: id };
+const isFileEngine = (id) => !!engineInfo(id).file;
+// The default users of the engines, to replace when another type is chosen.
+const defaultUsers = () => new Set(state.engines.map((e) => e.defaultUser).filter(Boolean));
+
+function engineOptions() {
+  const groups = [];
+  for (const e of state.engines) {
+    let g = groups.find((x) => x.name === (e.group || ""));
+    if (!g) groups.push(g = { name: e.group || "", items: [] });
+    g.items.push(e);
+  }
+  return groups.map((g) => `<optgroup label="${esc(g.name)}">` +
+    g.items.map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join("") + "</optgroup>").join("");
+}
+
 function dlgEngine(keepPort) {
-  const id = $("dEngine").value, isFile = id === "sqlite";
+  const id = $("dEngine").value, eng = engineInfo(id), isFile = !!eng.file;
   $("dFileFields").hidden = !isFile;
   $("dServerFields").hidden = isFile;
-  const eng = state.engines.find((e) => e.id === id);
-  if (!keepPort && eng) $("dPort").value = eng.defaultPort || "";
-  $("dDbLabel").textContent = id === "firebird" ? "Database path or alias" : "Database";
-  $("dDb").placeholder = id === "firebird" ? "/var/lib/firebird/data/employee.fdb"
-    : id === "mssql" ? "database name (blank = login default)"
-    : id === "postgres" ? "database name (blank = same as username)" : "database name";
-  $("dHost").placeholder = id === "mssql" ? "server or server\\INSTANCE" : "";
-  if (!keepPort && id === "firebird" && !$("dUser").value) $("dUser").value = "SYSDBA";
-  if (!keepPort && id === "postgres" && !$("dUser").value) $("dUser").value = "postgres";
+  $("dFileLabel").textContent = eng.fileLabel || "Database file";
+  $("dFile").placeholder = eng.fileHint || "";
+  if (!keepPort) $("dPort").value = eng.defaultPort || "";
+  const field = (wrap, label, text, input, hint) => {
+    $(wrap).hidden = text === "-";
+    if (label) $(label).textContent = text && text !== "-" ? text : $(label).textContent;
+    if (input) $(input).placeholder = hint || "";
+  };
+  field("dPortWrap", "dPortLabel", eng.portLabel, null);
+  $("dHostRow").classList.toggle("single", eng.portLabel === "-");
+  field("dUserWrap", "dUserLabel", eng.userLabel, null);
+  field("dPassWrap", "dPassLabel", eng.passLabel, "dPass", eng.passHint);
+  field("dDbWrap", "dDbLabel", eng.dbLabel, "dDb", eng.dbHint);
+  field("dOptsWrap", null, eng.optionsHint ? "Options" : "-", "dOpts", eng.optionsHint);
+  $("dHostLabel").textContent = eng.hostLabel || "Host";
+  // "localhost" only for a server's host, not a region, project or endpoint.
+  if (!keepPort && (eng.hostLabel || "Host") !== "Host" && $("dHost").value === "localhost") $("dHost").value = "";
+  if (!keepPort && (eng.hostLabel || "Host") === "Host" && !$("dHost").value) $("dHost").value = "localhost";
+  $("dHost").placeholder = eng.hostHint || "";
+  if (!keepPort && (!$("dUser").value || defaultUsers().has($("dUser").value))) $("dUser").value = eng.defaultUser || "";
+  $("dHelp").hidden = !eng.help; $("dHelp").textContent = eng.help || "";
   dlgResult();
 }
 
 function dlgParams() {
-  const engine = $("dEngine").value, isFile = engine === "sqlite";
+  const engine = $("dEngine").value, eng = engineInfo(engine), isFile = !!eng.file;
+  const shown = (wrap) => !isFile && !$(wrap).hidden;
   return {
     engine,
     host: isFile ? "" : $("dHost").value.trim(),
-    port: isFile ? 0 : parseInt($("dPort").value, 10) || 0,
-    username: isFile ? "" : $("dUser").value,
-    password: isFile ? "" : $("dPass").value,
-    database: isFile ? $("dFile").value.trim() : $("dDb").value.trim(),
+    port: shown("dPortWrap") ? parseInt($("dPort").value, 10) || 0 : 0,
+    username: shown("dUserWrap") ? $("dUser").value : "",
+    password: shown("dPassWrap") ? $("dPass").value : "",
+    database: isFile ? $("dFile").value.trim() : shown("dDbWrap") ? $("dDb").value.trim() : "",
+    options: shown("dOptsWrap") ? $("dOpts").value.trim() : "",
   };
 }
 
@@ -1668,7 +1715,7 @@ function dlgResult(cls, text) {
 }
 
 function openConnDialog(c, creds = {}) {
-  $("dEngine").innerHTML = state.engines.map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  $("dEngine").innerHTML = engineOptions();
   dlg.editId = c ? c.id : 0;
   dlg.hasPassword = !!(c && c.hasPassword);
   dlg.locked = !!(c && c.locked);
@@ -1681,8 +1728,9 @@ function openConnDialog(c, creds = {}) {
   $("dPass").value = "";
   $("dPass").placeholder = dlg.hasPassword ? "saved – leave blank to keep" : "";
   allowShowPassword("dPass", !c); // new connections only, never when editing
-  $("dFile").value = c && c.engine === "sqlite" ? c.database : "";
-  $("dDb").value = c && c.engine !== "sqlite" ? c.database : "";
+  $("dFile").value = c && isFileEngine(c.engine) ? c.database : "";
+  $("dDb").value = c && !isFileEngine(c.engine) ? c.database : "";
+  $("dOpts").value = c ? c.options || "" : "";
   // The connection password: required for a new connection (and for one
   // saved before connections had passwords); optional to change otherwise.
   $("dLock").value = $("dLock2").value = "";
@@ -1708,18 +1756,22 @@ $("dTest").addEventListener("click", async () => {
     const body = { ...p };
     if (!p.password && dlg.hasPassword) Object.assign(body, { keepPasswordOf: dlg.editId }, dlg.creds);
     const res = await api("POST", "/api/testconn", body);
-    dlgResult("ok", `✔ Connection works${res.version ? " – " + res.version : ""}\n${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} · ${res.elapsedMs} ms`);
+    dlgResult("ok", `✔ Connection works${res.version ? " – " + res.version : ""}\n${res.tables.toLocaleString()} ${(res.tablesLabel || "tables").toLowerCase()} · ${res.elapsedMs} ms`);
   } catch (e) {
     dlgResult("bad", "✘ " + e.message);
   } finally { b.disabled = false; }
 });
 
+// dlgMissing names what must be filled in before connecting or saving.
+function dlgMissing(p) {
+  const eng = engineInfo(p.engine);
+  if (eng.file) return p.database ? "" : "Enter the database file.";
+  return p.host ? "" : `Enter the ${(eng.hostLabel || "host").toLowerCase()}.`;
+}
+
 $("dConnect").addEventListener("click", () => {
   const p = dlgParams();
-  if (p.engine === "sqlite" ? !p.database : !p.host) {
-    dlgResult("bad", p.engine === "sqlite" ? "Enter the database file." : "Enter the host.");
-    return;
-  }
+  if (dlgMissing(p)) { dlgResult("bad", dlgMissing(p)); return; }
   const extra = { ...p, name: $("dName").value.trim() };
   if (!p.password && dlg.hasPassword) Object.assign(extra, { keepPasswordOf: dlg.editId }, dlg.creds);
   $("connDialog").close();
@@ -1728,10 +1780,7 @@ $("dConnect").addEventListener("click", () => {
 
 $("dSave").addEventListener("click", async () => {
   const p = dlgParams();
-  if (p.engine === "sqlite" ? !p.database : !p.host) {
-    dlgResult("bad", p.engine === "sqlite" ? "Enter the database file." : "Enter the host.");
-    return;
-  }
+  if (dlgMissing(p)) { dlgResult("bad", dlgMissing(p)); return; }
   let lock = "";
   try {
     if (!dlg.locked || $("dLock").value || $("dLock2").value) lock = newLockFromForm("dLock", "dLock2");
@@ -1804,10 +1853,15 @@ async function connect(extra = {}) {
     state.objects = res.objects; state.sel = null; state.table = null; state.defFor = null; resetTableStats(); state.idleNote = "";
     setTimeout(() => loadTableStats(true), 0); // rows and MB per table, from the database's estimates
     idle.last = Date.now();
-    const nTables = (res.objects.find((g) => g.type === "table") || { items: [] }).items.length;
-    $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${nTables} tables`;
+    const main = res.objects.find((g) => g.type === "table") || { items: [], label: "Tables" };
+    $("status").innerHTML = `Connected to <b>${esc(res.label)}</b> · ${main.items.length} ${esc(main.label.toLowerCase())}`;
     $("disconnectBtn").hidden = false; $("reconnectBtn").hidden = false; $("reconnectBtn").disabled = false;
-    $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false; $("backupBtn").disabled = false;
+    const eng = engineInfo(res.engine);
+    $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
+    $("backupBtn").disabled = !!eng.noBackup;
+    $("backupBtn").title = eng.noBackup ? `A backup as an SQL script isn't available for ${eng.name}: use Export all and DDL` : backupTitle;
+    $("sql").placeholder = eng.queryHint || sqlHint;
+    $("sqSqlHint").textContent = eng.language && eng.language !== "SQL" ? `read-only ${eng.language}` : "read-only: SELECT, WITH, SHOW, EXPLAIN…";
     setExportAllEnabled(true);
     $("runBtn").disabled = false; $("saveQueryBtn").disabled = false;
     $("queriesTab").hidden = false;

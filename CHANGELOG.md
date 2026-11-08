@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.32.0 — 2026-11-08
+
+- **18 more database types**, grouped in the New connection dialog as *Relational*,
+  *Cloud*, *NoSQL* and *Vector*, each with its own form (labels, hints, only the fields it
+  uses) and a new **Options** field (`key=value&…`, also `--dboptions` on the command line):
+  - Oracle (no Instant Client), Informix (wire listener, SQL passthrough), Microsoft Access
+    (`.mdb`/`.accdb` read directly, with a small SQL subset and the SQL of saved queries),
+    CockroachDB;
+  - Azure SQL Database (Hyperscale, read replica when there is one), Azure Database for
+    PostgreSQL, Azure HorizonDB, Amazon Redshift, Amazon Athena, Google BigQuery;
+  - MongoDB (MongoDB shell syntax), Azure Cosmos DB (NoSQL API), Couchbase (SQL++),
+    Apache Cassandra (CQL), Redis (key groups, SCAN listing), Neo4j (Cypher);
+  - PostgreSQL with pgvector, and Weaviate (GraphQL).
+- Each is read-only: the server's own read-only mode where it has one (BigQuery dry run,
+  Couchbase `readonly`, Neo4j READ transactions, Oracle read-only transactions), and a check
+  of every query that lets only reads through.
+- Documents are shown with a column per top-level field; definitions describe collections,
+  key groups, labels and containers from a sample, with their indexes and options.
+- Backup and Compare stay for the SQL databases with their own DDL; they're switched off
+  for the others.
+
 ## 1.31.0 — 2026-11-07
 
 - **Not connected: day and night**: the sky of the desert scene follows the system's light

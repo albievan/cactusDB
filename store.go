@@ -205,11 +205,11 @@ func (s *Store) decrypt(c *SavedConn) error {
 	return nil
 }
 
-const connCols = `id, name, engine, host, port, username, password, database, created_at, lock`
+const connCols = `id, name, engine, host, port, username, password, database, created_at, lock, options`
 
 func scanConn(sc interface{ Scan(...any) error }) (SavedConn, error) {
 	var c SavedConn
-	err := sc.Scan(&c.ID, &c.Name, &c.Engine, &c.Host, &c.Port, &c.Username, &c.Password, &c.Database, &c.Created, &c.Lock)
+	err := sc.Scan(&c.ID, &c.Name, &c.Engine, &c.Host, &c.Port, &c.Username, &c.Password, &c.Database, &c.Created, &c.Lock, &c.Options)
 	return c, err
 }
 
@@ -267,12 +267,12 @@ func (s *Store) GetByName(name string) (SavedConn, error) {
 
 // Save inserts a connection, or replaces the one with the same name.
 func (s *Store) Save(c SavedConn) (int64, error) {
-	_, err := s.DB().Exec(`INSERT INTO connections (name, engine, host, port, username, password, database, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := s.DB().Exec(`INSERT INTO connections (name, engine, host, port, username, password, database, created_at, options)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(name) DO UPDATE SET engine = excluded.engine, host = excluded.host, port = excluded.port,
-			username = excluded.username, password = excluded.password, database = excluded.database`,
+			username = excluded.username, password = excluded.password, database = excluded.database, options = excluded.options`,
 		c.Name, c.Engine, c.Host, c.Port, s.box.seal("username", c.Username), s.box.seal("password", c.Password),
-		c.Database, time.Now().Format(time.RFC3339))
+		c.Database, time.Now().Format(time.RFC3339), c.Options)
 	if err != nil {
 		return 0, err
 	}

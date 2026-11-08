@@ -5,8 +5,16 @@
 **One small program. No installation. Browse your databases in a web browser, or export them straight from the command line.**
 
 cactusdb is a standalone app for **Linux, macOS and Windows** that lets you look at
-**SQLite**, **MySQL**, **MariaDB**, **PostgreSQL**, **Firebird** and **Microsoft SQL Server** databases,
-including their views, stored procedures, functions, triggers and generators/sequences. It
+relational, cloud, NoSQL and vector databases (24 types, see [Supported databases](#9-supported-databases)):
+- **relational:** SQLite, MySQL, MariaDB, PostgreSQL, Firebird, Microsoft SQL Server, Oracle,
+  Informix, Microsoft Access, CockroachDB
+- **cloud:** Azure SQL Database (Hyperscale), Azure Database for PostgreSQL, Azure HorizonDB,
+  Amazon Redshift, Amazon Athena, Google BigQuery
+- **NoSQL:** MongoDB, Azure Cosmos DB, Couchbase, Apache Cassandra, Redis, Neo4j
+- **vector:** PostgreSQL with pgvector, Weaviate
+
+It shows their data and schemas: tables or collections, views, stored procedures,
+functions, triggers and generators/sequences. It
 also exports their data to
 **Excel**, **JSON**, **XML** or **CSV**. You start it from a terminal and use it in your browser,
 or export tables with a single command without opening a browser at all.
@@ -102,12 +110,14 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.31.0
+cactusdb 1.32.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
   driver SQL Server      github.com/microsoft/go-mssqldb v1.11.2 (bundled)
-  driver PostgreSQL      github.com/jackc/pgx/v5 v5.11.0 (bundled)
+  driver PostgreSQL, …   github.com/jackc/pgx/v5 v5.11.0 (bundled)
+  driver Oracle          github.com/sijms/go-ora/v2 v2.9.0 (bundled)
+  …                      (one line per driver: see 🧩 Drivers)
   saved connections: /home/me/cactusdb/cactus.conn.db (credentials encrypted with key file /home/me/cactusdb/cactus.key)
   export folder:     /home/me/cactusdb/export
   open http://localhost:8080
@@ -153,8 +163,9 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 Click outside the menu or press Esc to close it. The connection details are only shown in
 the connection dialog, opened by **＋ New connection** or **Edit**, never in the sidebar.
 
-1. **Click ＋ New connection** and choose the database type: SQLite, MySQL, MariaDB,
-   Firebird, SQL Server or PostgreSQL.
+1. **Click ＋ New connection** and choose the database type. The list is grouped into
+   *Relational*, *Cloud*, *NoSQL* and *Vector*, and the form changes with the type: its
+   labels and hints, and only the fields that type uses.
 2. **Fill in the connection details:**
 
    | Engine | What to enter |
@@ -164,6 +175,27 @@ the connection dialog, opened by **＋ New connection** or **Edit**, never in th
    | Firebird | Host, port (default 3050), username (often `SYSDBA`), password, and the database **path on the server** or an alias, e.g. `/var/lib/firebird/data/employee.fdb`, `C:\Data\EMPLOYEE.FDB` or `employee` |
    | PostgreSQL | Host, port (default 5432), username (often `postgres`), password, database name (leave blank to use the database named after the user) |
    | SQL Server | Host, port (default 1433), SQL Server login (e.g. `sa`) and password, database name (leave blank for the login's default database). For a named instance, enter the host as `server\INSTANCE` and clear the port. |
+   | Oracle | Host, port (default 1521), username, password, and the **service name** (e.g. `FREEPDB1`, `ORCL`). Options: `schema=HR` to browse another schema than the user's own, `sid=ORCL` for a SID, `ssl=true`. |
+   | Informix | The host and port of the Informix **wire listener** (default 27017), username, password and database (e.g. `stores_demo`). The listener must allow SQL passthrough (`security.sql.passthrough=true`). |
+   | Microsoft Access | The path to the `.mdb` or `.accdb` file. |
+   | CockroachDB | Host, port (default 26257), username (often `root`), password, database (e.g. `defaultdb`). For CockroachDB Cloud add the options it gives, e.g. `sslmode=verify-full`. |
+   | Azure SQL Database (Hyperscale) | `myserver.database.windows.net`, port 1433, SQL login and password, database. Encrypted; connects with `ApplicationIntent=ReadOnly`, so a read replica answers when there is one. |
+   | Azure Database for PostgreSQL, Azure HorizonDB | The server's or cluster's host name, port 5432, username, password, database. TLS is required (`sslmode=require`). |
+   | Amazon Redshift | The cluster endpoint, port 5439, username, password, database (e.g. `dev`). TLS is required. |
+   | Amazon Athena | The AWS **region** (e.g. `eu-west-1`), access key ID and secret access key (for temporary credentials: the secret, a space and the session token), the database (blank: every database), and in Options the `workgroup` (default `primary`), an `output` S3 location if the workgroup has none, and the `catalog` (default `AwsDataCatalog`). |
+   | Google BigQuery | The **project ID**, the **service account key** (paste the key file's JSON, or give the path of the file on the server), the dataset (blank: every dataset). Options: `location=EU`, `maxbytes=…` (the most a query may bill). A gcloud `application_default_credentials.json` works too. |
+   | MongoDB | Host and port (default 27017) or a whole `mongodb://` / `mongodb+srv://` URI in Host, username, password, database (blank: every database). Options: `authSource=admin` (the default), `tls=true`, `replicaSet=…`. |
+   | Azure Cosmos DB | The account **endpoint** (`https://myaccount.documents.azure.com:443/`), an account **key** (a read-only key is best), the database (blank: every database). The NoSQL API; for its MongoDB, Cassandra or PostgreSQL API use those types. |
+   | Couchbase | The host of a query node and the query port (8093, or 18093 with `tls=true`), username, password, the bucket (blank: every bucket). |
+   | Apache Cassandra | Host (several: `host1,host2`), port (default 9042), username, password, keyspace (blank: every keyspace). Options: `consistency=LOCAL_QUORUM`, `dc=dc1`, `tls=true`. Also ScyllaDB. |
+   | Redis | Host, port (default 6379), username (ACL, optional), password, the database number (0, 1, …). Options: `tls=true`. Also Valkey. |
+   | Neo4j | Host and port (default 7687) or a `neo4j+s://` URI, username (`neo4j`), password, database (blank: the default). |
+   | PostgreSQL + pgvector | As PostgreSQL. **Test connection** says which pgvector version the database has. |
+   | Weaviate | Host and port (default 8080) or `https://cluster.weaviate.cloud`, and the API key if it needs one. |
+
+   **Options** (shown for the types that have them) takes extra settings as
+   `key=value&key=value`. They are saved with the connection but not encrypted, so secrets
+   go in the password field.
 
 3. *(Optional)* Click **Test connection** to check the details first.
 4. Click **Connect** to connect without saving, or give it a name and a **connection
@@ -571,6 +603,31 @@ those objects.
 - If a definition is hidden (encrypted SQL Server modules, or a MySQL user without
   privileges), cactusdb says so instead of showing the source.
 
+<a id="other-languages"></a>
+### Databases that don't speak SQL
+
+Each database is browsed in its own query language. Clicking an object writes the query
+that shows its data, as for SQL databases, and the grid, **Show**, exports, **Export all
+tables**, **DDL**, saved queries and table sizes work the same:
+
+| Database | Objects | Query |
+|----------|---------|-------|
+| MongoDB | Collections and views (`database.collection` when no database is set) | `db.orders.find({ status: "open" }, { _id: 0 }).sort({ total: -1 }).limit(10)`, `.aggregate([…])`, `.countDocuments({…})`, `.distinct("field")`, `.getIndexes()`. Values as in the MongoDB shell: `ObjectId("…")`, `ISODate("…")`, `/regex/i`… |
+| Azure Cosmos DB | Containers, their stored procedures, functions and triggers | Cosmos DB SQL. The container is named in a first line: `-- container: shop.orders`, then `SELECT * FROM c WHERE c.status = 'open'` |
+| Couchbase | Collections (`bucket.scope.collection`) and indexes | SQL++ (N1QL): `SELECT META(c).id AS _id, c.* FROM `travel`.`inventory`.`airline` AS c` |
+| Apache Cassandra | Tables, materialized views, user types, functions, indexes (`keyspace.name`) | CQL `SELECT` |
+| Redis | Key groups by prefix (`user:*`, and `*` for every key) | `SCAN MATCH user:*` lists every matching key with its type, time to live and value; other read commands as typed: `GET`, `HGETALL`, `LRANGE`, `ZRANGE`, `XRANGE`, `INFO`… |
+| Neo4j | Node labels `(:Person)`, relationship types `[:KNOWS]`, indexes, constraints | Cypher: `MATCH (n:Person) RETURN n LIMIT 100`. Nodes and relationships are shown with one column per property. |
+| Weaviate | Collections | GraphQL `{ Get { Article { title _additional { id } } } }`; a `Get` without arguments pages through every object, so exports have them all. |
+| Microsoft Access | Tables, saved queries (their SQL), linked tables | `SELECT [TOP n] * \| columns FROM table [WHERE column = value AND …] [ORDER BY column [DESC]]`, with `=`, `<>`, `<`, `>`, `LIKE 'A*'`, `IS [NOT] NULL` and `#2024-01-31#` dates |
+| Google BigQuery, Amazon Athena, Informix, Oracle… | Tables, views and more | Their SQL |
+
+Documents are shown with one column per top-level field, taken from the first 1,000
+documents in the order the fields appear; nested documents and arrays are shown as JSON.
+The **Definition** of a collection, key group, label or container lists its fields and
+their types from a sample, with its indexes and options. **Backup** and **Compare** are
+for SQL databases with their own DDL; for the others, export the data and the DDL.
+
 ### Export formats
 
 | Format | File | Notes |
@@ -664,6 +721,15 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
    - SQL Server queries run in a transaction that is always rolled back. SQL Server
      can undo both data and table changes this way, and commands that can't run in
      a transaction (`BACKUP`, `RESTORE`, `DBCC`, …) are refused.
+   - Oracle queries run in a `SET TRANSACTION READ ONLY` transaction that is rolled back.
+   - CockroachDB, Azure Database for PostgreSQL, HorizonDB and pgvector sessions are
+     read-only like PostgreSQL's; Redshift queries run in a read-only transaction.
+   - BigQuery runs every query as a dry run first and refuses anything but a `SELECT`.
+   - Couchbase queries are sent with `readonly=true`; Neo4j queries run in READ
+     transactions; the Cosmos DB, Weaviate and Access readers have no way to write at all.
+   - MongoDB takes only `find`, `aggregate` (without `$out` or `$merge`), `countDocuments`,
+     `distinct` and `getIndexes`; Redis only the commands that read; Cassandra and Athena
+     only `SELECT`.
 
 ## 4. Exporting from the command line (no browser)
 
@@ -686,12 +752,13 @@ The password is **asked for** and not shown while you type. For scripts, pass it
 
 | Option | What it does |
 |--------|--------------|
-| `--dbtype` | `sqlite`, `mysql`, `mariadb`, `firebird`, `mssql` (or `sqlserver`) or `postgres` (or `postgresql`). Required. |
+| `--dbtype` | `sqlite`, `mysql`, `mariadb`, `firebird`, `mssql` (or `sqlserver`), `postgres` (or `postgresql`), `oracle`, `informix`, `access`, `cockroachdb`, `azuresql`, `azurepg`, `horizondb`, `redshift`, `athena`, `bigquery`, `mongodb`, `cosmosdb`, `couchbase`, `cassandra`, `redis`, `neo4j`, `pgvector` or `weaviate`. Required. |
 | `--host` | The database server. Default `localhost`. For a SQL Server named instance use `server\INSTANCE`. |
 | `--dbport` | The database port. Default: the standard port (3306, 3050, 1433 or 5432). |
-| `--user` | The database user. Required, except for SQLite. |
+| `--user` | The database user. Required for the SQL databases, except SQLite and Access. |
 | `--dbpassword` | The password. Leave it out to be prompted. |
-| `--dbname` | The database. For SQLite the database file; for Firebird the database path or alias on the server. Required. |
+| `--dbname` | The database. For SQLite and Access the database file; for Firebird the database path or alias on the server; for Oracle the service name; for BigQuery the dataset, for Cassandra the keyspace… Required for the SQL databases. |
+| `--dboptions` | Extra connection settings, as in the web UI's **Options**: `key=value&key=value`, e.g. `workgroup=primary&output=s3://bucket/results/` for Athena. |
 | `--dbtable` | The table or view to export; several separated by commas (`--dbtable orders,customers`); or `all` for every table. |
 | `--showtable` | `all` lists the tables and views; a table name prints its definition (`CREATE TABLE …`). |
 | `--exportas` | `csv` (default), `json`, `xml` or `excel`. |
@@ -1199,11 +1266,32 @@ is sent and how to set it up. In short:
 | MariaDB | 10.x and 11.x |
 | Firebird | 2.5, 3, 4 and 5, with Srp authentication and wire encryption |
 | PostgreSQL | 10 and newer (tested with PostgreSQL 17), and compatible servers such as Amazon RDS/Aurora, Azure Database for PostgreSQL and Supabase. TLS is used when the server offers it. |
-| Microsoft SQL Server | 2012 and newer (tested with SQL Server 2022); Azure SQL Database should work too. Uses SQL Server authentication; TLS encryption is used when the server offers it, and the server certificate is trusted like SSMS's *Trust server certificate* option. |
+| Microsoft SQL Server | 2012 and newer (tested with SQL Server 2022). Uses SQL Server authentication; TLS encryption is used when the server offers it, and the server certificate is trusted like SSMS's *Trust server certificate* option. |
+| Oracle | 11g and newer, including 19c, 21c, 23ai and Autonomous Database, through Oracle's own network protocol: no Instant Client needed. DDL from `DBMS_METADATA`, or built from the data dictionary without that privilege. |
+| Informix | 12.10 and newer, through the wire listener with SQL passthrough. |
+| Microsoft Access | `.mdb` files of Access 97 (Jet 3) and 2000–2003 (Jet 4), `.accdb` files of Access 2007 and newer, read directly: no Access, ACE or ODBC driver needed. Password-protected (encrypted) `.accdb` files can't be read. Tested with the sample files of the mdbtools project. |
+| CockroachDB | 23.1 and newer, self-hosted or Cloud (PostgreSQL protocol). DDL from `SHOW CREATE`. |
+| Azure SQL Database | Every service tier, Hyperscale included, with SQL authentication. |
+| Azure Database for PostgreSQL, Azure HorizonDB | Flexible Server and HorizonDB (PostgreSQL protocol, TLS). |
+| Amazon Redshift | Provisioned clusters and Serverless (PostgreSQL protocol, TLS). DDL from `SHOW TABLE` / `SHOW VIEW`. |
+| Amazon Athena | Engine versions 2 and 3, through the Athena API signed with AWS Signature Version 4. |
+| Google BigQuery | Through the BigQuery REST API, with a service account key or gcloud application-default credentials. |
+| MongoDB | 4.0 and newer, Atlas included, and servers that speak its protocol (Amazon DocumentDB, Azure Cosmos DB for MongoDB, FerretDB). |
+| Azure Cosmos DB | The NoSQL API, through its REST API with an account key; the emulator too (`http://localhost:8081`). |
+| Couchbase | 6.5 and newer (collections from 7.0), through the query service. |
+| Apache Cassandra | 3.x, 4.x and 5.x, ScyllaDB, DataStax Enterprise, Azure Cosmos DB for Apache Cassandra. |
+| Redis | 5 and newer, Valkey, Azure Cache for Redis, Amazon ElastiCache; RedisJSON values are shown as JSON. |
+| Neo4j | 4.4 and 5.x, Aura included (Bolt protocol). |
+| PostgreSQL + pgvector | Any PostgreSQL with the `vector` extension; vectors are shown as text, e.g. `[0.1,0.2,0.3]`. |
+| Weaviate | 1.20 and newer, Weaviate Cloud included. |
+
+Not every type was tried against a live server of that kind. They were all checked with
+the protocol's own test cases or a stand-in server, and real servers were used for Redis
+and for Access files. Please report anything that doesn't work.
 
 All drivers are built into cactusdb and listed under **🧩 Drivers** in the menu. Unlike tools such
 as DBeaver, there is nothing to download, and no client library (libmysqlclient,
-fbclient.dll, libpq, ODBC drivers, …) needs to be installed.
+fbclient.dll, libpq, Oracle Instant Client, ODBC drivers, cloud SDKs, …) needs to be installed.
 
 ---
 
@@ -1230,6 +1318,14 @@ docker run -d --rm --name cdb-mssql --platform linux/amd64 -e ACCEPT_EULA=Y -e '
 CACTUSDB_IT=1 go test ./...
 ```
 
+`engines_test.go` checks the other database types against stand-in servers (Cosmos DB,
+Couchbase, BigQuery, Athena, Weaviate) and AWS's signature test case. `access_probe_test.go`
+reads every table of the Access files in a folder:
+
+```sh
+CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
+```
+
 | File | Contents |
 |------|----------|
 | `main.go` | Command-line options, web server, API, action log |
@@ -1240,7 +1336,14 @@ CACTUSDB_IT=1 go test ./...
 | `backup.go` | Database backup: DDL plus every row as `INSERT`s, in a maximum-compression `.zip` |
 | `background.go` | `--runas background` |
 | `sys_windows.go`, `sys_other.go` | Platform specifics: detaching from the terminal, console colours, restarting after an update |
-| `db.go` | Connecting, listing columns, running queries |
+| `db.go` | The database types (`engines`) and their connection forms, connecting, listing columns, running queries |
+| `backend.go` | The databases reached through their own client: the `backend` interface, wrapped in `database/sql`, and documents shown as rows |
+| `oracle.go`, `pgflavors.go` | Oracle; the differences of CockroachDB, Redshift and pgvector from PostgreSQL |
+| `eng_mongo.go`, `jsparse.go` | MongoDB, and the MongoDB shell syntax of its queries |
+| `eng_informix.go` | Informix through the wire listener (SQL passthrough) |
+| `eng_cassandra.go`, `eng_redis.go`, `eng_neo4j.go` | Cassandra, Redis, Neo4j |
+| `eng_http.go`, `eng_couchbase.go`, `eng_cosmos.go`, `eng_weaviate.go`, `eng_bigquery.go`, `eng_athena.go` | The databases reached through an HTTPS API (BigQuery's Google sign-in, Athena's AWS Signature Version 4) |
+| `jet.go`, `eng_access.go` | Reading Microsoft Access files, and the SQL subset that queries them |
 | `objects.go` | Listing objects (tables, views, procedures, …) and building their definitions |
 | `tablestats.go`, `rowsize.go` | Rows and size of every table; the size estimated as rows × the columns' declared sizes when the database doesn't report it |
 | `readonly.go` | The read-only query check |
@@ -1278,5 +1381,5 @@ Public domain, under the same terms as SQLite: see [LICENSE](LICENSE).
 > May you find forgiveness for yourself and forgive others.
 > May you share freely, never taking more than you give.
 
-The third-party drivers built into the binary keep their own licenses (BSD-3-Clause,
-MPL-2.0 and MIT), listed in [LICENSE](LICENSE).
+The third-party drivers built into the binary keep their own licenses (BSD, MPL-2.0,
+MIT and Apache-2.0), listed in [LICENSE](LICENSE).
