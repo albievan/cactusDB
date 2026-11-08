@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cactusdb</title>
 <link rel="icon" type="image/svg+xml" href="cactusdb.svg">
+<link rel="stylesheet" href="vendor/bootstrap-5.3.8/bootstrap.min.css">
+<link rel="stylesheet" href="vendor/bootstrap-icons-1.13.2/bootstrap-icons.min.css">
+<script>
+  // Bootstrap's light or dark theme follows the system's, like cactusdb's own colours.
+  (() => {
+    const dark = matchMedia("(prefers-color-scheme: dark)");
+    const set = () => document.documentElement.setAttribute("data-bs-theme", dark.matches ? "dark" : "light");
+    set(); dark.addEventListener("change", set);
+  })();
+</script>
 <style>
   :root {
     --bg: #f6f7f5; --panel: #ffffff; --panel-2: #f0f2ee; --border: #dde1da;
@@ -21,6 +31,88 @@
       --null: #66706a; --row-alt: #1e2420; --row-hover: #243229; --flow-2: #3ee6d8;
     }
   }
+  /* Bootstrap 5.3 (web/vendor) in cactusdb's colours: primary and success are the cactus green. */
+  :root, [data-bs-theme=light], [data-bs-theme=dark] {
+    --bs-body-bg: var(--bg); --bs-body-color: var(--text); --bs-emphasis-color: var(--text);
+    --bs-secondary-color: var(--muted); --bs-secondary-bg: var(--panel-2); --bs-tertiary-bg: var(--panel-2);
+    --bs-border-color: var(--border); --bs-border-color-translucent: var(--border);
+    --bs-body-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --bs-font-monospace: var(--mono);
+    --bs-body-font-size: 14px; --bs-body-line-height: 1.4; --bs-code-color: inherit;
+    --bs-primary: var(--accent); --bs-primary-rgb: 47, 125, 79; --bs-primary-text-emphasis: var(--accent);
+    --bs-primary-bg-subtle: var(--accent-soft); --bs-primary-border-subtle: var(--accent);
+    --bs-success: var(--accent); --bs-success-rgb: 47, 125, 79; --bs-success-text-emphasis: var(--accent);
+    --bs-success-bg-subtle: var(--accent-soft); --bs-success-border-subtle: var(--accent);
+    --bs-danger: var(--danger); --bs-danger-rgb: 179, 38, 30; --bs-danger-text-emphasis: var(--danger);
+    --bs-danger-bg-subtle: var(--danger-soft); --bs-danger-border-subtle: var(--danger);
+    --bs-secondary-text-emphasis: var(--muted); --bs-secondary-bg-subtle: var(--panel-2); --bs-secondary-border-subtle: var(--border);
+    --bs-link-color: var(--accent); --bs-link-color-rgb: 47, 125, 79; --bs-link-hover-color: var(--accent-2); --bs-link-hover-color-rgb: 36, 100, 63;
+    --bs-focus-ring-color: rgba(var(--bs-primary-rgb), .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root, [data-bs-theme=light], [data-bs-theme=dark] {
+      --bs-primary-rgb: 79, 181, 122; --bs-success-rgb: 79, 181, 122; --bs-danger-rgb: 242, 134, 124;
+      --bs-link-color-rgb: 79, 181, 122; --bs-link-hover-color-rgb: 99, 199, 140;
+    }
+  }
+  /* Compact sizes: cactusdb shows a lot on one screen. */
+  .btn { --bs-btn-font-size: 13px; --bs-btn-padding-y: 5px; --bs-btn-padding-x: 12px; --bs-btn-border-radius: 6px; --bs-btn-line-height: 1.4;
+    --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb); --bs-btn-disabled-opacity: .5; }
+  .btn-sm, .btn-group-sm > .btn { --bs-btn-font-size: 12px; --bs-btn-padding-y: 2px; --bs-btn-padding-x: 8px; --bs-btn-border-radius: 6px; }
+  .btn .bi { line-height: 1; }
+  .btn-primary { --bs-btn-color: #fff; --bs-btn-bg: var(--accent); --bs-btn-border-color: var(--accent);
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: var(--accent-2); --bs-btn-hover-border-color: var(--accent-2);
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: var(--accent-2); --bs-btn-active-border-color: var(--accent-2);
+    --bs-btn-disabled-color: #fff; --bs-btn-disabled-bg: var(--accent); --bs-btn-disabled-border-color: var(--accent); }
+  .btn-outline-secondary { --bs-btn-color: var(--text); --bs-btn-bg: var(--panel-2); --bs-btn-border-color: var(--border);
+    --bs-btn-hover-color: var(--text); --bs-btn-hover-bg: var(--panel-2); --bs-btn-hover-border-color: var(--accent);
+    --bs-btn-active-color: var(--accent); --bs-btn-active-bg: var(--accent-soft); --bs-btn-active-border-color: var(--accent);
+    --bs-btn-disabled-color: var(--text); --bs-btn-disabled-bg: var(--panel-2); --bs-btn-disabled-border-color: var(--border); }
+  .btn-outline-primary { --bs-btn-color: var(--accent); --bs-btn-bg: transparent; --bs-btn-border-color: var(--accent);
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: var(--accent); --bs-btn-hover-border-color: var(--accent);
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: var(--accent-2); --bs-btn-active-border-color: var(--accent-2); }
+  .btn-outline-danger { --bs-btn-color: var(--danger); --bs-btn-bg: var(--panel-2); --bs-btn-border-color: var(--border);
+    --bs-btn-hover-color: var(--danger); --bs-btn-hover-bg: var(--danger-soft); --bs-btn-hover-border-color: var(--danger);
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: var(--danger); --bs-btn-active-border-color: var(--danger);
+    --bs-btn-disabled-color: var(--danger); --bs-btn-disabled-bg: var(--panel-2); --bs-btn-disabled-border-color: var(--border); }
+  .btn-danger { --bs-btn-color: #fff; --bs-btn-bg: var(--danger); --bs-btn-border-color: var(--danger);
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: var(--danger); --bs-btn-hover-border-color: var(--danger);
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: var(--danger); --bs-btn-active-border-color: var(--danger);
+    --bs-btn-disabled-bg: var(--danger); --bs-btn-disabled-border-color: var(--danger); }
+  .btn-danger:hover { filter: brightness(1.1); }
+  .btn-link { --bs-btn-color: var(--muted); --bs-btn-hover-color: var(--text); --bs-btn-active-color: var(--text); --bs-btn-disabled-color: var(--muted); text-decoration: none; }
+  /* A chosen option (a filter, a menu item, a type): Bootstrap's active look. */
+  .btn.on { color: var(--bs-btn-active-color); background-color: var(--bs-btn-active-bg); border-color: var(--bs-btn-active-border-color); font-weight: 600; }
+  .btn-check + .btn:hover { color: var(--bs-btn-hover-color); }
+  .btn-check:checked + .btn { font-weight: 600; }
+  .btn-close { --bs-btn-close-focus-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .25); }
+  .form-control, .form-select { --bs-border-radius-sm: 6px; }
+  .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .25); }
+  .form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+  .form-check-input:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .25); }
+  .form-switch .form-check-input:focus:not(:checked) { --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2366706a'/%3e%3c/svg%3e"); }
+  .form-label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  .form-check { margin: 10px 0 0; font-size: 13px; color: var(--text); min-height: 0; }
+  .form-check .form-check-input { margin-top: .2em; }
+  .input-group > .btn { position: relative; z-index: 2; }
+  .card { --bs-card-bg: var(--panel); --bs-card-border-color: var(--border); --bs-card-border-radius: 8px; --bs-card-color: var(--text); }
+  .table { --bs-table-bg: var(--panel); --bs-table-color: var(--text); --bs-table-border-color: var(--border);
+    --bs-table-striped-bg: var(--row-alt); --bs-table-striped-color: var(--text); --bs-table-hover-bg: var(--row-hover); --bs-table-hover-color: var(--text);
+    --bs-table-active-bg: var(--accent-soft); margin-bottom: 0; }
+  .nav-tabs { --bs-nav-tabs-border-color: var(--border); --bs-nav-tabs-link-active-bg: var(--panel); --bs-nav-tabs-link-active-color: var(--text);
+    --bs-nav-tabs-link-active-border-color: var(--border) var(--border) var(--panel); --bs-nav-tabs-link-hover-border-color: transparent;
+    --bs-nav-link-color: var(--muted); --bs-nav-link-hover-color: var(--text); --bs-nav-link-padding-x: 14px; --bs-nav-link-padding-y: 6px; --bs-nav-link-font-size: 14px; }
+  .nav-tabs .nav-link.active { font-weight: 600; }
+  .progress { --bs-progress-bg: var(--panel-2); --bs-progress-bar-bg: var(--accent); --bs-progress-border-radius: 6px; }
+  .alert { --bs-alert-padding-x: 10px; --bs-alert-padding-y: 8px; --bs-alert-margin-bottom: 0; --bs-alert-border-radius: 6px; font-size: 13px; }
+  .alert-secondary { --bs-alert-color: var(--muted); }
+  .list-group { --bs-list-group-bg: transparent; --bs-list-group-color: var(--text); --bs-list-group-border-color: var(--border);
+    --bs-list-group-action-hover-bg: var(--row-hover); --bs-list-group-action-hover-color: var(--text); }
+  .toast { --bs-toast-max-width: 520px; --bs-toast-font-size: 13px; --bs-toast-bg: var(--text); --bs-toast-color: var(--bg); --bs-toast-border-color: transparent; }
+  .toast.text-bg-danger { --bs-toast-bg: var(--danger); }
+  .toast .toast-body { white-space: pre-line; }
+  /* The toast is dark on a light page and light on a dark one: its close button follows. */
+  [data-bs-theme=light] .toast, .toast.text-bg-danger { --bs-btn-close-filter: invert(1) grayscale(100%) brightness(200%); }
+  [data-bs-theme=dark] .toast:not(.text-bg-danger) { --bs-btn-close-filter: none; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
@@ -37,7 +129,7 @@
   .bname { display: flex; flex-direction: column; line-height: 1.05; }
   .bver { font-size: 10px; font-weight: 500; letter-spacing: .3px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
   .bver:empty { display: none; }
-  .badge { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; }
+  header .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; }
   header .status { color: var(--muted); font-size: 13px; flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Data-in-transit animation in the free space of the header. */
   header .flow { flex: 1; min-width: 60px; height: 34px; align-self: center;
@@ -64,21 +156,19 @@
     overflow: hidden; display: flex; flex-direction: column; position: relative;
   }
   /* The pop-up menu with the connection, saved connections, export folder and drivers. */
-  .navbar { margin-top: auto; border-top: 1px solid var(--border); padding: 8px; background: var(--panel-2); }
-  #navMenuBtn { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 7px 10px; }
+  .navfoot { margin-top: auto; border-top: 1px solid var(--border); padding: 8px; background: var(--panel-2); }
+  #navMenuBtn { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; --bs-btn-padding-y: 7px; --bs-btn-padding-x: 10px; }
   #navMenuBtn[aria-expanded="true"] { border-color: var(--accent); }
   #navMenuBtn[aria-expanded="true"] .navcaret { transform: rotate(180deg); }
   .navicon { font-size: 16px; color: var(--muted); }
   .navtext { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
   .navtext small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .navcaret { color: var(--muted); font-size: 11px; transition: transform .15s; }
-  .navmenu { position: absolute; left: 8px; right: 8px; bottom: 60px; max-height: calc(100% - 76px); overflow-y: auto; z-index: 30;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.28); }
+  .navmenu { position: absolute; left: 8px; right: 8px; bottom: 60px; max-height: calc(100% - 76px); overflow-y: auto; z-index: 30; display: block; border-radius: 10px; }
   .navmenu[hidden] { display: none; }
   .menuitems { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border); }
-  .menuitems button { text-align: left; padding: 8px 10px; font-size: 13px; }
-  .menuitems button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  ul.list li button.go { display: inline-block; padding: 2px 8px; color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .menuitems .btn { --bs-btn-padding-y: 8px; --bs-btn-padding-x: 10px; display: flex; align-items: center; gap: 8px; }
+  .menuitems .btn .bi { font-size: 15px; color: var(--accent); }
   .home { padding: 4px 2px; }
   .home h3 { margin: 4px 0 8px; font-size: 13px; }
   .home .idlenote { font-size: 12px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 8px; margin: 0 0 10px; }
@@ -101,8 +191,8 @@
   .qdesc { white-space: normal !important; color: var(--muted); font-size: 12px; }
   .qsql { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 380px !important; }
   .qacts { white-space: nowrap; width: 1%; }
-  .qacts button, .qacts select { margin-left: 4px; }
-  select.qexpsel { font-size: 12px; padding: 3px 6px; width: auto; }
+  .qacts .btn, .qacts .form-select { margin-left: 4px; display: inline-block; }
+  .form-select.qexpsel { font-size: 12px; width: auto; }
   #qNote { margin: 0; }
   section.box { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   section.box h2 {
@@ -121,45 +211,17 @@
   section.box.collapsed h2 .toggle::before { content: "▸"; }
   section.box.collapsed > :not(h2) { display: none !important; }
   section.box:not(.collapsed) h2 .sub { display: none; }
-  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
-  input, select, textarea {
-    width: 100%; font: inherit; color: var(--text); background: var(--bg);
-    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
-  }
-  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .row2 { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
-  .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--text); }
-  .check[hidden] { display: none; }
-  .check input { width: auto; }
-  button {
-    font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px; padding: 6px 12px;
-    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
-  }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  button:disabled { opacity: .5; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.primary:hover:not(:disabled) { background: var(--accent-2); }
-  button.small { padding: 2px 8px; font-size: 12px; }
-  .dbrow { display: flex; gap: 6px; }
-  .dbrow input { flex: 1; min-width: 0; }
-  .dbrow button { white-space: nowrap; padding: 4px 10px; }
+  .dbrow .btn { white-space: nowrap; }
   #dDbPick { margin-top: 6px; }
-  /* Show-password toggle: only offered while entering a new connection. */
-  .pwwrap { position: relative; display: block; }
-  .pwwrap input { padding-right: 34px; }
-  .pwwrap .eye { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); padding: 3px 5px;
-    border: 0; background: none; color: var(--muted); line-height: 0; }
-  .pwwrap .eye:hover:not(:disabled) { color: var(--text); }
-  .pwwrap .eye[hidden] { display: none; }
-  .pwwrap .eye svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
-  .pwwrap .eye .slash { display: none; }
-  .pwwrap .eye[aria-pressed="true"] .slash { display: inline; }
+  /* Show-password toggle (an input group): only offered while entering a new connection. */
+  .pwwrap:has(.eye[hidden]) > .form-control { border-radius: var(--bs-border-radius-sm); }
+  .pwwrap .eye { --bs-btn-padding-x: 8px; color: var(--muted); }
   .actions { display: flex; gap: 8px; margin-top: 12px; }
   .actions .primary { flex: 1; }
   .row2.single { grid-template-columns: 1fr; }
   .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .engines button { padding: 6px 2px; font-size: 12px; }
-  .engines button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .engines .btn { --bs-btn-padding-x: 2px; --bs-btn-padding-y: 6px; }
   ul.list { list-style: none; margin: 0; padding: 0; }
   ul.list li {
     display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px;
@@ -170,24 +232,27 @@
   ul.list li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
   ul.list li .tag { font-size: 10px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
   ul.list li .icon { opacity: .55; font-size: 12px; }
-  ul.list li button { display: none; }
-  ul.list li:hover button { display: inline-block; }
+  ul.list li .btn { display: none; }
+  ul.list li:hover .btn, ul.list li .btn.go { display: inline-block; }
   ul.drivers li { cursor: default; font-size: 12px; }
   ul.drivers li:hover { background: none; }
   ul.drivers .ok { color: var(--accent); }
   ul.drivers .ver { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
   #objectsBox:not(.collapsed) { flex: 1; display: flex; flex-direction: column; min-height: 320px; }
-  .filterrow { display: flex; gap: 6px; }
+  .filterrow .btn { --bs-btn-padding-x: 8px; }
   .exportall { display: flex; align-items: center; gap: 3px; margin: -4px 0 8px; }
   .exportall span { font-size: 12px; color: var(--muted); margin-right: auto; }
-  .exportall button { padding: 2px 3px; line-height: 0; color: var(--muted); }
-  .exportall button:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
+  .exportall .btn { --bs-btn-padding-x: 3px; --bs-btn-padding-y: 2px; line-height: 0; }
+  .exportall .btn:hover:not(:disabled) { background: var(--panel-2); }
+  .exportall .bi { font-size: 20px; }
+  .fmt-xlsx { color: #217346; } .fmt-csv { color: #0e7490; } .fmt-json { color: #b45309; } .fmt-xml { color: #7c3aed; } .fmt-all { color: #64748b; }
+  @media (prefers-color-scheme: dark) { .fmt-xlsx { color: #4cc38a; } .fmt-csv { color: #38bdf8; } .fmt-json { color: #f59e0b; } .fmt-xml { color: #a78bfa; } .fmt-all { color: #94a3b8; } }
   .ealist { list-style: none; margin: 6px 0 2px; padding: 0; max-height: 220px; overflow-y: auto; }
   .eahead { display: flex; gap: 8px; align-items: baseline; }
   .eahead .t { flex: 1; min-width: 0; }
-  .eahead button { padding: 0 6px; font-size: 12px; line-height: 18px; }
-  .exportnote .clearnote { margin-left: 10px; padding: 0 10px; font-size: 12px; line-height: 20px; }
+  .eahead .btn-close { font-size: 10px; }
+  .exportnote .clearnote { margin-left: 10px; }
   .eahead .clearnote { margin-left: 0; }
   /* While "export all tables" is shown it takes the grid's place, using the
      full height, and on wide screens the tables flow into several columns. */
@@ -200,31 +265,22 @@
   .ealist .n { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .overall { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
   .overall[hidden] { display: none; }
-  .overall .obar { flex: 1; min-width: 120px; height: 12px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); overflow: hidden; }
-  .overall .obar i { display: block; height: 100%; width: 0; border-radius: 6px; transition: width .4s ease;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-  .overall.busy .obar i { width: 25% !important; animation: obusy 1.1s ease-in-out infinite alternate; }
-  @keyframes obusy { from { margin-left: 0; } to { margin-left: 75%; } }
-  @media (prefers-reduced-motion: reduce) { .overall.busy .obar i { animation-duration: 3s; } }
-  .overall.fail .obar i { background: var(--danger); }
+  .overall .obar { flex: 1; min-width: 120px; --bs-progress-height: 12px; }
+  .overall .progress-bar { width: 0; }
+  .overall.fail .progress-bar { --bs-progress-bar-bg: var(--danger); }
   .overall .otext { flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   .overall .otext b { color: var(--text); }
   .overall .otext .err { color: var(--danger); }
-  .ealist .bar { height: 7px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; }
-  .ealist .bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
-  .ealist .bar.busy i { width: 30% !important; animation: eabusy 1.2s ease-in-out infinite alternate; }
-  @keyframes eabusy { from { margin-left: 0; } to { margin-left: 70%; } }
+  .ealist .bar { --bs-progress-height: 7px; --bs-progress-border-radius: 4px; }
   .ealist .s { color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ealist .err { color: var(--danger); }
   .objtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
   .objtabs:empty { display: none; }
-  .objtabs button { padding: 3px 8px; font-size: 12px; border-radius: 999px; display: inline-flex; gap: 5px; align-items: center; }
-  .objtabs button .cnt { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .objtabs button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  .objtabs button.on .cnt { color: var(--accent); }
-  .objtabs button.none { opacity: .45; }
-  .objtabs button.statsbtn { padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--muted); }
-  .objtabs button.statsbtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .objtabs .btn { display: inline-flex; gap: 5px; align-items: center; }
+  .objtabs .btn .cnt { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .objtabs .btn.on .cnt { color: var(--accent); }
+  .objtabs .btn.none { opacity: .45; }
+  .objtabs .btn.statsbtn { --bs-btn-font-size: 11px; font-weight: 600; }
   .objhead { display: flex; align-items: center; gap: 6px; padding: 2px 8px 4px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--panel); z-index: 1; }
   .objhead button { border: 0; background: none; padding: 2px 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; cursor: pointer; }
   .objhead button:hover, .objhead button.on { color: var(--accent); }
@@ -244,9 +300,7 @@
   /* The open object looks like the active tab pill. */
   #objTree ul.list li.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); border-radius: 14px; }
   main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
-  .tabs { display: flex; align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); border-bottom: 1px solid var(--border); }
-  .tabs button { border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; background: none; padding: 6px 14px; margin-bottom: -1px; color: var(--muted); }
-  .tabs button.on { background: var(--panel); border-color: var(--border); color: var(--text); font-weight: 600; }
+  .tabs { align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); flex-wrap: nowrap; }
   .tabs .title { margin-left: 12px; font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     color: var(--accent); font-weight: 600; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 4px; max-width: 45%; }
   .tabs .title:empty { display: none; }
@@ -255,7 +309,8 @@
   #dataPane[hidden], #defPane[hidden], #filesPane[hidden], #logsPane[hidden] { display: none; }
   #logsPane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
   #logsPane .filesbar input[type=search] { flex: 1; min-width: 220px; }
-  #logsPane .filesbar select { width: auto; }
+  #logsPane .filesbar .form-select { width: auto; }
+  .filesbar .form-check { margin: 0; white-space: nowrap; }
   .lginfo { padding: 4px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
   .lginfo .live { color: var(--accent); font-weight: 600; }
   /* ☰ → Compare databases */
@@ -263,19 +318,18 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-miss: #f2867c; --c-miss-bg: #3a1f1d; --c-extra: #8ab8f0; --c-extra-bg: #1c2a3b; --c-diff: #f0c060; --c-diff-bg: #3a3018; } }
   #comparePane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
   #comparePane[hidden] { display: none; }
-  #comparePane .filesbar select { width: auto; max-width: 260px; }
+  #comparePane .filesbar .form-select { width: auto; max-width: 260px; }
   .cmpothers { display: flex; flex-wrap: wrap; gap: 4px; }
-  .cmpothers label { white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; cursor: pointer; background: var(--panel); }
-  .cmpothers label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  .cmpothers input { margin: 0; }
+  .cmpothers .btn { white-space: nowrap; }
   .cmpothers .none { font-size: 12px; color: var(--muted); }
   .cmpbody { display: grid; grid-template-columns: minmax(320px, 5fr) minmax(0, 6fr); min-height: 0; }
   .cmpbody[hidden] { display: none; }
   .cmpbody > div { min-height: 0; display: grid; grid-template-rows: auto 1fr; }
   .cmpleft { border-right: 1px solid var(--border); }
   .cmpbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--panel-2); font-size: 12px; }
-  .cmpbar input[type=search] { flex: 1; min-width: 120px; padding: 3px 8px; }
-  .cmpbar select { width: auto; padding: 2px 6px; }
+  .cmpbar input[type=search] { flex: 1; min-width: 120px; }
+  .cmpbar .form-select { width: auto; }
+  .cmpbar .form-label { margin: 0; }
   .cmpscroll { overflow: auto; min-height: 0; }
   table.cmp { border-collapse: collapse; width: 100%; font-size: 12.5px; }
   table.cmp th { position: sticky; top: 0; background: var(--panel-2); text-align: left; font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; z-index: 1; }
@@ -313,8 +367,7 @@
   pre.cmpscript .c { color: var(--muted); }
   pre.cmpscript .w { color: var(--c-miss); font-weight: 600; }
   .cmpprog { display: flex; align-items: center; gap: 10px; }
-  .cmpprog .obar { width: 180px; height: 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); overflow: hidden; display: inline-block; }
-  .cmpprog .obar i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+  .cmpprog .obar { width: 180px; --bs-progress-height: 8px; --bs-progress-border-radius: 4px; display: inline-flex; }
   /* Not connected: the data pane shows only the lonely cactus scene */
   #dataPane.offline { grid-template-rows: 1fr; }
   #dataPane.offline > .grid { grid-row: 1; }
@@ -383,13 +436,12 @@
   @keyframes spin { to { transform: rotate(-360deg); } }
   @media (prefers-reduced-motion: reduce) { .noconn * { animation: none !important; } .noconn .ripple.a, .noconn .ask { opacity: .7; } .noconn .star { opacity: .7; } .noconn .tw { transform: translateX(330px); } .noconn .tw.t2 { transform: translateX(110px); } .noconn .tw.t3 { transform: translateX(405px); } }
   @media (max-width: 900px) { .cmpbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) minmax(260px, 1fr); } .cmpleft { border-right: 0; border-bottom: 1px solid var(--border); } }
-  a.btn { display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 13px; }
-  a.btn:hover { border-color: var(--accent); }
   #filesPane { display: grid; grid-template-rows: auto auto 1fr auto; background: var(--panel); }
   .filesbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
   .filesbar .spacer { flex: 1; }
   #fFilter { width: 180px; max-width: 100%; }
   #fConn { width: auto; max-width: 220px; }
+  .filesbar .form-control[type=search] { width: auto; }
   .ftable td.fconn { font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
   .ftable td.fconn .none { color: var(--muted); font-style: italic; }
   .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
@@ -398,8 +450,7 @@
   :root[data-theme="dark"] .ftable td.fname mark { background: #6b5a12; }
   .fnomatch { text-align: center; color: var(--muted); padding: 24px !important; }
   .ftypes { display: flex; gap: 4px; flex-wrap: wrap; }
-  .ftypes button { padding: 2px 9px; font-size: 12px; border-radius: 999px; }
-  .ftypes button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
   .ftypes .cnt { color: var(--muted); margin-left: 3px; font-size: 11px; }
   .fsel { font-size: 12px; color: var(--muted); }
   .ftable { overflow: auto; min-height: 0; }
@@ -413,13 +464,11 @@
   .ftable tbody tr { cursor: pointer; }
   .ftable tbody tr.sel td { background: var(--accent-soft) !important; }
   .ftable th.facts, .ftable td.facts { width: 70px; padding: 3px 6px; cursor: default; }
-  .facts button { padding: 3px 5px; border: 1px solid transparent; background: none; color: var(--muted); line-height: 0; border-radius: 5px; }
-  .facts button:hover:not(:disabled) { border-color: var(--border); color: var(--text); background: var(--panel); }
-  .facts button.del:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
-  .facts svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .facts .btn { --bs-btn-padding-x: 5px; --bs-btn-padding-y: 1px; font-size: 15px; }
+  .facts .btn.del:hover:not(:disabled) { color: var(--danger); }
   .fdlist { margin: 8px 0 0; padding-left: 18px; max-height: 200px; overflow: auto; font: 12px/1.6 var(--mono); overflow-wrap: anywhere; }
-  dialog.modal.fprev { width: min(1100px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); padding: 0; }
-  dialog.modal.fprev[open] { display: grid; grid-template-rows: auto 1fr auto; }
+  dialog.dlg.fprev { width: min(1100px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); padding: 0; }
+  dialog.dlg.fprev[open] { display: grid; grid-template-rows: auto 1fr auto; }
   .fphead { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
   .fphead h3 { margin: 0; font: 600 14px var(--mono); overflow-wrap: anywhere; }
   .fphead .spacer { flex: 1; }
@@ -445,7 +494,7 @@
   .editor { padding: 12px 16px 8px; background: var(--panel); border-bottom: 1px solid var(--border); }
   textarea#sql { font-family: var(--mono); font-size: 13px; min-height: 76px; height: 96px; resize: vertical; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-  .toolbar select { width: auto; padding: 5px 6px; }
+  .toolbar .form-select { width: auto; }
   .toolbar .spacer { flex: 1; }
   .toolbar .group { display: flex; gap: 4px; align-items: center; }
   .toolbar .group span { font-size: 12px; color: var(--muted); margin-right: 2px; }
@@ -467,23 +516,24 @@
   th.n { z-index: 2; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12px; }
   td.null { color: var(--null); font-style: italic; }
-  tbody tr:nth-child(even) td:not(.n) { background: var(--row-alt); }
-  tbody tr:hover td:not(.n) { background: var(--row-hover); }
-  .placeholder { display: grid; place-items: center; height: 100%; color: var(--muted); text-align: center; padding: 24px; }
-  .placeholder .big { font-size: 46px; }
-  dialog.modal { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; width: min(440px, calc(100vw - 32px));
-    background: var(--panel); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
-  dialog.modal::backdrop { background: rgba(0,0,0,.35); }
-  dialog.modal h3 { margin: 0 0 6px; font-size: 16px; }
-  dialog.modal.wide { width: min(640px, calc(100vw - 32px)); }
+  table.datagrid { width: auto; }
+  .table > :not(caption) > * > th { background-color: var(--panel-2); }
+  .table > :not(caption) > * > td.n { background-color: var(--panel-2); box-shadow: none; }
+  .table.cvset > :not(caption) > * > * { background-color: var(--panel); border-right: 0; position: static; }
+  .emptymsg { display: grid; place-items: center; height: 100%; color: var(--muted); text-align: center; padding: 24px; }
+  .emptymsg .big { font-size: 46px; }
+  /* Dialogs: the browser's own <dialog> (focus, Esc, the backdrop) in Bootstrap's modal look. */
+  dialog.dlg { border: 1px solid var(--border); border-radius: var(--bs-border-radius-lg); padding: 18px 20px; width: min(440px, calc(100vw - 32px));
+    background: var(--panel); color: var(--text); box-shadow: var(--bs-box-shadow-lg); }
+  dialog.dlg::backdrop { background: rgba(0,0,0,.5); }
+  dialog.dlg h3 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+  dialog.dlg.wide { width: min(640px, calc(100vw - 32px)); }
   .lgtext { font-family: var(--mono); font-size: 11.5px; line-height: 1.45; background: var(--panel-2);
     padding: 8px 12px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 0; }
   .lgtext .bad { color: var(--danger); }
   .lgtext .new { background: var(--accent-soft); }
   /* Check for update: one row per system, with a small copy button. */
-  .upstatus { font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); margin: 6px 0 4px; }
-  .upstatus.new { background: var(--accent-soft); border-color: var(--accent); }
-  .upstatus.bad { background: var(--danger-soft); border-color: var(--danger); }
+  .upstatus { margin: 6px 0 4px; }
   ul.setup { margin-top: 8px; max-height: min(52vh, 460px); overflow-y: auto; }
   ul.setup li { cursor: default; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 6px 8px; }
   ul.setup li:hover { background: none; }
@@ -492,39 +542,31 @@
   ul.setup .plat { font-size: 12px; font-weight: 600; }
   ul.setup .plat .tag { margin-left: 6px; color: var(--accent); border-color: var(--accent); }
   ul.setup code { grid-column: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-  ul.setup li button.copy, ul.setup li:hover button.copy { display: inline-flex; grid-column: 2; grid-row: 1 / span 2; padding: 4px 6px; line-height: 0; }
-  button.copy svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  button.copy.done { color: var(--accent); border-color: var(--accent); }
+  ul.setup li .btn.copy, ul.setup li:hover .btn.copy { display: inline-flex; grid-column: 2; grid-row: 1 / span 2; }
+  .btn.copy.done { color: var(--accent); border-color: var(--accent); }
   /* Install: the new version replaces this one and restarts. */
-  .upinstall { border: 1px solid var(--accent); border-radius: 6px; padding: 8px 10px; margin: 6px 0 4px; font-size: 13px; }
+  .upinstall { --bs-card-spacer-y: 8px; --bs-card-spacer-x: 10px; margin: 6px 0 4px; font-size: 13px; }
   .upinstall p { margin: 0 0 8px; }
   .upinstall code { font-size: 12px; overflow-wrap: anywhere; }
   .upinstall .uprow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .upinstall .bar { flex: 1 1 160px; height: 7px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; }
-  .upinstall .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .upinstall .bar { flex: 1 1 160px; --bs-progress-height: 7px; --bs-progress-border-radius: 4px; }
   .upinstall .upmsg { font-size: 12px; color: var(--muted); }
   .upinstall .upmsg.bad { color: var(--danger); }
   .updot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 1px; }
   .updot[hidden] { display: none; }
-  .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--border); border-top-color: var(--accent);
-    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; margin-right: 4px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+  .spinner-border-sm { --bs-spinner-width: 11px; --bs-spinner-height: 11px; --bs-spinner-border-width: 2px; color: var(--accent); vertical-align: -1px; }
   .warn { color: var(--danger); }
   .folder { padding: 2px 0 4px; }
   .folder code { display: block; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
   .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
   .hint code { overflow-wrap: anywhere; }
-  .dresult { margin-top: 12px; padding: 8px 10px; border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
-  .dresult.ok { background: var(--accent-soft); color: var(--accent); }
-  .dresult.bad { background: var(--danger-soft); color: var(--danger); }
-  .gabanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 10px;
-    max-width: min(760px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 10px; background: var(--panel); color: var(--text);
-    border: 1px solid var(--border); box-shadow: 0 6px 24px rgba(0, 0, 0, .18); font-size: 13px; }
+  .dresult { margin-top: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .gabanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 1060; display: flex; flex-direction: row; align-items: center; gap: 10px;
+    max-width: min(760px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 10px; font-size: 13px; }
   .gabanner[hidden] { display: none; }
   .gabanner span { flex: 1; }
   @media (max-width: 640px) { .gabanner { flex-wrap: wrap; } }
-  dialog.modal.ctr { width: min(760px, calc(100vw - 32px)); }
+  dialog.dlg.ctr { width: min(760px, calc(100vw - 32px)); }
   .row2.half { grid-template-columns: 1fr 1fr; }
   ul.ctrt { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
   ul.ctrt li { padding: 2px 0; }
@@ -549,21 +591,16 @@
   .mggrid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; margin-top: 12px; }
   @media (max-width: 760px) { .mggrid { grid-template-columns: minmax(0, 1fr); } .mgarrow { transform: rotate(90deg); justify-self: center; } }
   .mgarrow { align-self: center; font-size: 22px; color: var(--muted); }
-  .mgcard { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px 14px; background: var(--panel); margin-top: 10px; min-width: 0; }
+  .mgcard { --bs-card-spacer-y: 10px; --bs-card-spacer-x: 14px; padding-bottom: 14px; margin-top: 10px; min-width: 0; }
   .mggrid .mgcard { margin-top: 0; }
   .mgcard h4 { margin: 0 0 4px; font-size: 13px; }
   .mgopts { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
-  .mgopts label { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; }
-  .mgopts label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  .mgopts input { margin: 0; width: auto; }
+  .mgopts .btn { white-space: nowrap; }
   .mgreshead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .mgreshead .spacer { flex: 1; }
   .mgreshead .btngroup { margin-left: 0; }
-  .btngroup a.btn { margin: 0; padding: 3px 9px; font-size: 12px; border-radius: 6px 0 0 6px; white-space: nowrap; }
-  .btngroup a.btn + button { margin-left: -1px; }
-  .btngroup a.btn[hidden], .btngroup button[hidden] { display: none; }
   .mgfilter { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
-  .mgfilter select { width: auto; }
+  .mgfilter .form-select { width: auto; }
   .mgfilter input { flex: 1; min-width: 160px; }
   table.mgtable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.mgtable th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); position: static; }
@@ -594,35 +631,25 @@
   .cvhead .st { font-size: 12px; border-radius: 4px; padding: 1px 6px; background: var(--panel-2); color: var(--muted); }
   .cvhead .st.running { background: var(--accent-soft); color: var(--accent); }
   .cvhead .st.exited, .cvhead .st.dead, .cvhead .st.stopped { background: var(--danger-soft); color: var(--danger); }
-  .btngroup { display: inline-flex; margin-left: auto; }
-  .btngroup button { margin: 0; padding: 3px 9px; font-size: 12px; border-radius: 0; white-space: nowrap; }
-  .btngroup button + button { margin-left: -1px; }
-  .btngroup button:first-child { border-radius: 6px 0 0 6px; }
-  .btngroup button:last-child { border-radius: 0 6px 6px 0; }
-  .btngroup button:hover:not(:disabled), .btngroup button:focus-visible { position: relative; z-index: 1; }
+  .btngroup { margin-left: auto; }
+  .btngroup .btn { white-space: nowrap; }
   .dactions .btngroup { margin-left: 0; }
-  .btngroup.icons button { padding: 3px 8px; font-size: 13px; line-height: 1.3; }
+  .btngroup.icons .btn { --bs-btn-font-size: 14px; --bs-btn-padding-x: 7px; }
   .cvusage { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   @media (max-width: 640px) { .cvusage { grid-template-columns: 1fr; } }
-  .cvusage .tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--panel-2); min-width: 0; }
+  .cvusage .tile { --bs-card-bg: var(--panel-2); --bs-card-spacer-y: 10px; --bs-card-spacer-x: 12px; min-width: 0; }
   .cvusage .lbl { font-size: 12px; color: var(--muted); }
   .cvusage .val { font-size: 20px; font-weight: 600; margin: 2px 0 6px; font-variant-numeric: tabular-nums; }
-  .cvusage .bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
-  .cvusage .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
-  .cvusage .bar i.hot { background: var(--danger); }
+  .cvusage .bar { --bs-progress-height: 6px; --bs-progress-border-radius: 3px; --bs-progress-bg: var(--border); }
+  .cvusage .progress-bar { width: 0; }
   .cvusage .sub { font-size: 12px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
   table.cvset { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.cvset th { text-align: left; font-weight: 500; color: var(--muted); padding: 3px 12px 3px 0; vertical-align: top; white-space: nowrap; width: 1%; }
   table.cvset td { padding: 3px 0; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; white-space: normal; max-width: none; text-overflow: clip; }
-  .cvask { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
-  .cvask.danger { border-color: var(--danger); }
+  .cvask { margin-top: 12px; --bs-card-spacer-y: 10px; --bs-card-spacer-x: 12px; }
   .cvask ul { margin: 6px 0; padding-left: 20px; font-size: 13px; }
   .edsub { margin: 22px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
   .dresult.busy { background: var(--panel-2); color: var(--muted); }
-  button.danger { color: var(--danger); }
-  button.danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-soft); }
-  button.dangerfill { background: var(--danger); border-color: var(--danger); color: #fff; }
-  button.dangerfill:hover:not(:disabled) { filter: brightness(1.1); }
   .sdtext { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 6px 0 0; }
   #stopped { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; text-align: center;
     background: var(--bg); padding: 16px; }
@@ -632,13 +659,7 @@
   #stopped code { font-family: var(--mono); background: var(--panel-2); padding: 2px 6px; border-radius: 4px; color: var(--text); }
   .dactions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
   .dactions .spacer { flex: 1; }
-  .toast {
-    position: fixed; right: 16px; bottom: 16px; padding: 10px 14px; border-radius: 8px;
-    background: var(--text); color: var(--bg); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
-    opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 520px; white-space: pre-line;
-  }
-  .toast.show { opacity: 1; transform: none; }
-  .toast.err { background: var(--danger); color: #fff; }
+  .toast-container { z-index: 1090; }
   @media (max-width: 760px) {
     body { overflow: auto; }
     .layout { grid-template-columns: minmax(0, 1fr); }
@@ -650,7 +671,7 @@
 <body>
 <header>
   <h1 class="brand"><img src="cactusdb.svg" alt="" width="28" height="28"><span class="bname">cactusdb<small class="bver" id="appVersion"></small></span></h1>
-  <span class="badge" title="INSERT, UPDATE, DELETE and schema changes are blocked">read-only</span>
+  <span class="badge rounded-pill text-success-emphasis bg-success-subtle border border-success" title="INSERT, UPDATE, DELETE and schema changes are blocked">read-only</span>
   <div class="status" id="status">Not connected</div>
   <div class="flow" aria-hidden="true">
     <svg viewBox="0 0 400 36" preserveAspectRatio="none">
@@ -672,9 +693,9 @@
       </g>
     </svg>
   </div>
-  <button id="reconnectBtn" class="small" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open">↻ Refresh</button>
-  <button id="disconnectBtn" class="small" hidden>Disconnect</button>
-  <button id="shutdownBtn" class="small danger" hidden title="Stop this background cactusdb">⏻ Shutdown</button>
+  <button id="reconnectBtn" class="btn btn-sm btn-outline-secondary" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
+  <button id="disconnectBtn" class="btn btn-sm btn-outline-secondary" hidden>Disconnect</button>
+  <button id="shutdownBtn" class="btn btn-sm btn-outline-danger" hidden title="Stop this background cactusdb"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
 </header>
 
 <div class="layout">
@@ -683,17 +704,17 @@
       <h2><button class="toggle" aria-expanded="true">Objects</button><span id="objCount"></span></h2>
       <div class="exportall">
         <span>Export all tables</span>
-        <button data-allfmt="xlsx" title="Export all tables to Excel, one file per table" aria-label="Export all tables to Excel" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#217346"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XLS</text></svg></button>
-        <button data-allfmt="csv" title="Export all tables to CSV, one file per table" aria-label="Export all tables to CSV" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#0e7490"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">CSV</text></svg></button>
-        <button data-allfmt="json" title="Export all tables to JSON, one file per table" aria-label="Export all tables to JSON" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#b45309"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">JSON</text></svg></button>
-        <button data-allfmt="xml" title="Export all tables to XML, one file per table" aria-label="Export all tables to XML" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#7c3aed"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">XML</text></svg></button>
-        <button data-allfmt="all" title="Export all tables to Excel, CSV, JSON and XML in one go, one file per table and format" aria-label="Export all tables to all four formats" disabled><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5l5 5V21.5H6z" style="fill:var(--panel)" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M14.5 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="1.5" y="11" width="17" height="7.5" rx="1.5" fill="#475569"/><text x="10" y="16.6" font-size="5.6" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,Segoe UI,sans-serif">ALL</text></svg></button>
+        <button class="btn btn-sm btn-link exp-icon" data-allfmt="xlsx" title="Export all tables to Excel, one file per table" aria-label="Export all tables to Excel" disabled><i class="bi bi-filetype-xlsx fmt-xlsx" aria-hidden="true"></i></button>
+        <button class="btn btn-sm btn-link exp-icon" data-allfmt="csv" title="Export all tables to CSV, one file per table" aria-label="Export all tables to CSV" disabled><i class="bi bi-filetype-csv fmt-csv" aria-hidden="true"></i></button>
+        <button class="btn btn-sm btn-link exp-icon" data-allfmt="json" title="Export all tables to JSON, one file per table" aria-label="Export all tables to JSON" disabled><i class="bi bi-filetype-json fmt-json" aria-hidden="true"></i></button>
+        <button class="btn btn-sm btn-link exp-icon" data-allfmt="xml" title="Export all tables to XML, one file per table" aria-label="Export all tables to XML" disabled><i class="bi bi-filetype-xml fmt-xml" aria-hidden="true"></i></button>
+        <button class="btn btn-sm btn-link exp-icon" data-allfmt="all" title="Export all tables to Excel, CSV, JSON and XML in one go, one file per table and format" aria-label="Export all tables to all four formats" disabled><i class="bi bi-files fmt-all" aria-hidden="true"></i></button>
       </div>
-      <div class="filterrow">
-        <input id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
-        <button id="refreshBtn" class="small" title="Refresh the connection and reload every table, view, procedure, trigger…" disabled>⟳</button>
-        <button id="ddlBtn" class="small" title="Export the DDL (CREATE statements) of every object to a .sql file in &lt;export folder&gt;/&lt;connection&gt;/sql" disabled>DDL</button>
-        <button id="backupBtn" class="small" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
+      <div class="input-group input-group-sm filterrow">
+        <input class="form-control form-control-sm" id="objFilter" placeholder="Filter tables, views, procedures…" disabled>
+        <button id="refreshBtn" class="btn btn-sm btn-outline-secondary" title="Refresh the connection and reload every table, view, procedure, trigger…" disabled><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+        <button id="ddlBtn" class="btn btn-sm btn-outline-secondary" title="Export the DDL (CREATE statements) of every object to a .sql file in &lt;export folder&gt;/&lt;connection&gt;/sql" disabled>DDL</button>
+        <button id="backupBtn" class="btn btn-sm btn-outline-secondary" title="Back up the whole database (every object and every row) to a compressed .zip in &lt;export folder&gt;/&lt;connection&gt;/backup" disabled>Backup</button>
       </div>
       <div class="objtabs" id="objTabs" role="tablist"></div>
       <div class="objstats" id="objStats" hidden></div>
@@ -701,18 +722,18 @@
     </section>
     <!-- Connections and settings live in a pop-up menu, opened from the bar at
          the bottom, so the sidebar shows only the database's objects. -->
-    <div class="navmenu" id="navMenu" hidden role="dialog" aria-label="Menu">
+    <div class="navmenu card shadow-lg" id="navMenu" hidden role="dialog" aria-label="Menu">
     <nav class="menuitems" aria-label="Menu">
-      <button data-menu="connections" title="Your saved connections">🔌 Connections</button>
-      <button data-menu="new" title="Add a connection, test it, then connect or save it">＋ New connection</button>
-      <button data-menu="folder" title="Choose where exports and backups are saved">📁 Folder setup</button>
-      <button data-menu="drivers" title="The databases cactusdb supports and their drivers">🧩 Drivers</button>
-      <button data-menu="settings" title="When to disconnect an unused connection">⚙ Settings</button>
-      <button data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request">📜 Logs</button>
-      <button data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes">🐳 DB container deployment</button>
-      <button data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences">⇄ Compare databases</button>
-      <button data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB">⇢ Migrate database</button>
-      <button data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system">⬆ Check for update<span class="updot" id="updateDot" hidden></span></button>
+      <button class="btn btn-outline-secondary text-start" data-menu="connections" title="Your saved connections"><i class="bi bi-plug" aria-hidden="true"></i> Connections</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="new" title="Add a connection, test it, then connect or save it"><i class="bi bi-plus-lg" aria-hidden="true"></i> New connection</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="folder" title="Choose where exports and backups are saved"><i class="bi bi-folder2-open" aria-hidden="true"></i> Folder setup</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="drivers" title="The databases cactusdb supports and their drivers"><i class="bi bi-puzzle" aria-hidden="true"></i> Drivers</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="settings" title="When to disconnect an unused connection"><i class="bi bi-gear" aria-hidden="true"></i> Settings</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request"><i class="bi bi-journal-text" aria-hidden="true"></i> Logs</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes"><i class="bi bi-box-seam" aria-hidden="true"></i> DB container deployment</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Compare databases</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate database</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i> Check for update<span class="updot" id="updateDot" hidden></span></button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
          shown: connections are added and edited in the connection dialog. -->
@@ -721,76 +742,76 @@
       <div class="engines" id="engines"></div>
 
       <div id="fileFields">
-        <label for="dbFile">SQLite database file</label>
-        <input id="dbFile" placeholder="/path/to/database.db" spellcheck="false">
+        <label class="form-label" for="dbFile">SQLite database file</label>
+        <input class="form-control form-control-sm" id="dbFile" placeholder="/path/to/database.db" spellcheck="false">
       </div>
 
       <div id="serverFields" hidden>
         <div class="row2">
-          <div><label for="host">Host</label><input id="host" value="localhost" spellcheck="false"></div>
-          <div><label for="port">Port</label><input id="port" type="number" min="0" max="65535"></div>
+          <div><label class="form-label" for="host">Host</label><input class="form-control form-control-sm" id="host" value="localhost" spellcheck="false"></div>
+          <div><label class="form-label" for="port">Port</label><input class="form-control form-control-sm" id="port" type="number" min="0" max="65535"></div>
         </div>
-        <label for="user">Username</label>
-        <input id="user" autocomplete="username" spellcheck="false">
-        <label for="pass">Password</label>
-        <span class="pwwrap"><input id="pass" type="password" autocomplete="current-password"><button type="button" class="eye" data-pw="pass" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
-        <label for="dbName" id="dbNameLabel">Database</label>
-        <input id="dbName" spellcheck="false">
+        <label class="form-label" for="user">Username</label>
+        <input class="form-control form-control-sm" id="user" autocomplete="username" spellcheck="false">
+        <label class="form-label" for="pass">Password</label>
+        <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="pass" type="password" autocomplete="current-password"><button type="button" class="btn btn-outline-secondary eye" data-pw="pass" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
+        <label class="form-label" for="dbName" id="dbNameLabel">Database</label>
+        <input class="form-control form-control-sm" id="dbName" spellcheck="false">
       </div>
 
-      <label class="check"><input type="checkbox" id="saveConn"> Save connection (protected by its own password)</label>
+      <label class="form-check form-switch"><input class="form-check-input" type="checkbox" id="saveConn" role="switch"> Save connection (protected by its own password)</label>
       <div id="saveNameWrap" hidden>
-        <label for="connName">Connection name</label>
-        <input id="connName" placeholder="e.g. Production MySQL">
-        <label for="connLock">Connection password <span class="hint-inline">protects this saved connection</span></label>
-        <input id="connLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
-        <label for="connLock2">Confirm connection password</label>
-        <input id="connLock2" type="password" autocomplete="new-password">
+        <label class="form-label" for="connName">Connection name</label>
+        <input class="form-control form-control-sm" id="connName" placeholder="e.g. Production MySQL">
+        <label class="form-label" for="connLock">Connection password <span class="hint-inline">protects this saved connection</span></label>
+        <input class="form-control form-control-sm" id="connLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
+        <label class="form-label" for="connLock2">Confirm connection password</label>
+        <input class="form-control form-control-sm" id="connLock2" type="password" autocomplete="new-password">
       </div>
 
       <div class="actions">
-        <button class="primary" id="connectBtn">Connect</button>
-        <button id="saveOnlyBtn" title="Save without connecting">Save</button>
+        <button class="btn btn-primary" id="connectBtn">Connect</button>
+        <button class="btn btn-outline-secondary" id="saveOnlyBtn" title="Save without connecting">Save</button>
       </div>
     </section>
 
     <section class="box" data-sec="saved">
-      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button><span class="hbtns"><button id="superBtn" class="small" title="Superuser: open every saved connection">🛡</button><button id="newConnBtn" class="small" title="Add a connection and test it before saving">+ New</button></span></h2>
-      <p class="superbar" id="superBar" hidden>🛡 Superuser: every connection is open. <button class="small" id="superOut">Sign out</button></p>
+      <h2><button class="toggle" aria-expanded="true">Saved connections<span class="sub" id="savedSub"></span></button><span class="hbtns"><button id="superBtn" class="btn btn-sm btn-outline-secondary" title="Superuser: open every saved connection" aria-label="Superuser"><i class="bi bi-shield-lock" aria-hidden="true"></i></button><button id="newConnBtn" class="btn btn-sm btn-outline-secondary" title="Add a connection and test it before saving"><i class="bi bi-plus-lg" aria-hidden="true"></i> New</button></span></h2>
+      <p class="superbar" id="superBar" hidden><i class="bi bi-shield-lock" aria-hidden="true"></i> Superuser: every connection is open. <button class="btn btn-sm btn-outline-secondary" id="superOut">Sign out</button></p>
       <ul class="list" id="savedList"><li class="empty">None yet</li></ul>
     </section>
 
     </div>
-    <div class="navbar">
-      <button id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup, drivers, settings and updates">
-        <span class="navicon" aria-hidden="true">☰</span>
+    <div class="navfoot">
+      <button class="btn btn-outline-secondary" id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup, drivers, settings and updates">
+        <span class="navicon" aria-hidden="true"><i class="bi bi-list" aria-hidden="true"></i></span>
         <span class="navtext"><b>Connections<span class="updot" id="navUpdateDot" hidden title="A newer cactusdb is available"></span></b><small id="navConn">Not connected</small></span>
-        <span class="navcaret" aria-hidden="true">▴</span>
+        <span class="navcaret" aria-hidden="true"><i class="bi bi-chevron-up" aria-hidden="true"></i></span>
       </button>
     </div>
   </aside>
 
   <main>
-    <div class="tabs">
-      <button data-tab="data" class="on">Data</button>
-      <button data-tab="def">Definition</button>
-      <button data-tab="queries" id="queriesTab" hidden title="Queries saved for this connection">Saved queries</button>
-      <button data-tab="files" title="Download exported files, compressed">Exported files</button>
-      <button data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
-      <button data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
-      <button data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
-      <button data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
+    <div class="tabs nav nav-tabs">
+      <button class="nav-link active" data-tab="data">Data</button>
+      <button class="nav-link" data-tab="def">Definition</button>
+      <button class="nav-link" data-tab="queries" id="queriesTab" hidden title="Queries saved for this connection">Saved queries</button>
+      <button class="nav-link" data-tab="files" title="Download exported files, compressed">Exported files</button>
+      <button class="nav-link" data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
+      <button class="nav-link" data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
+      <button class="nav-link" data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
+      <button class="nav-link" data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
       <span class="title" id="tabTitle"></span>
     </div>
     <div class="pane" id="dataPane">
     <div class="editor">
-      <textarea id="sql" spellcheck="false" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
+      <textarea class="form-control form-control-sm" id="sql" spellcheck="false" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
       <div class="toolbar">
-        <button class="primary" id="runBtn" disabled>▶ Run <small>(Ctrl+Enter)</small></button>
-        <button id="saveQueryBtn" disabled title="Save this query for the connection">💾 Save query</button>
+        <button class="btn btn-primary" id="runBtn" disabled><i class="bi bi-play-fill" aria-hidden="true"></i> Run <small>(Ctrl+Enter)</small></button>
+        <button class="btn btn-outline-secondary" id="saveQueryBtn" disabled title="Save this query for the connection"><i class="bi bi-floppy" aria-hidden="true"></i> Save query</button>
         <div class="group">
           <span>Show</span>
-          <select id="limit">
+          <select class="form-select form-select-sm" id="limit">
             <option value="100">100 rows</option>
             <option value="1000" selected>1,000 rows</option>
             <option value="10000">10,000 rows</option>
@@ -800,30 +821,30 @@
         <div class="spacer"></div>
         <div class="group">
           <span>Export all rows to folder</span>
-          <button data-fmt="xlsx" class="exp" disabled>Excel</button>
-          <button data-fmt="json" class="exp" disabled>JSON</button>
-          <button data-fmt="xml" class="exp" disabled>XML</button>
-          <button data-fmt="csv" class="exp" disabled>CSV</button>
+          <button data-fmt="xlsx" class="btn btn-outline-secondary exp" disabled>Excel</button>
+          <button data-fmt="json" class="btn btn-outline-secondary exp" disabled>JSON</button>
+          <button data-fmt="xml" class="btn btn-outline-secondary exp" disabled>XML</button>
+          <button data-fmt="csv" class="btn btn-outline-secondary exp" disabled>CSV</button>
         </div>
       </div>
       <div class="overall" id="overall" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Export progress">
-        <div class="obar"><i></i></div>
+        <div class="progress obar"><div class="progress-bar"></div></div>
         <span class="otext" id="overallText"></span>
       </div>
     </div>
     <div class="info" id="info"></div>
     <div class="exportnote" id="exportNote" hidden></div>
     <div class="grid" id="grid">
-      <div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>Connect to a database, then pick a table on the left.</p></div></div>
+      <div class="emptymsg"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>Connect to a database, then pick a table on the left.</p></div></div>
     </div>
     </div>
     <div class="pane" id="queriesPane" hidden>
       <div class="filesbar">
         <span class="flabel">Saved queries</span><span class="fsel" id="qConn"></span>
-        <input id="qFilter" type="search" placeholder="Filter by name or description…" spellcheck="false" autocomplete="off">
+        <input class="form-control form-control-sm" id="qFilter" type="search" placeholder="Filter by name or description…" spellcheck="false" autocomplete="off">
         <span class="spacer"></span>
-        <select id="qExportAll" class="qexpsel" title="Export the data (every row, not the SQL) of all saved queries shown, one file per query and format, to the export folder" aria-label="Export the data of all saved queries"><option value="">⤓ Export all queries…</option><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option><option value="json">JSON</option><option value="xml">XML</option><option value="all">All four formats</option></select>
-        <button class="primary" id="qNew" title="Save the query in the editor">+ Save current query</button>
+        <select id="qExportAll" class="form-select form-select-sm qexpsel" title="Export the data (every row, not the SQL) of all saved queries shown, one file per query and format, to the export folder" aria-label="Export the data of all saved queries"><option value="">⤓ Export all queries…</option><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option><option value="json">JSON</option><option value="xml">XML</option><option value="all">All four formats</option></select>
+        <button class="btn btn-primary" id="qNew" title="Save the query in the editor"><i class="bi bi-floppy" aria-hidden="true"></i> Save current query</button>
       </div>
       <div class="exportnote" id="qNote" hidden></div>
       <div class="ftable" id="qTable"></div>
@@ -833,15 +854,15 @@
         <span class="flabel">Type</span>
         <div class="ftypes" id="fTypes" role="group" aria-label="Show file types"></div>
         <label class="flabel" for="fConn">Connection</label>
-        <select id="fConn" title="Show the files of one connection"></select>
+        <select class="form-select form-select-sm" id="fConn" title="Show the files of one connection"></select>
         <label class="flabel" for="fFilter">Name</label>
-        <input id="fFilter" type="search" placeholder="contains…" spellcheck="false" autocomplete="off"
+        <input class="form-control form-control-sm" id="fFilter" type="search" placeholder="contains…" spellcheck="false" autocomplete="off"
           title="Shows files whose name contains this text (any case). Several words: all must appear. Esc clears.">
         <span class="spacer"></span>
         <span class="fsel" id="fSel"></span>
-        <button class="small" id="fRefresh" title="Reload the list">⟳</button>
-        <button class="danger" id="fDelete" disabled title="Delete the selected files (asks first)">Delete selected</button>
-        <button class="primary" id="fDownload" disabled title="Compress the selected files into one .zip (highest compression), then download it">Download selected</button>
+        <button class="btn btn-sm btn-outline-secondary" id="fRefresh" title="Reload the list"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+        <button class="btn btn-outline-danger" id="fDelete" disabled title="Delete the selected files (asks first)">Delete selected</button>
+        <button class="btn btn-primary" id="fDownload" disabled title="Compress the selected files into one .zip (highest compression), then download it">Download selected</button>
       </div>
       <div class="exportnote" id="fNote" hidden></div>
       <div class="ftable" id="fTable"></div>
@@ -850,20 +871,20 @@
     <div class="pane" id="logsPane" hidden>
       <div class="filesbar">
         <div class="ftypes" role="group" aria-label="Which log">
-          <button class="on" data-lgkind="log" title="Every action and request">Log</button>
-          <button data-lgkind="crash" title="Fatal errors of cactusdb, when it crashed">Crash log</button>
+          <button class="btn btn-sm btn-outline-secondary rounded-pill on" data-lgkind="log" title="Every action and request">Log</button>
+          <button class="btn btn-sm btn-outline-secondary rounded-pill" data-lgkind="crash" title="Fatal errors of cactusdb, when it crashed">Crash log</button>
         </div>
         <label class="flabel" for="lgDay">Day</label>
-        <select id="lgDay" title="The log of one day: a new file starts every day"></select>
-        <input id="lgFilter" type="search" placeholder="Filter, e.g. FAILED, session=1a2b3c4d, a table or an IP address" spellcheck="false" autocomplete="off" aria-label="Filter the log lines">
-        <label class="check"><input type="checkbox" id="lgErrors"> Problems only</label>
-        <select id="lgLines" aria-label="How many lines"><option value="500">Last 500 lines</option><option value="1000" selected>Last 1,000</option><option value="5000">Last 5,000</option><option value="20000">Last 20,000</option></select>
-        <label class="check"><input type="checkbox" id="lgNewest" checked> Newest first</label>
-        <label class="check" title="Show new lines as they come in, newest at the top (today's log)"><input type="checkbox" id="lgLive"> Live</label>
+        <select class="form-select form-select-sm" id="lgDay" title="The log of one day: a new file starts every day"></select>
+        <input class="form-control form-control-sm" id="lgFilter" type="search" placeholder="Filter, e.g. FAILED, session=1a2b3c4d, a table or an IP address" spellcheck="false" autocomplete="off" aria-label="Filter the log lines">
+        <label class="form-check form-switch"><input class="form-check-input" type="checkbox" id="lgErrors" role="switch"> Problems only</label>
+        <select class="form-select form-select-sm" id="lgLines" aria-label="How many lines"><option value="500">Last 500 lines</option><option value="1000" selected>Last 1,000</option><option value="5000">Last 5,000</option><option value="20000">Last 20,000</option></select>
+        <label class="form-check form-switch"><input class="form-check-input" type="checkbox" id="lgNewest" role="switch" checked> Newest first</label>
+        <label class="form-check form-switch" title="Show new lines as they come in, newest at the top (today's log)"><input class="form-check-input" type="checkbox" id="lgLive" role="switch"> Live</label>
         <span class="spacer"></span>
-        <button class="small" id="lgRefresh" title="Reload">⟳</button>
-        <button id="lgCopy" title="Copy the lines shown">Copy</button>
-        <a class="btn" id="lgZip" href="/api/logs/zip?errors=in-header" download title="Every log and crash log file, of every day kept, in one .zip (highest compression)">⤓ Download all (.zip)</a>
+        <button class="btn btn-sm btn-outline-secondary" id="lgRefresh" title="Reload"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+        <button class="btn btn-outline-secondary" id="lgCopy" title="Copy the lines shown">Copy</button>
+        <a class="btn btn-outline-secondary" id="lgZip" href="/api/logs/zip?errors=in-header" download title="Every log and crash log file, of every day kept, in one .zip (highest compression)"><i class="bi bi-download" aria-hidden="true"></i> Download all (.zip)</a>
       </div>
       <div class="lginfo" id="lgSub"></div>
       <pre id="lgText" class="lgtext" tabindex="0">…</pre>
@@ -871,34 +892,34 @@
     <div class="pane" id="comparePane" hidden>
       <div class="filesbar">
         <label class="flabel" for="cmpMaster">Master</label>
-        <select id="cmpMaster" title="The database the others are compared with: the scripts make them match it"></select>
+        <select class="form-select form-select-sm" id="cmpMaster" title="The database the others are compared with: the scripts make them match it"></select>
         <span class="flabel">Compare with</span>
         <div class="cmpothers" id="cmpOthers" role="group" aria-label="Databases to compare with the master"></div>
-        <label class="check" title="The scripts also drop tables, columns, views, procedures… that the master doesn't have"><input type="checkbox" id="cmpDrops" checked> Drop what the master doesn't have</label>
+        <label class="form-check form-switch" title="The scripts also drop tables, columns, views, procedures… that the master doesn't have"><input class="form-check-input" type="checkbox" id="cmpDrops" role="switch" checked> Drop what the master doesn't have</label>
         <span class="spacer"></span>
-        <button class="primary" id="cmpRun" title="Read the structure of every chosen database and compare it with the master's (no data is compared)">Compare</button>
+        <button class="btn btn-primary" id="cmpRun" title="Read the structure of every chosen database and compare it with the master's (no data is compared)">Compare</button>
       </div>
       <div class="lginfo" id="cmpSub">Choose the master database, then the databases to compare with it. Only the structure (DDL) is compared, never the data.</div>
       <div class="cmpbody" id="cmpBody" hidden>
         <div class="cmpleft">
           <div class="cmpbar">
-            <select id="cmpShow" aria-label="Which objects"><option value="diff" selected>Differences only</option><option value="all">All objects</option></select>
-            <select id="cmpType" aria-label="Object type"><option value="">All types</option></select>
-            <input id="cmpFilter" type="search" placeholder="Filter by name…" spellcheck="false" autocomplete="off" aria-label="Filter by name">
+            <select class="form-select form-select-sm" id="cmpShow" aria-label="Which objects"><option value="diff" selected>Differences only</option><option value="all">All objects</option></select>
+            <select class="form-select form-select-sm" id="cmpType" aria-label="Object type"><option value="">All types</option></select>
+            <input class="form-control form-control-sm" id="cmpFilter" type="search" placeholder="Filter by name…" spellcheck="false" autocomplete="off" aria-label="Filter by name">
           </div>
           <div class="cmpscroll" id="cmpMatrix"></div>
         </div>
         <div class="cmpright">
           <div class="cmpbar">
-            <label for="cmpTarget">Database</label>
-            <select id="cmpTarget"></select>
+            <label class="form-label" for="cmpTarget">Database</label>
+            <select class="form-select form-select-sm" id="cmpTarget"></select>
             <div class="ftypes" role="group" aria-label="Show">
-              <button class="on" data-cmpview="diff" title="The selected object: the master's definition beside this database's, differences highlighted">Differences</button>
-              <button data-cmpview="script" title="The script that makes this database's structure match the master's">Script</button>
+              <button class="btn btn-sm btn-outline-secondary rounded-pill on" data-cmpview="diff" title="The selected object: the master's definition beside this database's, differences highlighted">Differences</button>
+              <button class="btn btn-sm btn-outline-secondary rounded-pill" data-cmpview="script" title="The script that makes this database's structure match the master's">Script</button>
             </div>
             <span class="spacer"></span>
-            <button class="small" id="cmpCopy" title="Copy the script">Copy</button>
-            <button class="small" id="cmpSave" title="Download the script as a .sql file">⤓ .sql</button>
+            <button class="btn btn-sm btn-outline-secondary" id="cmpCopy" title="Copy the script">Copy</button>
+            <button class="btn btn-sm btn-outline-secondary" id="cmpSave" title="Download the script as a .sql file"><i class="bi bi-download" aria-hidden="true"></i> .sql</button>
           </div>
           <div class="cmpscroll" id="cmpDetail"></div>
         </div>
@@ -908,7 +929,7 @@
       <div class="defbar">
         <span class="kind" id="defKind"></span><b id="defName"></b>
         <span class="spacer"></span>
-        <button class="small" id="copyDefBtn" disabled>Copy</button>
+        <button class="btn btn-sm btn-outline-secondary" id="copyDefBtn" disabled>Copy</button>
       </div>
       <pre id="defSrc">Select an object on the left to see its definition.</pre>
     </div>
@@ -917,17 +938,17 @@
         <h2>Migrate a database</h2>
         <p class="hint">Copies the tables (columns, primary keys, unique constraints, indexes, foreign keys and checks), their rows, the sequences, views, procedures, functions and triggers to a <b>new</b> database of another type. The source is only read. cactusdb creates the new database and writes only to it: it refuses one that already exists.</p>
         <div class="mggrid">
-          <section class="mgcard">
+          <section class="card card-body mgcard">
             <h4>1 · From</h4>
-            <label for="mgSource">Source database</label>
-            <select id="mgSource"></select>
+            <label class="form-label" for="mgSource">Source database</label>
+            <select class="form-select form-select-sm" id="mgSource"></select>
             <p class="hint" id="mgSourceInfo"></p>
           </section>
           <div class="mgarrow" aria-hidden="true">⇢</div>
-          <section class="mgcard">
+          <section class="card card-body mgcard">
             <h4>2 · To</h4>
-            <label for="mgEngine">Database type</label>
-            <select id="mgEngine">
+            <label class="form-label" for="mgEngine">Database type</label>
+            <select class="form-select form-select-sm" id="mgEngine">
               <option value="mariadb">MariaDB</option>
               <option value="mysql">MySQL</option>
               <option value="postgres">PostgreSQL</option>
@@ -936,79 +957,79 @@
               <option value="firebird">Firebird</option>
             </select>
             <div id="mgServerWrap">
-              <label for="mgServer">Server: a saved connection to it</label>
-              <select id="mgServer"></select>
+              <label class="form-label" for="mgServer">Server: a saved connection to it</label>
+              <select class="form-select form-select-sm" id="mgServer"></select>
             </div>
-            <label for="mgNewDb" id="mgNewDbLabel">New database</label>
-            <input id="mgNewDb" spellcheck="false" autocomplete="off">
+            <label class="form-label" for="mgNewDb" id="mgNewDbLabel">New database</label>
+            <input class="form-control form-control-sm" id="mgNewDb" spellcheck="false" autocomplete="off">
             <p class="hint" id="mgTargetHint"></p>
           </section>
         </div>
-        <section class="mgcard">
+        <section class="card card-body mgcard">
           <h4>3 · What to migrate</h4>
           <div class="mgopts" role="group" aria-label="What to migrate">
-            <label title="Always: the columns, primary keys, unique constraints, indexes, foreign keys and checks"><input type="checkbox" checked disabled> Tables</label>
-            <label title="Every row of every table"><input type="checkbox" id="mgData" checked> Rows</label>
-            <label title="Sequences (generators), with their current values"><input type="checkbox" id="mgSeqs" checked> Sequences</label>
-            <label title="Views, their queries rewritten for the new database"><input type="checkbox" id="mgViews" checked> Views</label>
-            <label title="Procedures and functions: Firebird's are translated to MariaDB, MySQL or PostgreSQL; between databases of the same kind they are copied"><input type="checkbox" id="mgRoutines" checked> Procedures &amp; functions</label>
-            <label title="Triggers: Firebird's are translated to MariaDB, MySQL or PostgreSQL; between databases of the same kind they are copied"><input type="checkbox" id="mgTriggers" checked> Triggers</label>
+            <input class="btn-check" id="mgTables" type="checkbox" checked disabled autocomplete="off"><label class="btn btn-sm btn-outline-secondary rounded-pill" for="mgTables" title="Always: the columns, primary keys, unique constraints, indexes, foreign keys and checks">Tables</label>
+            <input class="btn-check" type="checkbox" id="mgData" checked autocomplete="off"><label class="btn btn-sm btn-outline-secondary rounded-pill" for="mgData" title="Every row of every table">Rows</label>
+            <input class="btn-check" type="checkbox" id="mgSeqs" checked autocomplete="off"><label class="btn btn-sm btn-outline-secondary rounded-pill" for="mgSeqs" title="Sequences (generators), with their current values">Sequences</label>
+            <input class="btn-check" type="checkbox" id="mgViews" checked autocomplete="off"><label class="btn btn-sm btn-outline-secondary rounded-pill" for="mgViews" title="Views, their queries rewritten for the new database">Views</label>
+            <input class="btn-check" type="checkbox" id="mgRoutines" checked autocomplete="off"><label class="btn btn-sm btn-outline-secondary rounded-pill" for="mgRoutines" title="Procedures and functions: Firebird's are translated to MariaDB, MySQL or PostgreSQL; between databases of the same kind they are copied">Procedures &amp; functions</label>
+            <input class="btn-check" type="checkbox" id="mgTriggers" checked autocomplete="off"><label class="btn btn-sm btn-outline-secondary rounded-pill" for="mgTriggers" title="Triggers: Firebird's are translated to MariaDB, MySQL or PostgreSQL; between databases of the same kind they are copied">Triggers</label>
           </div>
           <div class="row2 half">
             <div>
-              <label for="mgNames">Names in the new database</label>
-              <select id="mgNames">
+              <label class="form-label" for="mgNames">Names in the new database</label>
+              <select class="form-select form-select-sm" id="mgNames">
                 <option value="">As they are</option>
                 <option value="lower">lower case</option>
                 <option value="upper">UPPER CASE</option>
               </select>
             </div>
             <div>
-              <label for="mgMode">How</label>
-              <select id="mgMode">
+              <label class="form-label" for="mgMode">How</label>
+              <select class="form-select form-select-sm" id="mgMode">
                 <option value="run">Create the new database and copy into it</option>
                 <option value="script">Only write the script (.sql): no database is changed</option>
               </select>
             </div>
           </div>
           <div id="mgSuperWrap">
-            <label for="mgSuper">Superuser password</label>
-            <span class="pwwrap"><input id="mgSuper" type="password" autocomplete="off"><button type="button" class="eye" data-pw="mgSuper" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
+            <label class="form-label" for="mgSuper">Superuser password</label>
+            <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="mgSuper" type="password" autocomplete="off"><button type="button" class="btn btn-outline-secondary eye" data-pw="mgSuper" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
             <p class="hint">Only the superuser creates databases. It also opens the saved connections used here.</p>
           </div>
           <div class="dactions">
             <span class="spacer"></span>
-            <button type="button" id="mgStop" hidden title="Stop the migration: the new database is left as it is">■ Stop</button>
-            <button type="button" class="primary" id="mgGo">⇢ Migrate</button>
+            <button class="btn btn-outline-secondary" type="button" id="mgStop" hidden title="Stop the migration: the new database is left as it is"><i class="bi bi-stop-fill" aria-hidden="true"></i> Stop</button>
+            <button type="button" class="btn btn-primary" id="mgGo"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate</button>
           </div>
         </section>
-        <section class="mgcard" id="mgProgress" hidden>
+        <section class="card card-body mgcard" id="mgProgress" hidden>
           <h4 id="mgPhase">Starting…</h4>
-          <div class="cmpprog"><span class="obar"><i id="mgBar"></i></span><span id="mgCount"></span></div>
+          <div class="cmpprog"><span class="progress obar"><span class="progress-bar" id="mgBar"></span></span><span id="mgCount"></span></div>
           <p class="hint" id="mgCurrent"></p>
           <pre class="ctlog" id="mgLog"></pre>
         </section>
-        <section class="mgcard" id="mgResult" hidden>
+        <section class="card card-body mgcard" id="mgResult" hidden>
           <div class="mgreshead">
             <h4 id="mgResTitle">Result</h4>
             <span class="spacer"></span>
-            <span class="btngroup" role="group" aria-label="The new database">
-              <a class="btn" id="mgScript" download title="The SQL of the migration, with what is left to do by hand at the end">⤓ Script (.sql)</a><button type="button" id="mgAddConn" title="Open the New connection dialog filled in for the new database">🔌 Add as connection</button>
+            <span class="btngroup btn-group btn-group-sm" role="group" aria-label="The new database">
+              <a class="btn btn-outline-secondary" id="mgScript" download title="The SQL of the migration, with what is left to do by hand at the end"><i class="bi bi-download" aria-hidden="true"></i> Script (.sql)</a><button class="btn btn-outline-secondary" type="button" id="mgAddConn" title="Open the New connection dialog filled in for the new database"><i class="bi bi-plug" aria-hidden="true"></i> Add as connection</button>
             </span>
           </div>
           <p class="hint" id="mgResSub"></p>
           <div class="mgfilter">
-            <select id="mgShow" aria-label="Show">
+            <select class="form-select form-select-sm" id="mgShow" aria-label="Show">
               <option value="">Everything</option>
               <option value="attention" selected>Needs attention (check, by hand, failed)</option>
               <option value="done">Done</option>
             </select>
-            <input id="mgFilter" type="search" placeholder="Filter by name…" spellcheck="false" autocomplete="off">
+            <input class="form-control form-control-sm" id="mgFilter" type="search" placeholder="Filter by name…" spellcheck="false" autocomplete="off">
           </div>
-          <div class="ftable"><table class="mgtable" id="mgTable"></table></div>
+          <div class="ftable"><table class="table table-sm table-hover mgtable" id="mgTable"></table></div>
           <div id="mgDetail" hidden>
             <h4 class="edsub" id="mgDetTitle"></h4>
-            <div class="dresult bad" id="mgDetErr" hidden></div>
+            <div class="dresult alert alert-danger" id="mgDetErr" hidden></div>
             <ul class="mgnotes" id="mgDetNotes"></ul>
             <div class="mgcode">
               <div><div class="lbl">Source</div><pre class="ctlog" id="mgDetSrc"></pre></div>
@@ -1022,104 +1043,104 @@
       <div class="cvpage">
         <div class="cvhead">
           <h2 id="cvTitle">Container</h2><span class="st" id="cvState"></span>
-          <span class="btngroup" id="cvActs" role="group" aria-label="Container actions">
-            <button type="button" data-cv="start" title="Start the container (needs the superuser password)">▶ Start</button>
-            <button type="button" data-cv="stop" title="Stop the container; it keeps its settings and data (needs the superuser password)">■ Stop</button>
-            <button type="button" data-cv="restart" title="Stop and start the container again (needs the superuser password)">↻ Restart</button>
-            <button type="button" data-cv="delete" class="danger" title="Remove the container; its data folder or volume is kept (needs the superuser password)">🗑 Delete</button>
-            <button type="button" data-cv="purge" class="danger" title="Remove the container, its data folder or volume and its image: everything (needs the superuser password)">☠ Purge</button>
+          <span class="btngroup btn-group btn-group-sm" id="cvActs" role="group" aria-label="Container actions">
+            <button class="btn btn-outline-secondary" type="button" data-cv="start" title="Start the container (needs the superuser password)"><i class="bi bi-play-fill" aria-hidden="true"></i> Start</button>
+            <button class="btn btn-outline-secondary" type="button" data-cv="stop" title="Stop the container; it keeps its settings and data (needs the superuser password)"><i class="bi bi-stop-fill" aria-hidden="true"></i> Stop</button>
+            <button class="btn btn-outline-secondary" type="button" data-cv="restart" title="Stop and start the container again (needs the superuser password)"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart</button>
+            <button type="button" data-cv="delete" class="btn btn-outline-danger" title="Remove the container; its data folder or volume is kept (needs the superuser password)"><i class="bi bi-trash" aria-hidden="true"></i> Delete</button>
+            <button type="button" data-cv="purge" class="btn btn-outline-danger" title="Remove the container, its data folder or volume and its image: everything (needs the superuser password)"><i class="bi bi-trash3-fill" aria-hidden="true"></i> Purge</button>
           </span>
         </div>
         <p class="hint" id="cvSub"></p>
-        <div class="cvask" id="cvAsk" hidden>
+        <div class="cvask card card-body" id="cvAsk" hidden>
           <div id="cvAskText"></div>
-          <div id="cvConfirmWrap" hidden><label for="cvConfirm" id="cvConfirmLabel">Type the container's name to confirm</label>
-            <input id="cvConfirm" spellcheck="false" autocomplete="off"></div>
-          <label for="cvSuper">Superuser password</label>
-          <span class="pwwrap"><input id="cvSuper" type="password" autocomplete="off"><button type="button" class="eye" data-pw="cvSuper" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
+          <div id="cvConfirmWrap" hidden><label class="form-label" for="cvConfirm" id="cvConfirmLabel">Type the container's name to confirm</label>
+            <input class="form-control form-control-sm" id="cvConfirm" spellcheck="false" autocomplete="off"></div>
+          <label class="form-label" for="cvSuper">Superuser password</label>
+          <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="cvSuper" type="password" autocomplete="off"><button type="button" class="btn btn-outline-secondary eye" data-pw="cvSuper" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
           <div class="dactions"><span class="spacer"></span>
-            <button type="button" id="cvAskCancel">Cancel</button>
-            <button type="button" class="primary" id="cvAskGo">OK</button></div>
+            <button class="btn btn-outline-secondary" type="button" id="cvAskCancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="cvAskGo">OK</button></div>
         </div>
-        <div id="cvResult" class="dresult" hidden></div>
+        <div id="cvResult" class="dresult alert" hidden></div>
         <h4 class="edsub">Usage <span class="hint" id="cvChecked"></span></h4>
         <div class="cvusage">
-          <div class="tile"><div class="lbl">CPU</div><div class="val" id="cvCpu">–</div><div class="bar"><i id="cvCpuBar"></i></div><div class="sub" id="cvCpuSub"></div></div>
-          <div class="tile"><div class="lbl">Memory</div><div class="val" id="cvMem">–</div><div class="bar"><i id="cvMemBar"></i></div><div class="sub" id="cvMemSub"></div></div>
-          <div class="tile"><div class="lbl">Storage</div><div class="val" id="cvDisk">–</div><div class="bar"><i id="cvDiskBar"></i></div><div class="sub" id="cvDiskSub"></div></div>
+          <div class="card card-body tile"><div class="lbl">CPU</div><div class="val" id="cvCpu">–</div><div class="progress bar"><div class="progress-bar" id="cvCpuBar"></div></div><div class="sub" id="cvCpuSub"></div></div>
+          <div class="card card-body tile"><div class="lbl">Memory</div><div class="val" id="cvMem">–</div><div class="progress bar"><div class="progress-bar" id="cvMemBar"></div></div><div class="sub" id="cvMemSub"></div></div>
+          <div class="card card-body tile"><div class="lbl">Storage</div><div class="val" id="cvDisk">–</div><div class="progress bar"><div class="progress-bar" id="cvDiskBar"></div></div><div class="sub" id="cvDiskSub"></div></div>
         </div>
         <p class="hint" id="cvNotes" hidden></p>
         <h4 class="edsub">Settings</h4>
-        <table class="cvset" id="cvSettings"></table>
+        <table class="table table-sm cvset" id="cvSettings"></table>
         <h4 class="edsub">Environment</h4>
-        <table class="cvset" id="cvEnv"></table>
+        <table class="table table-sm cvset" id="cvEnv"></table>
         <div id="cvLogsWrap" hidden><h4 class="edsub">Log</h4><pre class="ctlog" id="cvLogs"></pre></div>
         <div class="dactions">
-          <span class="btngroup" role="group" aria-label="More">
-            <button type="button" id="cvConn" title="Open the New connection dialog filled in for this database">🔌 Add connection</button><button type="button" id="cvLogBtn" title="The container's last 300 log lines (needs the superuser password)">📜 Logs</button><button type="button" id="cvRefresh" title="Measure again now (it refreshes every 5 seconds)">⟳ Refresh</button></span>
+          <span class="btngroup btn-group btn-group-sm" role="group" aria-label="More">
+            <button class="btn btn-outline-secondary" type="button" id="cvConn" title="Open the New connection dialog filled in for this database"><i class="bi bi-plug" aria-hidden="true"></i> Add connection</button><button class="btn btn-outline-secondary" type="button" id="cvLogBtn" title="The container's last 300 log lines (needs the superuser password)"><i class="bi bi-journal-text" aria-hidden="true"></i> Logs</button><button class="btn btn-outline-secondary" type="button" id="cvRefresh" title="Measure again now (it refreshes every 5 seconds)"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button></span>
           <span class="spacer"></span>
-          <span class="btngroup" role="group" aria-label="Page">
-            <button type="button" id="cvBack" title="The list of deployed containers">☰ All containers</button><button type="button" id="cvClose" title="Close this page and its tab">✕ Close</button></span>
+          <span class="btngroup btn-group btn-group-sm" role="group" aria-label="Page">
+            <button class="btn btn-outline-secondary" type="button" id="cvBack" title="The list of deployed containers"><i class="bi bi-list-ul" aria-hidden="true"></i> All containers</button><button class="btn btn-outline-secondary" type="button" id="cvClose" title="Close this page and its tab"><i class="bi bi-x-lg" aria-hidden="true"></i> Close</button></span>
         </div>
       </div>
     </div>
   </main>
 </div>
-<dialog id="connDialog" class="modal" aria-labelledby="dTitle">
+<dialog id="connDialog" class="dlg" aria-labelledby="dTitle">
   <form method="dialog" id="dForm">
     <h3 id="dTitle">New connection</h3>
-    <label for="dName">Connection name</label>
-    <input id="dName" placeholder="e.g. Production MySQL" spellcheck="false">
-    <label for="dEngine">Database type</label>
-    <select id="dEngine"></select>
+    <label class="form-label" for="dName">Connection name</label>
+    <input class="form-control form-control-sm" id="dName" placeholder="e.g. Production MySQL" spellcheck="false">
+    <label class="form-label" for="dEngine">Database type</label>
+    <select class="form-select form-select-sm" id="dEngine"></select>
     <div id="dFileFields">
-      <label for="dFile" id="dFileLabel">SQLite database file</label>
-      <input id="dFile" placeholder="/path/to/database.db" spellcheck="false">
+      <label class="form-label" for="dFile" id="dFileLabel">SQLite database file</label>
+      <input class="form-control form-control-sm" id="dFile" placeholder="/path/to/database.db" spellcheck="false">
     </div>
     <div id="dServerFields">
       <div class="row2" id="dHostRow">
-        <div><label for="dHost" id="dHostLabel">Host</label><input id="dHost" value="localhost" spellcheck="false"></div>
-        <div id="dPortWrap"><label for="dPort" id="dPortLabel">Port</label><input id="dPort" type="number" min="0" max="65535"></div>
+        <div><label class="form-label" for="dHost" id="dHostLabel">Host</label><input class="form-control form-control-sm" id="dHost" value="localhost" spellcheck="false"></div>
+        <div id="dPortWrap"><label class="form-label" for="dPort" id="dPortLabel">Port</label><input class="form-control form-control-sm" id="dPort" type="number" min="0" max="65535"></div>
       </div>
       <div id="dUserWrap">
-        <label for="dUser" id="dUserLabel">Username</label>
-        <input id="dUser" autocomplete="off" spellcheck="false">
+        <label class="form-label" for="dUser" id="dUserLabel">Username</label>
+        <input class="form-control form-control-sm" id="dUser" autocomplete="off" spellcheck="false">
       </div>
       <div id="dPassWrap">
-        <label for="dPass" id="dPassLabel">Password</label>
-        <span class="pwwrap"><input id="dPass" type="password" autocomplete="new-password"><button type="button" class="eye" data-pw="dPass" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
+        <label class="form-label" for="dPass" id="dPassLabel">Password</label>
+        <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="dPass" type="password" autocomplete="new-password"><button type="button" class="btn btn-outline-secondary eye" data-pw="dPass" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
       </div>
       <div id="dDbWrap">
-        <label for="dDb" id="dDbLabel">Database</label>
-        <span class="dbrow"><input id="dDb" spellcheck="false"><button type="button" id="dDbList" title="Connect and list the databases on the server, to choose one">☰ List databases</button></span>
-        <select id="dDbPick" hidden aria-label="Databases on the server"></select>
+        <label class="form-label" for="dDb" id="dDbLabel">Database</label>
+        <span class="input-group input-group-sm dbrow"><input class="form-control form-control-sm" id="dDb" spellcheck="false"><button class="btn btn-outline-secondary" type="button" id="dDbList" title="Connect and list the databases on the server, to choose one"><i class="bi bi-list-ul" aria-hidden="true"></i> List databases</button></span>
+        <select class="form-select form-select-sm" id="dDbPick" hidden aria-label="Databases on the server"></select>
       </div>
       <div id="dOptsWrap">
-        <label for="dOpts">Options <span class="hint-inline">key=value&amp;key=value, optional</span></label>
-        <input id="dOpts" spellcheck="false">
+        <label class="form-label" for="dOpts">Options <span class="hint-inline">key=value&amp;key=value, optional</span></label>
+        <input class="form-control form-control-sm" id="dOpts" spellcheck="false">
       </div>
     </div>
     <p class="hint" id="dHelp" hidden></p>
     <div class="dlock" id="dLockWrap">
-      <label for="dLock" id="dLockLabel">Connection password</label>
-      <input id="dLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
-      <label for="dLock2">Confirm connection password</label>
-      <input id="dLock2" type="password" autocomplete="new-password">
+      <label class="form-label" for="dLock" id="dLockLabel">Connection password</label>
+      <input class="form-control form-control-sm" id="dLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
+      <label class="form-label" for="dLock2">Confirm connection password</label>
+      <input class="form-control form-control-sm" id="dLock2" type="password" autocomplete="new-password">
       <p class="hint" id="dLockHint">Every saved connection has its own password. You need it to connect, edit or delete
         the connection, and to download its exported files. It also encrypts the saved username, password and queries.</p>
     </div>
-    <div id="dResult" class="dresult" hidden></div>
+    <div id="dResult" class="dresult alert" hidden></div>
     <div class="dactions">
-      <button type="button" id="dTest">Test connection</button>
+      <button class="btn btn-outline-secondary" type="button" id="dTest">Test connection</button>
       <span class="spacer"></span>
-      <button type="button" id="dCancel">Cancel</button>
-      <button type="button" id="dConnect" title="Connect with these details, without saving them">Connect</button>
-      <button type="button" class="primary" id="dSave">Save</button>
+      <button class="btn btn-outline-secondary" type="button" id="dCancel">Cancel</button>
+      <button class="btn btn-outline-secondary" type="button" id="dConnect" title="Connect with these details, without saving them">Connect</button>
+      <button type="button" class="btn btn-primary" id="dSave">Save</button>
     </div>
   </form>
 </dialog>
 
-<dialog id="ctrDialog" class="modal wide ctr" aria-labelledby="ctTitle">
+<dialog id="ctrDialog" class="dlg wide ctr" aria-labelledby="ctTitle">
   <form method="dialog" id="ctForm">
     <h3 id="ctTitle">DB container deployment</h3>
     <p class="hint">Deploy a database server as a container on the Docker (Docker CE or Docker Desktop) or Kubernetes
@@ -1129,46 +1150,46 @@
     <div id="ctDeploy" hidden>
       <h4 class="edsub">Deploy a database</h4>
       <div class="row2 half">
-        <div><label for="ctSpec">Database</label><select id="ctSpec"></select></div>
-        <div><label for="ctRuntime">Deploy to</label><select id="ctRuntime"></select></div>
+        <div><label class="form-label" for="ctSpec">Database</label><select class="form-select form-select-sm" id="ctSpec"></select></div>
+        <div><label class="form-label" for="ctRuntime">Deploy to</label><select class="form-select form-select-sm" id="ctRuntime"></select></div>
       </div>
       <p class="hint" id="ctNote" hidden></p>
       <div class="row2 half">
-        <div><label for="ctName">Container name</label><input id="ctName" spellcheck="false" autocomplete="off"></div>
-        <div><label for="ctPort" id="ctPortLabel">Port on this computer</label><input id="ctPort" type="number" min="1" max="65535"></div>
+        <div><label class="form-label" for="ctName">Container name</label><input class="form-control form-control-sm" id="ctName" spellcheck="false" autocomplete="off"></div>
+        <div><label class="form-label" for="ctPort" id="ctPortLabel">Port on this computer</label><input class="form-control form-control-sm" id="ctPort" type="number" min="1" max="65535"></div>
       </div>
-      <label for="ctImage">Image</label>
-      <input id="ctImage" spellcheck="false" autocomplete="off">
-      <label for="ctData" id="ctDataLabel">Folder for the database files</label>
-      <input id="ctData" spellcheck="false" autocomplete="off">
+      <label class="form-label" for="ctImage">Image</label>
+      <input class="form-control form-control-sm" id="ctImage" spellcheck="false" autocomplete="off">
+      <label class="form-label" for="ctData" id="ctDataLabel">Folder for the database files</label>
+      <input class="form-control form-control-sm" id="ctData" spellcheck="false" autocomplete="off">
       <p class="hint" id="ctDataHint"></p>
-      <label class="check" id="ctPublicWrap"><input type="checkbox" id="ctPublic"> Reachable from other computers (otherwise only from this one)</label>
+      <label class="form-check form-switch" id="ctPublicWrap"><input class="form-check-input" type="checkbox" id="ctPublic" role="switch"> Reachable from other computers (otherwise only from this one)</label>
       <div id="ctKube" hidden>
         <div class="row2 half">
-          <div><label for="ctNs">Namespace</label><input id="ctNs" value="cactusdb" spellcheck="false" autocomplete="off"></div>
-          <div><label for="ctSvc">Service type</label><select id="ctSvc"><option value="LoadBalancer">LoadBalancer</option><option value="NodePort">NodePort (port 30000–32767)</option></select></div>
+          <div><label class="form-label" for="ctNs">Namespace</label><input class="form-control form-control-sm" id="ctNs" value="cactusdb" spellcheck="false" autocomplete="off"></div>
+          <div><label class="form-label" for="ctSvc">Service type</label><select class="form-select form-select-sm" id="ctSvc"><option value="LoadBalancer">LoadBalancer</option><option value="NodePort">NodePort (port 30000–32767)</option></select></div>
         </div>
-        <div id="ctStorageWrap"><label for="ctStorage">Volume size, when no folder is given</label><input id="ctStorage" value="10Gi" spellcheck="false"></div>
+        <div id="ctStorageWrap"><label class="form-label" for="ctStorage">Volume size, when no folder is given</label><input class="form-control form-control-sm" id="ctStorage" value="10Gi" spellcheck="false"></div>
       </div>
       <div class="row2 half">
-        <div id="ctUserWrap"><label for="ctUser">Username</label><input id="ctUser" spellcheck="false" autocomplete="off"></div>
-        <div id="ctDbWrap"><label for="ctDb" id="ctDbLabel">Database to create</label><input id="ctDb" spellcheck="false" autocomplete="off"></div>
+        <div id="ctUserWrap"><label class="form-label" for="ctUser">Username</label><input class="form-control form-control-sm" id="ctUser" spellcheck="false" autocomplete="off"></div>
+        <div id="ctDbWrap"><label class="form-label" for="ctDb" id="ctDbLabel">Database to create</label><input class="form-control form-control-sm" id="ctDb" spellcheck="false" autocomplete="off"></div>
       </div>
       <div id="ctPassWrap">
         <div class="row2 half">
-          <div><label for="ctPass" id="ctPassLabel">Password</label><span class="pwwrap"><input id="ctPass" type="password" autocomplete="new-password"><button type="button" class="eye" data-pw="ctPass" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span></div>
-          <div><label for="ctPass2">Confirm password</label><input id="ctPass2" type="password" autocomplete="new-password"></div>
+          <div><label class="form-label" for="ctPass" id="ctPassLabel">Password</label><span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="ctPass" type="password" autocomplete="new-password"><button type="button" class="btn btn-outline-secondary eye" data-pw="ctPass" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span></div>
+          <div><label class="form-label" for="ctPass2">Confirm password</label><input class="form-control form-control-sm" id="ctPass2" type="password" autocomplete="new-password"></div>
         </div>
         <p class="hint" id="ctPassHint"></p>
       </div>
-      <label for="ctSuper">Superuser password</label>
-      <span class="pwwrap"><input id="ctSuper" type="password" autocomplete="off"><button type="button" class="eye" data-pw="ctSuper" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
-      <div id="ctResult" class="dresult" hidden></div>
+      <label class="form-label" for="ctSuper">Superuser password</label>
+      <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="ctSuper" type="password" autocomplete="off"><button type="button" class="btn btn-outline-secondary eye" data-pw="ctSuper" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
+      <div id="ctResult" class="dresult alert" hidden></div>
       <pre class="ctlog" id="ctLog" hidden></pre>
       <div class="dactions">
         <span class="spacer"></span>
-        <button type="button" id="ctAddConn" hidden title="Open the New connection dialog filled in for this database">Add as connection…</button>
-        <button type="button" class="primary" id="ctGo">Deploy</button>
+        <button class="btn btn-outline-secondary" type="button" id="ctAddConn" hidden title="Open the New connection dialog filled in for this database"><i class="bi bi-plug" aria-hidden="true"></i> Add as connection…</button>
+        <button type="button" class="btn btn-primary" id="ctGo">Deploy</button>
       </div>
     </div>
 
@@ -1176,19 +1197,19 @@
     <ul class="list ctlist" id="ctList"><li class="empty">…</li></ul>
     <div id="ctLogsWrap" hidden><p class="hint" id="ctLogsTitle"></p><pre class="ctlog" id="ctLogs"></pre></div>
     <div class="dactions">
-      <button type="button" id="ctRefresh" title="Look for Docker and Kubernetes and list the containers again">⟳ Refresh</button>
+      <button class="btn btn-outline-secondary" type="button" id="ctRefresh" title="Look for Docker and Kubernetes and list the containers again"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
       <span class="spacer"></span>
-      <button type="button" class="primary" id="ctClose">Close</button>
+      <button type="button" class="btn btn-primary" id="ctClose">Close</button>
     </div>
   </form>
 </dialog>
 
 
-<dialog id="settingsDialog" class="modal" aria-labelledby="stTitle">
+<dialog id="settingsDialog" class="dlg" aria-labelledby="stTitle">
   <form method="dialog" id="stForm">
     <h3 id="stTitle">Settings</h3>
-    <label for="stIdle">Disconnect after this many minutes without activity</label>
-    <input id="stIdle" type="number" min="0" max="1440" step="1" required>
+    <label class="form-label" for="stIdle">Disconnect after this many minutes without activity</label>
+    <input class="form-control form-control-sm" id="stIdle" type="number" min="0" max="1440" step="1" required>
     <p class="hint">When nobody clicks, types or scrolls for this long, cactusdb disconnects from the database.
       It never disconnects while something is running (a query, an export, a backup), and counts again from when it
       finishes. <b>0</b> means never. The default is <span id="stDefault">15</span> minutes. The setting is saved on
@@ -1197,14 +1218,14 @@
     <h4 class="edsub">Google Analytics</h4>
     <p class="hint">Off until a Measurement ID is set, and then still only for the people who say yes in their browser.
       Only which functions are used is sent (tabs, menu items, connect, export…), never data, SQL, names or addresses.</p>
-    <label for="stGaId">Measurement ID of this cactusdb server</label>
-    <input id="stGaId" spellcheck="false" autocomplete="off" placeholder="G-XXXXXXXXXX (empty: off)">
+    <label class="form-label" for="stGaId">Measurement ID of this cactusdb server</label>
+    <input class="form-control form-control-sm" id="stGaId" spellcheck="false" autocomplete="off" placeholder="G-XXXXXXXXXX (empty: off)">
     <p class="hint" id="stGaIdNote" hidden></p>
-    <label class="check"><input type="checkbox" id="stGaMe"> Send usage statistics from <b>this browser</b></label>
-    <label for="stGaSecret">API secret, for command-line runs</label>
-    <input id="stGaSecret" type="password" autocomplete="new-password" spellcheck="false">
-    <label class="check"><input type="checkbox" id="stGaClear"> Remove the saved API secret</label>
-    <label class="check"><input type="checkbox" id="stGaCli"> Send command-line runs (<code>cactusdb --dbtype …</code>) on this server too</label>
+    <label class="form-check form-switch"><input class="form-check-input" type="checkbox" id="stGaMe" role="switch"> Send usage statistics from <b>this browser</b></label>
+    <label class="form-label" for="stGaSecret">API secret, for command-line runs</label>
+    <input class="form-control form-control-sm" id="stGaSecret" type="password" autocomplete="new-password" spellcheck="false">
+    <label class="form-check"><input class="form-check-input" type="checkbox" id="stGaClear"> Remove the saved API secret</label>
+    <label class="form-check form-switch"><input class="form-check-input" type="checkbox" id="stGaCli" role="switch"> Send command-line runs (<code>cactusdb --dbtype …</code>) on this server too</label>
     <p class="hint">Command-line runs are sent by the server itself, so it needs to reach Google and an API secret
       (Admin → Data streams → your stream → Measurement Protocol API secrets). They wait at most 2 seconds for Google.
       They are always recorded in the usage log.</p>
@@ -1212,52 +1233,52 @@
     <h4 class="edsub">Usage log</h4>
     <p class="hint" id="stUsageSum">…</p>
     <div class="row2">
-      <div><label for="stUsFrom">Delete events from</label><input id="stUsFrom" type="date"></div>
-      <div><label for="stUsTo">to (and with)</label><input id="stUsTo" type="date"></div>
+      <div><label class="form-label" for="stUsFrom">Delete events from</label><input class="form-control form-control-sm" id="stUsFrom" type="date"></div>
+      <div><label class="form-label" for="stUsTo">to (and with)</label><input class="form-control form-control-sm" id="stUsTo" type="date"></div>
     </div>
     <p class="hint">Days in this computer's time zone. Leave one empty for "from the first" or "up to the last". This can't be undone.</p>
-    <div id="stUsResult" class="dresult" hidden></div>
-    <div class="dactions"><span class="spacer"></span><button type="button" id="stUsDelete">Delete events</button></div>
+    <div id="stUsResult" class="dresult alert" hidden></div>
+    <div class="dactions"><span class="spacer"></span><button class="btn btn-outline-secondary" type="button" id="stUsDelete">Delete events</button></div>
 
-    <div id="stResult" class="dresult bad" hidden></div>
+    <div id="stResult" class="dresult alert alert-danger" hidden></div>
     <div class="dactions">
       <span class="spacer"></span>
-      <button type="button" id="stCancel">Cancel</button>
-      <button type="submit" class="primary" id="stSave">Save</button>
+      <button class="btn btn-outline-secondary" type="button" id="stCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="stSave">Save</button>
     </div>
   </form>
 </dialog>
 
-<div id="verBanner" class="gabanner" role="status" hidden>
+<div id="verBanner" class="gabanner card shadow" role="status" hidden>
   <span id="verBannerText"></span>
-  <button type="button" class="primary" id="verReload">Reload</button>
-  <button type="button" id="verLater">Later</button>
+  <button type="button" class="btn btn-primary" id="verReload">Reload</button>
+  <button class="btn btn-outline-secondary" type="button" id="verLater">Later</button>
 </div>
-<div id="gaBanner" class="gabanner" role="region" aria-label="Usage statistics" hidden>
+<div id="gaBanner" class="gabanner card shadow" role="region" aria-label="Usage statistics" hidden>
   <span>May cactusdb send <b>anonymous usage statistics</b> to Google Analytics? Only which functions are used, never
     your data, SQL, names or addresses. You can change this any time in ☰ → Settings.</span>
-  <button type="button" id="gaNo">No, thanks</button>
-  <button type="button" class="primary" id="gaYes">Yes, send</button>
+  <button class="btn btn-outline-secondary" type="button" id="gaNo">No, thanks</button>
+  <button type="button" class="btn btn-primary" id="gaYes">Yes, send</button>
 </div>
 
-<dialog id="driversDialog" class="modal" aria-labelledby="drTitle">
+<dialog id="driversDialog" class="dlg" aria-labelledby="drTitle">
   <form method="dialog">
     <h3 id="drTitle">Drivers<span class="sub" id="driversSub"></span></h3>
     <p class="hint">The databases cactusdb can connect to. Every driver is compiled into cactusdb: nothing to download or install.</p>
     <ul class="list drivers" id="driverList"><li class="empty">…</li></ul>
-    <div class="dactions"><span class="spacer"></span><button type="submit" class="primary">Close</button></div>
+    <div class="dactions"><span class="spacer"></span><button type="submit" class="btn btn-primary">Close</button></div>
   </form>
 </dialog>
 
-<dialog id="updateDialog" class="modal wide" aria-labelledby="upTitle">
+<dialog id="updateDialog" class="dlg wide" aria-labelledby="upTitle">
   <form method="dialog">
     <h3 id="upTitle">Check for update</h3>
-    <div id="upStatus" class="upstatus">Checking…</div>
-    <div id="upInstall" class="upinstall" hidden>
+    <div id="upStatus" class="upstatus alert alert-secondary">Checking…</div>
+    <div id="upInstall" class="upinstall card card-body border-success" hidden>
       <p id="upInstallText"></p>
       <div class="uprow">
-        <button type="button" class="primary" id="upInstallBtn">Install and restart</button>
-        <span class="bar" id="upBarWrap" hidden><i id="upBar"></i></span>
+        <button type="button" class="btn btn-primary" id="upInstallBtn" data-primary="1">Install and restart</button>
+        <span class="progress bar" id="upBarWrap" hidden><span class="progress-bar" id="upBar"></span></span>
         <span class="upmsg" id="upMsg" role="status"></span>
       </div>
     </div>
@@ -1266,113 +1287,113 @@
       system themselves; the other commands download one particular file as <code>cactusdb</code> (<code>cactusdb.exe</code> on Windows).</p>
     <ul class="list setup" id="upList"></ul>
     <div class="dactions">
-      <button type="button" id="upRefresh">Check again</button>
-      <button type="button" id="upChangelog" title="The changes in every version (CHANGELOG on GitHub, opens in a new tab)">What's new</button>
+      <button class="btn btn-outline-secondary" type="button" id="upRefresh"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Check again</button>
+      <button class="btn btn-outline-secondary" type="button" id="upChangelog" title="The changes in every version (CHANGELOG on GitHub, opens in a new tab)">What's new</button>
       <span class="spacer"></span>
-      <button type="submit" class="primary">Close</button>
+      <button type="submit" class="btn btn-primary">Close</button>
     </div>
   </form>
 </dialog>
 
-<dialog id="exportDirDialog" class="modal" aria-labelledby="edTitle">
+<dialog id="exportDirDialog" class="dlg" aria-labelledby="edTitle">
   <form method="dialog" id="edForm">
     <h3 id="edTitle">Folder setup</h3>
     <p class="hint">Exports and backups are saved in <code id="exportDirShow">…</code>, one folder per connection.</p>
-    <label for="edPath">Folder on the cactusdb server</label>
-    <input id="edPath" spellcheck="false" autocomplete="off">
+    <label class="form-label" for="edPath">Folder on the cactusdb server</label>
+    <input class="form-control form-control-sm" id="edPath" spellcheck="false" autocomplete="off">
     <p class="hint">A full path, e.g. <code id="edExample"></code>. It's created if it doesn't exist. Each export type
       goes to its own subfolder (json, csv, xlsx, xml, sql). The folder is saved and used again the next time cactusdb starts.</p>
     <p class="hint" id="edFlagNote" hidden></p>
-    <div id="edResult" class="dresult bad" hidden></div>
+    <div id="edResult" class="dresult alert alert-danger" hidden></div>
     <div class="dactions">
-      <button type="button" id="edDefault" title="Use the export folder next to the cactusdb program">Use default</button>
+      <button class="btn btn-outline-secondary" type="button" id="edDefault" title="Use the export folder next to the cactusdb program">Use default</button>
       <span class="spacer"></span>
-      <button type="button" id="edCancel">Cancel</button>
-      <button type="submit" class="primary" id="edSave">Save</button>
+      <button class="btn btn-outline-secondary" type="button" id="edCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="edSave">Save</button>
     </div>
     <h4 class="edsub">Connection database</h4>
     <p class="hint">Saved connections, saved queries, settings and the usage log are kept in <code id="dbPathShow">…</code>.</p>
-    <label for="dbPath">Move it to</label>
-    <input id="dbPath" spellcheck="false" autocomplete="off">
+    <label class="form-label" for="dbPath">Move it to</label>
+    <input class="form-control form-control-sm" id="dbPath" spellcheck="false" autocomplete="off">
     <p class="hint">A full path of the new file, or of a folder to put <code>cactus.conn.db</code> in, e.g. <code id="dbExample"></code>.
       The folder is created if it doesn't exist; an existing file is never overwritten. The key file (<code>cactus.key</code>) goes along
       when it is next to the database, and the old files are deleted. cactusdb remembers the new place for the next start
       (in <code>cactus.conn.db.location</code> next to the program).</p>
     <p class="hint" id="dbFlagNote" hidden></p>
-    <div id="dbResult" class="dresult" hidden></div>
+    <div id="dbResult" class="dresult alert" hidden></div>
     <div class="dactions">
-      <button type="button" id="dbDefault" title="Move it back next to the cactusdb program">Default place</button>
+      <button class="btn btn-outline-secondary" type="button" id="dbDefault" title="Move it back next to the cactusdb program">Default place</button>
       <span class="spacer"></span>
-      <button type="button" class="primary" id="dbMove">Move database</button>
+      <button type="button" class="btn btn-primary" id="dbMove">Move database</button>
     </div>
   </form>
 </dialog>
 
-<dialog id="pwDialog" class="modal" aria-labelledby="pwTitle">
+<dialog id="pwDialog" class="dlg" aria-labelledby="pwTitle">
   <form method="dialog" id="pwForm">
     <h3 id="pwTitle">Connection password</h3>
     <p class="sdtext" id="pwText"></p>
-    <label for="pwInput" id="pwLabel">Connection password</label>
-    <span class="pwwrap"><input id="pwInput" type="password" autocomplete="off"><button type="button" class="eye" data-pw="pwInput" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
-    <label class="check" id="pwSuperWrap"><input type="checkbox" id="pwSuper"> Use the superuser password instead</label>
-    <div id="pwResult" class="dresult bad" hidden></div>
+    <label class="form-label" for="pwInput" id="pwLabel">Connection password</label>
+    <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="pwInput" type="password" autocomplete="off"><button type="button" class="btn btn-outline-secondary eye" data-pw="pwInput" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
+    <label class="form-check" id="pwSuperWrap"><input class="form-check-input" type="checkbox" id="pwSuper"> Use the superuser password instead</label>
+    <div id="pwResult" class="dresult alert alert-danger" hidden></div>
     <div class="dactions">
       <span class="spacer"></span>
-      <button type="button" id="pwCancel">Cancel</button>
-      <button type="submit" class="primary" id="pwOk">Unlock</button>
+      <button class="btn btn-outline-secondary" type="button" id="pwCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="pwOk">Unlock</button>
     </div>
   </form>
 </dialog>
 
-<dialog id="sqDialog" class="modal" aria-labelledby="sqTitle">
+<dialog id="sqDialog" class="dlg" aria-labelledby="sqTitle">
   <form method="dialog" id="sqForm">
     <h3 id="sqTitle">Save query</h3>
-    <label for="sqName">Name</label>
-    <input id="sqName" maxlength="100" placeholder="e.g. Open orders" autocomplete="off">
-    <label for="sqDesc">Description</label>
-    <textarea id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
-    <label for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
-    <textarea id="sqSql" rows="8" spellcheck="false" class="mono"></textarea>
-    <div id="sqResult" class="dresult bad" hidden></div>
+    <label class="form-label" for="sqName">Name</label>
+    <input class="form-control form-control-sm" id="sqName" maxlength="100" placeholder="e.g. Open orders" autocomplete="off">
+    <label class="form-label" for="sqDesc">Description</label>
+    <textarea class="form-control form-control-sm" id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
+    <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
+    <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono"></textarea>
+    <div id="sqResult" class="dresult alert alert-danger" hidden></div>
     <div class="dactions">
       <span class="spacer"></span>
-      <button type="button" id="sqCancel">Cancel</button>
-      <button type="submit" class="primary" id="sqSave">Save</button>
+      <button class="btn btn-outline-secondary" type="button" id="sqCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="sqSave">Save</button>
     </div>
   </form>
 </dialog>
 
-<dialog id="fDelDialog" class="modal" aria-labelledby="fdTitle">
+<dialog id="fDelDialog" class="dlg" aria-labelledby="fdTitle">
   <h3 id="fdTitle">Delete files?</h3>
   <p class="sdtext" id="fdText"></p>
   <ul class="fdlist" id="fdList"></ul>
   <div class="dactions">
     <span class="spacer"></span>
-    <button type="button" id="fdCancel">Cancel</button>
-    <button type="button" class="dangerfill" id="fdConfirm">Delete</button>
+    <button class="btn btn-outline-secondary" type="button" id="fdCancel">Cancel</button>
+    <button type="button" class="btn btn-danger" id="fdConfirm">Delete</button>
   </div>
 </dialog>
 
-<dialog id="fPrevDialog" class="modal fprev" aria-labelledby="fpTitle">
+<dialog id="fPrevDialog" class="dlg fprev" aria-labelledby="fpTitle">
   <div class="fphead">
     <div><h3 id="fpTitle"></h3><div class="fpmeta" id="fpMeta"></div></div>
     <span class="spacer"></span>
-    <button type="button" id="fpDownload" title="Compress this file (highest level) and download it">Download</button>
-    <button type="button" class="danger" id="fpDelete" title="Delete this file (asks first)">Delete</button>
-    <button type="button" id="fpClose" aria-label="Close preview">✕</button>
+    <button class="btn btn-outline-secondary" type="button" id="fpDownload" title="Compress this file (highest level) and download it">Download</button>
+    <button type="button" class="btn btn-outline-danger" id="fpDelete" title="Delete this file (asks first)">Delete</button>
+    <button type="button" class="btn-close" id="fpClose" aria-label="Close preview"></button>
   </div>
   <div class="fpbody" id="fpBody"></div>
   <div class="fpfoot" id="fpFoot"></div>
 </dialog>
 
-<dialog id="shutdownDialog" class="modal" aria-labelledby="sdTitle">
+<dialog id="shutdownDialog" class="dlg" aria-labelledby="sdTitle">
   <h3 id="sdTitle">Shut down cactusdb?</h3>
   <p class="sdtext">This stops the cactusdb running in the background<span id="sdPid"></span>. Running exports are
     cancelled, all database connections are closed, and this page stops working until cactusdb is started again.</p>
   <div class="dactions">
     <span class="spacer"></span>
-    <button type="button" id="sdCancel">Cancel</button>
-    <button type="button" class="dangerfill" id="sdConfirm">Shut down</button>
+    <button class="btn btn-outline-secondary" type="button" id="sdCancel">Cancel</button>
+    <button type="button" class="btn btn-danger" id="sdConfirm">Shut down</button>
   </div>
 </dialog>
 
@@ -1385,8 +1406,13 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastBox">
+  <div class="toast align-items-center border-0" id="toast" role="status" aria-live="polite" aria-atomic="true">
+    <div class="d-flex"><div class="toast-body" id="toastText"></div><button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
+  </div>
+</div>
 
+<script src="vendor/bootstrap-5.3.8/bootstrap.bundle.min.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 // usage: the events to send, and this tab's id (see "usage" below).
@@ -1496,16 +1522,22 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-let toastTimer;
+// A Bootstrap toast at the bottom right.
 function toast(msg, isErr) {
-  const t = $("toast");
+  const box = $("toastBox"), t = $("toast");
   // An open modal dialog covers the page: show the message inside it.
   const d = document.querySelector("dialog[open]");
-  if (t.parentElement !== (d || document.body)) (d || document.body).appendChild(t);
-  t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
+  if (box.parentElement !== (d || document.body)) (d || document.body).appendChild(box);
+  bootstrap.Toast.getInstance(t)?.dispose();
+  $("toastText").textContent = msg;
+  t.classList.toggle("text-bg-danger", !!isErr);
   // Long explanations stay up long enough to read.
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = "toast"), isErr ? Math.max(5000, msg.length * 60) : 2500);
+  new bootstrap.Toast(t, { delay: isErr ? Math.max(5000, msg.length * 60) : 2500 }).show();
 }
+
+// The result under a form: a Bootstrap alert, ok (green), bad (red) or busy (grey).
+const RESULT_ALERT = { ok: "alert-success", bad: "alert-danger", busy: "alert-secondary" };
+function resultClass(kind) { return "dresult alert " + (RESULT_ALERT[kind] || "alert-secondary"); }
 
 function setInfo(msg, isErr) {
   const i = $("info"); i.textContent = msg; i.className = "info" + (isErr ? " error" : "");
@@ -1514,7 +1546,7 @@ function setInfo(msg, isErr) {
 // ---- engine & form -------------------------------------------------------
 function renderEngines() {
   $("engines").innerHTML = state.engines.map((e) =>
-    `<button data-engine="${e.id}" class="${e.id === state.engine ? "on" : ""}">${esc(e.name)}</button>`).join("");
+    `<button data-engine="${e.id}" class="btn btn-sm btn-outline-secondary ${e.id === state.engine ? "on" : ""}">${esc(e.name)}</button>`).join("");
 }
 
 function selectEngine(id, keepPort) {
@@ -1573,6 +1605,7 @@ function allowShowPassword(id, allowed) {
 function showPassword(btn, show) {
   $(btn.dataset.pw).type = show ? "text" : "password";
   btn.setAttribute("aria-pressed", show);
+  btn.querySelector(".bi").className = "bi " + (show ? "bi-eye-slash" : "bi-eye");
   btn.title = btn.ariaLabel = show ? "Hide password" : "Show password";
 }
 document.querySelectorAll(".eye").forEach((btn) => btn.addEventListener("click", () => {
@@ -1642,7 +1675,7 @@ let usArmed = false;
 function usDeleteArmed(on) {
   usArmed = on;
   $("stUsDelete").textContent = on ? "Yes, delete them" : "Delete events";
-  $("stUsDelete").classList.toggle("dangerfill", on);
+  $("stUsDelete").classList.toggle("btn-danger", on); $("stUsDelete").classList.toggle("btn-primary", !on && $("stUsDelete").dataset.primary === "1"); $("stUsDelete").classList.toggle("btn-outline-secondary", !on && $("stUsDelete").dataset.primary !== "1");
 }
 $("stUsFrom").addEventListener("input", () => usDeleteArmed(false));
 $("stUsTo").addEventListener("input", () => usDeleteArmed(false));
@@ -1653,9 +1686,9 @@ $("stUsDelete").addEventListener("click", async () => {
   const start = from ? new Date(from + "T00:00:00") : null;
   const end = to ? new Date(to + "T00:00:00") : null;
   if (end) end.setDate(end.getDate() + 1);
-  if (start && end && start >= end) { box.className = "dresult bad"; box.textContent = "The first day must be on or before the last one."; box.hidden = false; return; }
+  if (start && end && start >= end) { box.className = resultClass("bad"); box.textContent = "The first day must be on or before the last one."; box.hidden = false; return; }
   if (!usArmed) {
-    box.className = "dresult busy";
+    box.className = resultClass("busy");
     box.textContent = !from && !to ? "Delete ALL events of the usage log? Click “Yes, delete them” to go ahead."
       : `Delete the events ${from ? "from " + start.toLocaleDateString() : "up to"} ${to ? (from ? "to " : "") + new Date(to + "T00:00:00").toLocaleDateString() + " (and with)" : "onwards"}? Click “Yes, delete them” to go ahead.`;
     box.hidden = false; usDeleteArmed(true); return;
@@ -1664,8 +1697,8 @@ $("stUsDelete").addEventListener("click", async () => {
   try {
     const res = await api("POST", "/api/usage/delete", { from: start ? start.toISOString() : "", to: end ? end.toISOString() : "" });
     showUsageSummary(res);
-    box.className = "dresult ok"; box.textContent = `Deleted ${fmtInt(res.deleted)} event${res.deleted === 1 ? "" : "s"}.`;
-  } catch (e) { box.className = "dresult bad"; box.textContent = e.message; }
+    box.className = resultClass("ok"); box.textContent = `Deleted ${fmtInt(res.deleted)} event${res.deleted === 1 ? "" : "s"}.`;
+  } catch (e) { box.className = resultClass("bad"); box.textContent = e.message; }
   finally { $("stUsDelete").disabled = false; usDeleteArmed(false); }
 });
 $("stCancel").addEventListener("click", () => $("settingsDialog").close());
@@ -1720,17 +1753,17 @@ let dbMoveTarget = null;
 function dbMoveArmed(target) {
   dbMoveTarget = target;
   $("dbMove").textContent = target === null ? "Move database" : "Yes, move it";
-  $("dbMove").classList.toggle("dangerfill", target !== null);
+  $("dbMove").classList.toggle("btn-danger", target !== null); $("dbMove").classList.toggle("btn-primary", target === null);
 }
 async function moveDb(target) {
   if (dbMoveTarget !== target) {
     const same = target !== "" && target.trim() === settings.dbPath;
     if ((target !== "" && !target.trim()) || same) {
-      $("dbResult").className = "dresult bad"; $("dbResult").hidden = false;
+      $("dbResult").className = resultClass("bad"); $("dbResult").hidden = false;
       $("dbResult").textContent = same ? "That is where the connection database is now: change the path to the new place first." : "Enter the new place first.";
       $("dbPath").focus(); return;
     }
-    $("dbResult").className = "dresult busy";
+    $("dbResult").className = resultClass("busy");
     $("dbResult").textContent = `Move the connection database from ${settings.dbPath} to ${target === "" ? settings.defaultDbPath : target}? ` +
       "Everyone using cactusdb keeps working; a request that arrives at the very moment of the move may fail and need to be repeated. Click “Yes, move it” to go ahead.";
     $("dbResult").hidden = false;
@@ -1738,18 +1771,18 @@ async function moveDb(target) {
     return;
   }
   $("dbMove").disabled = $("dbDefault").disabled = true;
-  $("dbResult").className = "dresult busy"; $("dbResult").textContent = "Moving…";
+  $("dbResult").className = resultClass("busy"); $("dbResult").textContent = "Moving…";
   try {
     const res = await api("POST", "/api/settings", { dbPath: target });
     showSettings(res);
     const m = res.moved;
-    $("dbResult").className = "dresult " + (m.warnings && m.warnings.length ? "bad" : "ok");
+    $("dbResult").className = resultClass(m.warnings && m.warnings.length ? "bad" : "ok");
     $("dbResult").textContent = `Moved to ${m.to}.` + (m.keyTo ? ` The key is now ${m.keyTo}.` : "") +
       (m.warnings && m.warnings.length ? "\n" + m.warnings.join("\n") : "");
     $("dbPath").value = m.to;
     toast("Connection database moved to " + m.to);
   } catch (e) {
-    $("dbResult").className = "dresult bad"; $("dbResult").textContent = e.message;
+    $("dbResult").className = resultClass("bad"); $("dbResult").textContent = e.message;
   } finally {
     dbMoveArmed(null);
     $("dbMove").disabled = false;
@@ -1869,9 +1902,9 @@ function savedRows(list) {
       <li data-id="${c.id}" title="Click to connect">
         <span class="tag" title="${esc(engineInfo(c.engine).name)}">${esc(c.engine)}</span>
         <span class="name">${esc(c.name)}${lock}${det}</span>
-        <button class="small go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}">▶</button>
-        <button class="small" data-act="edit" title="Edit and test this connection">Edit</button>
-        <button class="small" data-act="del" title="Delete">✕</button>
+        <button class="btn btn-sm btn-outline-primary go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+        <button class="btn btn-sm btn-outline-secondary" data-act="edit" title="Edit and test this connection">Edit</button>
+        <button class="btn btn-sm btn-outline-secondary" data-act="del" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
       </li>`;
     }).join("") : `<li class="empty">None yet: add one with ＋ New connection</li>`;
 }
@@ -1883,8 +1916,8 @@ function renderHome() {
     ${state.idleNote ? `<p class="idlenote">⏱ ${esc(state.idleNote.charAt(0).toUpperCase() + state.idleNote.slice(1))}.</p>` : ""}
     <h3>Connect to a database</h3>
     <ul class="list" id="homeSaved">${savedRows(state.saved || [])}</ul>
-    <div class="homeactions"><button class="small" data-home="new">＋ New connection</button></div>
-    <p class="homefolder">📁 Exports go to <code>${esc(settings.exportDir || "…")}</code> <button class="small" data-home="folder">Change</button></p>
+    <div class="homeactions"><button class="btn btn-sm btn-outline-secondary" data-home="new"><i class="bi bi-plus-lg" aria-hidden="true"></i> New connection</button></div>
+    <p class="homefolder"><i class="bi bi-folder2-open" aria-hidden="true"></i> Exports go to <code>${esc(settings.exportDir || "…")}</code> <button class="btn btn-sm btn-outline-secondary" data-home="folder">Change</button></p>
   </div>`;
 }
 $("objTree").addEventListener("click", (ev) => {
@@ -2044,7 +2077,7 @@ function dlgParams() {
 
 function dlgResult(cls, text) {
   const r = $("dResult");
-  r.hidden = !cls; r.className = "dresult " + (cls || ""); r.textContent = text || "";
+  r.hidden = !cls; r.className = resultClass(cls); r.textContent = text || "";
 }
 
 // dlgDbPick shows the databases found on the server (null hides the list).
@@ -2490,24 +2523,24 @@ function renderQueries() {
   $("qConn").textContent = state.label ? "· " + state.label : "";
   $("qNew").disabled = !queries.saved;
   if (!queries.saved) {
-    $("qTable").innerHTML = `<div class="placeholder"><div><p>Queries are kept for saved connections.</p>
+    $("qTable").innerHTML = `<div class="emptymsg"><div><p>Queries are kept for saved connections.</p>
       <p>Save this connection (it gets its own connection password), then connect to it to save queries for it.</p></div></div>`;
     return;
   }
   const q = queries.q.toLowerCase();
   const vis = queries.list.filter((x) => !q || x.name.toLowerCase().includes(q) || (x.description || "").toLowerCase().includes(q));
   if (!queries.list.length) {
-    $("qTable").innerHTML = `<div class="placeholder"><div><p>No saved queries for this connection yet.</p>
+    $("qTable").innerHTML = `<div class="emptymsg"><div><p>No saved queries for this connection yet.</p>
       <p>Write a read-only query on the Data tab and press <b>💾 Save query</b>.</p></div></div>`;
     return;
   }
-  $("qTable").innerHTML = `<table><thead><tr><th>Name</th><th>Description</th><th>Query</th><th>Changed</th><th></th></tr></thead><tbody>` +
+  $("qTable").innerHTML = `<table class="table table-sm table-hover"><thead><tr><th>Name</th><th>Description</th><th>Query</th><th>Changed</th><th></th></tr></thead><tbody>` +
     (vis.length ? vis.map((x) => `<tr data-qid="${x.id}">
       <td><b>${esc(x.name)}</b></td>
       <td class="qdesc">${esc(x.description || "")}</td>
       <td class="qsql" title="${esc(x.sql)}">${esc(x.sql.replace(/\s+/g, " "))}</td>
       <td class="fdate">${esc(fmtDate(x.updated))}</td>
-      <td class="qacts"><select class="small qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select><button class="small primary" data-qact="run" title="Open in the editor and run">▶ Run</button><button class="small" data-qact="edit">Edit</button><button class="small danger" data-qact="del" title="Delete (asks first)">Delete</button></td>
+      <td class="qacts"><select class="form-select form-select-sm qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select><button class="btn btn-sm btn-primary" data-qact="run" title="Open in the editor and run"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button><button class="btn btn-sm btn-outline-secondary" data-qact="edit">Edit</button><button class="btn btn-sm btn-outline-danger" data-qact="del" title="Delete (asks first)">Delete</button></td>
     </tr>`).join("") : `<tr><td colspan="5" class="fnomatch">No saved query matches.</td></tr>`) + `</tbody></table>`;
 }
 $("qFilter").addEventListener("input", () => { queries.q = $("qFilter").value; renderQueries(); });
@@ -2528,7 +2561,7 @@ async function exportQueries(list, fmt) {
   try {
     for (const [i, { q, f }] of jobs.entries()) {
       if (session !== state.session) break; // disconnected
-      note.innerHTML = `<span class="spin"></span>Exporting ${i + 1} of ${jobs.length}: <b>${esc(q.name)}</b> as ${FMT_NAMES[f]}…`;
+      note.innerHTML = `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Exporting ${i + 1} of ${jobs.length}: <b>${esc(q.name)}</b> as ${FMT_NAMES[f]}…`;
       try {
         const r = await api("POST", "/api/export", { session, sql: q.sql, format: f, name: q.name, savedQuery: true });
         done.push({ q, f, r });
@@ -2540,7 +2573,7 @@ async function exportQueries(list, fmt) {
     (done.length ? ` to <code>${esc(done[0].r.folder.replace(/[\\/][^\\/]+$/, ""))}</code>:` : "") +
     done.map((d) => ` <a href="${esc(dlLink(d.r.download))}" download title="${esc(d.r.path)}">${esc(d.q.name)} · ${FMT_NAMES[d.f]}</a>`).join(" ·") +
     failed.map((x) => `<br><span class="err">✘ ${esc(x.q.name)} (${FMT_NAMES[x.f]}): ${esc(x.e.message)}</span>`).join("") +
-    `<button class="clearnote" data-act="close-qnote" title="Clear the export status">Clear</button>`;
+    `<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-qnote" title="Clear the export status">Clear</button>`;
   toast(failed.length ? `${failed.length} export${failed.length === 1 ? "" : "s"} failed` : `Exported ${done.length} file${done.length === 1 ? "" : "s"}`, failed.length > 0);
 }
 $("qExportAll").addEventListener("change", () => {
@@ -2609,8 +2642,9 @@ $("sqForm").addEventListener("submit", async (ev) => {
 });
 
 // ---- objects --------------------------------------------------------------
-const ICONS = { table: "▦", view: "◫", matview: "◩", procedure: "ƒ", function: "λ", package: "▣", trigger: "⚡",
-  sequence: "#", domain: "◇", exception: "!", event: "⏱", index: "↯", synonym: "↪" };
+const ICONS = { table: "table", view: "window", matview: "window-stack", procedure: "gear-wide-connected", function: "braces", package: "box",
+  trigger: "lightning-charge", sequence: "123", domain: "diamond", exception: "exclamation-triangle", event: "clock", index: "list-ol", synonym: "link-45deg" };
+const objIcon = (type) => `<i class="bi bi-${ICONS[type] || "dot"}" aria-hidden="true"></i>`;
 
 function renderObjects() {
   const f = $("objFilter").value.toLowerCase();
@@ -2627,10 +2661,10 @@ function renderObjects() {
   $("objTabs").innerHTML = groups.map((g) => {
     const on = cur && g.type === cur.type;
     const n = f ? g.matches.length : g.items.length;
-    return `<button role="tab" aria-selected="${on}" data-objtab="${g.type}" class="${on ? "on" : ""}${f && !n ? " none" : ""}"` +
-      ` title="${esc(g.label)}">${ICONS[g.type] || "•"} ${esc(g.label)} <span class="cnt">${n}</span></button>` +
-      (g.type === "table" && g.items.length ? `<button class="statsbtn${tstats.exact ? " on" : ""}" data-stats` +
-        ` title="Count the rows of every table exactly and measure their size (MB) again">${tstats.loading ? `<span class="spin"></span>` : "⟳ # MB"}</button>` : "");
+    return `<button role="tab" aria-selected="${on}" data-objtab="${g.type}" class="btn btn-sm btn-outline-secondary rounded-pill ${on ? "on" : ""}${f && !n ? " none" : ""}"` +
+      ` title="${esc(g.label)}">${objIcon(g.type)} ${esc(g.label)} <span class="cnt">${n}</span></button>` +
+      (g.type === "table" && g.items.length ? `<button class="btn btn-sm btn-outline-secondary rounded-pill statsbtn${tstats.exact ? " on" : ""}" data-stats` +
+        ` title="Count the rows of every table exactly and measure their size (MB) again">${tstats.loading ? `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ` : `<i class="bi bi-arrow-clockwise" aria-hidden="true"></i> # MB`}</button>` : "");
   }).join("");
   renderStatsSummary(cur);
   if (!cur) { $("objTree").innerHTML = `<p class="empty">No objects</p>`; return; }
@@ -2639,7 +2673,7 @@ function renderObjects() {
   const head = (key, cls, label) => {
     const on = sort.key === key;
     return `<button type="button" class="${cls}${on ? " on" : ""}" data-sort="${key}" aria-sort="${on ? (sort.dir > 0 ? "ascending" : "descending") : "none"}"` +
-      ` title="Sort by ${label.toLowerCase()}${on ? (sort.dir > 0 ? " (now ascending; click for descending)" : " (now descending; click for ascending)") : ""}">${label}${on ? (sort.dir > 0 ? " ▲" : " ▼") : ""}</button>`;
+      ` title="Sort by ${label.toLowerCase()}${on ? (sort.dir > 0 ? " (now ascending; click for descending)" : " (now descending; click for ascending)") : ""}">${label}${on ? (sort.dir > 0 ? ` <i class="bi bi-caret-up-fill" aria-hidden="true"></i>` : ` <i class="bi bi-caret-down-fill" aria-hidden="true"></i>`) : ""}</button>`;
   };
   $("objTree").innerHTML = cur.matches.length
     ? `<div class="objhead">${head("name", "hname", "Name")}${withStats ? head("rows", "hrows", "Rows") + head("bytes", "hmb", "MB") : ""}</div>` +
@@ -2647,7 +2681,7 @@ function renderObjects() {
         const on = state.sel && state.sel.type === cur.type && state.sel.name === n ? "on" : "";
         const st = withStats ? tstats.byName.get(n) : null;
         const meta = st ? `<span class="meta rows">${rowsCell(st)}</span><span class="meta mb">${mbCell(st)}</span>` : "";
-        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}${st ? " — " + esc(statTitle(st)) : ""}"><span class="icon">${ICONS[cur.type] || "•"}</span><span class="name">${esc(n).replace(/[_.]/g, "$&<wbr>")}</span>${meta}</li>`;
+        return `<li data-type="${cur.type}" data-name="${esc(n)}" class="${on}" title="${esc(n)}${st ? " — " + esc(statTitle(st)) : ""}"><span class="icon">${objIcon(cur.type)}</span><span class="name">${esc(n).replace(/[_.]/g, "$&<wbr>")}</span>${meta}</li>`;
       }).join("") + `</ul>`
     : `<p class="empty">${f ? "No match" : "None in this database"}</p>`;
 }
@@ -2771,7 +2805,7 @@ async function refreshAll() {
   if (!state.session) return;
   const btns = [$("reconnectBtn"), $("refreshBtn")];
   btns.forEach((b) => { b.disabled = true; });
-  $("reconnectBtn").textContent = "↻ Refreshing…";
+  $("reconnectBtn").innerHTML = `<i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refreshing…`;
   try {
     const session = state.session;
     const res = await api("POST", "/api/refresh", { session });
@@ -2789,7 +2823,7 @@ async function refreshAll() {
   } catch (e) { toast(e.message, true); }
   finally {
     btns.forEach((b) => { b.disabled = !state.session; });
-    $("reconnectBtn").textContent = "↻ Refresh";
+    $("reconnectBtn").innerHTML = `<i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh`;
   }
 }
 $("refreshBtn").addEventListener("click", refreshAll);
@@ -2922,7 +2956,7 @@ function renderFiles() {
   $("fTypes").innerHTML = [["", "All", inConn.length], ...Object.keys(fileTypeNames).filter((t) => counts[t]).map((t) => [t, fileTypeNames[t], counts[t]])]
     .map(([t, label, n]) => {
       const on = t ? files.types.has(t) : !files.types.size;
-      return `<button class="${on ? "on" : ""}" data-ftype="${t}" aria-pressed="${on}" title="${t ? `Show ${esc(label)} files (click several to combine)` : "Show every type"}">${esc(label)}<span class="cnt">${n}</span></button>`;
+      return `<button class="btn btn-sm btn-outline-secondary rounded-pill ${on ? "on" : ""}" data-ftype="${t}" aria-pressed="${on}" title="${t ? `Show ${esc(label)} files (click several to combine)` : "Show every type"}">${esc(label)}<span class="cnt">${n}</span></button>`;
     }).join("");
   if ($("fFilter").value !== files.q) $("fFilter").value = files.q;
   // The connection list: every connection folder, with its number of files.
@@ -2939,7 +2973,7 @@ function renderFiles() {
   const allOn = vis.length > 0 && vis.every((f) => files.sel.has(fileKey(f)));
   const someOn = vis.some((f) => files.sel.has(fileKey(f)));
   const head = `<thead><tr>
-      <th class="ck"><input type="checkbox" id="fAll" aria-label="Select all shown files" ${allOn ? "checked" : ""}></th>
+      <th class="ck"><input class="form-check-input" type="checkbox" id="fAll" aria-label="Select all shown files" ${allOn ? "checked" : ""}></th>
       <th class="facts"></th>
       <th data-fsort="conn" title="Sort by connection">Connection${arrow("conn")}</th>
       <th data-fsort="name" title="Sort by file name">File name${arrow("name")}</th>
@@ -2949,8 +2983,8 @@ function renderFiles() {
   const rows = vis.map((f) => {
     const k = fileKey(f), on = files.sel.has(k);
     return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}${f.conn ? "/" + esc(f.conn) : ""}/${esc(f.kind)}">
-      <td class="ck"><input type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
-      <td class="facts"><button data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button data-fact="delete" class="del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></td>
+      <td class="ck"><input class="form-check-input" type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
+      <td class="facts"><button class="btn btn-sm btn-link fact" data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><i class="bi bi-eye" aria-hidden="true"></i></button><button data-fact="delete" class="btn btn-sm btn-link fact del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></td>
       <td class="fconn">${f.conn ? esc(f.conn) : `<span class="none">${esc(connLabel(""))}</span>`}${f.protected ? `<span class="plock" title="Protected: needs the connection's password">🔒</span>` : ""}</td>
       <td class="fname">${highlightName(f.name, terms)}</td>
       <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
@@ -2958,8 +2992,8 @@ function renderFiles() {
       <td class="fsize" title="${f.size.toLocaleString()} bytes, uncompressed">${fmtSize(f.size)}</td></tr>`;
   }).join("");
   $("fTable").innerHTML = files.list.length
-    ? `<table>${head}<tbody>${rows || `<tr><td colspan="7" class="fnomatch">No files match the filter. <button class="small" data-fclear="1">Clear the filters</button></td></tr>`}</tbody></table>`
-    : `<div class="placeholder"><div><p>No exported files yet.</p><p>Exports, DDL scripts and backups appear here.</p></div></div>`;
+    ? `<table class="table table-sm table-hover">${head}<tbody>${rows || `<tr><td colspan="7" class="fnomatch">No files match the filter. <button class="btn btn-sm btn-outline-secondary" data-fclear="1">Clear the filters</button></td></tr>`}</tbody></table>`
+    : `<div class="emptymsg"><div><p>No exported files yet.</p><p>Exports, DDL scripts and backups appear here.</p></div></div>`;
   const all = $("fAll");
   if (all) all.indeterminate = someOn && !allOn;
 
@@ -3034,7 +3068,7 @@ async function downloadFiles(chosen) {
   if (!chosen.length) return;
   const b = $("fDownload"), note = $("fNote");
   b.disabled = true; b.dataset.busy = "1"; b.textContent = "Compressing…";
-  note.innerHTML = `<span class="spin"></span> Compressing ${chosen.length} file${chosen.length === 1 ? "" : "s"} (${fmtSize(chosen.reduce((t, f) => t + f.size, 0))}) at the highest level…`;
+  note.innerHTML = `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>  Compressing ${chosen.length} file${chosen.length === 1 ? "" : "s"} (${fmtSize(chosen.reduce((t, f) => t + f.size, 0))}) at the highest level…`;
   note.hidden = false;
   try {
     const res = await withFileUnlock((u) => api("POST", "/api/files/zip", { files: chosen.map(fileRef), ...u }));
@@ -3043,7 +3077,7 @@ async function downloadFiles(chosen) {
     note.innerHTML = `Compressed ${res.files} file${res.files === 1 ? "" : "s"}: ${fmtSize(res.size)} → <b>${fmtSize(res.zipSize)}</b> (${saved}% smaller) · ` +
       `<a href="${esc(res.download)}" download="${esc(res.name)}">${esc(res.name)}</a> <span class="fsel">(link valid for 15 minutes)</span>` +
       (res.missing && res.missing.length ? `<br><span class="err">${res.missing.length} file${res.missing.length === 1 ? " was" : "s were"} no longer there and left out: ${esc(res.missing.slice(0, 5).join(", "))}${res.missing.length > 5 ? "…" : ""}</span>` : "") +
-      `<button class="clearnote" data-act="close-fnote" title="Clear">Clear</button>`;
+      `<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-fnote" title="Clear">Clear</button>`;
     if (res.missing && res.missing.length) loadFiles();
     // Only now, with the .zip complete, does the download start.
     const a = document.createElement("a");
@@ -3091,7 +3125,7 @@ $("fdConfirm").addEventListener("click", async () => {
 // ---- preview ----
 let fPrevKey = null;
 function tableHTML(cols, rows) {
-  return `<table><thead><tr><th class="n">#</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
+  return `<table class="table table-sm table-striped table-hover datagrid"><thead><tr><th class="n">#</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
     rows.map((r, i) => `<tr><td class="n">${i + 1}</td>${cols.map((_, j) => {
       const v = r[j];
       return v === null || v === undefined ? `<td class="null">NULL</td>` : `<td>${esc(typeof v === "object" ? JSON.stringify(v) : v)}</td>`;
@@ -3101,7 +3135,7 @@ async function previewFile(f) {
   fPrevKey = fileKey(f);
   $("fpTitle").textContent = f.name;
   $("fpMeta").textContent = `${connLabel(f.conn)} · ${fileTypeNames[f.kind] || f.kind} · ${fmtSize(f.size)} · created ${fmtDate(f.modified)}`;
-  $("fpBody").innerHTML = `<p class="placeholder"><span class="spin"></span> Loading preview…</p>`;
+  $("fpBody").innerHTML = `<p class="emptymsg"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>  Loading preview…</p>`;
   $("fpFoot").textContent = "";
   if (!$("fPrevDialog").open) $("fPrevDialog").showModal();
   try {
@@ -3111,14 +3145,14 @@ async function previewFile(f) {
     let foot = "";
     switch (p.mode) {
       case "table":
-        $("fpBody").innerHTML = p.columns.length ? tableHTML(p.columns, p.rows) : `<p class="placeholder">The file is empty.</p>`;
+        $("fpBody").innerHTML = p.columns.length ? tableHTML(p.columns, p.rows) : `<p class="emptymsg">The file is empty.</p>`;
         foot = `${p.rows.length.toLocaleString()} row${p.rows.length === 1 ? "" : "s"}` + (p.truncated ? ` shown: the first ${p.limit} of more` : "") +
           (p.sheet ? ` · sheet "${p.sheet}"${p.sheets > 1 ? ` (1 of ${p.sheets})` : ""}` : "");
         break;
       case "json": {
         const cols = [];
         p.items.forEach((o) => Object.keys(o).forEach((k) => { if (!cols.includes(k)) cols.push(k); }));
-        $("fpBody").innerHTML = p.items.length ? tableHTML(cols, p.items.map((o) => cols.map((c) => o[c]))) : `<p class="placeholder">The array is empty.</p>`;
+        $("fpBody").innerHTML = p.items.length ? tableHTML(cols, p.items.map((o) => cols.map((c) => o[c]))) : `<p class="emptymsg">The array is empty.</p>`;
         foot = `${p.items.length.toLocaleString()} object${p.items.length === 1 ? "" : "s"}` + (p.truncated ? ` shown: the first ${p.limit} of more` : "");
         break;
       }
@@ -3136,11 +3170,11 @@ async function previewFile(f) {
         break;
       }
       default:
-        $("fpBody").innerHTML = `<p class="placeholder">This file can't be previewed. Download it to open it.</p>`;
+        $("fpBody").innerHTML = `<p class="emptymsg">This file can't be previewed. Download it to open it.</p>`;
     }
     $("fpFoot").textContent = foot;
   } catch (e) {
-    $("fpBody").innerHTML = `<p class="placeholder">${esc(e.message)}</p>`;
+    $("fpBody").innerHTML = `<p class="emptymsg">${esc(e.message)}</p>`;
   }
 }
 const prevFile = () => files.list.find((x) => fileKey(x) === fPrevKey);
@@ -3154,7 +3188,7 @@ document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("cli
 
 function showTab(tab) {
   state.tab = tab;
-  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   $("dataPane").hidden = tab !== "data";
   $("defPane").hidden = tab !== "def";
   $("filesPane").hidden = tab !== "files";
@@ -3281,7 +3315,10 @@ function showOverall(pct, html, cls = "") {
   const el = $("overall");
   el.hidden = false;
   el.className = "overall" + (pct === null ? " busy" : "") + (cls ? " " + cls : "");
-  el.querySelector("i").style.width = (pct === null ? 0 : Math.max(0, Math.min(100, pct))) + "%";
+  // Unknown size: a full, striped, moving bar.
+  el.querySelector(".progress-bar").classList.toggle("progress-bar-striped", pct === null);
+  el.querySelector(".progress-bar").classList.toggle("progress-bar-animated", pct === null);
+  el.querySelector(".progress-bar").style.width = (pct === null ? 100 : Math.max(0, Math.min(100, pct))) + "%";
   if (pct === null) el.removeAttribute("aria-valuenow"); else el.setAttribute("aria-valuenow", Math.round(pct));
   $("overallText").innerHTML = html;
 }
@@ -3323,7 +3360,7 @@ function clearGrid(msg) {
   closeExportPanel(false);
   state.result = null;
   $("dataPane").classList.remove("offline");
-  $("grid").innerHTML = `<div class="placeholder"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>${esc(msg)}</p></div></div>`;
+  $("grid").innerHTML = `<div class="emptymsg"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>${esc(msg)}</p></div></div>`;
 }
 
 // showNoConnection fills the data pane with the cactusdb cactus alone in the
@@ -3332,7 +3369,7 @@ function showNoConnection() {
   closeExportPanel(false);
   state.result = null;
   $("dataPane").classList.add("offline");
-  $("grid").innerHTML = `<div class="placeholder noconn"><div>
+  $("grid").innerHTML = `<div class="emptymsg noconn"><div>
     <svg viewBox="0 0 480 230" role="img" aria-label="The cactusdb cactus in the desert among small cactuses and flowers, calling out for a database that is not there">
       <defs>
         <linearGradient id="ncFade" gradientUnits="userSpaceOnUse" x1="250" y1="100" x2="364" y2="112">
@@ -3440,7 +3477,7 @@ function renderGrid() {
     const cls = typeof v === "number" ? ` class="num"` : "";
     return `<td${cls} title="${s.length > 40 ? esc(s.slice(0, 2000)) : ""}">${esc(s.length > 500 ? s.slice(0, 500) + "…" : s)}</td>`;
   }).join("") + `</tr>`).join("");
-  $("grid").innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  $("grid").innerHTML = `<table class="table table-sm table-striped table-hover datagrid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
 function cmp(a, b) {
@@ -3475,7 +3512,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
     const res = await runWithOverall(`Exporting all rows of ${name} as ${fmt === "xlsx" ? "Excel" : fmt.toUpperCase()}`,
       () => api("POST", "/api/export", { session: state.session, sql, format: fmt, name }),
       (r) => `Exported <b>${r.rows.toLocaleString()}</b> row${r.rows === 1 ? "" : "s"} of ${esc(name)}`);
-    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     toast("Saved " + res.file);
   } catch (e) { toast("Export failed: " + e.message, true); }
@@ -3490,7 +3527,7 @@ $("ddlBtn").addEventListener("click", async () => {
       () => api("POST", "/api/exportddl", { session: state.session }),
       (r) => `Exported the DDL of <b>${r.objects.toLocaleString()}</b> object${r.objects === 1 ? "" : "s"}`);
     closeExportPanel(false);
-    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     showTab("data");
     toast("Saved " + res.file);
@@ -3503,7 +3540,7 @@ $("backupBtn").addEventListener("click", async () => {
   const b = $("backupBtn"), note = $("exportNote");
   b.disabled = true; b.textContent = "…";
   closeExportPanel(false);
-  note.innerHTML = `<span class="spin"></span> Backing up the database: every object and every row, compressed to a .zip…`;
+  note.innerHTML = `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>  Backing up the database: every object and every row, compressed to a .zip…`;
   note.hidden = false;
   showTab("data");
   try {
@@ -3511,7 +3548,7 @@ $("backupBtn").addEventListener("click", async () => {
       () => api("POST", "/api/backup", { session: state.session }),
       (r) => `Backed up <b>${r.tables.toLocaleString()}</b> tables and <b>${r.rows.toLocaleString()}</b> rows (${esc(r.sizeText)} compressed)`);
     const failed = res.failed && res.failed.length ? ` <span class="warn">· rows of ${res.failed.length} table${res.failed.length === 1 ? "" : "s"} could not be read: ${esc(res.failed.join(", "))}</span>` : "";
-    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a>${failed}<button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a>${failed}<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     toast("Saved " + res.file);
   } catch (e) {
     note.hidden = true;
@@ -3593,21 +3630,21 @@ function renderExportAll(st) {
   const done = st.tables.filter((t) => t.state === "done" || t.state === "failed").length;
   const rows = st.tables.map((t) => {
     const pct = t.total > 0 ? Math.min(100, Math.floor((t.rows * 100) / t.total)) : 0;
-    let bar = `<span class="bar"><i style="width:${t.state === "done" ? 100 : pct}%"></i></span>`;
+    let bar = `<span class="progress bar"><span class="progress-bar" style="width:${t.state === "done" ? 100 : pct}%"></span></span>`;
     let s;
     switch (t.state) {
-      case "waiting": s = "waiting"; bar = `<span class="bar"><i style="width:0"></i></span>`; break;
+      case "waiting": s = "waiting"; bar = `<span class="progress bar"><span class="progress-bar" style="width:0"></span></span>`; break;
       case "counting": s = "counting rows…"; break;
       case "running":
         if (t.total > 0) s = `${pct}% · ${t.rows.toLocaleString()} / ${t.total.toLocaleString()} rows`;
-        else { s = `${t.rows.toLocaleString()} rows`; bar = `<span class="bar busy"><i></i></span>`; }
+        else { s = `${t.rows.toLocaleString()} rows`; bar = `<span class="progress bar"><span class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></span></span>`; }
         break;
       case "done": s = `${t.rows.toLocaleString()} rows · <a href="${esc(dlLink(t.download))}" download>${esc(t.file)}</a>`; break;
       default: s = `<span class="err">failed: ${esc(t.error)}</span>`;
     }
     return `<li><span class="n" title="${esc(t.name)}">${esc(t.name)}</span>${bar}<span class="s">${s}</span></li>`;
   }).join("");
-  $("exportNote").innerHTML = `<div class="eahead"><span class="t">${st.done ? "Exported" : "Exporting"} all tables as ${esc(st.format.toUpperCase())} to <code>${esc(st.folder)}</code> · ${done} / ${st.tables.length} done</span>${st.done ? `<button class="clearnote" data-act="close-export" title="Clear the export status">Clear</button>` : `<button data-act="close-export" title="Close (the export keeps running)">✕</button>`}</div><ul class="ealist">${rows}</ul>`;
+  $("exportNote").innerHTML = `<div class="eahead"><span class="t">${st.done ? "Exported" : "Exporting"} all tables as ${esc(st.format.toUpperCase())} to <code>${esc(st.folder)}</code> · ${done} / ${st.tables.length} done</span>${st.done ? `<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>` : `<button class="btn-close" data-act="close-export" title="Close (the export keeps running)" aria-label="Close (the export keeps running)"></button>`}</div><ul class="ealist">${rows}</ul>`;
 }
 
 $("exportNote").addEventListener("click", (ev) => {
@@ -3708,7 +3745,7 @@ $("lgCopy").addEventListener("click", async () => {
 });
 
 // ---- check for update -------------------------------------------------------
-const COPY_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+const COPY_ICON = `<i class="bi bi-clipboard" aria-hidden="true"></i>`;
 const PLATFORMS = [
   { os: "linux", arch: "amd64", label: "Linux · Intel/AMD 64-bit (amd64, x86_64)" },
   { os: "linux", arch: "arm64", label: "Linux · ARM 64-bit (arm64, aarch64: Raspberry Pi 4/5, Graviton)" },
@@ -3739,14 +3776,14 @@ function setupCommands(u) {
 function renderUpdate(u) {
   const st = $("upStatus");
   if (u.error) {
-    st.className = "upstatus bad";
+    st.className = "upstatus alert alert-danger";
     st.textContent = `This is cactusdb ${u.current}. Could not check for a newer version: ${u.error}. The commands below still download the latest cactusdb.`;
   } else if (u.newer) {
-    st.className = "upstatus new";
+    st.className = "upstatus alert alert-success";
     st.innerHTML = `<b>cactusdb ${esc(u.latest)} is available.</b> This is ${esc(u.current)}. ` +
       (u.canInstall ? "Install it from here, or copy the command for the computer cactusdb runs on." : "Copy the command for the computer cactusdb runs on.");
   } else {
-    st.className = "upstatus";
+    st.className = "upstatus alert alert-secondary";
     st.textContent = `cactusdb ${u.current} is up to date` + (u.via ? ` (checked from this browser: ${u.via})` : "") + ".";
   }
   $("upChangelog").dataset.href = u.changelog;
@@ -3755,7 +3792,7 @@ function renderUpdate(u) {
     ? `<li class="group">${esc(r.group)}</li>`
     : `<li class="${here(r) ? "here" : ""}"><span class="plat">${esc(r.label)}${here(r) ? `<span class="tag" title="The cactusdb you're using runs on ${esc(u.os)}/${esc(u.arch)}">this server</span>` : ""}</span>
         <code title="${esc(r.cmd)}">${esc(r.cmd)}</code>
-        <button type="button" class="copy" data-copy="${i}" title="Copy the command" aria-label="Copy the command for ${esc(r.label)}">${COPY_ICON}</button></li>`).join("");
+        <button type="button" class="btn btn-sm btn-outline-secondary copy" data-copy="${i}" title="Copy the command" aria-label="Copy the command for ${esc(r.label)}">${COPY_ICON}</button></li>`).join("");
   $("upList").dataset.cmds = JSON.stringify(setupCommands(u).map((r) => r.cmd || ""));
   renderInstall(u);
   const dot = !!u.newer;
@@ -3811,7 +3848,7 @@ function upgArm(on) {
   upg.armed = on;
   const v = updateInfo && updateInfo.latest ? " " + updateInfo.latest : "";
   $("upInstallBtn").textContent = on ? `Yes, install${v} and restart` : `Install${v} and restart`;
-  $("upInstallBtn").classList.toggle("dangerfill", on);
+  $("upInstallBtn").classList.toggle("btn-danger", on); $("upInstallBtn").classList.toggle("btn-primary", !on && $("upInstallBtn").dataset.primary === "1"); $("upInstallBtn").classList.toggle("btn-outline-secondary", !on && $("upInstallBtn").dataset.primary !== "1");
 }
 
 $("upInstallBtn").addEventListener("click", async () => {
@@ -3950,11 +3987,11 @@ function newerVersion(a, b) {
 }
 
 async function openUpdateDialog() {
-  $("upStatus").className = "upstatus"; $("upStatus").innerHTML = `<span class="spin"></span>Checking GitHub for a newer cactusdb…`;
+  $("upStatus").className = "upstatus alert alert-secondary"; $("upStatus").innerHTML = `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Checking GitHub for a newer cactusdb…`;
   if (!updateInfo) $("upList").innerHTML = "";
   $("updateDialog").showModal();
   try { await checkUpdate(true); }
-  catch (e) { $("upStatus").className = "upstatus bad"; $("upStatus").textContent = "Could not check for an update: " + e.message; }
+  catch (e) { $("upStatus").className = "upstatus alert alert-danger"; $("upStatus").textContent = "Could not check for an update: " + e.message; }
 }
 
 $("upRefresh").addEventListener("click", openUpdateDialog);
@@ -3965,7 +4002,7 @@ $("upList").addEventListener("click", async (ev) => {
   const cmd = JSON.parse($("upList").dataset.cmds || "[]")[+b.dataset.copy];
   if (cmd && await copyText(cmd)) {
     toast("Command copied: paste it in a terminal on the cactusdb computer");
-    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`; b.classList.add("done");
+    b.innerHTML = `<i class="bi bi-check2" aria-hidden="true"></i>`; b.classList.add("done");
     setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); }, 1500);
   } else toast("Copy failed – select the command and copy it manually", true);
 });
@@ -4056,7 +4093,7 @@ function renderCmpPick() {
   const ticked = new Set([...$("cmpOthers").querySelectorAll("input:checked")].map((i) => i.value));
   const others = list.filter((x) => x.value !== m.value);
   $("cmpOthers").innerHTML = others.length
-    ? others.map((x) => `<label title="${esc(x.title || "")}"><input type="checkbox" value="${esc(x.value)}"${ticked.has(x.value) ? " checked" : ""}>${esc(x.label)}</label>`).join("")
+    ? others.map((x) => `<input class="btn-check" type="checkbox" id="cmpo-${esc(x.value)}" value="${esc(x.value)}" autocomplete="off"${ticked.has(x.value) ? " checked" : ""}><label class="btn btn-sm btn-outline-secondary rounded-pill" for="cmpo-${esc(x.value)}" title="${esc(x.title || "")}">${esc(x.label)}</label>`).join("")
     : `<span class="none">Save another connection to compare with (☰ → New connection)</span>`;
 }
 $("cmpMaster").addEventListener("change", renderCmpPick);
@@ -4099,7 +4136,7 @@ $("cmpRun").addEventListener("click", async () => {
         break;
       }
       const pct = st.total ? Math.floor(100 * st.done / st.total) : 0;
-      $("cmpSub").innerHTML = `<span class="cmpprog"><span class="obar"><i style="width:${pct}%"></i></span>Reading the structure: ${fmtInt(st.done)} of ${st.total ? fmtInt(st.total) : "…"} objects` +
+      $("cmpSub").innerHTML = `<span class="cmpprog"><span class="progress obar"><span class="progress-bar" style="width:${pct}%"></span></span>Reading the structure: ${fmtInt(st.done)} of ${st.total ? fmtInt(st.total) : "…"} objects` +
         (st.reading && st.reading.length ? ` · still reading ${st.reading.map((x) => "<b>" + esc(x) + "</b>").join(", ")}` : "") + `</span>`;
     }
   } catch (e) {
@@ -4139,7 +4176,7 @@ function renderCmpMatrix() {
   if (!res) return;
   const show = $("cmpShow").value, type = $("cmpType").value;
   const words = $("cmpFilter").value.toLowerCase().split(/\s+/).filter(Boolean);
-  let html = `<table class="cmp"><thead><tr><th>Object</th>` +
+  let html = `<table class="table table-sm table-hover cmp"><thead><tr><th>Object</th>` +
     res.targets.map((t, i) => `<th class="db" title="${esc(t.label)}">${esc(t.label)}</th>`).join("") + `</tr></thead><tbody>`;
   let lastType = "", shown = 0;
   res.objects.forEach((o, i) => {
@@ -4335,12 +4372,12 @@ function ctrRenderList() {
     const key = `${c.runtime}/${c.namespace || ""}/${c.name}`;
     return `<li data-i="${i}"><span class="name"><b class="cvopen" data-ct="view" title="Open this container's page">${esc(c.name)}</b> <span class="meta">${esc(specName(c.spec))} · ${c.runtime === "docker" ? "Docker" : "Kubernetes, namespace " + esc(c.namespace)}${c.port ? " · port " + c.port : ""}</span></span>
       <span class="st ${esc(c.state)}" title="${esc(c.status)}">${esc(c.state)}</span>
-      <span class="btngroup icons" role="group" aria-label="${esc(c.name)}"><button type="button" data-ct="view" title="View: its settings, CPU, memory and storage; start, stop, restart, delete or purge it" aria-label="View">👁</button><button type="button" data-ct="conn" ${c.engine ? "" : "disabled"} title="Add connection: the New connection dialog filled in for this database" aria-label="Add connection">🔌</button><button type="button" data-ct="logs" title="Logs: the container's last 300 log lines (needs the superuser password)" aria-label="Logs">📜</button><button type="button" class="danger" data-ct="remove" title="${ctr.removeArmed === key ? "Click again to remove it" : "Remove the container; its data folder or volume is kept (needs the superuser password)"}" aria-label="${ctr.removeArmed === key ? "Yes, remove it" : "Remove"}">${ctr.removeArmed === key ? "🗑 Yes, remove it" : "🗑"}</button></span></li>`;
+      <span class="btngroup btn-group btn-group-sm icons" role="group" aria-label="${esc(c.name)}"><button class="btn btn-outline-secondary" type="button" data-ct="view" title="View: its settings, CPU, memory and storage; start, stop, restart, delete or purge it" aria-label="View"><i class="bi bi-eye" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" type="button" data-ct="conn" ${c.engine ? "" : "disabled"} title="Add connection: the New connection dialog filled in for this database" aria-label="Add connection"><i class="bi bi-plug" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" type="button" data-ct="logs" title="Logs: the container's last 300 log lines (needs the superuser password)" aria-label="Logs"><i class="bi bi-journal-text" aria-hidden="true"></i></button><button type="button" class="btn btn-outline-danger" data-ct="remove" title="${ctr.removeArmed === key ? "Click again to remove it" : "Remove the container; its data folder or volume is kept (needs the superuser password)"}" aria-label="${ctr.removeArmed === key ? "Yes, remove it" : "Remove"}">${ctr.removeArmed === key ? `<i class="bi bi-trash" aria-hidden="true"></i> Yes, remove it` : `<i class="bi bi-trash" aria-hidden="true"></i>`}</button></span></li>`;
   }).join("");
 }
 function ctrResult(cls, text) {
   $("ctResult").hidden = !cls;
-  $("ctResult").className = "dresult " + (cls || "");
+  $("ctResult").className = resultClass(cls);
   $("ctResult").textContent = text || "";
 }
 function ctrUniqueName(base) {
@@ -4566,12 +4603,12 @@ function mgTargetChanged() {
     $("mgNewDb").placeholder = "e.g. shop";
   }
   if (!script && eng !== "sqlite" && !servers.length)
-    hint = `No ${name} server saved yet: add a connection to one (☰ → New connection), or deploy one (☰ → 🐳 DB container deployment).`;
+    hint = `No ${name} server saved yet: add a connection to one (☰ → New connection), or deploy one (☰ → DB container deployment).`;
   else if (!script && eng !== "sqlite")
     hint = `cactusdb creates the new database on that server, with the connection's user: it needs the right to create databases. The connection's own database isn't touched.`;
   $("mgTargetHint").textContent = hint;
   $("mgSuperWrap").hidden = script;
-  $("mgGo").textContent = script ? "⤓ Write the script" : "⇢ Migrate";
+  $("mgGo").innerHTML = script ? `<i class="bi bi-download" aria-hidden="true"></i> Write the script` : `<i class="bi bi-database-up" aria-hidden="true"></i> Migrate`;
   // Names: Firebird's are upper case; elsewhere lower case reads better.
   if (!mg.namesTouched) {
     const up = srcEng === "firebird" || srcEng === "oracle";
@@ -4773,7 +4810,7 @@ function cvCloseView() {
 }
 function cvResult(cls, text) {
   $("cvResult").hidden = !cls;
-  $("cvResult").className = "dresult " + (cls || "");
+  $("cvResult").className = resultClass(cls);
   $("cvResult").textContent = text || "";
 }
 async function cvLoad() {
@@ -4794,7 +4831,7 @@ async function cvLoad() {
 function cvBar(id, frac) {
   const f = Math.max(0, Math.min(1, frac || 0));
   $(id).style.width = (f * 100).toFixed(1) + "%";
-  $(id).classList.toggle("hot", f > 0.85);
+  $(id).classList.toggle("bg-danger", f > 0.85);
 }
 function cvRender(d) {
   const u = d.usage, rows = (list) => list.map((r) => `<tr><th>${esc(r.k)}</th><td>${esc(r.v)}</td></tr>`).join("");
@@ -4844,12 +4881,12 @@ function cvAsk(action) {
   else if (action === "purge") html = `<p><b class="warn">Purge ${esc(name)}?</b> This deletes everything about it and can't be undone:</p><ul>${(d?.purge || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
   else html = `<p>${cvWords[action]} <b>${esc(name)}</b>?</p>`;
   $("cvAskText").innerHTML = html;
-  $("cvAsk").className = "cvask" + (action === "delete" || action === "purge" ? " danger" : "");
+  $("cvAsk").className = "cvask card card-body" + (action === "delete" || action === "purge" ? " border-danger" : "");
   $("cvConfirmWrap").hidden = action !== "purge";
   $("cvConfirm").value = "";
   $("cvAskGo").textContent = cvWords[action];
   $("cvAskGo").hidden = false;
-  $("cvAskGo").className = action === "delete" || action === "purge" ? "danger" : "primary";
+  $("cvAskGo").className = "btn " + (action === "delete" || action === "purge" ? "btn-danger" : "btn-primary");
   $("cvAsk").hidden = false;
   (action === "purge" ? $("cvConfirm") : $("cvSuper").value ? $("cvAskGo") : $("cvSuper")).focus();
 }

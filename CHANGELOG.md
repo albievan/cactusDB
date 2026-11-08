@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.36.0 — 2026-11-08
+
+- **The interface is built with Bootstrap 5.3.8** (the latest stable release) and **Bootstrap
+  Icons 1.13.2**, embedded in the binary (`web/vendor/`): the page still loads nothing from
+  the internet. Light or dark follows the system, in cactusdb's colours.
+  - Buttons, button groups (container actions, script and connection), toggle buttons (the
+    object types, file types, Migrate and Compare options), switches (Live, Newest first,
+    Problems only, the analytics settings), form controls, input groups (show password, list
+    databases), tabs, tables, cards, alerts, progress bars (striped and moving while the size
+    is unknown), spinners and toasts are Bootstrap components; dialogs keep the browser's own
+    `<dialog>` in Bootstrap's modal look, with its close button.
+  - Every compact or icon button uses a Bootstrap icon instead of an emoji, a symbol or a
+    drawn icon: the menu, refresh, run, save, download, start, stop, restart, delete, purge,
+    view, logs, add connection, copy, preview, the export formats and the object types.
+
 ## 1.35.2 — 2026-11-08
 
 - **Folder setup → Connection database**: *Move it to* starts with the database's current

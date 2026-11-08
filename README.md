@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.35.2
+cactusdb 1.36.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -1532,6 +1532,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `upgrade.go`, `dist/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written by `build.sh`) |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
+| `web/vendor/` | [Bootstrap 5.3.8](https://getbootstrap.com/) (its CSS and JavaScript bundle) and [Bootstrap Icons 1.13.2](https://icons.getbootstrap.com/), embedded too: the page loads nothing from the internet |
 
 ## Changes
 
@@ -1546,4 +1547,5 @@ Public domain, under the same terms as SQLite: see [LICENSE](LICENSE).
 > May you share freely, never taking more than you give.
 
 The third-party drivers built into the binary keep their own licenses (BSD, MPL-2.0,
-MIT and Apache-2.0), listed in [LICENSE](LICENSE).
+MIT and Apache-2.0), listed in [LICENSE](LICENSE). Bootstrap and Bootstrap Icons are MIT
+licensed: their licenses are next to them in `web/vendor/`.
