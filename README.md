@@ -21,7 +21,9 @@ or export tables with a single command without opening a browser at all.
 
 - No installer, no runtime, no database drivers or client libraries to install:
   everything is inside the one file.
-- **Read-only:** it can never change, insert or delete data in your databases.
+- **Read-only:** it can never change, insert or delete data in your databases. The one
+  database it writes to is a new one it creates itself, when it migrates a database to
+  another type (☰ → Migrate database).
 - Remembers your connections, so you only type them once.
 
 ```sh
@@ -110,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.34.1
+cactusdb 1.35.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -159,6 +161,7 @@ The **☰ Connections** menu at the bottom of the sidebar has these items:
 | **📜 Logs** | Opens the **Logs** tab (see below) |
 | **🐳 DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection. Each deployed container has a page with its settings and its CPU, memory and storage use, and start, stop, restart, delete and purge (see [Deploying a database as a container](#db-containers)) |
 | **⇄ Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
+| **⇢ Migrate database** | Copies a database, structure and data, with its views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB (see [Migrating a database](#migrate)) |
 | **⬆ Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
@@ -422,6 +425,59 @@ not differences: MySQL's next `AUTO_INCREMENT` value, the `DEFINER` user, the da
 name in a view, a sequence's current value, and the order of columns. Only databases of the
 same kind are compared object by object (MySQL and MariaDB count as one); with another kind
 only the names are compared, and no script is made.
+
+<a id="migrate"></a>
+**Migrating a database.** **☰ → ⇢ Migrate database** (or the **Migrate** tab) copies a
+database to a **new** database of another type, e.g. Firebird to MariaDB, SQL Server to
+PostgreSQL or MySQL to SQLite:
+1. **From:** the source, a saved connection or the one you're connected to (any SQL
+   database: SQLite, MySQL, MariaDB, PostgreSQL and its relatives, SQL Server, Azure SQL,
+   Firebird, Oracle, Access, Informix).
+2. **To:** the type of the new database (MariaDB, MySQL, PostgreSQL, SQL Server, SQLite or
+   Firebird), the server (a saved connection to it, e.g. one you deployed with ☰ → 🐳 DB
+   container deployment) and the **new database's name**: for SQLite a full path on the
+   cactusdb server, for Firebird a path on the Firebird server.
+3. **What to migrate:** the tables always, and ticked: their **rows**, the **sequences**,
+   the **views**, the **procedures & functions** and the **triggers**. **Names in the new
+   database:** as they are, lower case or UPPER CASE (Firebird's upper-case names become
+   lower case elsewhere, by default).
+4. **How:** *Create the new database and copy into it* (needs the superuser password), or
+   *Only write the script (.sql)*, which changes no database: run it yourself with mysql,
+   psql, sqlcmd, sqlite3 or isql.
+
+cactusdb creates the database (refusing one that already exists), then:
+- **Sequences** (generators), going on from their current values (MySQL and SQLite have
+  none: they are listed).
+- **Tables:** each column's type in the new database's terms (e.g. Firebird's `BLOB SUB_TYPE
+  TEXT` becomes `LONGTEXT` on MariaDB, `TEXT` on PostgreSQL, `NVARCHAR(MAX)` on SQL Server),
+  nullability, defaults, auto-numbered (identity) columns and the primary key.
+- **Rows**, in batches of multi-row INSERTs committed every few thousand rows; afterwards
+  each table's rows are counted again. Dates and times are copied as they are, without a
+  time zone moving them.
+- **Unique constraints, indexes, foreign keys and checks**, after the rows; then each
+  auto-numbered column goes on from the largest value copied.
+- **Views**, their query rewritten: quoting, names, and what differs (Firebird's `FIRST`/`SKIP`
+  and SQL Server's `TOP` become `LIMIT`, or the reverse; `IIF`, `LIST`, `GEN_ID`, `NEXT VALUE
+  FOR`, `CONCAT`, `ISNULL`, `SUBSTRING(… FROM … FOR …)`, PostgreSQL's `::` casts and `= ANY
+  (ARRAY[…])`, `WHERE flag` on SQL Server). A view that reads another is made after it.
+- **Procedures, functions and triggers:** Firebird's PSQL is translated to MariaDB/MySQL
+  and to PostgreSQL's PL/pgSQL: variables, `IF`, `WHILE`, `FOR SELECT … INTO … DO` (a cursor
+  loop on MariaDB), `SUSPEND` (a selectable procedure is a function `RETURNS TABLE` on
+  PostgreSQL; on MariaDB `CALL` returns its rows), `EXIT`, `EXCEPTION` (`SIGNAL` / `RAISE`),
+  `EXECUTE PROCEDURE … RETURNING_VALUES`, `WHEN ANY DO` and the `INSERTING`/`UPDATING`/
+  `DELETING` of a trigger (on MariaDB a trigger per event). Between databases of the same
+  kind (e.g. MySQL to MariaDB, PostgreSQL to Azure Database for PostgreSQL) they are copied
+  as they are. Other code (T-SQL, PL/pgSQL, MySQL's) is listed with its source, to rewrite
+  by hand. On MySQL and SQLite, which have no sequences, Firebird's usual trigger that
+  numbers a column from a generator becomes an auto-numbered column.
+
+The page shows the progress, then every object with its result: **✓ done**, **check** (made,
+but read its notes), **by hand** (not made: its source is shown), **✘ failed** (with the
+database's error) or **skipped**. Click one to see its source beside what was made of it.
+**⤓ Script** downloads the SQL of the migration (what was run, and at the end, as comments,
+what is left to do by hand); **🔌 Add as connection** opens the connection dialog filled in
+for the new database. If it stops (or you click **■ Stop**), the new database is left as it
+is: delete it before migrating again.
 
 **Adding and editing connections.** Click **＋ New connection** (in the menu or the sidebar)
 to open the connection dialog: a name, the database type and the connection details. Click
@@ -812,6 +868,10 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
    - MongoDB takes only `find`, `aggregate` (without `$out` or `$merge`), `countDocuments`,
      `distinct` and `getIndexes`; Redis only the commands that read; Cassandra and Athena
      only `SELECT`.
+
+The one exception is [migrating a database](#migrate): cactusdb then writes to a **new**
+database it creates for it (and refuses one that already exists), and only for the
+superuser. The source is read like any other database, in read-only transactions.
 
 ## 4. Exporting from the command line (no browser)
 
@@ -1270,6 +1330,9 @@ is sent and how to set it up. In short:
   even someone with `cactus.conn.db` *and* `cactus.key` can't read them without that
   password. Wrong guesses are slowed down. The connection's exported files are only served
   to someone who gives its password. See [Connection passwords](#connection-passwords).
+- **Migrating** writes only to a database cactusdb creates for it, refusing one that already
+  exists, and only with the superuser password. *Only write the script* writes to no
+  database. The script of a migration can be downloaded only by whoever started it.
 - **The superuser password** is never stored. It protects an X25519 private key, and each
   connection password is sealed to the matching public key (with HKDF-SHA256 and
   AES-256-GCM). Choose a long one, keep it somewhere safe, and don't put it in shared
@@ -1452,6 +1515,9 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
+| `migrate.go` | ☰ → Migrate database: the job, creating the new database, copying the rows, keys, indexes and the report and script |
+| `migrate_schema.go` | Tables described without their engine: reading each engine's catalog, and writing the target's column types, defaults and DDL |
+| `migrate_code.go` | Views, procedures and triggers for the target: an SQL tokenizer and rewrites, and Firebird's PSQL parsed and written as MariaDB/MySQL or PL/pgSQL |
 | `dbmove.go` | Moving `cactus.conn.db` (☰ → Folder setup) and finding it again at the next start |
 | `ga.go` | Google Analytics settings, and command-line runs in the usage log and Google Analytics |
 | `usage.go` | The usage log: every function used, in the `usage_events` table of `cactus.conn.db` |

@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.34.1"
+var version = "1.35.0"
 
 //go:embed web
 var webFS embed.FS
@@ -78,11 +78,12 @@ type server struct {
 	defaultConnDB string // cactus.conn.db next to the program
 	connDBFlag    string // --conn-db, which overrides a moved database
 
-	mu       sync.Mutex
-	sessions map[string]*session
-	batches  map[string]*webBatch    // "export all tables" jobs, by id
-	zips     map[string]*preparedZip // compressed downloads of the Exported files page, by id
-	compares map[string]*compareJob  // ☰ → Compare databases, by id (compare.go)
+	mu         sync.Mutex
+	sessions   map[string]*session
+	batches    map[string]*webBatch    // "export all tables" jobs, by id
+	zips       map[string]*preparedZip // compressed downloads of the Exported files page, by id
+	compares   map[string]*compareJob  // ☰ → Compare databases, by id (compare.go)
+	migrations map[string]*migrateJob  // ☰ → Migrate, by id (migrate.go)
 
 	throttle lockThrottle // slows down guessing connection passwords
 
@@ -439,6 +440,10 @@ func main() {
 	mux.HandleFunc("POST /api/files/delete", s.handleDeleteFiles)
 	mux.HandleFunc("POST /api/compare", s.handleCompare)
 	mux.HandleFunc("GET /api/compare/{job}", s.handleCompareStatus)
+	mux.HandleFunc("POST /api/migrate", s.handleMigrate)
+	mux.HandleFunc("GET /api/migrate/{job}", s.handleMigrateStatus)
+	mux.HandleFunc("POST /api/migrate/{job}/cancel", s.handleMigrateCancel)
+	mux.HandleFunc("GET /api/migrate/{job}/script", s.handleMigrateScript)
 	mux.HandleFunc("GET /api/connections", s.handleListConns)
 	mux.HandleFunc("POST /api/connections", s.handleSaveConn)
 	mux.HandleFunc("DELETE /api/connections/{id}", s.handleDeleteConn)

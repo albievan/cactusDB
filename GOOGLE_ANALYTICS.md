@@ -43,18 +43,19 @@ months and a view over time without running SQL.
 
 | Event | When | Parameters |
 |---|---|---|
-| `page_view` | the page opens, and each tab (a virtual page: `/data`, `/def`, `/logs`, `/compare`, `/files`, `/queries`) | `page_location`, `page_title` |
+| `page_view` | the page opens, and each tab (a virtual page: `/data`, `/def`, `/logs`, `/compare`, `/migrate`, `/files`, `/queries`) | `page_location`, `page_title` |
 | `connect`, `disconnect`, `test_connection` | connecting | `engine`, `result` (`ok`/`failed`), `duration_bucket` |
 | `open_table`, `show_definition`, `run_query`, `table_stats` | browsing | `engine`, `result`, `duration_bucket` |
 | `export`, `export_all`, `export_ddl`, `backup` | exporting | `engine`, `format`, `result`, `duration_bucket` |
 | `compare` | ☰ → Compare databases | `engine`, `databases` (how many), `result` |
+| `migrate` | ☰ → Migrate database | `engine`, `target` (the new database's type, `_script` for a script only), `result` |
 | `save_connection`, `delete_connection`, `save_query`, `delete_saved_query`, `zip_files`, `preview_file`, `delete_files`, `save_settings`, `usage_housekeeping` | the other functions | `result`, `duration_bucket` |
 | `menu_click` | a ☰ menu item | `item` (e.g. `compare`) |
 | `sort`, `object_tab` | sorting the object list, its tabs | `by`, `type` |
 | `ui_click`, `ui_toggle`, `ui_choose` | buttons, check boxes and drop-down lists with a fixed id | `control` (the id, e.g. `cmpDrops`); never the chosen value |
 | `cli_export`, `cli_export_ddl`, `cli_backup`, `cli_show_tables` | command-line runs | `engine`, `format`, `tables_bucket`, `result`, `duration_bucket` |
 
-Every event also has `app_version` (e.g. `1.34.1`).
+Every event also has `app_version` (e.g. `1.35.0`).
 
 **Never sent:** SQL, table, column, connection, host or database names, file paths, IP
 addresses, session ids, usernames, error messages, or anything typed. Google's terms

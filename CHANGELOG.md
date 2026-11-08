@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.35.0 — 2026-11-08
+
+- **☰ → ⇢ Migrate database** (or the **Migrate** tab): copy a database to a **new** database
+  of another type, e.g. Firebird to MariaDB, with its structure, data, views, procedures and
+  triggers.
+  - From any SQL database (SQLite, MySQL, MariaDB, the PostgreSQL family, SQL Server, Azure
+    SQL, Firebird, Oracle, Access, Informix) to MariaDB, MySQL, PostgreSQL, SQL Server,
+    SQLite or Firebird. cactusdb creates the new database on the chosen server (a saved
+    connection), refuses one that already exists, and needs the superuser password; or it
+    only writes the script (.sql) and changes no database.
+  - Sequences with their current values; tables with each column's type for the new
+    database, defaults, identity columns and primary keys; the rows (batched, committed every
+    few thousand, then counted); unique constraints, indexes, foreign keys and checks; the
+    identity counters set to go on.
+  - Views rewritten for the new database (quoting, names, FIRST/SKIP/TOP/LIMIT, IIF, LIST,
+    GEN_ID, CONCAT, ISNULL, PostgreSQL casts and ANY(ARRAY), …).
+  - Firebird's procedures, functions and triggers translated to MariaDB/MySQL and to
+    PostgreSQL (PL/pgSQL): FOR SELECT loops, SUSPEND, EXCEPTION, EXECUTE PROCEDURE,
+    INSERTING/UPDATING/DELETING, WHEN ANY. Between databases of the same kind they are
+    copied; other code is listed with its source to rewrite by hand. On MySQL and SQLite the
+    generator trigger of a column becomes an auto-numbered column.
+  - A report of every object (done, check, by hand, failed, skipped) with its source beside
+    what was made of it, the script to download, and *Add as connection* for the new
+    database.
+
 ## 1.34.1 — 2026-11-08
 
 - **A container's page is a page, not a dialog**: **View** opens it in the main area under

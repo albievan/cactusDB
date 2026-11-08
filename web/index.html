@@ -540,6 +540,50 @@
   ul.ctlist li .name b.cvopen { cursor: pointer; text-decoration: underline dotted; }
   .cvhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cvhead h2 { margin: 0; font-size: 18px; font-family: var(--mono); overflow-wrap: anywhere; }
+  /* ☰ → Migrate database: a page in the main area. */
+  #migratePane { overflow-y: auto; background: var(--panel); }
+  #migratePane[hidden] { display: none; }
+  .mgpage { padding: 16px 20px 24px; max-width: 1100px; }
+  .mgpage h2 { margin: 0 0 4px; font-size: 18px; }
+  .mggrid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; margin-top: 12px; }
+  @media (max-width: 760px) { .mggrid { grid-template-columns: minmax(0, 1fr); } .mgarrow { transform: rotate(90deg); justify-self: center; } }
+  .mgarrow { align-self: center; font-size: 22px; color: var(--muted); }
+  .mgcard { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px 14px; background: var(--panel); margin-top: 10px; min-width: 0; }
+  .mggrid .mgcard { margin-top: 0; }
+  .mgcard h4 { margin: 0 0 4px; font-size: 13px; }
+  .mgopts { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  .mgopts label { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; }
+  .mgopts label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .mgopts input { margin: 0; width: auto; }
+  .mgreshead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mgreshead .spacer { flex: 1; }
+  .mgreshead .btngroup { margin-left: 0; }
+  .btngroup a.btn { margin: 0; padding: 3px 9px; font-size: 12px; border-radius: 6px 0 0 6px; white-space: nowrap; }
+  .btngroup a.btn + button { margin-left: -1px; }
+  .btngroup a.btn[hidden], .btngroup button[hidden] { display: none; }
+  .mgfilter { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .mgfilter select { width: auto; }
+  .mgfilter input { flex: 1; min-width: 160px; }
+  table.mgtable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.mgtable th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); position: static; }
+  table.mgtable td { padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; white-space: normal; max-width: none; overflow-wrap: anywhere; }
+  table.mgtable tr[data-i] { cursor: pointer; }
+  table.mgtable td:first-child, table.mgtable td:nth-child(4) { white-space: nowrap; }
+  table.mgtable td.mono { min-width: 12ch; }
+  table.mgtable tr.on td { background: var(--accent-soft); }
+  table.mgtable td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.mgtable .mono { font-family: var(--mono); font-size: 12px; }
+  .mgst { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .mgst.done { color: var(--accent); background: var(--accent-soft); }
+  .mgst.check, .mgst.manual { color: var(--c-diff); background: var(--c-diff-bg); }
+  .mgst.failed { color: var(--danger); background: var(--danger-soft); }
+  .mgst.skipped { color: var(--muted); background: var(--panel-2); }
+  .mgnotes { margin: 6px 0; padding-left: 20px; font-size: 13px; }
+  .mgcode { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  @media (max-width: 900px) { .mgcode { grid-template-columns: minmax(0, 1fr); } }
+  .mgcode .lbl { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .mgcode pre.ctlog { max-height: 50vh; margin-top: 4px; }
+  #mgLog { max-height: 160px; }
   /* The container's page: a pane of its own, scrolling as a whole. */
   #ctrPane { overflow-y: auto; background: var(--panel); }
   #ctrPane[hidden] { display: none; }
@@ -666,6 +710,7 @@
       <button data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request">📜 Logs</button>
       <button data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes">🐳 DB container deployment</button>
       <button data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences">⇄ Compare databases</button>
+      <button data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB">⇢ Migrate database</button>
       <button data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system">⬆ Check for update<span class="updot" id="updateDot" hidden></span></button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
@@ -732,6 +777,7 @@
       <button data-tab="files" title="Download exported files, compressed">Exported files</button>
       <button data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <button data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
+      <button data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
       <button data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
       <span class="title" id="tabTitle"></span>
     </div>
@@ -864,6 +910,112 @@
         <button class="small" id="copyDefBtn" disabled>Copy</button>
       </div>
       <pre id="defSrc">Select an object on the left to see its definition.</pre>
+    </div>
+    <div class="pane" id="migratePane" hidden>
+      <div class="mgpage">
+        <h2>Migrate a database</h2>
+        <p class="hint">Copies the tables (columns, primary keys, unique constraints, indexes, foreign keys and checks), their rows, the sequences, views, procedures, functions and triggers to a <b>new</b> database of another type. The source is only read. cactusdb creates the new database and writes only to it: it refuses one that already exists.</p>
+        <div class="mggrid">
+          <section class="mgcard">
+            <h4>1 · From</h4>
+            <label for="mgSource">Source database</label>
+            <select id="mgSource"></select>
+            <p class="hint" id="mgSourceInfo"></p>
+          </section>
+          <div class="mgarrow" aria-hidden="true">⇢</div>
+          <section class="mgcard">
+            <h4>2 · To</h4>
+            <label for="mgEngine">Database type</label>
+            <select id="mgEngine">
+              <option value="mariadb">MariaDB</option>
+              <option value="mysql">MySQL</option>
+              <option value="postgres">PostgreSQL</option>
+              <option value="mssql">SQL Server</option>
+              <option value="sqlite">SQLite</option>
+              <option value="firebird">Firebird</option>
+            </select>
+            <div id="mgServerWrap">
+              <label for="mgServer">Server: a saved connection to it</label>
+              <select id="mgServer"></select>
+            </div>
+            <label for="mgNewDb" id="mgNewDbLabel">New database</label>
+            <input id="mgNewDb" spellcheck="false" autocomplete="off">
+            <p class="hint" id="mgTargetHint"></p>
+          </section>
+        </div>
+        <section class="mgcard">
+          <h4>3 · What to migrate</h4>
+          <div class="mgopts" role="group" aria-label="What to migrate">
+            <label title="Always: the columns, primary keys, unique constraints, indexes, foreign keys and checks"><input type="checkbox" checked disabled> Tables</label>
+            <label title="Every row of every table"><input type="checkbox" id="mgData" checked> Rows</label>
+            <label title="Sequences (generators), with their current values"><input type="checkbox" id="mgSeqs" checked> Sequences</label>
+            <label title="Views, their queries rewritten for the new database"><input type="checkbox" id="mgViews" checked> Views</label>
+            <label title="Procedures and functions: Firebird's are translated to MariaDB, MySQL or PostgreSQL; between databases of the same kind they are copied"><input type="checkbox" id="mgRoutines" checked> Procedures &amp; functions</label>
+            <label title="Triggers: Firebird's are translated to MariaDB, MySQL or PostgreSQL; between databases of the same kind they are copied"><input type="checkbox" id="mgTriggers" checked> Triggers</label>
+          </div>
+          <div class="row2 half">
+            <div>
+              <label for="mgNames">Names in the new database</label>
+              <select id="mgNames">
+                <option value="">As they are</option>
+                <option value="lower">lower case</option>
+                <option value="upper">UPPER CASE</option>
+              </select>
+            </div>
+            <div>
+              <label for="mgMode">How</label>
+              <select id="mgMode">
+                <option value="run">Create the new database and copy into it</option>
+                <option value="script">Only write the script (.sql): no database is changed</option>
+              </select>
+            </div>
+          </div>
+          <div id="mgSuperWrap">
+            <label for="mgSuper">Superuser password</label>
+            <input id="mgSuper" type="password" autocomplete="off">
+            <p class="hint">Only the superuser creates databases. It also opens the saved connections used here.</p>
+          </div>
+          <div class="dactions">
+            <span class="spacer"></span>
+            <button type="button" id="mgStop" hidden title="Stop the migration: the new database is left as it is">■ Stop</button>
+            <button type="button" class="primary" id="mgGo">⇢ Migrate</button>
+          </div>
+        </section>
+        <section class="mgcard" id="mgProgress" hidden>
+          <h4 id="mgPhase">Starting…</h4>
+          <div class="cmpprog"><span class="obar"><i id="mgBar"></i></span><span id="mgCount"></span></div>
+          <p class="hint" id="mgCurrent"></p>
+          <pre class="ctlog" id="mgLog"></pre>
+        </section>
+        <section class="mgcard" id="mgResult" hidden>
+          <div class="mgreshead">
+            <h4 id="mgResTitle">Result</h4>
+            <span class="spacer"></span>
+            <span class="btngroup" role="group" aria-label="The new database">
+              <a class="btn" id="mgScript" download title="The SQL of the migration, with what is left to do by hand at the end">⤓ Script (.sql)</a><button type="button" id="mgAddConn" title="Open the New connection dialog filled in for the new database">🔌 Add as connection</button>
+            </span>
+          </div>
+          <p class="hint" id="mgResSub"></p>
+          <div class="mgfilter">
+            <select id="mgShow" aria-label="Show">
+              <option value="">Everything</option>
+              <option value="attention" selected>Needs attention (check, by hand, failed)</option>
+              <option value="done">Done</option>
+            </select>
+            <input id="mgFilter" type="search" placeholder="Filter by name…" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="ftable"><table class="mgtable" id="mgTable"></table></div>
+          <div id="mgDetail" hidden>
+            <h4 class="edsub" id="mgDetTitle"></h4>
+            <div class="dresult bad" id="mgDetErr" hidden></div>
+            <ul class="mgnotes" id="mgDetNotes"></ul>
+            <div class="mgcode">
+              <div><div class="lbl">Source</div><pre class="ctlog" id="mgDetSrc"></pre></div>
+              <div><div class="lbl">In the new database</div><pre class="ctlog" id="mgDetSQL"></pre></div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
     <div class="pane" id="ctrPane" hidden>
       <div class="cvpage">
@@ -1660,6 +1812,7 @@ const UNLOCK_WORDS = {
   edit: (n) => ({ title: `Edit “${n}”`, text: `Enter the connection password of “${n}” to unlock it for editing.`, ok: "Unlock to edit" }),
   delete: (n) => ({ title: `Delete “${n}”?`, text: `Enter the connection password of “${n}” to delete it and its saved queries.`, ok: "Delete" }),
   compare: (n) => ({ title: `Compare “${n}”`, text: `“${n}” is protected by its connection password. Enter it to read its structure.`, ok: "Unlock" }),
+  migrate: (n) => ({ title: `Migrate “${n}”`, text: `“${n}” is protected by its connection password. Enter it to read its structure and data.`, ok: "Unlock" }),
 };
 async function withUnlock(c, fn, action = "connect", first = null) {
   let creds = first || credsFor(c.id);
@@ -2045,6 +2198,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "update": setNavMenu(false); openUpdateDialog(); break;
     case "logs": setNavMenu(false); showTab("logs"); break;
     case "compare": setNavMenu(false); showTab("compare"); break;
+    case "migrate": setNavMenu(false); showTab("migrate"); break;
     case "containers": setNavMenu(false); openContainers(); break;
   }
 });
@@ -2275,7 +2429,7 @@ const GA_API = {
   "POST /api/connect": "connect", "POST /api/testconn": "test_connection", "POST /api/disconnect": "disconnect",
   "GET /api/select": "open_table", "GET /api/definition": "show_definition", "POST /api/query": "run_query",
   "GET /api/tablestats": "table_stats", "POST /api/export": "export", "POST /api/exportall": "export_all",
-  "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare",
+  "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare", "POST /api/migrate": "migrate",
   "POST /api/connections": "save_connection", "POST /api/queries": "save_query",
   "POST /api/files/zip": "zip_files", "POST /api/files/preview": "preview_file", "POST /api/files/delete": "delete_files",
   "POST /api/settings": "save_settings", "POST /api/usage/delete": "usage_housekeeping",
@@ -2292,6 +2446,7 @@ function gaApi(method, url, body, status, ms) {
   if (engine) p.engine = gaSafe(engine);
   if (body && body.format) p.format = gaSafe(body.format);
   if (body && Array.isArray(body.others)) p.databases = body.others.length + 1;
+  if (body && body.targetEngine) p.target = gaSafe(body.targetEngine + (body.scriptOnly ? "_script" : ""));
   gaEvent(name, p);
 }
 
@@ -2307,7 +2462,7 @@ for (const ev of ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"
   document.addEventListener(ev, () => { idle.last = Date.now(); }, { capture: true, passive: true });
 setInterval(() => {
   const m = settings.idleMinutes ?? 15;
-  if (!state.session || pending > 0 || overall.running || !(m > 0)) { idle.last = Date.now(); return; }
+  if (!state.session || pending > 0 || overall.running || mg.running || !(m > 0)) { idle.last = Date.now(); return; }
   if (Date.now() - idle.last >= m * 60000)
     disconnect(`disconnected from “%s” after ${m} minute${m === 1 ? "" : "s"} without activity (change this in ☰ → Settings)`);
 }, 5000);
@@ -3006,6 +3161,8 @@ function showTab(tab) {
   if (tab === "def") loadDefinition();
   if (tab === "files") loadFiles();
   $("ctrPane").hidden = tab !== "container";
+  $("migratePane").hidden = tab !== "migrate";
+  if (tab === "migrate") openMigrate();
   if (tab === "container") cvLoad(); else cvPause();
 }
 
@@ -3900,13 +4057,13 @@ $("cmpMaster").addEventListener("change", renderCmpPick);
 
 // cmpSource returns what the server needs to open one database, asking for
 // its connection password when it is protected and not yet unlocked.
-async function cmpSource(value) {
+async function cmpSource(value, action = "compare") {
   if (value === "session") return state.session ? { session: state.session } : null;
   const c = (state.saved || []).find((x) => String(x.id) === value);
   if (!c) return null;
   let creds = credsFor(c.id);
   if (c.locked && !creds.lockPassword && !creds.superPassword) {
-    const ok = await withUnlock(c, (cr) => { creds = cr; return api("POST", `/api/connections/${c.id}/unlock`, cr); }, "compare");
+    const ok = await withUnlock(c, (cr) => { creds = cr; return api("POST", `/api/connections/${c.id}/unlock`, cr); }, action);
     if (!ok) return null;
   }
   return { savedId: c.id, ...creds };
@@ -4355,6 +4512,202 @@ $("ctList").addEventListener("click", async (ev) => {
     toast(`Removed ${c.name}; its data was kept`);
   } catch (e) { ctrResult("bad", "✘ " + e.message); }
   loadContainersList();
+});
+
+// ---- ☰ → Migrate database ---------------------------------------------------------
+// The source (a saved connection or the open one) is copied to a new
+// database the server creates on the target server, a saved connection, or
+// written as a script only (migrate.go). The page polls the job and shows
+// every object: done, to check, to finish by hand, failed or skipped.
+const mg = { job: "", timer: 0, res: null, sel: -1, running: false };
+const MG_TARGET_KIND = { mariadb: ["mysql", "mariadb"], mysql: ["mysql", "mariadb"], postgres: ["postgres", "pgvector", "azurepg", "horizondb"],
+  mssql: ["mssql"], firebird: ["firebird"], sqlite: [] };
+const MG_STATUS = { done: "✓ done", check: "check", manual: "by hand", failed: "✘ failed", skipped: "skipped" };
+const MG_TYPES = { table: "Table", unique: "Unique", index: "Index", "foreign key": "Foreign key", check: "Check", sequence: "Sequence",
+  view: "View", procedure: "Procedure", function: "Function", trigger: "Trigger", package: "Package" };
+
+function mgSourceEngine() {
+  const v = $("mgSource").value;
+  if (v === "session") return state.engine;
+  return ((state.saved || []).find((c) => String(c.id) === v) || {}).engine || "";
+}
+function openMigrate() {
+  const list = cmpSources(), src = $("mgSource"), prev = src.value;
+  src.innerHTML = list.length ? list.map((x) => `<option value="${esc(x.value)}" title="${esc(x.title || "")}">${esc(x.label)}</option>`).join("")
+    : `<option value="">No saved connections yet</option>`;
+  if (list.some((x) => x.value === prev)) src.value = prev;
+  mgTargetChanged();
+}
+function mgTargetChanged() {
+  const eng = $("mgEngine").value, script = $("mgMode").value === "script", srcEng = mgSourceEngine();
+  const kinds = MG_TARGET_KIND[eng] || [];
+  const servers = (state.saved || []).filter((c) => kinds.includes(c.engine));
+  const prev = $("mgServer").value;
+  $("mgServer").innerHTML = servers.map((c) => `<option value="${c.id}">${esc(c.name)} · ${esc([c.host, c.port].filter(Boolean).join(":"))}</option>`).join("");
+  if (servers.some((c) => String(c.id) === prev)) $("mgServer").value = prev;
+  $("mgServerWrap").hidden = eng === "sqlite" || script;
+  const name = engineLabel(eng);
+  let hint = "";
+  if (eng === "sqlite") {
+    $("mgNewDbLabel").textContent = script ? "New database (a name for the script)" : "New database file: a full path on the cactusdb server";
+    $("mgNewDb").placeholder = script ? "e.g. shop" : "/data/shop.db";
+  } else if (eng === "firebird") {
+    $("mgNewDbLabel").textContent = "New database file: a path on the Firebird server";
+    $("mgNewDb").placeholder = "/var/lib/firebird/data/shop.fdb";
+  } else {
+    $("mgNewDbLabel").textContent = "New database name";
+    $("mgNewDb").placeholder = "e.g. shop";
+  }
+  if (!script && eng !== "sqlite" && !servers.length)
+    hint = `No ${name} server saved yet: add a connection to one (☰ → New connection), or deploy one (☰ → 🐳 DB container deployment).`;
+  else if (!script && eng !== "sqlite")
+    hint = `cactusdb creates the new database on that server, with the connection's user: it needs the right to create databases. The connection's own database isn't touched.`;
+  $("mgTargetHint").textContent = hint;
+  $("mgSuperWrap").hidden = script;
+  $("mgGo").textContent = script ? "⤓ Write the script" : "⇢ Migrate";
+  // Names: Firebird's are upper case; elsewhere lower case reads better.
+  if (!mg.namesTouched) {
+    const up = srcEng === "firebird" || srcEng === "oracle";
+    $("mgNames").value = eng === "firebird" ? (up ? "" : "upper") : up ? "lower" : "";
+  }
+  const code = srcEng === "firebird" && ["mariadb", "mysql", "postgres"].includes(eng);
+  const same = srcEng === eng || (["mysql", "mariadb"].includes(srcEng) && ["mysql", "mariadb"].includes(eng)) ||
+    (MG_TARGET_KIND.postgres.includes(srcEng) && eng === "postgres") || (srcEng === "azuresql" && eng === "mssql");
+  $("mgSourceInfo").textContent = !srcEng ? "" : code ? "Its procedures, functions and triggers are translated from Firebird's PSQL."
+    : same ? "Its procedures, functions and triggers are copied as they are."
+    : `Its procedures, functions and triggers are listed with their source, to rewrite by hand for ${name}.`;
+}
+function engineLabel(id) { return ((state.engines || []).find((e) => e.id === id) || {}).name || id; }
+$("mgSource").addEventListener("change", mgTargetChanged);
+$("mgEngine").addEventListener("change", mgTargetChanged);
+$("mgMode").addEventListener("change", mgTargetChanged);
+$("mgNames").addEventListener("change", () => { mg.namesTouched = true; });
+
+$("mgGo").addEventListener("click", async () => {
+  if (mg.running) return;
+  const script = $("mgMode").value === "script", eng = $("mgEngine").value;
+  const sv = $("mgSource").value, newDb = $("mgNewDb").value.trim(), su = $("mgSuper").value;
+  if (!sv) { toast("Choose the source database", true); return; }
+  if (!newDb) { toast("Enter the new database", true); $("mgNewDb").focus(); return; }
+  if (!script && eng !== "sqlite" && !$("mgServer").value) { toast(`Choose the ${engineLabel(eng)} server`, true); return; }
+  if (!script && !su) { toast("Enter the superuser password", true); $("mgSuper").focus(); return; }
+  $("mgResult").hidden = true;
+  let source;
+  if (sv !== "session" && su && !script) source = { savedId: +sv };
+  else source = await cmpSource(sv, "migrate");
+  if (!source) return;
+  const body = { source, targetEngine: eng, newDatabase: newDb, superPassword: script ? "" : su, scriptOnly: script, names: $("mgNames").value,
+    data: $("mgData").checked, sequences: $("mgSeqs").checked, views: $("mgViews").checked, routines: $("mgRoutines").checked, triggers: $("mgTriggers").checked };
+  if (!script && eng !== "sqlite") body.target = { savedId: +$("mgServer").value };
+  mg.running = true; $("mgGo").disabled = true;
+  $("mgResult").hidden = true; $("mgProgress").hidden = false;
+  $("mgPhase").textContent = "Starting…"; $("mgLog").textContent = ""; $("mgCurrent").textContent = ""; $("mgCount").textContent = "";
+  $("mgBar").style.width = "0";
+  try {
+    const r = await api("POST", "/api/migrate", body);
+    mg.job = r.job;
+    $("mgStop").hidden = false;
+    mgPoll();
+  } catch (e) {
+    mg.running = false; $("mgGo").disabled = false; $("mgProgress").hidden = true;
+    toast(e.message, true);
+  }
+});
+$("mgStop").addEventListener("click", async () => {
+  if (!mg.job) return;
+  $("mgStop").disabled = true;
+  try { await api("POST", "/api/migrate/" + encodeURIComponent(mg.job) + "/cancel", {}); } catch (e) { toast(e.message, true); }
+});
+async function mgPoll() {
+  clearTimeout(mg.timer);
+  let st;
+  try { st = await api("GET", "/api/migrate/" + encodeURIComponent(mg.job)); }
+  catch (e) { mg.timer = setTimeout(mgPoll, 2000); return; }
+  $("mgPhase").textContent = st.phase + (st.finished ? "" : "…");
+  const pct = st.total ? Math.floor(100 * st.done / st.total) : 0;
+  $("mgBar").style.width = (st.finished ? 100 : pct) + "%";
+  $("mgCount").textContent = (st.total ? `${fmtInt(st.done)} of ${fmtInt(st.total)}` : "") + (st.rows ? ` · ${fmtInt(st.rows)} rows copied` : "");
+  $("mgCurrent").textContent = st.current || "";
+  const log = $("mgLog"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+  log.textContent = (st.log || []).join("\n");
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  if (!st.finished) { mg.timer = setTimeout(mgPoll, 700); return; }
+  mg.running = false; $("mgGo").disabled = false; $("mgStop").hidden = true; $("mgStop").disabled = false;
+  mgShow(st);
+}
+function mgShow(st) {
+  mg.res = st; mg.sel = -1;
+  const items = st.items || [], n = {};
+  for (const it of items) n[it.status] = (n[it.status] || 0) + 1;
+  const rows = items.reduce((a, it) => a + (it.type === "table" ? it.rows || 0 : 0), 0);
+  const tables = items.filter((it) => it.type === "table").length;
+  $("mgResult").hidden = false;
+  $("mgResTitle").textContent = st.error ? "✘ The migration stopped" : st.scriptOnly ? "✔ The script is written: no database was changed"
+    : n.failed || n.manual || n.check ? "✔ Migrated: some objects need attention" : "✔ Migrated";
+  const word = (k) => st.scriptOnly && k === "done" ? "✓ in the script" : MG_STATUS[k];
+  const chips = ["done", "check", "manual", "failed", "skipped"].filter((k) => n[k]).map((k) => `<span class="mgst ${k}">${fmtInt(n[k])} ${word(k)}</span>`).join(" ");
+  $("mgResSub").innerHTML = (st.error ? `<span class="warn">${esc(st.error)}</span>` + (items.length ? "<br>" : "") : "") +
+    (items.length ? `${fmtInt(tables)} tables, ${fmtInt(rows)} rows in ${(st.seconds || 0).toFixed(1)} s · ${chips}` : "");
+  $("mgScript").hidden = !st.download;
+  if (st.download) { $("mgScript").href = "/api/migrate/" + encodeURIComponent(mg.job) + "/script"; $("mgScript").title = st.script || ""; }
+  $("mgAddConn").hidden = !st.target;
+  $("mgShow").value = items.some((it) => ["check", "manual", "failed"].includes(it.status)) ? "attention" : "";
+  $("mgDetail").hidden = true;
+  $("mgTable").parentElement.hidden = $("mgShow").parentElement.hidden = !items.length;
+  mgRender();
+  $("mgResult").scrollIntoView({ block: "nearest" });
+}
+function mgRender() {
+  const st = mg.res;
+  if (!st) return;
+  const show = $("mgShow").value, words = $("mgFilter").value.toLowerCase().split(/\s+/).filter(Boolean);
+  let html = `<thead><tr><th>Type</th><th>Source</th><th>New database</th><th>Result</th><th class="n">Rows</th><th>Notes</th></tr></thead><tbody>`, shown = 0;
+  (st.items || []).forEach((it, i) => {
+    if (show === "attention" && !["check", "manual", "failed"].includes(it.status)) return;
+    if (show === "done" && it.status !== "done") return;
+    if (words.length && !words.every((w) => (it.name + " " + it.target).toLowerCase().includes(w))) return;
+    shown++;
+    const notes = [it.error, ...(it.notes || [])].filter(Boolean);
+    html += `<tr data-i="${i}"${i === mg.sel ? ` class="on"` : ""}><td>${esc(MG_TYPES[it.type] || it.type)}</td><td class="mono">${esc(it.name)}</td>` +
+      `<td class="mono">${esc(it.target || "")}</td><td><span class="mgst ${esc(it.status)}">${esc(MG_STATUS[it.status] || it.status)}</span></td>` +
+      `<td class="n">${it.type === "table" ? fmtInt(it.rows || 0) : ""}</td><td>${esc(notes[0] || "")}${notes.length > 1 ? ` <span class="hint">(+${notes.length - 1})</span>` : ""}</td></tr>`;
+  });
+  html += `</tbody>`;
+  if (!shown) html = `<tbody><tr><td class="hint">${show === "attention" ? "✓ Nothing needs attention." : "Nothing matches."}</td></tr></tbody>`;
+  $("mgTable").innerHTML = html;
+}
+$("mgShow").addEventListener("change", mgRender);
+$("mgFilter").addEventListener("input", mgRender);
+$("mgTable").addEventListener("click", (ev) => {
+  const tr = ev.target.closest("tr[data-i]");
+  if (!tr) return;
+  mg.sel = +tr.dataset.i;
+  const it = mg.res.items[mg.sel];
+  mgRender();
+  $("mgDetail").hidden = false;
+  $("mgDetTitle").textContent = `${MG_TYPES[it.type] || it.type} ${it.name}` + (it.target ? ` → ${it.target}` : "");
+  $("mgDetErr").hidden = !it.error; $("mgDetErr").textContent = it.error || "";
+  $("mgDetNotes").innerHTML = (it.notes || []).map((n) => `<li>${esc(n)}</li>`).join("");
+  $("mgDetSrc").textContent = it.source || "(the structure read from the catalog)";
+  $("mgDetSQL").textContent = it.sql || (it.status === "manual" ? "(not created: to do by hand)" : "");
+  $("mgDetail").scrollIntoView({ block: "nearest" });
+});
+$("mgAddConn").addEventListener("click", () => {
+  const t = mg.res && mg.res.target;
+  if (!t) return;
+  openConnDialog(null);
+  $("dEngine").value = t.engine;
+  dlgEngine(false);
+  $("dName").value = (t.database || "").split(/[\\/]/).pop();
+  if (t.engine === "sqlite") $("dFile").value = t.database;
+  else {
+    $("dHost").value = t.host || "localhost";
+    if (t.port) $("dPort").value = t.port;
+    $("dUser").value = t.username || "";
+    $("dDb").value = t.database || "";
+  }
+  dlgResult();
+  (t.engine === "sqlite" ? $("dLock") : $("dPass")).focus();
 });
 
 // ---- a deployed container's page ------------------------------------------------
