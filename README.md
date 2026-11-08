@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.35.0
+cactusdb 1.35.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -443,7 +443,10 @@ PostgreSQL or MySQL to SQLite:
    lower case elsewhere, by default).
 4. **How:** *Create the new database and copy into it* (needs the superuser password), or
    *Only write the script (.sql)*, which changes no database: run it yourself with mysql,
-   psql, sqlcmd, sqlite3 or isql.
+   psql, sqlcmd, sqlite3 or isql. The 👁 button in the password field shows what you typed.
+   The superuser password also opens the source and target connections. A connection saved
+   before the superuser password was set can't be opened by it yet: cactusdb asks for that
+   connection's own password once, and from then on the superuser password opens it too.
 
 cactusdb creates the database (refusing one that already exists), then:
 - **Sequences** (generators), going on from their current values (MySQL and SQLite have

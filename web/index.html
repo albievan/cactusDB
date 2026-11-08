@@ -129,6 +129,7 @@
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .row2 { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
   .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--text); }
+  .check[hidden] { display: none; }
   .check input { width: auto; }
   button {
     font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px; padding: 6px 12px;
@@ -972,7 +973,7 @@
           </div>
           <div id="mgSuperWrap">
             <label for="mgSuper">Superuser password</label>
-            <input id="mgSuper" type="password" autocomplete="off">
+            <span class="pwwrap"><input id="mgSuper" type="password" autocomplete="off"><button type="button" class="eye" data-pw="mgSuper" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
             <p class="hint">Only the superuser creates databases. It also opens the saved connections used here.</p>
           </div>
           <div class="dactions">
@@ -1035,7 +1036,7 @@
           <div id="cvConfirmWrap" hidden><label for="cvConfirm" id="cvConfirmLabel">Type the container's name to confirm</label>
             <input id="cvConfirm" spellcheck="false" autocomplete="off"></div>
           <label for="cvSuper">Superuser password</label>
-          <input id="cvSuper" type="password" autocomplete="off">
+          <span class="pwwrap"><input id="cvSuper" type="password" autocomplete="off"><button type="button" class="eye" data-pw="cvSuper" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
           <div class="dactions"><span class="spacer"></span>
             <button type="button" id="cvAskCancel">Cancel</button>
             <button type="button" class="primary" id="cvAskGo">OK</button></div>
@@ -1161,7 +1162,7 @@
         <p class="hint" id="ctPassHint"></p>
       </div>
       <label for="ctSuper">Superuser password</label>
-      <input id="ctSuper" type="password" autocomplete="off">
+      <span class="pwwrap"><input id="ctSuper" type="password" autocomplete="off"><button type="button" class="eye" data-pw="ctSuper" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
       <div id="ctResult" class="dresult" hidden></div>
       <pre class="ctlog" id="ctLog" hidden></pre>
       <div class="dactions">
@@ -1312,7 +1313,7 @@
     <h3 id="pwTitle">Connection password</h3>
     <p class="sdtext" id="pwText"></p>
     <label for="pwInput" id="pwLabel">Connection password</label>
-    <input id="pwInput" type="password" autocomplete="off">
+    <span class="pwwrap"><input id="pwInput" type="password" autocomplete="off"><button type="button" class="eye" data-pw="pwInput" title="Show password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></span>
     <label class="check" id="pwSuperWrap"><input type="checkbox" id="pwSuper"> Use the superuser password instead</label>
     <div id="pwResult" class="dresult bad" hidden></div>
     <div class="dactions">
@@ -1771,7 +1772,7 @@ function askPassword({ title, text, label = "Connection password", ok = "Unlock"
   return new Promise((resolve) => {
     const d = $("pwDialog");
     $("pwTitle").textContent = title; $("pwText").textContent = text || ""; $("pwText").hidden = !text;
-    $("pwInput").value = ""; $("pwResult").hidden = true; $("pwOk").textContent = ok;
+    $("pwInput").value = ""; showPassword(document.querySelector('.eye[data-pw="pwInput"]'), false); $("pwResult").hidden = true; $("pwOk").textContent = ok;
     $("pwSuper").checked = superOnly; $("pwSuperWrap").hidden = superOnly || !allowSuper;
     const setLabel = () => ($("pwLabel").textContent = $("pwSuper").checked ? "Superuser password" : label);
     setLabel();
@@ -4395,6 +4396,7 @@ $("ctClose").addEventListener("click", () => $("ctrDialog").close());
 $("ctForm").addEventListener("submit", (ev) => ev.preventDefault());
 $("ctrDialog").addEventListener("close", () => {
   $("ctSuper").value = $("ctPass").value = $("ctPass2").value = "";
+  showPassword(document.querySelector('.eye[data-pw="ctSuper"]'), false);
   allowShowPassword("ctPass", true);
 });
 
@@ -4604,7 +4606,24 @@ $("mgGo").addEventListener("click", async () => {
   $("mgPhase").textContent = "Starting…"; $("mgLog").textContent = ""; $("mgCurrent").textContent = ""; $("mgCount").textContent = "";
   $("mgBar").style.width = "0";
   try {
-    const r = await api("POST", "/api/migrate", body);
+    // A connection saved before the superuser password was set can't be
+    // opened by it yet: its own password is asked for once, after which the
+    // superuser password opens it too.
+    let r, asked = 0;
+    for (;;) {
+      try { r = await api("POST", "/api/migrate", body); break; } catch (e) {
+        const d = e.data || {}, id = d.needsOwnPassword ? d.savedId : d.locked && asked;
+        if (!id) throw e;
+        const c = (state.saved || []).find((x) => x.id === id) || { name: "the connection" };
+        const cr = await askPassword({ title: `Unlock “${c.name}”`, ok: "Unlock", allowSuper: false,
+          text: (d.needsOwnPassword ? "" : e.message.charAt(0).toUpperCase() + e.message.slice(1) + ". ") +
+            `“${c.name}” was saved before the superuser password was set, so the superuser password can't open it yet. Enter its own connection password once: from then on the superuser password opens it too.` });
+        if (!cr) { mg.running = false; $("mgGo").disabled = false; $("mgProgress").hidden = true; return; }
+        for (const x of [body.source, body.target]) if (x && x.savedId === id) x.lockPassword = cr.lockPassword;
+        unlocks[id] = { lockPassword: cr.lockPassword };
+        asked = id;
+      }
+    }
     mg.job = r.job;
     $("mgStop").hidden = false;
     mgPoll();
@@ -4742,6 +4761,7 @@ function cvCloseView() {
   cvPause();
   cv.c = cv.d = null; cv.ask = ""; cv.busy = false;
   $("cvSuper").value = $("cvConfirm").value = "";
+  showPassword(document.querySelector('.eye[data-pw="cvSuper"]'), false);
   $("cvAsk").hidden = true; $("cvAskGo").hidden = false;
   $("ctrTab").hidden = true;
   if (state.tab === "container") showTab("data");

@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.35.0"
+var version = "1.35.1"
 
 //go:embed web
 var webFS embed.FS
@@ -995,7 +995,11 @@ func (s *server) unlockConnAs(w http.ResponseWriter, r *http.Request, id int64, 
 			writeJSON(w, 403, map[string]any{"error": "wrong superuser password", "locked": true})
 			return c, nil, false
 		}
-		if errors.Is(err, errNoSuperuser) || errors.Is(err, errNoEscrow) {
+		if errors.Is(err, errNoEscrow) { // the page asks for the connection's own password once
+			writeJSON(w, 409, map[string]any{"error": err.Error(), "needsOwnPassword": true, "savedId": id})
+			return c, nil, false
+		}
+		if errors.Is(err, errNoSuperuser) {
 			writeErr(w, 409, err)
 			return c, nil, false
 		}

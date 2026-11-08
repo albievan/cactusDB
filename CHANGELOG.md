@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.35.1 — 2026-11-08
+
+- **Migrate** no longer stops with "this connection was saved before the superuser password
+  was set…": when the source or target connection was saved before the superuser password,
+  cactusdb asks for that connection's own password once (a wrong one is asked again) and
+  goes on; from then on the superuser password opens it too.
+- A 👁 **Show password** button in the superuser password fields (Migrate, the container page
+  and DB container deployment) and in the connection-password prompt; a cleared field is
+  masked again.
+- The *Use the superuser password instead* checkbox no longer shows in prompts that don't
+  offer it.
+
 ## 1.35.0 — 2026-11-08
 
 - **☰ → ⇢ Migrate database** (or the **Migrate** tab): copy a database to a **new** database
