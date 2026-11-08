@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.35.2 — 2026-11-08
+
+- **Folder setup → Connection database**: *Move it to* starts with the database's current
+  place instead of being empty; moving to that same place says so before asking.
+- A new path without an extension (like the dialog's own example,
+  `/Users/you/cactusdb-data`) is now a folder for `cactus.conn.db`; before, it became a
+  file of that name.
+
 ## 1.35.1 — 2026-11-08
 
 - **Migrate** no longer stops with "this connection was saved before the superuser password

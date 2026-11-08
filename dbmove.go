@@ -62,7 +62,10 @@ func checkDBPath(in, defaultPath string) (string, error) {
 	if !filepath.IsAbs(p) {
 		return "", fmt.Errorf("%q is not a full path: give the whole path, e.g. %s", in, filepath.Join(filepath.Dir(filepath.Dir(defaultPath)), "cactusdb-data", filepath.Base(defaultPath)))
 	}
-	if fi, err := os.Stat(p); (err == nil && fi.IsDir()) || strings.HasSuffix(in, "/") || strings.HasSuffix(in, `\`) {
+	// A folder: one that exists, a path ending in a slash, or a new path
+	// without an extension (e.g. /srv/cactusdb-data).
+	fi, err := os.Stat(p)
+	if (err == nil && fi.IsDir()) || strings.HasSuffix(in, "/") || strings.HasSuffix(in, `\`) || (err != nil && filepath.Ext(p) == "") {
 		p = filepath.Join(p, filepath.Base(defaultPath))
 	}
 	return filepath.Clean(p), nil

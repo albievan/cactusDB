@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.35.1
+cactusdb 1.35.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -566,9 +566,11 @@ the program. Files exported before the change can still be downloaded until cact
 `--exportto` on the command line always wins over the saved folder.
 
 **Connection database.** The same dialog shows where `cactus.conn.db` is (saved
-connections, saved queries, settings and the usage log) and can **move** it: type the new
-file, or a folder to put `cactus.conn.db` in, and click **Move database**, then **Yes, move
-it**.
+connections, saved queries, settings and the usage log) and can **move** it. **Move it to**
+starts with its current place: change it to the new file, or a folder to put
+`cactus.conn.db` in, and click **Move database**, then **Yes, move it**.
+- A new path without an extension (e.g. `/srv/cactusdb-data`) or ending in `/` is a folder;
+  one with an extension (e.g. `/srv/data/my.db`) is the file itself.
 - The folder is created if it doesn't exist. An existing file is never overwritten.
 - cactusdb copies the database while holding its only connection, so nothing is written
   in between, checks the copy, uses it straight away and deletes the old file.

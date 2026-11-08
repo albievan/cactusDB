@@ -74,6 +74,17 @@ func TestMoveConnDB(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(exe, keyFileName)); err != nil {
 		t.Errorf("key not moved back: %v", err)
 	}
+	dir := t.TempDir()
+	for in, want := range map[string]string{
+		filepath.Join(dir, "new-folder"): filepath.Join(dir, "new-folder", "cactus.conn.db"),
+		filepath.Join(dir, "x") + "/":    filepath.Join(dir, "x", "cactus.conn.db"),
+		filepath.Join(dir, "my.db"):      filepath.Join(dir, "my.db"),
+		dir:                              filepath.Join(dir, "cactus.conn.db"),
+	} {
+		if got, err := checkDBPath(in, def); err != nil || got != want {
+			t.Errorf("checkDBPath(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
 	if _, err := checkDBPath("relative/x.db", def); err == nil {
 		t.Error("relative path accepted")
 	}

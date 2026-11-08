@@ -1603,7 +1603,7 @@ function openFolderDialog() {
     ? `cactusdb was started with --exportto ${settings.exportToFlag}. Your choice applies now, but at the next start --exportto wins as long as it is given.` : "";
   $("edResult").hidden = true;
   showDbPath();
-  $("dbPath").value = ""; $("dbResult").hidden = true; dbMoveArmed(null);
+  $("dbPath").value = settings.dbPath || ""; $("dbResult").hidden = true; dbMoveArmed(null);
   $("exportDirDialog").showModal();
   $("edPath").select();
 }
@@ -1724,7 +1724,12 @@ function dbMoveArmed(target) {
 }
 async function moveDb(target) {
   if (dbMoveTarget !== target) {
-    if (target !== "" && !target.trim()) { $("dbResult").className = "dresult bad"; $("dbResult").textContent = "Enter the new place first."; $("dbResult").hidden = false; return; }
+    const same = target !== "" && target.trim() === settings.dbPath;
+    if ((target !== "" && !target.trim()) || same) {
+      $("dbResult").className = "dresult bad"; $("dbResult").hidden = false;
+      $("dbResult").textContent = same ? "That is where the connection database is now: change the path to the new place first." : "Enter the new place first.";
+      $("dbPath").focus(); return;
+    }
     $("dbResult").className = "dresult busy";
     $("dbResult").textContent = `Move the connection database from ${settings.dbPath} to ${target === "" ? settings.defaultDbPath : target}? ` +
       "Everyone using cactusdb keeps working; a request that arrives at the very moment of the move may fail and need to be repeated. Click “Yes, move it” to go ahead.";
@@ -1741,7 +1746,7 @@ async function moveDb(target) {
     $("dbResult").className = "dresult " + (m.warnings && m.warnings.length ? "bad" : "ok");
     $("dbResult").textContent = `Moved to ${m.to}.` + (m.keyTo ? ` The key is now ${m.keyTo}.` : "") +
       (m.warnings && m.warnings.length ? "\n" + m.warnings.join("\n") : "");
-    $("dbPath").value = "";
+    $("dbPath").value = m.to;
     toast("Connection database moved to " + m.to);
   } catch (e) {
     $("dbResult").className = "dresult bad"; $("dbResult").textContent = e.message;
