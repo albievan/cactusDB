@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.37.0
+cactusdb 1.38.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -232,7 +232,7 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
 
 **Saved connections** appear under **Connections** in the menu, and in the sidebar while
 you're not connected, grouped by the type of database (Firebird, MariaDB, SQL Server…, each
-with how many there are) and sorted by name. Each type opens and closes from its heading,
+with how many there are) and sorted by name, each with the date and time it was saved. Each type opens and closes from its heading,
 and several can be open at once; when you open cactusdb in the browser, they all start
 closed. Hovering over a connection shows its whole name, which the list may cut off. Click **▶** (or the name) to connect, **Edit** to change it, or the
 bin icon to delete it. 🔒 marks a connection protected by its own password,
@@ -660,6 +660,9 @@ those objects.
   reloaded; if it no longer exists, the selection is cleared.
 - The Objects and Saved connections sections fold open and closed from their heading, and
   cactusdb remembers your choice.
+- The sidebar is as wide as you like: drag its right edge (220 pixels up to 60% of the
+  window). The browser remembers the width; double-click the edge for the usual width again.
+  With the edge focused, the arrow keys make it narrower or wider and Home resets it.
 
 | Engine | Object groups |
 |--------|---------------|
@@ -712,7 +715,22 @@ for SQL databases with their own DDL; for the others, export the data and the DD
 **☰ → DB container deployment** starts a new database server as a container on the
 computer cactusdb runs on, when it has **Docker** (Docker CE or Docker Desktop) or
 **Kubernetes** (k8s, k3s, with `kubectl`). The dialog shows what it found, the database
-containers cactusdb deployed, and a form:
+containers cactusdb deployed, and a form.
+
+**How to install Docker or Kubernetes on this server** (in the dialog; open when neither
+was found) shows the steps for the system cactusdb runs on: its OS, its processor (Intel/AMD
+or ARM 64-bit) and, on Linux, its distribution. One tab each for **Docker CE**, **Docker
+Desktop**, **k3s** and **Kubernetes (k8s)**, with the commands to copy:
+
+- Linux: Docker CE with Docker's install script (and the `docker` group for cactusdb's
+  user), Docker Desktop's `.deb`/`.rpm` (Intel/AMD only), k3s with its installer and a
+  kubeconfig for cactusdb's user, and kubectl plus kubeadm for a full cluster.
+- macOS: Docker Desktop (Homebrew or the download for Apple silicon or Intel), Docker CE in
+  Colima, k3s with k3d or Colima, and Docker Desktop's Kubernetes.
+- Windows: Docker Desktop with WSL 2 (`winget` or the download), Docker CE and k3s inside
+  WSL 2, and Docker Desktop's Kubernetes with `kubectl` from `winget`.
+
+Then **Refresh** looks for `docker`, `kubectl` and `k3s` again. The form:
 
 | Field | |
 |-------|---|
@@ -729,9 +747,12 @@ containers cactusdb deployed, and a form:
 **Deploy** downloads the image (unless it's already there), starts the container and
 connects until the database answers, showing each step. Then **Add as connection…** opens
 the New connection dialog filled in (type, host, port, user, password, database): give it
-a connection password and save it. Each deployed container in the list has one compact
-group of buttons (hover one for what it does): **View**, **Add connection**, **Logs**
-(the last 300 lines) and **Remove**. Remove asks first (click it again) and removes the
+a connection password and save it. The deployed containers are in a table (name, database,
+where it runs, port, state, status): click a column heading to sort by it (again for the
+other way), and type in **Search by container name** to show only the containers whose
+name contains it. Each row has its compact group of buttons, always shown (hover one for
+what it does): **View**, **Add connection**, **Logs** (the last 300 lines, newest first)
+and **Remove**. Remove asks first (click it again) and removes the
 container (Docker) or the deployment, service and secret (Kubernetes); the data folder,
 volume or volume claim is kept.
 

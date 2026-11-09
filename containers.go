@@ -1023,12 +1023,43 @@ func portFree(port int, public bool) bool {
 	return true
 }
 
+// linuxDistro is the Linux distribution cactusdb runs on, from /etc/os-release
+// (id, its family and its name), for the install instructions of Docker and
+// Kubernetes; nil on other systems.
+func linuxDistro() map[string]string {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	b, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return nil
+	}
+	d := map[string]string{}
+	for _, line := range strings.Split(string(b), "\n") {
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		v = strings.Trim(v, `"'`)
+		switch k {
+		case "ID":
+			d["id"] = v
+		case "ID_LIKE":
+			d["like"] = v
+		case "PRETTY_NAME":
+			d["name"] = v
+		}
+	}
+	return d
+}
+
 // ---- web ----------------------------------------------------------------------------------
 
 func (s *server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	docker, kube := detectRuntimes(r.Context())
 	out := map[string]any{"runtimes": []*ctrRuntime{docker, kube}, "catalog": containerCatalog,
-		"superuserSet": s.store.SuperuserSet(), "exampleDir": exampleDataDir("NAME"), "os": runtime.GOOS}
+		"superuserSet": s.store.SuperuserSet(), "exampleDir": exampleDataDir("NAME"), "os": runtime.GOOS,
+		"arch": runtime.GOARCH, "distro": linuxDistro()}
 	deployed := []deployedCtr{}
 	var errs []string
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)

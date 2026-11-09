@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.38.0 — 2026-11-09
+
+- **DB container deployment**: the deployed containers are in a **table** (container,
+  database, runs on, port, state, status) **sorted by any column** (click its heading, again
+  for the other way) with a **search by container name**; each row's buttons (view, add
+  connection, logs, remove) are always shown, not only on hover.
+- **How to install Docker or Kubernetes on this server**: steps for the server's OS,
+  processor (amd64 or arm64) and Linux distribution, one tab each for Docker CE, Docker
+  Desktop, k3s and Kubernetes (k8s), with the commands to copy. Open when neither Docker nor
+  Kubernetes was found.
+- Each **saved connection shows when it was saved** (date and time) next to its name, and in
+  its hint.
+- The **sidebar can be resized**: drag its right edge; the width is remembered in the
+  browser, and a double-click on the edge restores the usual width.
+
 ## 1.37.0 — 2026-11-09
 
 - **A container's log** on its page is shown **newest first** (a message over several lines

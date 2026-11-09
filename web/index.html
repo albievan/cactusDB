@@ -151,10 +151,18 @@
   body.busy .flow .pk { stroke-width: 3; }
   @media (prefers-reduced-motion: reduce) { .flow .wave, .flow .pk { animation: none; } }
   header .status b { color: var(--accent); font-weight: 600; }
-  .layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); min-height: 0; }
+  .layout { display: grid; grid-template-columns: var(--nav-w, 320px) minmax(0, 1fr); min-height: 0; }
+  /* The sidebar's right edge: drag it to make the sidebar wider or narrower. */
+  .navsizer { position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; z-index: 40; cursor: col-resize; touch-action: none; }
+  .navsizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
+  .navsizer:hover::after, .navsizer:focus-visible::after, body.navresizing .navsizer::after { background: var(--accent); }
+  .navsizer:focus-visible { outline: none; }
+  body.navresizing { cursor: col-resize; user-select: none; }
+  aside > section.box, aside > .navfoot { overflow: hidden; }
   aside {
     background: var(--panel); border-right: 1px solid var(--border);
-    overflow: hidden; display: flex; flex-direction: column; position: relative;
+    /* visible: the resize handle sits on its edge; min-height keeps it in the window. */
+    overflow: visible; min-height: 0; display: flex; flex-direction: column; position: relative;
   }
   /* The pop-up menu with the connection, saved connections, export folder and drivers. */
   .navfoot { margin-top: auto; border-top: 1px solid var(--border); padding: 8px; background: var(--panel-2); }
@@ -184,6 +192,7 @@
   .dlock { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); }
   .dlock[hidden] { display: none; }
   #savedList .lock { font-size: 11px; margin-left: 4px; }
+  ul.list li .created { margin-left: 6px; font: 400 10.5px var(--bs-body-font-family); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* Saved connections grouped by the type of database. */
   ul.list li.group { padding: 0; }
   ul.list li.group:hover { background: none; }
@@ -585,13 +594,34 @@
   ul.ctrt .no { color: var(--muted); }
   pre.ctlog { margin: 10px 0 0; max-height: 220px; overflow: auto; padding: 8px 10px; border-radius: 6px; background: var(--panel-2);
     font: 11.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-  ul.ctlist li { flex-wrap: wrap; gap: 6px; cursor: default; }
-  ul.ctlist li button { display: inline-block; }
-  ul.ctlist li .meta { margin-left: 0; }
-  ul.ctlist li .st { font-size: 11px; border-radius: 4px; padding: 0 5px; background: var(--panel-2); color: var(--muted); }
-  ul.ctlist li .st.running { background: var(--accent-soft); color: var(--accent); }
-  ul.ctlist li .st.exited, ul.ctlist li .st.dead { background: var(--danger-soft); color: var(--danger); }
-  ul.ctlist li .name b.cvopen { cursor: pointer; text-decoration: underline dotted; }
+  /* How to install Docker or Kubernetes: one tab each, with the commands to copy. */
+  .ctinstall { margin: 8px 0 4px; }
+  .ctinstall-head { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 12px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .ctinstall-head .hint { margin: 0; font-weight: 400; }
+  .ctinstall-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+  .ctinstall .card-body { padding: 4px 12px 10px; }
+  .ctinstall .nav-pills { --bs-nav-pills-link-active-bg: var(--accent); --bs-nav-link-color: var(--muted); --bs-nav-link-hover-color: var(--text);
+    --bs-nav-link-padding-y: 4px; --bs-nav-link-font-size: 13px; gap: 4px; margin-bottom: 6px; }
+  .ctinstall ol { margin: 6px 0; padding-left: 20px; font-size: 13px; }
+  .ctinstall ol li { margin: 6px 0; overflow-wrap: anywhere; }
+  .ctinstall .input-group { margin-top: 3px; }
+  .ctinstall code.form-control { font: 12px/1.5 var(--mono); color: var(--text); background: var(--panel-2); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+  /* The deployed containers: a sortable table, its buttons always shown. */
+  .ctsearch { margin: 6px 0 8px; max-width: 320px; }
+  .ctwrap { overflow-x: auto; }
+  table.ctable { font-size: 13px; width: 100%; }
+  table.ctable th { white-space: nowrap; }
+  table.ctable th.acts { cursor: default; }
+  table.ctable td { vertical-align: middle; max-width: 260px; }
+  table.ctable td.num, table.ctable th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.ctable td.cname { font-family: var(--mono); }
+  table.ctable td.cstatus { color: var(--muted); font-size: 12px; }
+  table.ctable td.acts { width: 1%; text-align: right; }
+  table.ctable td.empty { color: var(--muted); text-align: center; padding: 14px; }
+  table.ctable b.cvopen { cursor: pointer; text-decoration: underline dotted; }
+  table.ctable .st { font-size: 11px; border-radius: 4px; padding: 0 5px; background: var(--panel-2); color: var(--muted); }
+  table.ctable .st.running { background: var(--accent-soft); color: var(--accent); }
+  table.ctable .st.exited, table.ctable .st.dead { background: var(--danger-soft); color: var(--danger); }
   .cvhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cvhead h2 { margin: 0; font-size: 18px; font-family: var(--mono); overflow-wrap: anywhere; }
   /* ☰ → Migrate database: a page in the main area. */
@@ -677,6 +707,7 @@
   .dactions .spacer { flex: 1; }
   .toast-container { z-index: 1090; }
   @media (max-width: 760px) {
+    .navsizer { display: none; }
     body { overflow: auto; }
     .layout { grid-template-columns: minmax(0, 1fr); }
     aside { border-right: 0; border-bottom: 1px solid var(--border); }
@@ -716,7 +747,9 @@
 </header>
 
 <div class="layout">
-  <aside>
+  <aside id="sidebar">
+    <div class="navsizer" id="navSizer" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" tabindex="0"
+      title="Drag to resize the sidebar; double-click for its usual width (arrow keys work too)"></div>
     <section class="box" id="objectsBox" data-sec="objects">
       <h2><button class="toggle" aria-expanded="true">Objects</button><span id="objCount"></span></h2>
       <div class="exportall">
@@ -1173,6 +1206,7 @@
     <p class="hint">Deploy a database server as a container on the Docker (Docker CE or Docker Desktop) or Kubernetes
       (k8s, k3s) of the computer cactusdb runs on. Only the superuser can deploy and remove containers or read their logs.</p>
     <ul class="ctrt" id="ctRuntimes"><li>Looking for Docker and Kubernetes…</li></ul>
+    <div class="ctinstall card" id="ctInstall" hidden></div>
 
     <div id="ctDeploy" hidden>
       <h4 class="edsub">Deploy a database</h4>
@@ -1221,7 +1255,8 @@
     </div>
 
     <h4 class="edsub">Deployed by cactusdb</h4>
-    <ul class="list ctlist" id="ctList"><li class="empty">…</li></ul>
+    <input class="form-control form-control-sm ctsearch" id="ctSearch" type="search" placeholder="Search by container name…" spellcheck="false" autocomplete="off" aria-label="Search by container name">
+    <div class="ctwrap"><table class="table table-sm table-hover ctable" id="ctList"><tbody><tr><td class="empty">…</td></tr></tbody></table></div>
     <div id="ctLogsWrap" hidden><p class="hint" id="ctLogsTitle"></p><pre class="ctlog" id="ctLogs"></pre></div>
     <div class="dactions">
       <button class="btn btn-outline-secondary" type="button" id="ctRefresh" title="Look for Docker and Kubernetes and list the containers again"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
@@ -1817,6 +1852,43 @@ async function moveDb(target) {
   }
 }
 $("dbMove").addEventListener("click", () => moveDb($("dbPath").value));
+
+// ---- resizing the sidebar ------------------------------------------------------
+// Its width is kept in this browser; double-click the edge for the usual width.
+const NAV_W = { def: 320, min: 220, key: "cactusdb.navWidth" };
+const navMax = () => Math.max(NAV_W.min, Math.min(720, Math.round(innerWidth * 0.6)));
+function setNavWidth(px, keep = true) {
+  const w = Math.round(Math.max(NAV_W.min, Math.min(navMax(), px)));
+  document.querySelector(".layout").style.setProperty("--nav-w", w + "px");
+  $("navSizer").setAttribute("aria-valuenow", w);
+  if (keep) try { w === NAV_W.def ? localStorage.removeItem(NAV_W.key) : localStorage.setItem(NAV_W.key, w); } catch {}
+}
+try { const w = +localStorage.getItem(NAV_W.key); if (w) setNavWidth(w, false); } catch {}
+$("navSizer").setAttribute("aria-valuemin", NAV_W.min);
+$("navSizer").addEventListener("pointerdown", (ev) => {
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  const sizer = $("navSizer"), left = $("sidebar").getBoundingClientRect().left;
+  sizer.setPointerCapture(ev.pointerId);
+  document.body.classList.add("navresizing");
+  const move = (e) => setNavWidth(e.clientX - left, false);
+  const up = (e) => {
+    sizer.removeEventListener("pointermove", move); sizer.removeEventListener("pointerup", up); sizer.removeEventListener("pointercancel", up);
+    document.body.classList.remove("navresizing");
+    setNavWidth(e.clientX - left);
+  };
+  sizer.addEventListener("pointermove", move); sizer.addEventListener("pointerup", up); sizer.addEventListener("pointercancel", up);
+});
+$("navSizer").addEventListener("dblclick", () => setNavWidth(NAV_W.def));
+$("navSizer").addEventListener("keydown", (ev) => {
+  const w = $("sidebar").getBoundingClientRect().width, step = ev.shiftKey ? 64 : 16;
+  if (ev.key === "ArrowLeft") setNavWidth(w - step);
+  else if (ev.key === "ArrowRight") setNavWidth(w + step);
+  else if (ev.key === "Home") setNavWidth(NAV_W.def);
+  else return;
+  ev.preventDefault();
+});
+addEventListener("resize", () => { const w = $("sidebar").getBoundingClientRect().width; if (w > navMax()) setNavWidth(navMax(), false); });
 $("dbDefault").addEventListener("click", () => moveDb(""));
 $("dbPath").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); moveDb($("dbPath").value); } });
 $("dbPath").addEventListener("input", () => { if (dbMoveTarget !== null) { dbMoveArmed(null); $("dbResult").hidden = true; } });
@@ -1937,11 +2009,12 @@ function savedRows(list) {
         : `${c.username ? c.username + "@" : ""}${c.host || ""}${c.port ? ":" + c.port : ""}${c.database ? " / " + c.database : ""}`;
       const det = superPw ? `<span class="det" title="${esc(where)}">${esc(where)}${c.needsOwnPassword ? " · open once with its own password" : ""}</span>` : "";
       // The hint shows the whole name, which the list may cut off.
-      const hint = [c.name, name(c) + (superPw && where ? " · " + where : ""), "Click to connect"].join("\n");
+      const created = c.created ? new Date(c.created).toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+      const hint = [c.name, name(c) + (superPw && where ? " · " + where : ""), created ? "Created " + created : "", "Click to connect"].filter(Boolean).join("\n");
       return head + `
       <li data-id="${c.id}" title="${esc(hint)}"${savedOpen.has(name(c)) ? "" : " hidden"}>
         <span class="tag" title="${esc(engineInfo(c.engine).name)}">${esc(c.engine)}</span>
-        <span class="name">${esc(c.name)}${lock}${det}</span>
+        <span class="name">${esc(c.name)}${lock}${created ? `<span class="created" title="Created ${esc(created)}">${esc(created)}</span>` : ""}${det}</span>
         <button class="btn btn-sm btn-outline-primary go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
         <button class="btn btn-sm btn-outline-secondary" data-act="edit" title="Edit and test this connection">Edit</button>
         <button class="btn btn-sm btn-outline-secondary" data-act="del" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
@@ -4392,10 +4465,10 @@ async function openContainers() {
 }
 async function loadContainers() {
   $("ctRuntimes").innerHTML = "<li>Looking for Docker and Kubernetes…</li>";
-  $("ctList").innerHTML = '<li class="empty">…</li>';
+  $("ctList").innerHTML = '<tbody><tr><td class="empty">…</td></tr></tbody>';
   let info;
   try { info = await api("GET", "/api/containers"); } catch (e) {
-    $("ctRuntimes").innerHTML = `<li class="no">${esc(e.message)}</li>`; $("ctList").innerHTML = ""; return;
+    $("ctRuntimes").innerHTML = `<li class="no">${esc(e.message)}</li>`; $("ctList").innerHTML = ""; ctrInstallGuide(null); return;
   }
   const first = !ctr.info;
   ctr.info = info;
@@ -4406,6 +4479,7 @@ async function loadContainers() {
   if (!ok.length) {
     $("ctRuntimes").insertAdjacentHTML("beforeend", "<li>Install Docker (Docker CE or Docker Desktop) or Kubernetes (k8s or k3s, with kubectl) on the cactusdb server to deploy database containers, then press ⟳ Refresh.</li>");
   }
+  ctrInstallGuide(info);
   $("ctDeploy").hidden = !ok.length;
   if (ok.length) {
     const keepRt = $("ctRuntime").value;
@@ -4419,18 +4493,177 @@ async function loadContainers() {
   }
   ctrRenderList();
 }
-function ctrRenderList() {
-  const info = ctr.info, list = info?.deployed || [];
-  const errs = (info?.listErrors || []).map((e) => `<li class="empty">${esc(e)}</li>`).join("");
-  if (!list.length) { $("ctList").innerHTML = errs + '<li class="empty">No database containers deployed by cactusdb yet.</li>'; return; }
-  const specName = (id) => (info.catalog.find((c) => c.id === id) || {}).name || id || "?";
-  $("ctList").innerHTML = errs + list.map((c, i) => {
-    const key = `${c.runtime}/${c.namespace || ""}/${c.name}`;
-    return `<li data-i="${i}"><span class="name"><b class="cvopen" data-ct="view" title="Open this container's page">${esc(c.name)}</b> <span class="meta">${esc(specName(c.spec))} · ${c.runtime === "docker" ? "Docker" : "Kubernetes, namespace " + esc(c.namespace)}${c.port ? " · port " + c.port : ""}</span></span>
-      <span class="st ${esc(c.state)}" title="${esc(c.status)}">${esc(c.state)}</span>
-      <span class="btngroup btn-group btn-group-sm icons" role="group" aria-label="${esc(c.name)}"><button class="btn btn-outline-secondary" type="button" data-ct="view" title="View: its settings, CPU, memory and storage; start, stop, restart, delete or purge it" aria-label="View"><i class="bi bi-eye" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" type="button" data-ct="conn" ${c.engine ? "" : "disabled"} title="Add connection: the New connection dialog filled in for this database" aria-label="Add connection"><i class="bi bi-plug" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" type="button" data-ct="logs" title="Logs: the container's last 300 log lines (needs the superuser password)" aria-label="Logs"><i class="bi bi-journal-text" aria-hidden="true"></i></button><button type="button" class="btn btn-outline-danger" data-ct="remove" title="${ctr.removeArmed === key ? "Click again to remove it" : "Remove the container; its data folder or volume is kept (needs the superuser password)"}" aria-label="${ctr.removeArmed === key ? "Yes, remove it" : "Remove"}">${ctr.removeArmed === key ? `<i class="bi bi-trash" aria-hidden="true"></i> Yes, remove it` : `<i class="bi bi-trash" aria-hidden="true"></i>`}</button></span></li>`;
-  }).join("");
+// ---- how to install Docker or Kubernetes -------------------------------------------
+// Instructions for the system cactusdb runs on (its OS, processor and, on
+// Linux, distribution): Docker CE, Docker Desktop, k3s and Kubernetes (k8s).
+// Shown open when neither Docker nor Kubernetes was found.
+function installGuide(os, arch, distro) {
+  const d = distro || {}, fam = ((d.id || "") + " " + (d.like || "")).toLowerCase();
+  const deb = /debian|ubuntu/.test(fam), rpm = /fedora|rhel|centos|rocky|alma/.test(fam);
+  const docsId = ["ubuntu", "debian", "fedora", "rhel", "centos", "raspberry-pi-os", "sles"].includes(d.id) ? d.id : "";
+  const kArch = arch === "arm64" ? "arm64" : "amd64";
+  const L = (t, cmd) => ({ t, cmd }), N = (t) => ({ t });
+  const g = {};
+  if (os === "linux") {
+    g.dockerce = { name: "Docker CE", note: "Docker Engine, the usual choice for a Linux server" + (d.name ? ` (${d.name})` : "") + ".", steps: [
+      L("Install it with Docker's script (Ubuntu, Debian, Fedora, RHEL, CentOS, Raspberry Pi OS…, " + kArch + "):", "curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh"),
+      L("Start it now and at every boot:", "sudo systemctl enable --now docker"),
+      L("Let the user cactusdb runs as use Docker (then log out and in again, or restart cactusdb's service):", "sudo usermod -aG docker $USER"),
+      L("Check it:", "docker version"),
+      N(docsId ? `Or follow Docker's steps for ${d.name || d.id}: https://docs.docker.com/engine/install/${docsId}/` : "Or follow Docker's steps for your distribution: https://docs.docker.com/engine/install/")] };
+    g.desktop = kArch === "amd64" ? { name: "Docker Desktop", note: "Docker in a virtual machine, with a window; meant for a desktop with a user logged in, not a server.", steps: [
+      deb ? L("Download and install the .deb (Ubuntu, Debian):", "curl -fLO https://desktop.docker.com/linux/main/amd64/docker-desktop-amd64.deb && sudo apt-get update && sudo apt-get install ./docker-desktop-amd64.deb")
+        : rpm ? L("Download and install the .rpm (Fedora, RHEL):", "curl -fLO https://desktop.docker.com/linux/main/amd64/docker-desktop-x86_64.rpm && sudo dnf install ./docker-desktop-x86_64.rpm")
+        : N("Download the package for your distribution: https://docs.docker.com/desktop/setup/install/linux/"),
+      L("Start it:", "systemctl --user start docker-desktop"),
+      N("It needs KVM virtualization. Its Settings → Kubernetes can also run a Kubernetes cluster.")] }
+      : { name: "Docker Desktop", note: "Docker Desktop for Linux is only made for Intel/AMD 64-bit (amd64): on this ARM server use Docker CE.", steps: [] };
+    g.k3s = { name: "k3s", note: "A small, complete Kubernetes in one program, for a single server or a few.", steps: [
+      L("Install it (" + kArch + "); it starts at once and at every boot:", "curl -sfL https://get.k3s.io | sh -"),
+      L("Let the user cactusdb runs as reach the cluster:", "mkdir -p ~/.kube && sudo k3s kubectl config view --raw > ~/.kube/config && chmod 600 ~/.kube/config"),
+      L("Make kubectl use that file (add it to that user's profile, or to cactusdb's service):", "export KUBECONFIG=$HOME/.kube/config"),
+      L("Check it:", "kubectl get nodes"),
+      N("Its LoadBalancer services answer on the server's own address; data folders are hostPath folders on the node.")] };
+    g.k8s = { name: "Kubernetes (k8s)", note: "Full Kubernetes with kubeadm: for a cluster of several machines. On one server, k3s is simpler.", steps: [
+      L("Install kubectl (" + kArch + "):", `curl -fLO "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${kArch}/kubectl" && sudo install -m 0755 kubectl /usr/local/bin/kubectl`),
+      N("Set up the cluster with kubeadm (a container runtime such as containerd, then kubeadm, kubelet and a network add-on): https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"),
+      L("Copy the cluster's admin config for the user cactusdb runs as:", "mkdir -p ~/.kube && sudo cp /etc/kubernetes/admin.conf ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config"),
+      L("Check it:", "kubectl get nodes"),
+      N("For a LoadBalancer service the cluster needs a load balancer (e.g. MetalLB); otherwise deploy with NodePort.")] };
+  } else if (os === "darwin") {
+    const chip = kArch === "arm64" ? "Apple silicon" : "Intel";
+    g.desktop = { name: "Docker Desktop", note: `Docker for macOS (${chip}), with Kubernetes built in.`, steps: [
+      L("With Homebrew:", "brew install --cask docker"),
+      N(`Or download it for ${chip}: https://desktop.docker.com/mac/main/${kArch}/Docker.dmg, open it and drag Docker to Applications.`),
+      N("Start Docker from Applications and wait until it says it is running."),
+      L("Check it:", "docker version")] };
+    g.dockerce = { name: "Docker CE", note: "Docker Engine runs only on Linux: on a Mac it runs in a small Linux virtual machine. Colima does that from the command line, without Docker Desktop.", steps: [
+      L("Install Colima and the docker command:", "brew install colima docker"),
+      L("Start it now (“brew services start colima” starts it at every login):", "colima start"),
+      L("Check it:", "docker version")] };
+    g.k3s = { name: "k3s", note: "k3s runs only on Linux: on a Mac it runs inside Docker with k3d, or in Colima.", steps: [
+      L("With k3d (needs Docker Desktop or Colima running):", "brew install k3d kubectl && k3d cluster create cactusdb"),
+      L("Or with Colima, which starts k3s in its virtual machine:", "brew install colima kubectl && colima start --kubernetes"),
+      L("Check it:", "kubectl get nodes")] };
+    g.k8s = { name: "Kubernetes (k8s)", note: "The simplest Kubernetes on a Mac is the one in Docker Desktop.", steps: [
+      N("Docker Desktop → Settings → Kubernetes → Enable Kubernetes → Apply & restart."),
+      L("Install kubectl (Docker Desktop also adds one):", "brew install kubectl"),
+      L("Use Docker Desktop's cluster:", "kubectl config use-context docker-desktop"),
+      L("Check it:", "kubectl get nodes")] };
+  } else if (os === "windows") {
+    const cpu = kArch === "arm64" ? "ARM 64-bit" : "Intel/AMD 64-bit";
+    g.desktop = { name: "Docker Desktop", note: `Docker for Windows (${cpu}), using WSL 2, with Kubernetes built in.`, steps: [
+      L("Turn on WSL 2 (in an administrator PowerShell; restart when asked):", "wsl --install"),
+      L("Install Docker Desktop:", "winget install -e --id Docker.DockerDesktop"),
+      N(`Or download it: https://desktop.docker.com/win/main/${kArch}/Docker%20Desktop%20Installer.exe`),
+      N("Start Docker Desktop and wait until it says it is running."),
+      L("Check it:", "docker version")] };
+    g.dockerce = { name: "Docker CE", note: "Docker Engine runs only on Linux: on Windows it runs inside WSL 2, and cactusdb must then run inside WSL too to reach it. Otherwise use Docker Desktop.", steps: [
+      L("Install WSL 2 with Ubuntu (administrator PowerShell):", "wsl --install -d Ubuntu"),
+      L("Inside Ubuntu, install Docker with Docker's script:", "curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh"),
+      L("Inside Ubuntu, let your user use Docker:", "sudo usermod -aG docker $USER"),
+      N("Then run the Linux cactusdb inside Ubuntu (WSL).")] };
+    g.k3s = { name: "k3s", note: "k3s runs only on Linux: on Windows use it inside WSL 2 (with cactusdb in WSL too), or use Docker Desktop's Kubernetes.", steps: [
+      L("Inside WSL (Ubuntu), install it:", "curl -sfL https://get.k3s.io | sh -"),
+      L("Inside WSL, let your user reach the cluster:", "mkdir -p ~/.kube && sudo k3s kubectl config view --raw > ~/.kube/config && chmod 600 ~/.kube/config"),
+      L("Check it:", "kubectl get nodes")] };
+    g.k8s = { name: "Kubernetes (k8s)", note: "The simplest Kubernetes on Windows is the one in Docker Desktop.", steps: [
+      N("Docker Desktop → Settings → Kubernetes → Enable Kubernetes → Apply & restart."),
+      L("Install kubectl:", "winget install -e --id Kubernetes.kubectl"),
+      L("Use Docker Desktop's cluster:", "kubectl config use-context docker-desktop"),
+      L("Check it:", "kubectl get nodes")] };
+  }
+  return g;
 }
+const OS_NAMES = { linux: "Linux", darwin: "macOS", windows: "Windows" };
+const ARCH_NAMES = { amd64: "Intel/AMD 64-bit (amd64)", arm64: "ARM 64-bit (arm64)" };
+function ctrInstallGuide(info) {
+  const box = $("ctInstall");
+  const g = info && installGuide(info.os, info.arch, info.distro);
+  if (!g || !Object.keys(g).length) { box.hidden = true; return; }
+  const anyOk = info.runtimes.some((r) => r.ok);
+  const order = ["dockerce", "desktop", "k3s", "k8s"].filter((k) => g[k]);
+  const pick = ctr.installTab && g[ctr.installTab] ? ctr.installTab : order[0];
+  const where = [info.distro?.name || OS_NAMES[info.os] || info.os, ARCH_NAMES[info.arch] || info.arch].join(" · ");
+  box.innerHTML = `<button type="button" class="ctinstall-head" id="ctInstallToggle" aria-expanded="${!anyOk || !!ctr.installOpen}" aria-controls="ctInstallBody">` +
+      `<i class="bi bi-chevron-${!anyOk || ctr.installOpen ? "down" : "right"}" aria-hidden="true"></i> How to install Docker or Kubernetes on this server <span class="hint">· ${esc(where)}</span></button>` +
+    `<div class="card-body" id="ctInstallBody"${!anyOk || ctr.installOpen ? "" : " hidden"}>` +
+      `<ul class="nav nav-pills nav-fill" role="tablist">${order.map((k) => `<li class="nav-item" role="presentation"><button type="button" class="nav-link${k === pick ? " active" : ""}" role="tab" aria-selected="${k === pick}" data-itab="${k}">${esc(g[k].name)}</button></li>`).join("")}</ul>` +
+      order.map((k) => `<div class="ctinstall-pane" data-ipane="${k}"${k === pick ? "" : " hidden"}><p class="hint">${esc(g[k].note)}</p>` +
+        (g[k].steps.length ? `<ol>${g[k].steps.map((st) => `<li>${linkify(esc(st.t))}${st.cmd ? `<div class="input-group input-group-sm"><code class="form-control">${esc(st.cmd)}</code><button type="button" class="btn btn-outline-secondary" data-icopy="${esc(st.cmd)}" title="Copy the command" aria-label="Copy the command"><i class="bi bi-clipboard" aria-hidden="true"></i></button></div>` : ""}</li>`).join("")}</ol>` : "") +
+        `<p class="hint">Then press <b>Refresh</b> below: cactusdb looks for <code>docker</code>, <code>kubectl</code> and <code>k3s</code> again.</p></div>`).join("") +
+    `</div>`;
+  box.hidden = false;
+}
+// linkify makes the https:// addresses in already escaped text links.
+const linkify = (html) => html.replace(/https:\/\/[^\s<]+[^\s<.,)]/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+$("ctInstall").addEventListener("click", async (ev) => {
+  if (ev.target.closest("#ctInstallToggle")) {
+    const open = $("ctInstallBody").hidden;
+    ctr.installOpen = open;
+    $("ctInstallBody").hidden = !open;
+    $("ctInstallToggle").setAttribute("aria-expanded", open);
+    $("ctInstallToggle").querySelector(".bi").className = "bi bi-chevron-" + (open ? "down" : "right");
+    return;
+  }
+  const t = ev.target.closest("[data-itab]");
+  if (t) {
+    ctr.installTab = t.dataset.itab;
+    $("ctInstall").querySelectorAll("[data-itab]").forEach((b) => { b.classList.toggle("active", b === t); b.setAttribute("aria-selected", b === t); });
+    $("ctInstall").querySelectorAll("[data-ipane]").forEach((p) => (p.hidden = p.dataset.ipane !== t.dataset.itab));
+    return;
+  }
+  const c = ev.target.closest("[data-icopy]");
+  if (c) {
+    try { await navigator.clipboard.writeText(c.dataset.icopy); } catch { toast("Copy didn't work here: select the command and copy it", true); return; }
+    c.innerHTML = '<i class="bi bi-check2" aria-hidden="true"></i>'; c.classList.add("on");
+    setTimeout(() => { c.innerHTML = '<i class="bi bi-clipboard" aria-hidden="true"></i>'; c.classList.remove("on"); }, 1500);
+  }
+});
+
+// The deployed containers: a table sorted by a column (click its heading;
+// again for the other way) and filtered by the name searched for.
+const CT_COLS = [
+  { key: "name", label: "Container" }, { key: "spec", label: "Database" }, { key: "runtime", label: "Runs on" },
+  { key: "port", label: "Port", num: true }, { key: "state", label: "State" }, { key: "status", label: "Status" }];
+function ctrRenderList() {
+  const info = ctr.info, all = info?.deployed || [];
+  const errs = (info?.listErrors || []).map((e) => `<tr><td colspan="7" class="empty">${esc(e)}</td></tr>`).join("");
+  const specName = (id) => (info?.catalog?.find((c) => c.id === id) || {}).name || id || "?";
+  const runsOn = (c) => c.runtime === "docker" ? "Docker" : "Kubernetes · " + (c.namespace || "");
+  const sort = ctr.sort || (ctr.sort = { key: "name", dir: 1 });
+  const val = (c) => sort.key === "spec" ? specName(c.spec) : sort.key === "runtime" ? runsOn(c) : c[sort.key] ?? "";
+  const q = $("ctSearch").value.trim().toLowerCase();
+  const rows = all.map((c, i) => ({ c, i })).filter(({ c }) => !q || c.name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const x = val(a.c), y = val(b.c);
+      return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" })) * sort.dir;
+    });
+  const head = `<thead><tr>${CT_COLS.map((col) => {
+    const on = sort.key === col.key;
+    return `<th data-ctsort="${col.key}" class="${col.num ? "num" : ""}" aria-sort="${on ? (sort.dir > 0 ? "ascending" : "descending") : "none"}" title="Sort by ${col.label.toLowerCase()}">` +
+      `${col.label}${on ? ` <i class="bi bi-caret-${sort.dir > 0 ? "up" : "down"}-fill" aria-hidden="true"></i>` : ""}</th>`;
+  }).join("")}<th class="acts"><span class="visually-hidden">Actions</span></th></tr></thead>`;
+  let body;
+  if (!all.length) body = errs + '<tr><td colspan="7" class="empty">No database containers deployed by cactusdb yet.</td></tr>';
+  else if (!rows.length) body = errs + `<tr><td colspan="7" class="empty">No container's name contains “${esc(q)}”.</td></tr>`;
+  else body = errs + rows.map(({ c, i }) => {
+    const key = `${c.runtime}/${c.namespace || ""}/${c.name}`, armed = ctr.removeArmed === key;
+    return `<tr data-i="${i}">
+      <td class="cname"><b class="cvopen" data-ct="view" title="Open this container's page">${esc(c.name)}</b></td>
+      <td>${esc(specName(c.spec))}</td><td>${esc(runsOn(c))}</td><td class="num">${c.port || ""}</td>
+      <td><span class="st ${esc(c.state)}">${esc(c.state)}</span></td><td class="cstatus">${esc(c.status || "")}</td>
+      <td class="acts"><span class="btn-group btn-group-sm" role="group" aria-label="${esc(c.name)}">` +
+        `<button class="btn btn-outline-secondary" type="button" data-ct="view" title="View: its settings, CPU, memory and storage; start, stop, restart, delete or purge it" aria-label="View"><i class="bi bi-eye" aria-hidden="true"></i></button>` +
+        `<button class="btn btn-outline-secondary" type="button" data-ct="conn" ${c.engine ? "" : "disabled"} title="Add connection: the New connection dialog filled in for this database" aria-label="Add connection"><i class="bi bi-plug" aria-hidden="true"></i></button>` +
+        `<button class="btn btn-outline-secondary" type="button" data-ct="logs" title="Logs: the container's last 300 log lines, newest first (needs the superuser password)" aria-label="Logs"><i class="bi bi-journal-text" aria-hidden="true"></i></button>` +
+        `<button type="button" class="btn btn-outline-danger" data-ct="remove" title="${armed ? "Click again to remove it" : "Remove the container; its data folder or volume is kept (needs the superuser password)"}" aria-label="${armed ? "Yes, remove it" : "Remove"}"><i class="bi bi-trash" aria-hidden="true"></i>${armed ? " Yes, remove it" : ""}</button>` +
+      `</span></td></tr>`;
+  }).join("");
+  $("ctList").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+$("ctSearch").addEventListener("input", ctrRenderList);
+$("ctSearch").addEventListener("keydown", (ev) => { if (ev.key === "Escape" && $("ctSearch").value) { ev.preventDefault(); ev.stopPropagation(); $("ctSearch").value = ""; ctrRenderList(); } });
 function ctrResult(cls, text) {
   $("ctResult").hidden = !cls;
   $("ctResult").className = resultClass(cls);
@@ -4577,9 +4810,16 @@ $("ctAddConn").addEventListener("click", () => {
   if (d && d.conn) ctrAddConn(d.name, d.conn.engine, d.conn, d.password);
 });
 $("ctList").addEventListener("click", async (ev) => {
+  const h = ev.target.closest("[data-ctsort]");
+  if (h) {
+    const k = h.dataset.ctsort, sort = ctr.sort || { key: "name", dir: 1 };
+    ctr.sort = { key: k, dir: sort.key === k ? -sort.dir : 1 };
+    ctrRenderList();
+    return;
+  }
   const b = ev.target.closest("[data-ct]");
   if (!b) return;
-  const c = ctr.info.deployed[+b.closest("li").dataset.i];
+  const c = ctr.info.deployed[+b.closest("tr").dataset.i];
   const key = `${c.runtime}/${c.namespace || ""}/${c.name}`;
   if (b.dataset.ct === "view") { openCtrView(c); return; }
   if (b.dataset.ct === "conn") {
