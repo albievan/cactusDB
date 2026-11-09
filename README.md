@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.38.0
+cactusdb 1.39.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -607,6 +607,28 @@ The version of the cactusdb you're using is shown under its name in the top bar 
 example *v1.31.0*), as reported by the running program. Next to the *read-only* label, a
 second label shows the type of the database you're connected to (for example *PostgreSQL*
 or *Firebird*); it goes away when you disconnect.
+
+<a id="dashboard"></a>
+### The database's dashboard
+
+When the connected database has statistics cactusdb can read, a **Dashboard** button
+appears in the top bar. It opens the **Dashboard** tab in the main area (not a dialog): what
+the database says about itself, measured again every 10 seconds while the tab is shown (untick
+**Live** to stop; **Refresh** measures at once). Only reads: the statistics views of the
+database.
+
+| Database | What it shows |
+|---|---|
+| PostgreSQL (and pgvector, Azure, CockroachDB, Redshift: what they support) | Version, uptime, size, connections of the maximum, cache hit rate, commits and rollbacks, rows read and changed, deadlocks, temporary files; connections by state, running queries, the largest tables (dead rows, scans, last autovacuum), the least used indexes, locks, the main settings |
+| MySQL, MariaDB | Version, uptime, connections of the maximum, running threads, statements per second, slow queries, InnoDB buffer pool hit rate, SELECT/INSERT/UPDATE/DELETE counts, traffic; the database's tables, rows, data and index size; running statements, connections by user, the largest tables, the main settings |
+| SQL Server, Azure SQL | Version, edition, recovery model, size, uptime, CPUs, memory, sessions, running and blocked requests; running requests, sessions by login, the largest tables, top waits, the files |
+| Firebird | Version, dialect, ODS, size, page size, forced writes, transactions since the oldest; page reads, writes and fetches, cache hit rate, memory; attachments, running statements, transactions |
+| SQLite | Version, size, free space, page size, the number of tables, indexes, views and triggers; the largest tables and indexes; encoding, journal mode, auto vacuum |
+| Oracle | Instance, host, version, uptime; sessions; the schema's tables, indexes, views and size; the largest segments; tablespace use |
+
+A part the connection may not read (SQL Server's activity needs *VIEW SERVER STATE*, Oracle's
+`v$` views need a grant…) is listed at the bottom as not available, with the reason; the rest
+still shows. Sizes, durations and percentages are shown as such, with a bar for percentages.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -1556,6 +1578,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
+| `dbstats.go` | The Dashboard: the statistics queries of each kind of database and `/api/dbstats` |
 | `migrate.go` | ☰ → Migrate database: the job, creating the new database, copying the rows, keys, indexes and the report and script |
 | `migrate_schema.go` | Tables described without their engine: reading each engine's catalog, and writing the target's column types, defaults and DDL |
 | `migrate_code.go` | Views, procedures and triggers for the target: an SQL tokenizer and rewrites, and Firebird's PSQL parsed and written as MariaDB/MySQL or PL/pgSQL |

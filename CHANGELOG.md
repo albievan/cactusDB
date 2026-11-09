@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.39.0 — 2026-11-09
+
+- **Dashboard**: when the connected database has statistics cactusdb can read (PostgreSQL
+  and its family, MySQL, MariaDB, SQL Server, Azure SQL, Firebird, SQLite, Oracle), a
+  **Dashboard** button in the top bar opens a **Dashboard** tab in the main area: version,
+  uptime, size, connections, activity, cache hit rates, running queries, the largest tables,
+  waits, locks, settings… as cards (with bars for percentages) and tables, measured again
+  every 10 seconds while shown (**Live**), from the database's statistics views only. What
+  the connection may not read is listed as not available, with the reason.
+
 ## 1.38.0 — 2026-11-09
 
 - **DB container deployment**: the deployed containers are in a **table** (container,

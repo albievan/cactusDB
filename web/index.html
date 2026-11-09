@@ -663,6 +663,31 @@
   .mgcode .lbl { font-size: 12px; color: var(--muted); margin-top: 6px; }
   .mgcode pre.ctlog { max-height: 50vh; margin-top: 4px; }
   #mgLog { max-height: 160px; }
+  /* The dashboard of the connected database: a page in the main area. */
+  #dashPane { overflow-y: auto; background: var(--panel); }
+  .dashpage { padding: 16px 20px 24px; }
+  .dashhead { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .dashhead h2 { margin: 0; font-size: 18px; }
+  .dashhead .hint { margin: 2px 0 0; }
+  .dashhead .form-check { margin: 4px 0 0; }
+  .dashsec { margin-top: 14px; }
+  .dashsec > h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  .dashsec > h4 .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 6px; }
+  .dashtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .dashtile { --bs-card-spacer-y: 8px; --bs-card-spacer-x: 12px; --bs-card-bg: var(--panel-2); min-width: 0; }
+  .dashtile .lbl { font-size: 12px; color: var(--muted); }
+  .dashtile .val { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; margin-top: 2px; }
+  .dashtile .val.text { font-size: 14px; }
+  .dashtile .progress { --bs-progress-height: 6px; margin-top: 6px; }
+  .dashtable { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .dashtable table { width: 100%; font-size: 12.5px; }
+  .dashtable td, .dashtable th { max-width: 420px; }
+  .dashtable td.num, .dashtable th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .dashtable th { cursor: default; }
+  .dashtable td.empty { color: var(--muted); text-align: center; }
+  .dashtable .progress { --bs-progress-height: 6px; min-width: 80px; }
+  .dashna { margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .dashna li { overflow-wrap: anywhere; }
   /* The container's page: a pane of its own, scrolling as a whole. */
   #ctrPane { overflow-y: auto; background: var(--panel); }
   #ctrPane[hidden] { display: none; }
@@ -742,6 +767,7 @@
     </svg>
   </div>
   <button id="reconnectBtn" class="btn btn-sm btn-outline-secondary" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
+  <button id="dashBtn" class="btn btn-sm btn-outline-secondary" hidden title="The database's statistics: version, uptime, size, connections, activity, caches, its largest tables…"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</button>
   <button id="disconnectBtn" class="btn btn-sm btn-outline-secondary" hidden>Disconnect</button>
   <button id="shutdownBtn" class="btn btn-sm btn-outline-danger" hidden title="Stop this background cactusdb"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
 </header>
@@ -850,6 +876,7 @@
       <button class="nav-link" data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <button class="nav-link" data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
       <button class="nav-link" data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
+      <button class="nav-link" data-tab="dashboard" id="dashTab" hidden title="The statistics of the connected database">Dashboard</button>
       <button class="nav-link" data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
       <span class="title" id="tabTitle"></span>
     </div>
@@ -1087,6 +1114,18 @@
             </div>
           </div>
         </section>
+      </div>
+    </div>
+    <div class="pane" id="dashPane" hidden>
+      <div class="dashpage">
+        <div class="dashhead">
+          <div><h2><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard · <span id="dashLabel"></span></h2>
+            <p class="hint" id="dashSub"></p></div>
+          <span class="spacer"></span>
+          <label class="form-check form-switch" title="Measure again every 10 seconds while this tab is shown"><input class="form-check-input" type="checkbox" id="dashLive" role="switch" checked> Live</label>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="dashRefresh" title="Measure again now"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
+        </div>
+        <div id="dashBody"><p class="hint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Reading the statistics…</p></div>
       </div>
     </div>
     <div class="pane" id="ctrPane" hidden>
@@ -1853,6 +1892,99 @@ async function moveDb(target) {
 }
 $("dbMove").addEventListener("click", () => moveDb($("dbPath").value));
 
+// ---- the dashboard of the connected database -------------------------------------
+// Its statistics (dbstats.go), read again every 10 seconds while the tab is
+// shown and Live is on. Columns named "… %" are bars, "… (bytes)" sizes and
+// "… (seconds)" durations.
+const dash = { timer: 0, seq: 0, busy: false };
+const DASH_MS = 10000;
+// dashReset follows a new connection (or none): while the dashboard is
+// shown it goes on with the new database's, or gives way to the Data tab.
+function dashReset(available) {
+  dashPause();
+  const showing = state.tab === "dashboard";
+  state.dashboard = available;
+  $("dashBtn").hidden = !available;
+  $("dashTab").hidden = !(available && showing);
+  $("dashBody").innerHTML = `<p class="hint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Reading the statistics…</p>`;
+  $("dashSub").textContent = "";
+  if (showing) { if (available) dashLoad(); else showTab("data"); }
+}
+$("dashBtn").addEventListener("click", () => { $("dashTab").hidden = false; showTab("dashboard"); });
+function dashPause() { clearTimeout(dash.timer); dash.timer = 0; dash.seq++; }
+async function dashLoad() {
+  clearTimeout(dash.timer); dash.timer = 0;
+  if (!state.session || !state.dashboard || $("dashPane").hidden) return;
+  $("dashLabel").textContent = state.label;
+  const seq = ++dash.seq;
+  $("dashRefresh").disabled = true;
+  try {
+    const d = await api("GET", "/api/dbstats?session=" + encodeURIComponent(state.session));
+    if (seq !== dash.seq) return;
+    dashRender(d);
+  } catch (e) {
+    if (seq !== dash.seq) return;
+    $("dashSub").textContent = "✘ " + e.message;
+  } finally { if (seq === dash.seq) $("dashRefresh").disabled = false; }
+  if (seq === dash.seq && $("dashLive").checked && !$("dashPane").hidden) dash.timer = setTimeout(dashLoad, DASH_MS);
+}
+$("dashRefresh").addEventListener("click", () => { dash.seq++; dashLoad(); });
+$("dashLive").addEventListener("change", () => { if ($("dashLive").checked) dashLoad(); else clearTimeout(dash.timer); });
+// fmtSecs: a duration in days, hours, minutes and seconds.
+function fmtSecs(s) {
+  s = Math.max(0, Math.round(+s));
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`;
+}
+// dashCell: a column's label without its unit, and the value as shown.
+function dashCell(col, v) {
+  const unit = /\((bytes|seconds)\)$/.exec(col)?.[1];
+  const label = col.replace(/\s*\((bytes|seconds)\)$/, "");
+  // A version (or Firebird's ODS) is text, even when it looks like a number.
+  const num = v !== null && v !== "" && !isNaN(+v) && typeof v !== "boolean" && !/version|^ODS$/i.test(label);
+  let text;
+  if (v === null || v === undefined || v === "") text = "–";
+  else if (unit === "bytes" && num) text = fmtSize(+v);
+  else if (unit === "seconds" && num) text = fmtSecs(v);
+  else if (num) text = (+v).toLocaleString(undefined, { maximumFractionDigits: 2 }) + (/%$/.test(col) ? " %" : "");
+  else if (typeof v === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(v)) text = fmtDate(v);
+  else text = String(v);
+  return { label, text, num, pct: /%$/.test(col) && num ? Math.max(0, Math.min(100, +v)) : null };
+}
+// A bar for a percentage; one of how much is used turns red above 90%
+// (a hit rate is good when high).
+const dashBar = (pct, label) => `<div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar${/used/i.test(label) && pct > 90 ? " bg-danger" : ""}" style="width:${pct}%"></div></div>`;
+function dashRender(d) {
+  $("dashSub").textContent = `${engineInfo(d.engine).name} · measured ${new Date(d.checked).toLocaleTimeString()} in ${fmtInt(d.ms)} ms` +
+    ($("dashLive").checked ? " · live, every 10 seconds" : "");
+  const ok = d.sections.filter((x) => !x.error), na = d.sections.filter((x) => x.error);
+  const head = (x) => `<h4>${esc(x.title)}${x.note ? `<span class="note">· ${esc(x.note)}</span>` : ""}</h4>`;
+  let html = ok.map((x) => {
+    if (x.kind === "cards") {
+      const row = (x.rows || [])[0] || [];
+      return `<section class="dashsec">${head(x)}<div class="dashtiles">${(x.columns || []).map((c, i) => {
+        const cell = dashCell(c, row[i]);
+        return `<div class="card card-body dashtile"><div class="lbl">${esc(cell.label)}</div>` +
+          `<div class="val${cell.num || cell.text === "–" ? "" : " text"}" title="${esc(cell.text)}">${esc(cell.text)}</div>${cell.pct !== null ? dashBar(cell.pct, cell.label) : ""}</div>`;
+      }).join("")}</div></section>`;
+    }
+    const cols = x.columns || [], rows = x.rows || [];
+    const numCol = cols.map((c, i) => rows.length > 0 && rows.every((r) => r[i] === null || (!isNaN(+r[i]) && r[i] !== "" && typeof r[i] !== "boolean")));
+    return `<section class="dashsec">${head(x)}<div class="dashtable"><table class="table table-sm table-hover">` +
+      `<thead><tr>${cols.map((c, i) => `<th class="${numCol[i] ? "num" : ""}">${esc(dashCell(c, null).label)}</th>`).join("")}</tr></thead><tbody>` +
+      (rows.length ? rows.map((r) => `<tr>${r.map((v, i) => {
+        const cell = dashCell(cols[i], v);
+        return `<td class="${numCol[i] ? "num" : ""}" title="${esc(cell.text)}">${cell.pct !== null ? `${esc(cell.text)}${dashBar(cell.pct, cell.label)}` : esc(cell.text)}</td>`;
+      }).join("")}</tr>`).join("") : `<tr><td colspan="${Math.max(1, cols.length)}" class="empty">none right now</td></tr>`) +
+      `</tbody></table></div></section>`;
+  }).join("");
+  if (na.length) html += `<div class="dashna">Not available here (often a missing privilege):<ul>${na.map((x) => `<li><b>${esc(x.title)}</b>${x.note ? ` (${esc(x.note)})` : ""}: ${esc(x.error)}</li>`).join("")}</ul></div>`;
+  // Keep the scroll position while the numbers are replaced.
+  const top = $("dashPane").scrollTop;
+  $("dashBody").innerHTML = html || '<p class="hint">The database returned no statistics.</p>';
+  $("dashPane").scrollTop = top;
+}
+
 // ---- resizing the sidebar ------------------------------------------------------
 // Its width is kept in this browser; double-click the edge for the usual width.
 const NAV_W = { def: 320, min: 220, key: "cactusdb.navWidth" };
@@ -2410,6 +2542,8 @@ async function connect(extra = {}) {
     $("engineName").textContent = eng.name;
     $("engineBadge").title = `Connected to a ${eng.name} database`;
     $("engineBadge").hidden = false;
+    // The dashboard, for the databases whose statistics cactusdb can read.
+    dashReset(!!res.dashboard);
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
     $("backupBtn").disabled = !!eng.noBackup;
     $("backupBtn").title = eng.noBackup ? `A backup as an SQL script isn't available for ${eng.name}: use Export all and DDL` : backupTitle;
@@ -2455,6 +2589,7 @@ async function disconnect(reason = "") {
   state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
   $("engineBadge").hidden = true;
+  dashReset(false);
   $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
@@ -2468,7 +2603,7 @@ async function disconnect(reason = "") {
   // statistics; the data pane shows that nothing is connected.
   $("sql").value = ""; $("objStats").hidden = true; $("objStats").innerHTML = ""; $("exportNote").hidden = true;
   showNoConnection();
-  if (state.tab === "def" || state.tab === "queries") showTab("data");
+  if (state.tab === "def" || state.tab === "queries" || state.tab === "dashboard") showTab("data");
   if (!$("comparePane").hidden) renderCmpPick();
   if (state.idleNote) { $("status").textContent = "Not connected · " + state.idleNote; toast(state.idleNote); renderHome(); }
   else setNavMenu(true);
@@ -3333,6 +3468,8 @@ function showTab(tab) {
   $("migratePane").hidden = tab !== "migrate";
   if (tab === "migrate") openMigrate();
   if (tab === "container") cvLoad(); else cvPause();
+  $("dashPane").hidden = tab !== "dashboard";
+  if (tab === "dashboard") dashLoad(); else dashPause();
 }
 
 async function loadDefinition() {

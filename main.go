@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.38.0"
+var version = "1.39.0"
 
 //go:embed web
 var webFS embed.FS
@@ -465,6 +465,7 @@ func main() {
 	mux.HandleFunc("POST /api/containers/inspect", s.handleContainerInspect)
 	mux.HandleFunc("POST /api/containers/action", s.handleContainerAction)
 	mux.HandleFunc("POST /api/containers/reveal", s.handleContainerReveal)
+	mux.HandleFunc("GET /api/dbstats", s.handleDBStats)
 	mux.HandleFunc("POST /api/containers/logs/export", s.handleContainerLogExport)
 	mux.HandleFunc("POST /api/usage", s.handleUsage)
 	mux.HandleFunc("GET /api/usage/summary", s.handleUsageSummary)
@@ -1108,6 +1109,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	logAction(r, "connect %s as %q in %s", defaultConnName(p), label, time.Since(start).Round(time.Millisecond))
 	resp["session"] = id
 	resp["engine"] = p.Engine
+	resp["dashboard"] = hasDashboard(dialect(p.Engine))
 	resp["label"] = label
 	resp["savedConn"] = savedID // saved queries are kept for saved connections
 	resp["folder"] = folder     // its folder in the export folder (the Exported files page)
