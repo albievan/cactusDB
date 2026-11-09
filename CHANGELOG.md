@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.0 — 2026-11-09
+
+- **DB container deployment**: a **Restart** choice below *Reachable from other computers*
+  (Docker): **Unless stopped** (the default, as before), **Always**, **On failure** or **No**.
+  The container page's settings show the policy it has. Hidden for Kubernetes, which always
+  restarts a deployment's pods.
+
 ## 1.39.0 — 2026-11-09
 
 - **Dashboard**: when the connected database has statistics cactusdb can read (PostgreSQL

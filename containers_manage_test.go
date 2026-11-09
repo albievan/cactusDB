@@ -114,3 +114,19 @@ func TestNeedsDatabase(t *testing.T) {
 		}
 	}
 }
+
+// The restart policy: unless-stopped by default, one of Docker's four, nothing else.
+func TestDeployRestartPolicy(t *testing.T) {
+	sp, _ := specByID("postgres")
+	for in, want := range map[string]string{"": "unless-stopped", "always": "always", "on-failure": "on-failure", "no": "no"} {
+		d := deployReq{Runtime: "docker", Spec: "postgres", Name: "BAD NAME", Restart: in}
+		d.check(sp) // fails on the name, after the policy is checked
+		if d.Restart != want {
+			t.Errorf("restart %q became %q, want %q", in, d.Restart, want)
+		}
+	}
+	d := deployReq{Runtime: "docker", Spec: "postgres", Name: "pg", Restart: "sometimes"}
+	if err := d.check(sp); err == nil || !strings.Contains(err.Error(), "restart policy") {
+		t.Errorf("restart sometimes: %v", err)
+	}
+}

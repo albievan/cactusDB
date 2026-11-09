@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.39.0
+cactusdb 1.40.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -764,6 +764,7 @@ Then **Refresh** looks for `docker`, `kubectl` and `k3s` again. The form:
 | Username, database | Where the image lets you choose them (PostgreSQL, MongoDB, MySQL/MariaDB database, Firebird file…); otherwise shown (`sa`, `system`/`FREEPDB1`, `SYSDBA`, `neo4j`…) |
 | Password | The administrator password, with the database's rules (SQL Server: 8+ characters, three of upper, lower, digits, symbols). Cassandra and CockroachDB (insecure mode) have none. For Weaviate it is the API key |
 | Reachable from other computers | Docker only: otherwise the port is published on 127.0.0.1 only |
+| Restart | Docker only: when Docker starts the container again by itself. **Unless stopped** (the default): after a crash and when Docker starts, unless you stopped it; **Always**: even if you stopped it; **On failure**: only when it stops with an error; **No**: never. Kubernetes always restarts a deployment's pods |
 | Superuser password | Needed to deploy (see [Superuser](#superuser)) |
 
 **Deploy** downloads the image (unless it's already there), starts the container and

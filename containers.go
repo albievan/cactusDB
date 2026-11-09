@@ -332,6 +332,7 @@ type deployReq struct {
 	Image       string `json:"image"`
 	Port        int    `json:"port"`    // on this computer (docker), the service port (kubernetes)
 	Public      bool   `json:"public"`  // docker: reachable from other computers, not only this one
+	Restart     string `json:"restart"` // docker: no, on-failure, always or unless-stopped (""); kubernetes always restarts
 	DataDir     string `json:"dataDir"` // a folder on this computer (docker) or on the node (kubernetes); "" = a volume
 	Username    string `json:"username"`
 	Password    string `json:"password"`
@@ -356,6 +357,13 @@ func (d *deployReq) check(sp containerSpec) error {
 	d.Name, d.Image, d.DataDir = strings.TrimSpace(d.Name), strings.TrimSpace(d.Image), strings.TrimSpace(d.DataDir)
 	if d.Image == "" {
 		d.Image = sp.Image
+	}
+	switch d.Restart {
+	case "":
+		d.Restart = "unless-stopped"
+	case "no", "on-failure", "always", "unless-stopped":
+	default:
+		return fmt.Errorf("unknown restart policy %q: use no, on-failure, always or unless-stopped", d.Restart)
 	}
 	if !ctrNameRe.MatchString(d.Name) {
 		return errors.New("the name may have lowercase letters, digits and dashes (not at the start or end), at most 40")
@@ -611,7 +619,7 @@ func dockerRunArgs(sp containerSpec, d deployReq) []string {
 	if d.Public {
 		bind = ""
 	}
-	args := []string{"run", "-d", "--name", d.Name, "--restart", "unless-stopped",
+	args := []string{"run", "-d", "--name", d.Name, "--restart", d.Restart,
 		"--label", ctrLabel + "=true", "--label", "com.cactusdb.spec=" + sp.ID, "--label", "com.cactusdb.port=" + strconv.Itoa(d.Port),
 		"-p", bind + strconv.Itoa(d.Port) + ":" + strconv.Itoa(sp.Port)}
 	if d.DataDir != "" {

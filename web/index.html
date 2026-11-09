@@ -1264,6 +1264,15 @@
       <input class="form-control form-control-sm" id="ctData" spellcheck="false" autocomplete="off">
       <p class="hint" id="ctDataHint"></p>
       <label class="form-check form-switch" id="ctPublicWrap"><input class="form-check-input" type="checkbox" id="ctPublic" role="switch"> Reachable from other computers (otherwise only from this one)</label>
+      <div id="ctRestartWrap">
+        <label for="ctRestart" class="form-label">Restart</label>
+        <select id="ctRestart" class="form-select form-select-sm">
+          <option value="unless-stopped" selected>Unless stopped: after a crash and when Docker starts, unless you stopped it</option>
+          <option value="always">Always: after a crash and when Docker starts, even if you stopped it</option>
+          <option value="on-failure">On failure: only when it stops with an error</option>
+          <option value="no">No: never restart it by itself</option>
+        </select>
+      </div>
       <div id="ctKube" hidden>
         <div class="row2 half">
           <div><label class="form-label" for="ctNs">Namespace</label><input class="form-control form-control-sm" id="ctNs" value="cactusdb" spellcheck="false" autocomplete="off"></div>
@@ -4839,6 +4848,7 @@ function ctrRuntimeChanged() {
   const sp = ctrSpec(), kube = ctrKube(), node = kube && $("ctSvc").value === "NodePort";
   $("ctKube").hidden = !kube;
   $("ctPublicWrap").style.display = kube ? "none" : ""; // .check's display:flex beats [hidden]
+  $("ctRestartWrap").hidden = kube; // Kubernetes always restarts a deployment's pods
   $("ctPortLabel").textContent = !kube ? "Port on this computer" : node ? "NodePort" : "Service port";
   const port = +$("ctPort").value;
   if (sp) {
@@ -4876,7 +4886,7 @@ $("ctGo").addEventListener("click", async () => {
   const kube = ctrKube();
   const body = {
     runtime: $("ctRuntime").value, spec: sp.id, name: $("ctName").value.trim(), image: $("ctImage").value.trim(),
-    port: +$("ctPort").value, public: !kube && $("ctPublic").checked, dataDir: $("ctData").value.trim(),
+    port: +$("ctPort").value, public: !kube && $("ctPublic").checked, restart: kube ? "" : $("ctRestart").value, dataDir: $("ctData").value.trim(),
     username: $("ctUser").value.trim(), password: sp.noPassword ? "" : $("ctPass").value, database: $("ctDb").value.trim(),
     namespace: kube ? $("ctNs").value.trim() : "", serviceType: kube ? $("ctSvc").value : "", storage: kube ? $("ctStorage").value.trim() : "",
     superPassword: $("ctSuper").value,
