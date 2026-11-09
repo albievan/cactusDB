@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.1 — 2026-11-09
+
+- Connected but no table picked yet: the Data tab shows an animation instead of the still
+  cactus: an arrow nudges towards the tables on the left while a table beside the swaying
+  cactus fills in, row by row. It follows light and dark mode and stays still with *reduce
+  motion*.
+
 ## 1.40.0 — 2026-11-09
 
 - **DB container deployment**: a **Restart** choice below *Reachable from other computers*

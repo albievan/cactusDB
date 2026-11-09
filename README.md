@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.40.0
+cactusdb 1.40.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -148,6 +148,10 @@ of your system: in light mode the sun glows with slowly turning rays, in dark mo
 becomes a crescent moon that rocks gently among twinkling stars, with now and then a
 shooting star. With *reduce motion* switched on in the system settings
 the scene stays still.
+
+Once connected, until you pick a table, a smaller scene shows what to do: an arrow nudges
+towards the tables on the left while a table beside the cactus fills in, row by row, with
+a highlight moving down it (still too with *reduce motion*).
 
 The **Connections** menu at the bottom of the sidebar has these items:
 
