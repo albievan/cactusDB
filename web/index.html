@@ -211,7 +211,8 @@
   .qdesc { white-space: normal !important; color: var(--muted); font-size: 12px; }
   .qsql { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 380px !important; }
   .qacts { white-space: nowrap; width: 1%; }
-  .qacts .btn, .qacts .form-select { margin-left: 4px; display: inline-block; }
+  .qacts .btn-group, .qacts .form-select { margin-left: 4px; vertical-align: middle; }
+  .qacts .form-select { display: inline-block; }
   .form-select.qexpsel { font-size: 12px; width: auto; }
   #qNote { margin: 0; }
   section.box { padding: 14px 16px; border-bottom: 1px solid var(--border); }
@@ -253,7 +254,10 @@
   ul.list li .tag { font-size: 10px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
   ul.list li .icon { opacity: .55; font-size: 12px; }
   ul.list li .btn { display: none; }
-  ul.list li:hover .btn, ul.list li .btn.go { display: inline-block; }
+  ul.list li:hover .btn, ul.list li:focus-within .btn, ul.list li .btn.go { display: inline-block; }
+  /* The saved connection's buttons: one compact group; only ▶ until hovered. */
+  ul.list li .savedacts { flex: none; margin-left: auto; }
+  ul.list li:not(:hover):not(:focus-within) .savedacts .btn.go { border-radius: var(--bs-btn-border-radius); }
   ul.drivers li { cursor: default; font-size: 12px; }
   ul.drivers li:hover { background: none; }
   ul.drivers .ok { color: var(--accent); }
@@ -484,8 +488,7 @@
   .ftable tbody tr { cursor: pointer; }
   .ftable tbody tr.sel td { background: var(--accent-soft) !important; }
   .ftable th.facts, .ftable td.facts { width: 70px; padding: 3px 6px; cursor: default; }
-  .facts .btn { --bs-btn-padding-x: 5px; --bs-btn-padding-y: 1px; font-size: 15px; }
-  .facts .btn.del:hover:not(:disabled) { color: var(--danger); }
+  .facts .btn { --bs-btn-padding-x: 6px; font-size: 13px; }
   .fdlist { margin: 8px 0 0; padding-left: 18px; max-height: 200px; overflow: auto; font: 12px/1.6 var(--mono); overflow-wrap: anywhere; }
   dialog.dlg.fprev { width: min(1100px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); padding: 0; }
   dialog.dlg.fprev[open] { display: grid; grid-template-rows: auto 1fr auto; }
@@ -726,6 +729,9 @@
   .cvloghead h4 { margin: 0; font-size: 14px; }
   .cvloghead .hint { margin: 0; }
   .cvloghead .form-check { margin: 0; }
+  .cvloghead .badge { font-size: 10px; margin-left: 2px; }
+  /* An error, failure or warning in a container's log. */
+  pre.ctlog .lerr { color: var(--danger); font-weight: 600; background: var(--danger-soft); border-left: 3px solid var(--danger); display: inline-block; width: 100%; padding-left: 4px; margin-left: -7px; }
   table.cvset .envshow { --bs-btn-padding-x: 5px; --bs-btn-padding-y: 0; margin-left: 8px; font-family: var(--bs-body-font-family); vertical-align: 1px; }
   .cvhead .st { font-size: 12px; border-radius: 4px; padding: 1px 6px; background: var(--panel-2); color: var(--muted); }
   .cvhead .st.running { background: var(--accent-soft); color: var(--accent); }
@@ -1197,6 +1203,10 @@
           <div class="cvloghead edsub">
             <h4>Log</h4><span class="hint" id="cvLogInfo"></span>
             <span class="spacer"></span>
+            <span class="btn-group btn-group-sm" role="group" aria-label="Which lines">
+              <input type="radio" class="btn-check" name="cvLogShow" id="cvLogAll" value="all" autocomplete="off" checked><label class="btn btn-outline-secondary" for="cvLogAll" title="Every line of the log">All lines</label>
+              <input type="radio" class="btn-check" name="cvLogShow" id="cvLogErr" value="errors" autocomplete="off"><label class="btn btn-outline-secondary" for="cvLogErr" title="Only the lines with an error, a failure or a warning"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Errors only <span class="badge text-bg-danger" id="cvLogErrN" hidden></span></label>
+            </span>
             <label class="form-check form-switch" title="Show new lines as they come in, newest at the top"><input class="form-check-input" type="checkbox" id="cvLogLive" role="switch" checked> Live</label>
             <span class="btn-group btn-group-sm" role="group" aria-label="The whole log">
               <button class="btn btn-outline-secondary" type="button" id="cvLogExport" title="Save the whole log to the export folder: it's listed on the Exported files page (needs the superuser password)"><i class="bi bi-box-arrow-up" aria-hidden="true"></i> Export</button><button class="btn btn-outline-secondary" type="button" id="cvLogDownload" title="Download the whole log as a .log file (needs the superuser password)"><i class="bi bi-download" aria-hidden="true"></i> Download</button>
@@ -2232,9 +2242,10 @@ function savedRows(list) {
       <li data-id="${c.id}" title="${esc(hint)}"${savedOpen.has(name(c)) ? "" : " hidden"}>
         <span class="tag" title="${esc(engineInfo(c.engine).name)}">${esc(c.engine)}</span>
         <span class="name">${esc(c.name)}${lock}${created ? `<span class="created" title="Created ${esc(created)}">${esc(created)}</span>` : ""}${det}</span>
-        <button class="btn btn-sm btn-outline-primary go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
-        <button class="btn btn-sm btn-outline-secondary" data-act="edit" title="Edit and test this connection">Edit</button>
-        <button class="btn btn-sm btn-outline-secondary" data-act="del" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+        <span class="btn-group btn-group-sm savedacts" role="group" aria-label="${esc(c.name)}">` +
+          `<button class="btn btn-outline-primary go" data-act="connect" title="Connect to ${esc(c.name)}" aria-label="Connect to ${esc(c.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button>` +
+          `<button class="btn btn-outline-secondary" data-act="edit" title="Edit and test this connection" aria-label="Edit ${esc(c.name)}"><i class="bi bi-pencil" aria-hidden="true"></i></button>` +
+          `<button class="btn btn-outline-danger" data-act="del" title="Delete this connection (asks first)" aria-label="Delete ${esc(c.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></span>
       </li>`;
     }).join("") : `<li class="empty">None yet: add one with ＋ New connection</li>`;
 }
@@ -2889,7 +2900,7 @@ function renderQueries() {
       <td class="qdesc">${esc(x.description || "")}</td>
       <td class="qsql" title="${esc(x.sql)}">${esc(x.sql.replace(/\s+/g, " "))}</td>
       <td class="fdate">${esc(fmtDate(x.updated))}</td>
-      <td class="qacts"><select class="form-select form-select-sm qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select><button class="btn btn-sm btn-primary" data-qact="run" title="Open in the editor and run"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button><button class="btn btn-sm btn-outline-secondary" data-qact="edit">Edit</button><button class="btn btn-sm btn-outline-danger" data-qact="del" title="Delete (asks first)">Delete</button></td>
+      <td class="qacts"><select class="form-select form-select-sm qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select><span class="btn-group btn-group-sm" role="group" aria-label="${esc(x.name)}"><button class="btn btn-outline-primary" data-qact="run" title="Open in the editor and run" aria-label="Run ${esc(x.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" data-qact="edit" title="Edit the name, description or query" aria-label="Edit ${esc(x.name)}"><i class="bi bi-pencil" aria-hidden="true"></i></button><button class="btn btn-outline-danger" data-qact="del" title="Delete (asks first)" aria-label="Delete ${esc(x.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></span></td>
     </tr>`).join("") : `<tr><td colspan="5" class="fnomatch">No saved query matches.</td></tr>`) + `</tbody></table>`;
 }
 $("qFilter").addEventListener("input", () => { queries.q = $("qFilter").value; renderQueries(); });
@@ -3333,7 +3344,7 @@ function renderFiles() {
     const k = fileKey(f), on = files.sel.has(k);
     return `<tr data-fkey="${esc(k)}" class="${on ? "sel" : ""}" title="${esc(f.folder)}${f.conn ? "/" + esc(f.conn) : ""}/${esc(f.kind)}">
       <td class="ck"><input class="form-check-input" type="checkbox" ${on ? "checked" : ""} aria-label="Select ${esc(f.name)}"></td>
-      <td class="facts"><button class="btn btn-sm btn-link fact" data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><i class="bi bi-eye" aria-hidden="true"></i></button><button data-fact="delete" class="btn btn-sm btn-link fact del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></td>
+      <td class="facts"><span class="btn-group btn-group-sm" role="group" aria-label="${esc(f.name)}"><button class="btn btn-outline-secondary fact" data-fact="preview" title="Preview" aria-label="Preview ${esc(f.name)}"><i class="bi bi-eye" aria-hidden="true"></i></button><button data-fact="delete" class="btn btn-outline-danger fact del" title="Delete (asks first)" aria-label="Delete ${esc(f.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></span></td>
       <td class="fconn">${f.conn ? esc(f.conn) : `<span class="none">${esc(connLabel(""))}</span>`}${f.protected ? `<span class="plock" title="Protected: needs the connection's password">🔒</span>` : ""}</td>
       <td class="fname">${highlightName(f.name, terms)}</td>
       <td class="ftype"><span>${esc(fileTypeNames[f.kind] || f.kind)}</span></td>
@@ -5315,7 +5326,7 @@ const cvBody = (extra) => ({ runtime: cv.c.runtime, name: cv.c.name, namespace: 
 
 function openCtrView(c) {
   cvLogStop();
-  cv.c = c; cv.d = null; cv.ask = ""; cv.revealed = {};
+  cv.c = c; cv.d = null; cv.ask = ""; cv.revealed = {}; cv.logRaw = cv.logHtml = "";
   const su = $("ctSuper").value; // typed in the list already
   if ($("ctrDialog").open) $("ctrDialog").close();
   if (su) $("cvSuper").value = su;
@@ -5338,7 +5349,7 @@ function cvPause() { clearTimeout(cv.timer); cv.seq++; clearTimeout(cv.logTimer)
 function cvCloseView() {
   cvPause();
   cvLogStop();
-  cv.c = cv.d = null; cv.ask = ""; cv.busy = false; cv.revealed = {};
+  cv.c = cv.d = null; cv.ask = ""; cv.busy = false; cv.revealed = {}; cv.logRaw = cv.logHtml = "";
   $("cvSuper").value = $("cvConfirm").value = "";
   showPassword(document.querySelector('.eye[data-pw="cvSuper"]'), false);
   $("cvAsk").hidden = true; $("cvAskGo").hidden = false;
@@ -5501,24 +5512,39 @@ const CV_LOG_LINES = 1000, CV_LIVE_MS = 3000;
 // newestFirst turns the log around. A line that starts with a space or tab
 // belongs to the line before it (a message over several lines), so it stays
 // below that line.
-function newestFirst(text) {
+function logEntries(text) {
   const entries = [];
   for (const line of text.replace(/\n$/, "").split("\n")) {
     if (entries.length && /^[ \t]/.test(line)) entries[entries.length - 1].push(line);
     else entries.push([line]);
   }
-  return entries.reverse().map((e) => e.join("\n")).join("\n");
+  return entries.reverse().map((e) => e.join("\n"));
 }
+function newestFirst(text) { return logEntries(text).join("\n"); }
+// LOG_ERROR: a log line about an error, a failure or a warning, as databases
+// write them (SQL Server "Error: 18456", PostgreSQL "ERROR:"/"FATAL:", MySQL
+// "[ERROR]", "level=error"…), not "This is an informational message".
+const LOG_ERROR = /\b(error|errors|errno|fatal|panic|failed|failure|fails|exception|denied|refused|critical|corrupt\w*|deadlock\w*|crash\w*|abort\w*|warn(ing)?|severity:\s*(1[6-9]|2\d))\b|\[(err|error|warn|warning|fatal|crit)\]|level=(error|fatal|warn)/i;
 function cvLogShow(logs) {
-  const pre = $("cvLogs"), text = logs ? newestFirst(logs) : "(no log lines)";
-  if (text === pre.textContent) return;
+  if (logs !== undefined) cv.logRaw = logs;
+  const pre = $("cvLogs"), raw = cv.logRaw || "", onlyErr = $("cvLogErr").checked;
+  const entries = raw ? logEntries(raw) : [];
+  const bad = entries.map((e) => LOG_ERROR.test(e));
+  const nErr = bad.filter(Boolean).length;
+  $("cvLogErrN").textContent = fmtInt(nErr); $("cvLogErrN").hidden = !nErr;
+  const shown = entries.map((e, i) => ({ e, b: bad[i] })).filter((x) => !onlyErr || x.b);
+  const html = !raw ? "(no log lines)" : !shown.length ? "(no errors in these lines)"
+    : shown.map((x) => x.b ? `<span class="lerr">${esc(x.e)}</span>` : esc(x.e)).join("\n");
+  if (html === cv.logHtml) return;
+  cv.logHtml = html;
   // At the top (the newest lines) it stays there; further down, what is
   // being read stays in place as new lines arrive above it.
   const atTop = pre.scrollTop < 30, fromBottom = pre.scrollHeight - pre.scrollTop;
-  pre.textContent = text;
+  pre.innerHTML = html;
   pre.scrollTop = atTop ? 0 : pre.scrollHeight - fromBottom;
-  $("cvLogInfo").textContent = `· newest first · the last ${fmtInt(CV_LOG_LINES)} lines` + ($("cvLogLive").checked ? " · live" : "");
+  $("cvLogInfo").textContent = `· newest first · the last ${fmtInt(CV_LOG_LINES)} lines` + (onlyErr ? ` · ${fmtInt(nErr)} with errors` : "") + ($("cvLogLive").checked ? " · live" : "");
 }
+for (const id of ["cvLogAll", "cvLogErr"]) $(id).addEventListener("change", () => { $("cvLogs").scrollTop = 0; cvLogShow(); });
 function cvLogStop() { clearTimeout(cv.logTimer); cv.logTimer = 0; }
 async function cvLogPoll() {
   cv.logTimer = 0;

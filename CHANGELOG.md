@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.42.0 — 2026-11-09
+
+- **A container's log**: lines about an error, a failure or a warning are shown in **red**,
+  and **All lines** / **Errors only** (with how many) switches between the whole log and just
+  those; the choice stays while the log is live. Informational lines are left alone.
+- **Compact Bootstrap button groups** with icons for every row of buttons: a saved
+  connection's connect, edit (pencil) and delete (only ▶ until hovered), a saved query's
+  run, edit and delete, and an exported file's preview and delete.
+
 ## 1.41.1 — 2026-11-09
 
 - A container's page and the Migrate page use the **whole width** of the main area (they

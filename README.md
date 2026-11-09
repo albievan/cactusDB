@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.41.1
+cactusdb 1.42.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -238,8 +238,8 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
 you're not connected, grouped by the type of database (Firebird, MariaDB, SQL Server…, each
 with how many there are) and sorted by name, each with the date and time it was saved. Each type opens and closes from its heading,
 and several can be open at once; when you open cactusdb in the browser, they all start
-closed. Hovering over a connection shows its whole name, which the list may cut off. Click **▶** (or the name) to connect, **Edit** to change it, or the
-bin icon to delete it. 🔒 marks a connection protected by its own password,
+closed. Hovering over a connection shows its whole name, which the list may cut off. Click **▶** (or the name) to connect; hovering shows the rest of its compact button group:
+the pencil edits it and the bin deletes it. 🔒 marks a connection protected by its own password,
 🔓 one saved by an older cactusdb or by the command line that has none yet (**Edit** it to
 set one).
 
@@ -827,7 +827,10 @@ by side, and the log is as tall as the window allows. It shows:
   shows the container's last 1,000 log lines **newest first**: a message over several lines
   keeps its lines in order. It is **live**: new lines appear at the top every 3 seconds and
   the view stays at the newest lines (if you scroll down to read, what you're reading stays
-  in place). Untick **Live** to stop it. **Export** saves the whole log to the export folder
+  in place). Untick **Live** to stop it. Lines about an error, a failure or a warning
+  (`Error: 18456`, `Login failed`, `ERROR:`, `FATAL:`, `[ERROR]`, `WARNING`, `level=error`…)
+  are **red**; **All lines** / **Errors only** switches between the whole log and just those
+  lines, with how many there are. **Export** saves the whole log to the export folder
   (`<export folder>/<container>/log/<container>_<date>-<time>.log`, listed on the Exported
   files page as type *Log*), and **Download** downloads the whole log as a `.log` file; both
   keep the log's own order, oldest first.
