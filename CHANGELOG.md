@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.37.0 — 2026-11-09
+
+- **A container's log** on its page is shown **newest first** (a message over several lines
+  keeps its lines in order) and **live**: new lines come in every 3 seconds, at the top,
+  while the view stays there; untick **Live** to stop. **Export** saves the whole log to
+  `<export folder>/<container>/log/` (a new *Log* type on the Exported files page) and
+  **Download** downloads it as a `.log` file. The password asked for is the superuser's,
+  kept while the page is open. The log in the containers list is newest first too.
+- A **hidden value** of a container's environment (a password, key or token) has an eye
+  button: after the superuser password, asked every time, it shows the value (on
+  Kubernetes from the deployment's Secret); clicking again hides it. Each reveal is logged.
+
 ## 1.36.3 — 2026-11-08
 
 - The type groups of the saved connections **open and close** from their heading (a chevron

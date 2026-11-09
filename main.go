@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.36.3"
+var version = "1.37.0"
 
 //go:embed web
 var webFS embed.FS
@@ -464,6 +464,8 @@ func main() {
 	mux.HandleFunc("POST /api/containers/remove", s.handleContainerRemove)
 	mux.HandleFunc("POST /api/containers/inspect", s.handleContainerInspect)
 	mux.HandleFunc("POST /api/containers/action", s.handleContainerAction)
+	mux.HandleFunc("POST /api/containers/reveal", s.handleContainerReveal)
+	mux.HandleFunc("POST /api/containers/logs/export", s.handleContainerLogExport)
 	mux.HandleFunc("POST /api/usage", s.handleUsage)
 	mux.HandleFunc("GET /api/usage/summary", s.handleUsageSummary)
 	mux.HandleFunc("POST /api/usage/delete", s.handleUsageDelete)

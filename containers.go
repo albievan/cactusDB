@@ -1173,6 +1173,8 @@ type ctrTarget struct {
 	Lines         int    `json:"lines"`
 	Action        string `json:"action"`  // start, stop, restart, delete, purge
 	Confirm       string `json:"confirm"` // purge: the container's name, typed again
+	All           bool   `json:"all"`     // logs: every line, not the last ones
+	Key           string `json:"key"`     // reveal: the environment variable
 }
 
 // target finds a container cactusdb deployed: it never touches others. Only
@@ -1230,25 +1232,70 @@ func (s *server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n := t.Lines
-	if n <= 0 || n > 2000 {
+	if n <= 0 || n > 5000 {
 		n = 300
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	var cmd *exec.Cmd
-	if t.Runtime == "docker" {
-		cmd = toolCmd(ctx, rt.tool, "logs", "--tail", strconv.Itoa(n), t.Name)
-	} else {
-		cmd = toolCmd(ctx, rt.tool, "logs", "deployment/"+t.Name, "-n", t.Namespace, "--tail", strconv.Itoa(n), "--all-containers")
+	if t.All {
+		n = 0
 	}
-	var b bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &b, &b // databases log to both
-	err := cmd.Run()
-	if err != nil && b.Len() == 0 {
+	logs, err := ctrLogs(r.Context(), rt, t, n)
+	if err != nil {
 		writeErr(w, 502, err)
 		return
 	}
-	writeJSON(w, 200, map[string]string{"logs": b.String()})
+	if t.All {
+		logAction(r, "download the log of container %s", t.Name)
+	}
+	writeJSON(w, 200, map[string]string{"logs": logs})
+}
+
+// ctrLogs is the container's log: its last n lines, or all of it (n 0).
+func ctrLogs(ctx context.Context, rt *ctrRuntime, t ctrTarget, n int) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	var cmd *exec.Cmd
+	if t.Runtime == "docker" {
+		tail := "all"
+		if n > 0 {
+			tail = strconv.Itoa(n)
+		}
+		cmd = toolCmd(ctx, rt.tool, "logs", "--tail", tail, t.Name)
+	} else {
+		tail := "-1"
+		if n > 0 {
+			tail = strconv.Itoa(n)
+		}
+		cmd = toolCmd(ctx, rt.tool, "logs", "deployment/"+t.Name, "-n", t.Namespace, "--tail", tail, "--all-containers")
+	}
+	var b bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &b, &b // databases log to both
+	if err := cmd.Run(); err != nil && b.Len() == 0 {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+// handleContainerLogExport writes the container's whole log to
+// <export>/<container>/log/<container>_<date>-<time>.log, listed on the
+// Exported files page.
+func (s *server) handleContainerLogExport(w http.ResponseWriter, r *http.Request) {
+	t, rt, _, ok := s.ctrTarget(w, r, "export container logs", true)
+	if !ok {
+		return
+	}
+	logs, err := ctrLogs(r.Context(), rt, t, 0)
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	path, _, err := writeExportFile(filepath.Join(s.exportFolder(), connFolderName(t.Name)), t.Name, "log",
+		func(w io.Writer) (int, error) { n, err := io.WriteString(w, logs); return n, err })
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	logAction(r, "export the log of container %s to %s", t.Name, path)
+	writeJSON(w, 200, map[string]any{"path": path, "name": filepath.Base(path), "size": len(logs), "download": downloadURL(path)})
 }
 
 // handleContainerRemove removes the container (docker) or the deployment,

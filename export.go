@@ -27,7 +27,7 @@ var exportFormats = map[string]string{"csv": "csv", "json": "json", "xml": "xml"
 
 // exportSubdirs are the subfolders of the export folder: one per file type,
 // sql holding DDL scripts and backup the database backups.
-var exportSubdirs = map[string]bool{"csv": true, "json": true, "xml": true, "xlsx": true, "sql": true, "backup": true}
+var exportSubdirs = map[string]bool{"csv": true, "json": true, "xml": true, "xlsx": true, "sql": true, "backup": true, "log": true}
 
 var unsafeFileChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 

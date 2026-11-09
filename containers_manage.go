@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -52,6 +53,7 @@ type ctrDetail struct {
 	Running  bool     `json:"running"`
 	Settings []kv     `json:"settings"`
 	Env      []kv     `json:"env"`
+	Hidden   []string `json:"hiddenEnv"` // the variables whose value is hidden: the superuser can reveal them
 	Usage    ctrUsage `json:"usage"`
 	Purge    []string `json:"purge"` // what purge removes
 	Checked  string   `json:"checked"`
@@ -353,6 +355,9 @@ func dockerDetail(ctx context.Context, rt *ctrRuntime, c deployedCtr) (*ctrDetai
 	for _, e := range in.Config.Env {
 		k, v, _ := strings.Cut(e, "=")
 		d.Env = append(d.Env, kv{k, maskEnv(k, v)})
+		if maskEnv(k, v) != v {
+			d.Hidden = append(d.Hidden, k)
+		}
 	}
 
 	d.Purge = []string{"the container " + c.Name}
@@ -450,7 +455,7 @@ type kubeDeployment struct {
 						Name      string
 						Value     string
 						ValueFrom *struct {
-							SecretKeyRef *struct{ Name string }
+							SecretKeyRef *struct{ Name, Key string }
 						}
 					}
 					Resources struct {
@@ -557,6 +562,9 @@ func kubeDetail(ctx context.Context, rt *ctrRuntime, c deployedCtr) (*ctrDetail,
 			v := maskEnv(e.Name, e.Value)
 			if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
 				v = "from the secret " + e.ValueFrom.SecretKeyRef.Name
+			}
+			if v != e.Value {
+				d.Hidden = append(d.Hidden, e.Name)
 			}
 			d.Env = append(d.Env, kv{e.Name, v})
 		}
@@ -888,6 +896,66 @@ func (s *server) handleContainerInspect(w http.ResponseWriter, r *http.Request) 
 	}
 	d.Checked = time.Now().Format(time.RFC3339)
 	writeJSON(w, 200, d)
+}
+
+// handleContainerReveal shows the superuser the value of a hidden environment
+// variable of the container (a password): docker's own setting, or on
+// Kubernetes the value it takes from its secret.
+func (s *server) handleContainerReveal(w http.ResponseWriter, r *http.Request) {
+	t, rt, c, ok := s.ctrTarget(w, r, "see a hidden setting of a database container", true)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	v, err := ctrEnvValue(ctx, rt, c, t.Key)
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	logAction(r, "superuser revealed %s of container %s", t.Key, t.Name)
+	writeJSON(w, 200, map[string]string{"key": t.Key, "value": v})
+}
+
+// ctrEnvValue is the value of the environment variable key of container c.
+func ctrEnvValue(ctx context.Context, rt *ctrRuntime, c deployedCtr, key string) (string, error) {
+	if c.Runtime == "docker" {
+		in, err := dockerInspectOne(ctx, rt, c.Name, false)
+		if err != nil {
+			return "", err
+		}
+		for _, e := range in.Config.Env {
+			if k, v, _ := strings.Cut(e, "="); k == key {
+				return v, nil
+			}
+		}
+		return "", fmt.Errorf("%s has no setting %s", c.Name, key)
+	}
+	var dep kubeDeployment
+	if err := kubeJSON(ctx, rt, &dep, "get", "deployment", c.Name, "-n", c.Namespace); err != nil {
+		return "", err
+	}
+	for _, k := range dep.Spec.Template.Spec.Containers {
+		for _, e := range k.Env {
+			if e.Name != key {
+				continue
+			}
+			if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
+				return e.Value, nil
+			}
+			ref := e.ValueFrom.SecretKeyRef
+			var sec struct{ Data map[string]string }
+			if err := kubeJSON(ctx, rt, &sec, "get", "secret", ref.Name, "-n", c.Namespace); err != nil {
+				return "", err
+			}
+			raw, err := base64.StdEncoding.DecodeString(sec.Data[ref.Key])
+			if err != nil {
+				return "", fmt.Errorf("the secret %s: %w", ref.Name, err)
+			}
+			return string(raw), nil
+		}
+	}
+	return "", fmt.Errorf("%s has no setting %s", c.Name, key)
 }
 
 func (s *server) handleContainerAction(w http.ResponseWriter, r *http.Request) {

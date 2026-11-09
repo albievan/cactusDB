@@ -639,6 +639,11 @@
   .cvpage { padding: 16px 20px 24px; max-width: 1100px; }
   .cvpage .cvask { max-width: 560px; }
   .cvpage pre.ctlog { max-height: 50vh; }
+  .cvloghead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cvloghead h4 { margin: 0; font-size: 14px; }
+  .cvloghead .hint { margin: 0; }
+  .cvloghead .form-check { margin: 0; }
+  table.cvset .envshow { --bs-btn-padding-x: 5px; --bs-btn-padding-y: 0; margin-left: 8px; font-family: var(--bs-body-font-family); vertical-align: 1px; }
   .cvhead .st { font-size: 12px; border-radius: 4px; padding: 1px 6px; background: var(--panel-2); color: var(--muted); }
   .cvhead .st.running { background: var(--accent-soft); color: var(--accent); }
   .cvhead .st.exited, .cvhead .st.dead, .cvhead .st.stopped { background: var(--danger-soft); color: var(--danger); }
@@ -1086,10 +1091,20 @@
         <table class="table table-sm cvset" id="cvSettings"></table>
         <h4 class="edsub">Environment</h4>
         <table class="table table-sm cvset" id="cvEnv"></table>
-        <div id="cvLogsWrap" hidden><h4 class="edsub">Log</h4><pre class="ctlog" id="cvLogs"></pre></div>
+        <div id="cvLogsWrap" hidden>
+          <div class="cvloghead edsub">
+            <h4>Log</h4><span class="hint" id="cvLogInfo"></span>
+            <span class="spacer"></span>
+            <label class="form-check form-switch" title="Show new lines as they come in, newest at the top"><input class="form-check-input" type="checkbox" id="cvLogLive" role="switch" checked> Live</label>
+            <span class="btn-group btn-group-sm" role="group" aria-label="The whole log">
+              <button class="btn btn-outline-secondary" type="button" id="cvLogExport" title="Save the whole log to the export folder: it's listed on the Exported files page (needs the superuser password)"><i class="bi bi-box-arrow-up" aria-hidden="true"></i> Export</button><button class="btn btn-outline-secondary" type="button" id="cvLogDownload" title="Download the whole log as a .log file (needs the superuser password)"><i class="bi bi-download" aria-hidden="true"></i> Download</button>
+            </span>
+          </div>
+          <pre class="ctlog" id="cvLogs"></pre>
+        </div>
         <div class="dactions">
           <span class="btngroup btn-group btn-group-sm" role="group" aria-label="More">
-            <button class="btn btn-outline-secondary" type="button" id="cvConn" title="Open the New connection dialog filled in for this database"><i class="bi bi-plug" aria-hidden="true"></i> Add connection</button><button class="btn btn-outline-secondary" type="button" id="cvLogBtn" title="The container's last 300 log lines (needs the superuser password)"><i class="bi bi-journal-text" aria-hidden="true"></i> Logs</button><button class="btn btn-outline-secondary" type="button" id="cvRefresh" title="Measure again now (it refreshes every 5 seconds)"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button></span>
+            <button class="btn btn-outline-secondary" type="button" id="cvConn" title="Open the New connection dialog filled in for this database"><i class="bi bi-plug" aria-hidden="true"></i> Add connection</button><button class="btn btn-outline-secondary" type="button" id="cvLogBtn" title="The container's log, newest first and live (needs the superuser password)"><i class="bi bi-journal-text" aria-hidden="true"></i> Logs</button><button class="btn btn-outline-secondary" type="button" id="cvRefresh" title="Measure again now (it refreshes every 5 seconds)"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button></span>
           <span class="spacer"></span>
           <span class="btngroup btn-group btn-group-sm" role="group" aria-label="Page">
             <button class="btn btn-outline-secondary" type="button" id="cvBack" title="The list of deployed containers"><i class="bi bi-list-ul" aria-hidden="true"></i> All containers</button><button class="btn btn-outline-secondary" type="button" id="cvClose" title="Close this page and its tab"><i class="bi bi-x-lg" aria-hidden="true"></i> Close</button></span>
@@ -2925,7 +2940,7 @@ function highlightName(name, terms) {
   }
   return out + (open ? "</mark>" : "");
 }
-const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup", queries: "Saved queries" };
+const fileTypeNames = { xlsx: "Excel", csv: "CSV", json: "JSON", xml: "XML", sql: "DDL", backup: "Backup", log: "Log", queries: "Saved queries" };
 // A file is its connection folder, type and name ("" connection: exported
 // before files were sorted by connection).
 const fileKey = (f) => f.conn + "/" + f.kind + "/" + f.name;
@@ -4581,10 +4596,10 @@ $("ctList").addEventListener("click", async (ev) => {
     b.disabled = true;
     try {
       const r = await api("POST", "/api/containers/logs", body);
-      $("ctLogsTitle").textContent = `Last log lines of ${c.name}:`;
-      $("ctLogs").textContent = r.logs || "(no log lines)";
+      $("ctLogsTitle").textContent = `Last log lines of ${c.name}, newest first:`;
+      $("ctLogs").textContent = r.logs ? newestFirst(r.logs) : "(no log lines)";
       $("ctLogsWrap").hidden = false;
-      $("ctLogs").scrollTop = $("ctLogs").scrollHeight;
+      $("ctLogs").scrollTop = 0;
     } catch (e) { ctrResult("bad", "✘ " + e.message); } finally { b.disabled = false; }
     return;
   }
@@ -4816,11 +4831,12 @@ $("mgAddConn").addEventListener("click", () => {
 // The Container tab: its settings and what it uses (refreshed every 5 seconds
 // while the tab is shown), with start, stop, restart, delete and purge
 // (containers_manage.go).
-const cv = { c: null, d: null, timer: 0, seq: 0, ask: "" };
+const cv = { c: null, d: null, timer: 0, seq: 0, ask: "", logTimer: 0, revealed: {} };
 const cvBody = (extra) => ({ runtime: cv.c.runtime, name: cv.c.name, namespace: cv.c.namespace || "", ...extra });
 
 function openCtrView(c) {
-  cv.c = c; cv.d = null; cv.ask = "";
+  cvLogStop();
+  cv.c = c; cv.d = null; cv.ask = ""; cv.revealed = {};
   const su = $("ctSuper").value; // typed in the list already
   if ($("ctrDialog").open) $("ctrDialog").close();
   if (su) $("cvSuper").value = su;
@@ -4838,11 +4854,12 @@ function openCtrView(c) {
 }
 const cvShown = () => !!cv.c && !$("ctrPane").hidden;
 // cvPause stops the refreshing while another tab is shown.
-function cvPause() { clearTimeout(cv.timer); cv.seq++; }
+function cvPause() { clearTimeout(cv.timer); cv.seq++; clearTimeout(cv.logTimer); cv.logTimer = 0; }
 // cvCloseView closes the page and its tab, forgetting the password typed.
 function cvCloseView() {
   cvPause();
-  cv.c = cv.d = null; cv.ask = ""; cv.busy = false;
+  cvLogStop();
+  cv.c = cv.d = null; cv.ask = ""; cv.busy = false; cv.revealed = {};
   $("cvSuper").value = $("cvConfirm").value = "";
   showPassword(document.querySelector('.eye[data-pw="cvSuper"]'), false);
   $("cvAsk").hidden = true; $("cvAskGo").hidden = false;
@@ -4857,6 +4874,8 @@ function cvResult(cls, text) {
 async function cvLoad() {
   clearTimeout(cv.timer);
   if (!cvShown()) return;
+  // Back on the page: the live log goes on.
+  if (!$("cvLogsWrap").hidden && $("cvLogLive").checked && !cv.logTimer) cv.logTimer = setTimeout(cvLogPoll, 0);
   const seq = ++cv.seq;
   try {
     const d = await api("POST", "/api/containers/inspect", cvBody());
@@ -4903,7 +4922,15 @@ function cvRender(d) {
   $("cvNotes").hidden = !(u.notes || []).length;
   $("cvNotes").textContent = (u.notes || []).join(". ") + ".";
   $("cvSettings").innerHTML = rows(d.settings);
-  $("cvEnv").innerHTML = d.env.length ? rows(d.env) : '<tr><td class="hint">none</td></tr>';
+  // A hidden value (a password) has a button to show it, after the superuser password.
+  const hidden = new Set(d.hiddenEnv || []);
+  $("cvEnv").innerHTML = d.env.length ? d.env.map((r) => {
+    if (!hidden.has(r.k)) return `<tr><th>${esc(r.k)}</th><td>${esc(r.v)}</td></tr>`;
+    const shown = Object.hasOwn(cv.revealed, r.k);
+    return `<tr><th>${esc(r.k)}</th><td>${esc(shown ? cv.revealed[r.k] : r.v)}<button type="button" class="btn btn-sm btn-outline-secondary envshow" data-env="${esc(r.k)}"` +
+      ` title="${shown ? "Hide the value" : "Show the value (needs the superuser password)"}" aria-label="${shown ? "Hide" : "Show"} ${esc(r.k)}">` +
+      `<i class="bi bi-${shown ? "eye-slash" : "eye"}" aria-hidden="true"></i></button></td></tr>`;
+  }).join("") : '<tr><td class="hint">none</td></tr>';
   const run = d.running, busy = !!cv.busy;
   $("cvActs").querySelector('[data-cv="start"]').disabled = busy || run;
   $("cvActs").querySelector('[data-cv="stop"]').disabled = busy || !run;
@@ -4975,17 +5002,116 @@ $("cvConn").addEventListener("click", () => {
   const c = cv.c, sp = (ctr.info?.catalog || []).find((s) => s.id === c.spec) || {};
   ctrAddConn(c.name, c.engine, { host: c.runtime === "kubernetes" ? "" : "localhost", port: c.port, username: sp.user || "", database: sp.id === "firebird" ? "" : sp.db || "" }, "");
 });
+// cvWithSuper runs fn(superPassword): with the one typed on this page, or
+// asking for it (again, when it was wrong). It is kept while the page is open.
+async function cvWithSuper(what, fn) {
+  const typed = $("cvSuper").value;
+  if (typed) {
+    try { return await fn(typed); } catch (e) { if (!(e.data && e.data.locked)) throw e; $("cvSuper").value = ""; }
+  }
+  let res;
+  const cr = await askPassword({ title: "Superuser password", text: `${what} needs the superuser password.`, ok: "OK", superOnly: true,
+    check: async (v) => { res = await fn(v.superPassword); } });
+  if (!cr) return null;
+  $("cvSuper").value = cr.superPassword;
+  return res;
+}
+
+// The log: newest first, live (every 3 seconds) unless Live is unticked.
+const CV_LOG_LINES = 1000, CV_LIVE_MS = 3000;
+// newestFirst turns the log around. A line that starts with a space or tab
+// belongs to the line before it (a message over several lines), so it stays
+// below that line.
+function newestFirst(text) {
+  const entries = [];
+  for (const line of text.replace(/\n$/, "").split("\n")) {
+    if (entries.length && /^[ \t]/.test(line)) entries[entries.length - 1].push(line);
+    else entries.push([line]);
+  }
+  return entries.reverse().map((e) => e.join("\n")).join("\n");
+}
+function cvLogShow(logs) {
+  const pre = $("cvLogs"), text = logs ? newestFirst(logs) : "(no log lines)";
+  if (text === pre.textContent) return;
+  // At the top (the newest lines) it stays there; further down, what is
+  // being read stays in place as new lines arrive above it.
+  const atTop = pre.scrollTop < 30, fromBottom = pre.scrollHeight - pre.scrollTop;
+  pre.textContent = text;
+  pre.scrollTop = atTop ? 0 : pre.scrollHeight - fromBottom;
+  $("cvLogInfo").textContent = `· newest first · the last ${fmtInt(CV_LOG_LINES)} lines` + ($("cvLogLive").checked ? " · live" : "");
+}
+function cvLogStop() { clearTimeout(cv.logTimer); cv.logTimer = 0; }
+async function cvLogPoll() {
+  cv.logTimer = 0;
+  if (!cvShown() || $("cvLogsWrap").hidden) return;
+  const seq = cv.seq;
+  try {
+    const r = await api("POST", "/api/containers/logs", cvBody({ superPassword: $("cvSuper").value, lines: CV_LOG_LINES }));
+    if (seq !== cv.seq || !cvShown()) return;
+    cvLogShow(r.logs);
+  } catch (e) {
+    $("cvLogLive").checked = false;
+    $("cvLogInfo").textContent = `· newest first · the last ${fmtInt(CV_LOG_LINES)} lines · paused`;
+    cvResult("bad", "✘ The live log stopped: " + e.message);
+    return;
+  }
+  if ($("cvLogLive").checked && seq === cv.seq && !cv.logTimer) cv.logTimer = setTimeout(cvLogPoll, CV_LIVE_MS);
+}
 $("cvLogBtn").addEventListener("click", async () => {
-  if (!$("cvSuper").value) { cvResult("bad", "Enter the superuser password first."); $("cvAsk").hidden = false; $("cvAskText").innerHTML = "<p>Reading the log needs the superuser password.</p>"; $("cvConfirmWrap").hidden = true; cv.ask = ""; $("cvAskGo").hidden = true; $("cvSuper").focus(); return; }
   $("cvLogBtn").disabled = true;
   try {
-    const r = await api("POST", "/api/containers/logs", cvBody({ superPassword: $("cvSuper").value }));
-    $("cvLogs").textContent = r.logs || "(no log lines)";
+    const r = await cvWithSuper("Reading the log", (su) => api("POST", "/api/containers/logs", cvBody({ superPassword: su, lines: CV_LOG_LINES })));
+    if (!r) return;
     $("cvLogsWrap").hidden = false;
-    $("cvLogs").scrollTop = $("cvLogs").scrollHeight;
+    $("cvLogs").scrollTop = 0;
+    cvLogShow(r.logs);
     $("cvLogsWrap").scrollIntoView({ block: "nearest" });
     cvResult();
+    cvLogStop();
+    if ($("cvLogLive").checked) cv.logTimer = setTimeout(cvLogPoll, CV_LIVE_MS);
   } catch (e) { cvResult("bad", "✘ " + e.message); } finally { $("cvLogBtn").disabled = false; }
+});
+$("cvLogLive").addEventListener("change", () => {
+  cvLogStop();
+  if ($("cvLogLive").checked) cvLogPoll(); else $("cvLogInfo").textContent = `· newest first · the last ${fmtInt(CV_LOG_LINES)} lines · paused`;
+});
+// Export: the whole log into the export folder (Exported files).
+$("cvLogExport").addEventListener("click", async () => {
+  const b = $("cvLogExport"); b.disabled = true;
+  try {
+    const r = await cvWithSuper("Exporting the log", (su) => api("POST", "/api/containers/logs/export", cvBody({ superPassword: su })));
+    if (!r) return;
+    $("cvResult").hidden = false; $("cvResult").className = resultClass("ok");
+    $("cvResult").innerHTML = `The log of ${esc(cv.c.name)} (${fmtSize(r.size)}) is saved as <code>${esc(r.path)}</code> · <a href="${esc(dlLink(r.download))}" download>Download</a> · listed on the Exported files page`;
+    toast("Log exported to the export folder");
+  } catch (e) { cvResult("bad", "✘ " + e.message); } finally { b.disabled = false; }
+});
+// Download: the whole log as a .log file.
+$("cvLogDownload").addEventListener("click", async () => {
+  const b = $("cvLogDownload"); b.disabled = true;
+  try {
+    const r = await cvWithSuper("Downloading the log", (su) => api("POST", "/api/containers/logs", cvBody({ superPassword: su, all: true })));
+    if (!r) return;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([r.logs || ""], { type: "text/plain" }));
+    a.download = `${cv.c.name}_${stamp}.log`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { cvResult("bad", "✘ " + e.message); } finally { b.disabled = false; }
+});
+// A hidden value: shown after the superuser password, asked every time.
+$("cvEnv").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-env]");
+  if (!b) return;
+  const k = b.dataset.env;
+  if (Object.hasOwn(cv.revealed, k)) { delete cv.revealed[k]; if (cv.d) cvRender(cv.d); return; }
+  let value;
+  const cr = await askPassword({ title: `Show ${k}`, text: `Showing the hidden value of ${k} needs the superuser password.`, ok: "Show", superOnly: true,
+    check: async (v) => { value = (await api("POST", "/api/containers/reveal", cvBody({ superPassword: v.superPassword, key: k }))).value; } });
+  if (!cr || value === undefined) return;
+  cv.revealed[k] = value;
+  if (cv.d) cvRender(cv.d);
 });
 </script>
 </body>

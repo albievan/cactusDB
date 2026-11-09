@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.36.3
+cactusdb 1.37.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -751,7 +751,10 @@ containers** opens the list again and **Close** closes the page and its tab. It 
   the restart policy and restarts, the ports, the data folder or volume, the command, the
   limits and labels; on Kubernetes the namespace, replicas, service, volume claim and pods
   (node, IP, restarts).
-- **Environment**: its variables; passwords, keys and tokens are hidden.
+- **Environment**: its variables; passwords, keys and tokens are hidden. The eye button
+  next to a hidden value shows it after you enter the superuser password (asked every
+  time); click it again to hide the value. On Kubernetes it shows the value from the
+  deployment's Secret.
 - One compact row of buttons: **Start**, **Stop**, **Restart**, **Delete** and
   **Purge**. On Kubernetes, stop scales the deployment to 0 and start back to 1. Each
   asks first and needs the superuser password. **Delete** is Remove: the data stays.
@@ -762,7 +765,14 @@ containers** opens the list again and **Close** closes the page and its tab. It 
   home folder, or a folder holding cactusdb. On Kubernetes a short-lived pod on the node
   deletes a `hostPath` folder (the pod must be running, so cactusdb knows the node); the
   nodes remove the unused image themselves.
-- **Logs**, **Add connection** and **⟳ Refresh**.
+- **Logs**, **Add connection** and **⟳ Refresh**. **Logs** (after the superuser password)
+  shows the container's last 1,000 log lines **newest first**: a message over several lines
+  keeps its lines in order. It is **live**: new lines appear at the top every 3 seconds and
+  the view stays at the newest lines (if you scroll down to read, what you're reading stays
+  in place). Untick **Live** to stop it. **Export** saves the whole log to the export folder
+  (`<export folder>/<container>/log/<container>_<date>-<time>.log`, listed on the Exported
+  files page as type *Log*), and **Download** downloads the whole log as a `.log` file; both
+  keep the log's own order, oldest first.
 
 - Passwords never appear on a command line: docker gets them from its environment, and on
   Kubernetes they are in a Secret (`<name>-credentials`) sent to `kubectl apply` on stdin.
