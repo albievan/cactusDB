@@ -474,6 +474,7 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request) {
 	}
 	j.set(func(j *upgradeJob) { j.Command = opts.Command })
 	logAction(r, "upgrade to cactusdb %s started: downloading %s", latest, distURL+binaryName())
+	s.notify(r, "upgrade", 0, "started updating cactusdb from %s to %s: it restarts once installed, and this page reloads", version, latest)
 	go s.runUpgrade(j, exe, opts, latest, nil)
 	writeJSON(w, 200, j.snapshot())
 }
@@ -557,6 +558,7 @@ func (s *server) handleUpgradeUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	logAction(r, "upgrade from a file sent by the browser (%d bytes), superuser password given", n)
+	s.notify(r, "upgrade", 0, "started updating cactusdb %s from a file: it restarts once installed, and this page reloads", version)
 	s.runUpgrade(j, exe, opts, "", func(context.Context, func(int64, int64)) (string, error) { return tmp, nil })
 	snap := j.snapshot()
 	if snap.State == "failed" {
@@ -573,6 +575,7 @@ func (s *server) runUpgrade(j *upgradeJob, exe string, opts startupOptions, late
 	fail := func(err error) {
 		j.set(func(j *upgradeJob) { j.State, j.Error = "failed", err.Error() })
 		log.Printf("upgrade FAILED: %v", err)
+		s.notify(nil, "upgrade", 0, "the update of cactusdb failed: %s; cactusdb %s keeps running", firstLine(err.Error()), version)
 	}
 	if fetch == nil {
 		fetch = func(ctx context.Context, progress func(int64, int64)) (string, error) {

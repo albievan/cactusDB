@@ -151,6 +151,27 @@
   body.busy .flow .pk { stroke-width: 3; }
   @media (prefers-reduced-motion: reduce) { .flow .wave, .flow .pk { animation: none; } }
   header .status b { color: var(--accent); font-weight: 600; }
+  /* Who is using cactusdb (the header's people button). */
+  #usersWrap { flex: none; }
+  #usersBtn.others { color: var(--accent); border-color: var(--accent); }
+  .users { width: min(560px, calc(100vw - 32px)); max-height: min(70vh, 560px); overflow: auto; padding: 10px 12px; font-size: 13px; }
+  .users h6 { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 4px 0 6px; }
+  .users table { margin-bottom: 10px; }
+  .users td, .users th { padding: 4px 6px; white-space: nowrap; }
+  .users td.ip { font-family: var(--mono); }
+  .users .you { font-size: 10px; margin-left: 6px; }
+  .users ul { list-style: none; padding: 0; margin: 0; }
+  .users li { padding: 4px 0; border-top: 1px solid var(--border); white-space: normal; }
+  .users li small { color: var(--muted); margin-right: 6px; font-family: var(--mono); }
+  .users .none { color: var(--muted); }
+  /* A notice of another user's change: a panel, not the inverted toast of this page's own messages. */
+  .toast.notice { --bs-toast-bg: var(--panel); --bs-toast-color: var(--text); --bs-toast-border-color: var(--border);
+    --bs-toast-header-bg: var(--panel-2); --bs-toast-header-color: var(--text); --bs-toast-header-border-color: var(--border); }
+  [data-bs-theme=light] .toast.notice { --bs-btn-close-filter: none; }
+  [data-bs-theme=dark] .toast.notice { --bs-btn-close-filter: invert(1) grayscale(100%) brightness(200%); }
+  .toast.notice .toast-header { gap: 6px; }
+  .toast.notice .toast-header .bi { color: var(--accent); }
+  .toast.notice .toast-header strong { font-family: var(--mono); font-size: 12px; }
   .layout { display: grid; grid-template-columns: var(--nav-w, 320px) minmax(0, 1fr); min-height: 0; }
   /* The sidebar's right edge: drag it to make the sidebar wider or narrower. */
   .navsizer { position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; z-index: 40; cursor: col-resize; touch-action: none; }
@@ -799,6 +820,10 @@
         <use href="#w1" class="pk p1"/><use href="#w3" class="pk p2"/><use href="#w2" class="pk p3"/>
       </g>
     </svg>
+  </div>
+  <div class="dropdown" id="usersWrap" hidden>
+    <button id="usersBtn" class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Who is using cactusdb"><i class="bi bi-people" aria-hidden="true"></i> <span id="usersN">1</span><span class="visually-hidden"> using cactusdb</span></button>
+    <div class="dropdown-menu dropdown-menu-end shadow users" id="usersMenu"></div>
   </div>
   <button id="reconnectBtn" class="btn btn-sm btn-outline-secondary" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
   <button id="dashBtn" class="btn btn-sm btn-outline-secondary" hidden title="The database's statistics: version, uptime, size, connections, activity, caches, its largest tables…"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</button>
@@ -1574,10 +1599,14 @@ const state = { engines: [], engine: "sqlite", session: null, label: "", objects
   result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
 let pending = 0; // API calls in flight: the header animation speeds up while busy
+// This page's id for presence.go: who is using cactusdb, and so that the
+// notices of what this page changes go to the other pages, not back to it.
+const presence = { id: [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join(""), clients: [], recent: [] };
+
 async function api(method, url, body, retried = false) {
   // Errors come back as 200 with the status in a header: firewalls that see a
   // 401 or 403 may block this computer from cactusdb for minutes.
-  const opt = { method, headers: { "X-Cactusdb-Errors": "in-header", "X-Cactusdb-Page": usage.page } };
+  const opt = { method, headers: { "X-Cactusdb-Errors": "in-header", "X-Cactusdb-Page": usage.page, "X-Cactusdb-Client": presence.id } };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   document.body.classList.toggle("busy", ++pending > 0);
   const t0 = performance.now();
@@ -4299,7 +4328,7 @@ async function installFromBrowser(u) {
   const send = async (pw) => {
     upgMsg(`Sending ${mb(file.size)} to the server…`);
     const r = await fetch("/api/upgrade/upload", { method: "POST", body: file, headers: { "Content-Type": "application/octet-stream",
-      "X-Cactusdb-Errors": "in-header", "X-Cactusdb-Page": usage.page, "X-Cactusdb-Superuser": pw, "X-Cactusdb-Sha256": sum } });
+      "X-Cactusdb-Errors": "in-header", "X-Cactusdb-Page": usage.page, "X-Cactusdb-Client": presence.id, "X-Cactusdb-Superuser": pw, "X-Cactusdb-Sha256": sum } });
     const data = await r.json().catch(() => ({}));
     const status = +(r.headers.get("X-Cactusdb-Status") || r.status);
     if (status >= 400) { const e = new Error(data.error || `error ${status}`); e.status = status; throw e; }
@@ -4429,6 +4458,84 @@ async function watchVersion() {
   $("verBanner").hidden = false;
 }
 setInterval(watchVersion, 20000);
+
+// ---- who is using cactusdb, and what they change (presence.go) -------------
+// The page checks in every 5 seconds. The answer lists the open pages with
+// their client IP, and what the others changed since: a saved connection or
+// query, a container deployed, an update of cactusdb. Each is shown as a
+// notice, and what it changed is loaded again here.
+async function presenceCheck() {
+  let data;
+  try {
+    const r = await fetch("/api/presence", { method: "POST", cache: "no-store", body: JSON.stringify({ client: presence.id }),
+      headers: { "Content-Type": "application/json", "X-Cactusdb-Errors": "in-header" } });
+    if (+(r.headers.get("X-Cactusdb-Status") || r.status) >= 400) return;
+    data = await r.json();
+  } catch (e) { return; } // restarting, or the network: next time
+  presence.clients = data.clients || [];
+  for (const n of data.notices || []) presenceNotice(n);
+  renderUsers();
+}
+setInterval(presenceCheck, 5000);
+presenceCheck();
+// Closed or reloaded: gone from the others' list straight away.
+addEventListener("pagehide", () => navigator.sendBeacon?.("/api/presence/leave", new Blob([JSON.stringify({ client: presence.id })], { type: "application/json" })));
+
+function presenceNotice(n) {
+  presence.recent.unshift(n);
+  presence.recent.length = Math.min(presence.recent.length, 20);
+  noticeToast(n);
+  if (n.kind === "connections") loadSaved();
+  else if (n.kind === "queries" && state.savedConn && state.savedConn === n.savedId) loadQueries();
+  else if (n.kind === "containers" && $("ctrDialog").open) loadContainersList();
+}
+const noticeText = (n) => n.ip ? n.text : n.text.charAt(0).toUpperCase() + n.text.slice(1);
+const NOTICE_ICON = { connections: "bi-plug", queries: "bi-journal-code", containers: "bi-box-seam", upgrade: "bi-cloud-arrow-down" };
+// A notice is a toast of its own, so several stack up instead of replacing each other.
+function noticeToast(n) {
+  const box = $("toastBox"), d = document.querySelector("dialog[open]");
+  if (box.parentElement !== (d || document.body)) (d || document.body).appendChild(box);
+  const t = document.createElement("div");
+  t.className = "toast notice";
+  t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite"); t.setAttribute("aria-atomic", "true");
+  t.innerHTML = `<div class="toast-header"><i class="bi ${NOTICE_ICON[n.kind] || "bi-people"}" aria-hidden="true"></i>` +
+    `<strong class="me-auto">${esc(n.ip || "cactusdb")}</strong><small>${esc(new Date(n.at).toLocaleTimeString())}</small>` +
+    `<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body"></div>`;
+  t.querySelector(".toast-body").textContent = noticeText(n);
+  box.appendChild(t);
+  t.addEventListener("hidden.bs.toast", () => t.remove());
+  new bootstrap.Toast(t, { delay: 12000 }).show();
+}
+
+// "Chrome on macOS", from the browser's user agent.
+function uaShort(ua = "") {
+  const b = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome"
+    : /Safari\//.test(ua) ? "Safari" : (ua.split(/[/ ]/)[0] || "unknown");
+  const os = /Windows/.test(ua) ? "Windows" : /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android"
+    : /Macintosh|Mac OS X/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
+  return os ? `${b} on ${os}` : b;
+}
+function agoText(t) {
+  const s = Math.max(0, Math.round((Date.now() - new Date(t)) / 1000));
+  return s < 10 ? "now" : s < 60 ? `${s} s ago` : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`;
+}
+function renderUsers() {
+  const list = presence.clients, n = list.length;
+  $("usersWrap").hidden = !n;
+  if (!n) return;
+  const ips = [...new Set(list.map((c) => c.ip))];
+  const pages = `${n} open page${n === 1 ? "" : "s"}`, from = `${ips.length} client IP${ips.length === 1 ? "" : "s"}`;
+  $("usersN").textContent = n;
+  $("usersBtn").title = `Using cactusdb now: ${pages} from ${from} (${ips.join(", ")})`;
+  $("usersBtn").classList.toggle("others", list.some((c) => !c.you));
+  $("usersMenu").innerHTML = `<h6>Using cactusdb now: ${pages} from ${from}</h6>
+    <table class="table table-sm table-hover"><thead><tr><th>Client IP</th><th>Browser</th><th>Opened</th><th>Last seen</th></tr></thead><tbody>` +
+    list.map((c) => `<tr><td class="ip">${esc(c.ip)}${c.you ? `<span class="badge text-bg-primary you">this page</span>` : ""}</td>` +
+      `<td title="${esc(c.agent)}">${esc(uaShort(c.agent))}</td><td>${esc(new Date(c.since).toLocaleTimeString())}</td><td>${esc(agoText(c.seen))}</td></tr>`).join("") +
+    `</tbody></table><h6>Changes by others</h6>` +
+    (presence.recent.length ? `<ul>${presence.recent.map((x) => `<li><small>${esc(new Date(x.at).toLocaleTimeString())}</small>` +
+      `${x.ip ? `<b>${esc(x.ip)}</b> ` : ""}${esc(noticeText(x))}</li>`).join("")}</ul>` : `<p class="none mb-1">None since this page was opened.</p>`);
+}
 document.addEventListener("visibilitychange", () => { if (!document.hidden) watchVersion(); });
 $("verReload").addEventListener("click", () => location.reload());
 $("verLater").addEventListener("click", () => { $("verBanner").hidden = true; state.serverVersion = ""; });

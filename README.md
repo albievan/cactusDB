@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.42.2
+cactusdb 1.43.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -612,6 +612,27 @@ The version of the cactusdb you're using is shown under its name in the top bar 
 example *v1.31.0*), as reported by the running program. Next to the *read-only* label, a
 second label shows the type of the database you're connected to (for example *PostgreSQL*
 or *Firebird*); it goes away when you disconnect.
+
+<a id="who-is-using"></a>
+**Who is using cactusdb.** The people button in the top bar (for example 👥 *3*) shows how
+many pages have cactusdb open right now: every browser tab counts, from this computer or
+another. It turns green when someone else is using it too. Hover over it for the client
+IPs, or click it for the list: each page's **client IP**, its browser, when it was opened and
+when it was last heard from, with *this page* marked. A page checks in every 5 seconds; one
+that is closed or reloaded leaves the list straight away, and one that goes quiet (the
+computer asleep, the network gone) after about a minute. cactusdb's log notes each page
+opening and closing, with its IP and how many are using it.
+
+**Notices of other people's changes.** When someone, on another page, **adds, changes,
+renames or deletes a saved connection**, **adds, changes or deletes a saved query**,
+**deploys a database container** (when it starts, and when it is ready or fails) or
+**updates cactusdb to the latest release**, every other page shows a notice within a few
+seconds: who did it (their client IP), when, and what. The page they did it on doesn't get
+one. What changed is loaded again: the saved connections, the saved queries (on a page
+connected to that same connection) and the list of containers (when it is open). A saved
+query's name isn't in the notice, as it is kept encrypted with the connection password.
+After an update every page reloads by itself once the new version is running. The last
+notices are listed under *Changes by others* in the people button's list.
 
 <a id="dashboard"></a>
 ### The database's dashboard
@@ -1412,6 +1433,9 @@ is sent and how to set it up. In short:
   even someone with `cactus.conn.db` *and* `cactus.key` can't read them without that
   password. Wrong guesses are slowed down. The connection's exported files are only served
   to someone who gives its password. See [Connection passwords](#connection-passwords).
+- **Who is using cactusdb** (the people button) shows every open page's client IP and
+  browser to everyone who can open cactusdb, and the notices name who changed what by client
+  IP. They never contain a password, a query or a query's name.
 - **Migrating** writes only to a database cactusdb creates for it, refusing one that already
   exists, and only with the superuser password. *Only write the script* writes to no
   database. The script of a migration can be downloaded only by whoever started it.
@@ -1598,6 +1622,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
 | `dbstats.go` | The Dashboard: the statistics queries of each kind of database and `/api/dbstats` |
+| `presence.go` | Who is using cactusdb (the open pages and their client IPs, `/api/presence`) and the notices of changes sent to the other pages |
 | `migrate.go` | ☰ → Migrate database: the job, creating the new database, copying the rows, keys, indexes and the report and script |
 | `migrate_schema.go` | Tables described without their engine: reading each engine's catalog, and writing the target's column types, defaults and DDL |
 | `migrate_code.go` | Views, procedures and triggers for the target: an SQL tokenizer and rewrites, and Firebird's PSQL parsed and written as MariaDB/MySQL or PL/pgSQL |

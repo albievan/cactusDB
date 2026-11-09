@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.42.2"
+var version = "1.43.0"
 
 //go:embed web
 var webFS embed.FS
@@ -97,6 +97,8 @@ type server struct {
 	restart     *restartPlan // set when a new version is in place: restart once stopped
 	logPath     string       // the log file shown by ☰ → Logs; "" = only the lines in memory (logs.go)
 	crashPath   string
+
+	presence presence // the pages using cactusdb, and the notices to them (presence.go)
 }
 
 func main() {
@@ -470,6 +472,8 @@ func main() {
 	mux.HandleFunc("POST /api/usage", s.handleUsage)
 	mux.HandleFunc("GET /api/usage/summary", s.handleUsageSummary)
 	mux.HandleFunc("POST /api/usage/delete", s.handleUsageDelete)
+	mux.HandleFunc("POST /api/presence", s.handlePresence)
+	mux.HandleFunc("POST /api/presence/leave", s.handlePresenceLeave)
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)
@@ -802,8 +806,9 @@ func logRequests(h http.Handler) http.Handler {
 		// Progress polls of "export all tables" are not actions; the export
 		// itself is logged.
 		// Nor are the Logs tab's reads: live, it would fill the log with itself.
-		// Nor the page's usage events (see usage.go).
-		if !strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api/usage" || (r.Method == "GET" && (strings.HasPrefix(r.URL.Path, "/api/exportall/") || r.URL.Path == "/api/logs")) {
+		// Nor the page's usage events (see usage.go), nor its check-ins
+		// (presence.go, which logs pages opening and closing).
+		if !strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api/usage" || strings.HasPrefix(r.URL.Path, "/api/presence") || (r.Method == "GET" && (strings.HasPrefix(r.URL.Path, "/api/exportall/") || r.URL.Path == "/api/logs")) {
 			h.ServeHTTP(w, r)
 			return
 		}
@@ -1089,6 +1094,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			resp["saveError"] = err.Error()
 		} else {
 			logAction(r, "save connection %q (password-protected)", req.Name)
+			s.notify(r, "connections", 0, "added the saved connection “%s”", strings.TrimSpace(req.Name))
 			resp["savedId"] = id
 			label, savedID, connBox = strings.TrimSpace(req.Name), id, box
 		}
@@ -1651,12 +1657,13 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var oldBox *secretBox
+	oldName := ""
 	if c.ID != 0 {
 		old, box, ok := s.unlockConnAs(w, r, c.ID, req.LockPassword, req.SuperPassword)
 		if !ok {
 			return
 		}
-		oldBox = box
+		oldBox, oldName = box, old.Name
 		if req.KeepPassword && c.Password == "" {
 			c.Password = old.Password
 		}
@@ -1686,6 +1693,14 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	logAction(r, "save connection %q (%s, password-protected)", c.Name, defaultConnName(c.ConnParams))
+	switch {
+	case c.ID == 0:
+		s.notify(r, "connections", 0, "added the saved connection “%s”", c.Name)
+	case oldName != c.Name:
+		s.notify(r, "connections", 0, "changed the saved connection “%s” and renamed it “%s”", oldName, c.Name)
+	default:
+		s.notify(r, "connections", 0, "changed the saved connection “%s”", c.Name)
+	}
 	writeJSON(w, 200, map[string]any{"id": id})
 }
 
@@ -1725,5 +1740,6 @@ func (s *server) handleDeleteConn(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	logAction(r, "delete saved connection %q and its saved queries", c.Name)
+	s.notify(r, "connections", 0, "deleted the saved connection “%s” and its saved queries", c.Name)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

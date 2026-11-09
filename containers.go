@@ -1166,6 +1166,7 @@ func (s *server) handleContainerDeploy(w http.ResponseWriter, r *http.Request) {
 		data = d.DataDir
 	}
 	logAction(r, "deploying %s as %s on %s, port %d, data in %s", sp.Name, d.Name, where, d.Port, data)
+	s.notify(r, "containers", 0, "started deploying %s as the container %s on %s", sp.Name, d.Name, rt.Name)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 		defer cancel()
@@ -1185,9 +1186,11 @@ func (s *server) handleContainerDeploy(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			j.log("✘ %s", err)
 			logAction(r, "deploying %s FAILED: %s", d.Name, firstLine(err.Error()))
+			s.notify(r, "containers", 0, "couldn't deploy the container %s: %s", d.Name, firstLine(err.Error()))
 		} else {
 			j.log("✔ %s is ready", sp.Name)
 			logAction(r, "deployed %s (%s) on %s", d.Name, sp.Name, where)
+			s.notify(r, "containers", 0, "deployed the container %s (%s) on %s: it is ready", d.Name, sp.Name, rt.Name)
 		}
 	}()
 	writeJSON(w, 200, map[string]string{"job": j.ID})

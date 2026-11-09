@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.43.0 — 2026-11-09
+
+- **Who is using cactusdb**: a people button in the top bar with how many pages have
+  cactusdb open (every browser tab, from any computer), green when someone else is using it.
+  Its list shows each page's **client IP**, browser, when it was opened and when it was last
+  heard from. The log notes each page opening and closing.
+- **Notices to everyone connected** when someone adds, changes, renames or deletes a saved
+  connection, adds, changes or deletes a saved query, deploys a database container (started,
+  ready or failed) or updates cactusdb: a notice on every other page with the client IP, the
+  time and what changed, and the saved connections, saved queries or containers are loaded
+  again there. The last ones are listed under *Changes by others*.
+
 ## 1.42.2 — 2026-11-09
 
 - **Show password** (eye) buttons in the connection dialog when **editing** a saved
