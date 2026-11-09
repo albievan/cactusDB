@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.36.3 — 2026-11-08
+
+- The type groups of the saved connections **open and close** from their heading (a chevron
+  shows which are open), in the menu and the sidebar alike; several can be open at once, and
+  all start closed when cactusdb is opened in the browser.
+- Opening or closing something in the menu no longer closes the menu.
+
 ## 1.36.2 — 2026-11-08
 
 - **Saved connections are grouped by the type of database** (Firebird, MariaDB, SQL Server…,

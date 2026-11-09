@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.36.2
+cactusdb 1.36.3
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -232,8 +232,9 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
 
 **Saved connections** appear under **Connections** in the menu, and in the sidebar while
 you're not connected, grouped by the type of database (Firebird, MariaDB, SQL Server…, each
-with how many there are) and sorted by name. Hovering over one shows its whole name, which
-the list may cut off. Click **▶** (or the name) to connect, **Edit** to change it, or the
+with how many there are) and sorted by name. Each type opens and closes from its heading,
+and several can be open at once; when you open cactusdb in the browser, they all start
+closed. Hovering over a connection shows its whole name, which the list may cut off. Click **▶** (or the name) to connect, **Edit** to change it, or the
 bin icon to delete it. 🔒 marks a connection protected by its own password,
 🔓 one saved by an older cactusdb or by the command line that has none yet (**Edit** it to
 set one).
