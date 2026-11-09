@@ -160,6 +160,7 @@
   .users td, .users th { padding: 4px 6px; white-space: nowrap; }
   .users td.ip { font-family: var(--mono); }
   .users .you { font-size: 10px; margin-left: 6px; }
+  .users .uname { font-family: var(--bs-body-font-family); font-weight: 600; margin-left: 4px; }
   .users ul { list-style: none; padding: 0; margin: 0; }
   .users li { padding: 4px 0; border-top: 1px solid var(--border); white-space: normal; }
   .users li small { color: var(--muted); margin-right: 6px; font-family: var(--mono); }
@@ -170,6 +171,20 @@
   [data-bs-theme=light] .toast.notice { --bs-btn-close-filter: none; }
   [data-bs-theme=dark] .toast.notice { --bs-btn-close-filter: invert(1) grayscale(100%) brightness(200%); }
   .toast.notice .toast-header { gap: 6px; }
+  .toast.notice .toast-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+  /* Direct messages. */
+  #msgBtn { flex: none; }
+  .msgunread { position: absolute; top: -6px; right: -8px; font-size: 10px; }
+  .msgpanel { --bs-offcanvas-width: min(440px, 100vw); --bs-offcanvas-bg: var(--panel); --bs-offcanvas-color: var(--text); }
+  .msgpanel .offcanvas-body { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .msgthread { flex: 1; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 2px; margin-top: 6px; border-top: 1px solid var(--border); }
+  .msgthread .empty { color: var(--muted); font-size: 13px; margin: auto; text-align: center; }
+  .msg { max-width: 85%; padding: 6px 10px; border-radius: 12px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel-2); border: 1px solid var(--border); align-self: flex-start; }
+  .msg.mine { align-self: flex-end; background: color-mix(in srgb, var(--accent) 18%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .msg small { display: block; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+  .msgform { display: flex; gap: 6px; align-items: flex-end; }
+  .msgform textarea { resize: vertical; }
+  .users td.act { text-align: right; }
   .toast.notice .toast-header .bi { color: var(--accent); }
   .toast.notice .toast-header strong { font-family: var(--mono); font-size: 12px; }
   .layout { display: grid; grid-template-columns: var(--nav-w, 320px) minmax(0, 1fr); min-height: 0; }
@@ -825,6 +840,7 @@
     <button id="usersBtn" class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Who is using cactusdb"><i class="bi bi-people" aria-hidden="true"></i> <span id="usersN">1</span><span class="visually-hidden"> using cactusdb</span></button>
     <div class="dropdown-menu dropdown-menu-end shadow users" id="usersMenu"></div>
   </div>
+  <button id="msgBtn" class="btn btn-sm btn-outline-secondary position-relative" type="button" hidden title="Messages: send a direct message to someone using cactusdb" aria-controls="msgPanel"><i class="bi bi-chat-dots" aria-hidden="true"></i><span class="visually-hidden">Messages</span><span class="badge rounded-pill text-bg-danger msgunread" id="msgUnread" hidden></span></button>
   <button id="reconnectBtn" class="btn btn-sm btn-outline-secondary" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
   <button id="dashBtn" class="btn btn-sm btn-outline-secondary" hidden title="The database's statistics: version, uptime, size, connections, activity, caches, its largest tables…"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</button>
   <button id="disconnectBtn" class="btn btn-sm btn-outline-secondary" hidden>Disconnect</button>
@@ -1578,6 +1594,27 @@
     <h2>cactusdb has shut down</h2>
     <p>All database connections were closed. You can close this tab.</p>
     <p>To start it again: <code id="restartCmd">cactusdb --runas background</code></p>
+  </div>
+</div>
+
+<!-- Direct messages between the pages using cactusdb (presence.go). -->
+<div class="offcanvas offcanvas-end msgpanel" tabindex="-1" id="msgPanel" aria-labelledby="msgTitle">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="msgTitle"><i class="bi bi-chat-dots" aria-hidden="true"></i> Messages</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <label class="form-label" for="msgName">Your name <span class="hint-inline">shown to the others, optional</span></label>
+    <input class="form-control form-control-sm" id="msgName" maxlength="40" autocomplete="off" placeholder="e.g. Albie">
+    <label class="form-label" for="msgTo">To</label>
+    <select class="form-select form-select-sm" id="msgTo"></select>
+    <div class="msgthread" id="msgThread" aria-live="polite"></div>
+    <form id="msgForm" class="msgform">
+      <textarea class="form-control form-control-sm" id="msgText" rows="2" maxlength="2000" placeholder="Write a message (Enter sends, Shift+Enter for a new line)"></textarea>
+      <button class="btn btn-primary btn-sm" type="submit" id="msgSend" title="Send"><i class="bi bi-send" aria-hidden="true"></i><span class="visually-hidden">Send</span></button>
+    </form>
+    <p class="hint mb-0">Only you and the person you pick see a message: it goes to their page alone, isn't logged, and is
+      forgotten once both pages are closed. Reloading this page starts a new conversation.</p>
   </div>
 </div>
 
@@ -4466,18 +4503,24 @@ setInterval(watchVersion, 20000);
 // notice, and what it changed is loaded again here.
 async function presenceCheck() {
   let data;
+  presence.last = Date.now();
   try {
-    const r = await fetch("/api/presence", { method: "POST", cache: "no-store", body: JSON.stringify({ client: presence.id }),
+    const r = await fetch("/api/presence", { method: "POST", cache: "no-store", body: JSON.stringify({ client: presence.id, name: msg.name }),
       headers: { "Content-Type": "application/json", "X-Cactusdb-Errors": "in-header" } });
     if (+(r.headers.get("X-Cactusdb-Status") || r.status) >= 400) return;
     data = await r.json();
   } catch (e) { return; } // restarting, or the network: next time
   presence.clients = data.clients || [];
+  presence.me = (presence.clients.find((c) => c.you) || {}).handle || presence.me;
+  for (const c of presence.clients) msg.who.set(c.handle, { ip: c.ip, name: c.name, agent: c.agent }); // still named once closed
   for (const n of data.notices || []) presenceNotice(n);
+  for (const m of data.messages || []) msgAdd(m);
   renderUsers();
+  msgRender();
 }
-setInterval(presenceCheck, 5000);
-presenceCheck();
+// Every 5 seconds; every 2 while the messages are open, so a reply shows soon.
+setInterval(() => { if (msgOpen() || Date.now() - (presence.last || 0) >= 4500) presenceCheck(); }, 2000);
+setTimeout(presenceCheck, 0); // once the rest of the page's code has run
 // Closed or reloaded: gone from the others' list straight away.
 addEventListener("pagehide", () => navigator.sendBeacon?.("/api/presence/leave", new Blob([JSON.stringify({ client: presence.id })], { type: "application/json" })));
 
@@ -4491,21 +4534,108 @@ function presenceNotice(n) {
 }
 const noticeText = (n) => n.ip ? n.text : n.text.charAt(0).toUpperCase() + n.text.slice(1);
 const NOTICE_ICON = { connections: "bi-plug", queries: "bi-journal-code", containers: "bi-box-seam", upgrade: "bi-cloud-arrow-down" };
-// A notice is a toast of its own, so several stack up instead of replacing each other.
-function noticeToast(n) {
+const noticeToast = (n) => stackToast(NOTICE_ICON[n.kind] || "bi-people", n.ip || "cactusdb", n.at, noticeText(n));
+// A toast of its own, so several stack up instead of replacing each other;
+// with an action, a button that does it and closes the toast.
+function stackToast(icon, title, at, text, action) {
   const box = $("toastBox"), d = document.querySelector("dialog[open]");
   if (box.parentElement !== (d || document.body)) (d || document.body).appendChild(box);
   const t = document.createElement("div");
   t.className = "toast notice";
   t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite"); t.setAttribute("aria-atomic", "true");
-  t.innerHTML = `<div class="toast-header"><i class="bi ${NOTICE_ICON[n.kind] || "bi-people"}" aria-hidden="true"></i>` +
-    `<strong class="me-auto">${esc(n.ip || "cactusdb")}</strong><small>${esc(new Date(n.at).toLocaleTimeString())}</small>` +
-    `<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body"></div>`;
-  t.querySelector(".toast-body").textContent = noticeText(n);
+  t.innerHTML = `<div class="toast-header"><i class="bi ${icon}" aria-hidden="true"></i>` +
+    `<strong class="me-auto">${esc(title)}</strong><small>${esc(new Date(at).toLocaleTimeString())}</small>` +
+    `<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body"><div class="text"></div></div>`;
+  t.querySelector(".text").textContent = text;
+  const bt = new bootstrap.Toast(t, { delay: action ? 20000 : 12000 });
+  if (action) {
+    const row = document.createElement("div"); row.className = "toast-actions";
+    row.innerHTML = `<button type="button" class="btn btn-sm btn-primary"><i class="bi ${action.icon}" aria-hidden="true"></i> ${esc(action.label)}</button>`;
+    row.querySelector("button").addEventListener("click", () => { bt.hide(); action.run(); });
+    t.querySelector(".toast-body").appendChild(row);
+  }
   box.appendChild(t);
   t.addEventListener("hidden.bs.toast", () => t.remove());
-  new bootstrap.Toast(t, { delay: 12000 }).show();
+  bt.show();
 }
+
+// ---- direct messages (presence.go) -------------------------------------------
+// To one page picked from the people using cactusdb. Only that page and this
+// one are given the message, and the server forgets it once both are closed.
+const msg = { threads: new Map(), unread: new Map(), who: new Map(), to: "", name: "" };
+try { msg.name = localStorage.getItem("cactusdb.msgName") || ""; } catch (e) { /* no storage */ }
+$("msgName").value = msg.name;
+const msgOpen = () => $("msgPanel").classList.contains("show");
+// How a page is shown: the name it gave, else its IP and browser.
+function whoLabel(handle) {
+  const c = presence.clients.find((x) => x.handle === handle), w = c || msg.who.get(handle) || {};
+  const base = w.name ? `${w.name} (${w.ip})` : `${w.ip || "a page"}${w.agent ? " · " + uaShort(w.agent) : ""}`;
+  return c ? base : base + " – closed";
+}
+function msgAdd(m) {
+  const mine = m.from === presence.me, other = mine ? m.to : m.from;
+  const th = msg.threads.get(other) || [];
+  if (th.some((x) => x.seq === m.seq)) return;
+  th.push(m); th.sort((a, b) => a.seq - b.seq);
+  msg.threads.set(other, th);
+  if (mine) return;
+  msg.who.set(other, { ...msg.who.get(other), ip: m.fromIp, name: m.fromName });
+  if (msgOpen() && msg.to === other && !document.hidden) return;
+  msg.unread.set(other, (msg.unread.get(other) || 0) + 1);
+  stackToast("bi-chat-dots", m.fromName ? `${m.fromName} (${m.fromIp})` : m.fromIp, m.at, m.text,
+    { icon: "bi-reply", label: "Reply", run: () => msgShow(other) });
+}
+function msgShow(handle) {
+  if (handle) msg.to = handle;
+  bootstrap.Dropdown.getInstance($("usersBtn"))?.hide();
+  bootstrap.Offcanvas.getOrCreateInstance($("msgPanel")).show();
+  msgRender();
+  setTimeout(() => $("msgText").focus(), 300);
+}
+function msgRender() {
+  const others = presence.clients.filter((c) => !c.you).map((c) => c.handle);
+  const handles = [...new Set([...others, ...msg.threads.keys()])];
+  if (!handles.includes(msg.to)) msg.to = handles[0] || "";
+  if (msgOpen() && !document.hidden) msg.unread.delete(msg.to);
+  const unread = [...msg.unread.values()].reduce((a, b) => a + b, 0);
+  $("msgBtn").hidden = !handles.length;
+  $("msgUnread").hidden = !unread; $("msgUnread").textContent = unread;
+  $("msgBtn").title = unread ? `Messages: ${unread} new` : "Messages: send a direct message to someone using cactusdb";
+  const sel = $("msgTo");
+  sel.innerHTML = handles.length ? handles.map((h) => { const u = msg.unread.get(h);
+    return `<option value="${esc(h)}"${h === msg.to ? " selected" : ""}>${esc(whoLabel(h))}${u ? ` (${u} new)` : ""}</option>`; }).join("")
+    : `<option value="">No one else has cactusdb open</option>`;
+  const open = others.includes(msg.to);
+  $("msgText").disabled = $("msgSend").disabled = !open;
+  $("msgText").placeholder = open ? "Write a message (Enter sends, Shift+Enter for a new line)" : msg.to ? "That page has been closed" : "";
+  const th = msg.threads.get(msg.to) || [], box = $("msgThread");
+  const atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = th.length ? th.map((m) => `<div class="msg${m.from === presence.me ? " mine" : ""}">${esc(m.text)}` +
+    `<small>${m.from === presence.me ? "You" : esc(m.fromName || m.fromIp)} · ${esc(new Date(m.at).toLocaleTimeString())}</small></div>`).join("")
+    : `<p class="empty">${open ? `No messages with ${esc(whoLabel(msg.to))} yet.<br>Only they will see what you write here.` : "Pick someone to write to."}</p>`;
+  if (atEnd || th.length) box.scrollTop = box.scrollHeight;
+}
+$("msgBtn").addEventListener("click", () => msgShow());
+$("msgPanel").addEventListener("shown.bs.offcanvas", () => msgRender());
+$("msgTo").addEventListener("change", () => { msg.to = $("msgTo").value; msgRender(); });
+$("msgName").addEventListener("change", () => {
+  msg.name = $("msgName").value.trim();
+  try { localStorage.setItem("cactusdb.msgName", msg.name); } catch (e) { /* no storage: this page only */ }
+  presenceCheck();
+});
+$("msgText").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $("msgForm").requestSubmit(); } });
+$("msgForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const text = $("msgText").value.trim();
+  if (!text || !msg.to) return;
+  $("msgSend").disabled = true;
+  try {
+    msgAdd(await api("POST", "/api/messages", { client: presence.id, to: msg.to, text }));
+    $("msgText").value = "";
+  } catch (e) { toast(e.message, true); }
+  msgRender();
+  $("msgText").focus();
+});
 
 // "Chrome on macOS", from the browser's user agent.
 function uaShort(ua = "") {
@@ -4519,6 +4649,7 @@ function agoText(t) {
   const s = Math.max(0, Math.round((Date.now() - new Date(t)) / 1000));
   return s < 10 ? "now" : s < 60 ? `${s} s ago` : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`;
 }
+$("usersMenu").addEventListener("click", (ev) => { const b = ev.target.closest("[data-msg]"); if (b) msgShow(b.dataset.msg); });
 function renderUsers() {
   const list = presence.clients, n = list.length;
   $("usersWrap").hidden = !n;
@@ -4529,9 +4660,10 @@ function renderUsers() {
   $("usersBtn").title = `Using cactusdb now: ${pages} from ${from} (${ips.join(", ")})`;
   $("usersBtn").classList.toggle("others", list.some((c) => !c.you));
   $("usersMenu").innerHTML = `<h6>Using cactusdb now: ${pages} from ${from}</h6>
-    <table class="table table-sm table-hover"><thead><tr><th>Client IP</th><th>Browser</th><th>Opened</th><th>Last seen</th></tr></thead><tbody>` +
-    list.map((c) => `<tr><td class="ip">${esc(c.ip)}${c.you ? `<span class="badge text-bg-primary you">this page</span>` : ""}</td>` +
-      `<td title="${esc(c.agent)}">${esc(uaShort(c.agent))}</td><td>${esc(new Date(c.since).toLocaleTimeString())}</td><td>${esc(agoText(c.seen))}</td></tr>`).join("") +
+    <table class="table table-sm table-hover"><thead><tr><th>Client IP</th><th>Browser</th><th>Opened</th><th>Last seen</th><th></th></tr></thead><tbody>` +
+    list.map((c) => `<tr><td class="ip">${esc(c.ip)}${c.name ? ` <span class="uname">${esc(c.name)}</span>` : ""}${c.you ? `<span class="badge text-bg-primary you">this page</span>` : ""}</td>` +
+      `<td title="${esc(c.agent)}">${esc(uaShort(c.agent))}</td><td>${esc(new Date(c.since).toLocaleTimeString())}</td><td>${esc(agoText(c.seen))}</td>` +
+      `<td class="act">${c.you ? "" : `<button type="button" class="btn btn-sm btn-outline-primary" data-msg="${esc(c.handle)}" title="Send a direct message to this page" aria-label="Message ${esc(c.name || c.ip)}"><i class="bi bi-chat-dots" aria-hidden="true"></i></button>`}</td></tr>`).join("") +
     `</tbody></table><h6>Changes by others</h6>` +
     (presence.recent.length ? `<ul>${presence.recent.map((x) => `<li><small>${esc(new Date(x.at).toLocaleTimeString())}</small>` +
       `${x.ip ? `<b>${esc(x.ip)}</b> ` : ""}${esc(noticeText(x))}</li>`).join("")}</ul>` : `<p class="none mb-1">None since this page was opened.</p>`);

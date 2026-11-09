@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.43.0
+cactusdb 1.44.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -633,6 +633,19 @@ connected to that same connection) and the list of containers (when it is open).
 query's name isn't in the notice, as it is kept encrypted with the connection password.
 After an update every page reloads by itself once the new version is running. The last
 notices are listed under *Changes by others* in the people button's list.
+
+<a id="messages"></a>
+**Direct messages.** To write to someone using cactusdb, open the people button's list and
+click the 💬 button on their row, or click 💬 **Messages** in the top bar (shown when someone
+else has cactusdb open) and pick them under **To**. Type the message and press **Enter**
+(**Shift+Enter** starts a new line). It reaches their page within a few seconds as a notice
+with **Reply**, and the 💬 button shows how many are unread; **Reply** opens the conversation
+so they can answer. Messages are **private**: only the page you picked, and yours, are given
+a message. Other pages, from the same computer or another, never see it. Pages are addressed by
+a handle that isn't the secret id a page checks in with, so no page can read another's
+messages. Messages are kept in memory only, are never logged or written to disk, and are
+forgotten once both pages are closed. Reloading a page starts a new conversation. Under
+**Your name** you can give a name the others see next to your IP (kept in this browser).
 
 <a id="dashboard"></a>
 ### The database's dashboard
@@ -1436,6 +1449,9 @@ is sent and how to set it up. In short:
 - **Who is using cactusdb** (the people button) shows every open page's client IP and
   browser to everyone who can open cactusdb, and the notices name who changed what by client
   IP. They never contain a password, a query or a query's name.
+- **Direct messages** are given only to the page they are sent to and the page that sent
+  them, are held in memory only (never logged or stored), and are dropped once both pages
+  are closed. The log notes only that one IP sent a message to another.
 - **Migrating** writes only to a database cactusdb creates for it, refusing one that already
   exists, and only with the superuser password. *Only write the script* writes to no
   database. The script of a migration can be downloaded only by whoever started it.
@@ -1622,7 +1638,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
 | `dbstats.go` | The Dashboard: the statistics queries of each kind of database and `/api/dbstats` |
-| `presence.go` | Who is using cactusdb (the open pages and their client IPs, `/api/presence`) and the notices of changes sent to the other pages |
+| `presence.go` | Who is using cactusdb (the open pages and their client IPs, `/api/presence`), the notices of changes sent to the other pages, and direct messages between pages (`/api/messages`) |
 | `migrate.go` | ☰ → Migrate database: the job, creating the new database, copying the rows, keys, indexes and the report and script |
 | `migrate_schema.go` | Tables described without their engine: reading each engine's catalog, and writing the target's column types, defaults and DDL |
 | `migrate_code.go` | Views, procedures and triggers for the target: an SQL tokenizer and rewrites, and Firebird's PSQL parsed and written as MariaDB/MySQL or PL/pgSQL |

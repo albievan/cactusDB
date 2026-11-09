@@ -35,7 +35,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.43.0"
+var version = "1.44.0"
 
 //go:embed web
 var webFS embed.FS
@@ -474,6 +474,7 @@ func main() {
 	mux.HandleFunc("POST /api/usage/delete", s.handleUsageDelete)
 	mux.HandleFunc("POST /api/presence", s.handlePresence)
 	mux.HandleFunc("POST /api/presence/leave", s.handlePresenceLeave)
+	mux.HandleFunc("POST /api/messages", s.handleMessage)
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	ln, err := net.Listen("tcp", addr)

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.44.0 — 2026-11-09
+
+- **Direct messages** between the people using cactusdb: pick someone in the people list
+  (💬 on their row) or under **To** in 💬 **Messages**, write, and press Enter. Only that
+  page gets the message, as a notice with **Reply**, with an unread count on the 💬 button;
+  they answer in the same conversation. Messages are held in memory only, never logged or
+  stored, and forgotten once both pages are closed. An optional **name** is shown to the
+  others next to your IP.
+
 ## 1.43.0 — 2026-11-09
 
 - **Who is using cactusdb**: a people button in the top bar with how many pages have
