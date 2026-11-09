@@ -55,7 +55,7 @@ months and a view over time without running SQL.
 | `ui_click`, `ui_toggle`, `ui_choose` | buttons, check boxes and drop-down lists with a fixed id | `control` (the id, e.g. `cmpDrops`); never the chosen value |
 | `cli_export`, `cli_export_ddl`, `cli_backup`, `cli_show_tables` | command-line runs | `engine`, `format`, `tables_bucket`, `result`, `duration_bucket` |
 
-Every event also has `app_version` (e.g. `1.41.0`).
+Every event also has `app_version` (e.g. `1.41.1`).
 
 **Never sent:** SQL, table, column, connection, host or database names, file paths, IP
 addresses, session ids, usernames, error messages, or anything typed. Google's terms

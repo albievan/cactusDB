@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.41.1 — 2026-11-09
+
+- A container's page and the Migrate page use the **whole width** of the main area (they
+  stopped at 1,100 pixels). On a wide screen the container's settings and environment are
+  side by side, and its log is as tall as the window allows.
+
 ## 1.41.0 — 2026-11-09
 
 - **Dashboard: potential issues in red.** Figures and rows that may be a problem are drawn

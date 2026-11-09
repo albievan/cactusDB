@@ -641,7 +641,7 @@
   /* ☰ → Migrate database: a page in the main area. */
   #migratePane { overflow-y: auto; background: var(--panel); }
   #migratePane[hidden] { display: none; }
-  .mgpage { padding: 16px 20px 24px; max-width: 1100px; }
+  .mgpage { padding: 16px 20px 24px; }
   .mgpage h2 { margin: 0 0 4px; font-size: 18px; }
   .mggrid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; margin-top: 12px; }
   @media (max-width: 760px) { .mggrid { grid-template-columns: minmax(0, 1fr); } .mgarrow { transform: rotate(90deg); justify-self: center; } }
@@ -716,9 +716,12 @@
   /* The container's page: a pane of its own, scrolling as a whole. */
   #ctrPane { overflow-y: auto; background: var(--panel); }
   #ctrPane[hidden] { display: none; }
-  .cvpage { padding: 16px 20px 24px; max-width: 1100px; }
+  .cvpage { padding: 16px 20px 24px; }
+  /* Wide screens: the settings and the environment side by side. */
+  .cvcols { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 28px; }
+  @media (min-width: 1280px) { .cvcols { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
   .cvpage .cvask { max-width: 560px; }
-  .cvpage pre.ctlog { max-height: 50vh; }
+  .cvpage pre.ctlog { max-height: max(50vh, calc(100vh - 260px)); }
   .cvloghead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cvloghead h4 { margin: 0; font-size: 14px; }
   .cvloghead .hint { margin: 0; }
@@ -1184,10 +1187,12 @@
           <div class="card card-body tile"><div class="lbl">Storage</div><div class="val" id="cvDisk">–</div><div class="progress bar"><div class="progress-bar" id="cvDiskBar"></div></div><div class="sub" id="cvDiskSub"></div></div>
         </div>
         <p class="hint" id="cvNotes" hidden></p>
-        <h4 class="edsub">Settings</h4>
-        <table class="table table-sm cvset" id="cvSettings"></table>
-        <h4 class="edsub">Environment</h4>
-        <table class="table table-sm cvset" id="cvEnv"></table>
+        <div class="cvcols">
+          <div><h4 class="edsub">Settings</h4>
+            <table class="table table-sm cvset" id="cvSettings"></table></div>
+          <div><h4 class="edsub">Environment</h4>
+            <table class="table table-sm cvset" id="cvEnv"></table></div>
+        </div>
         <div id="cvLogsWrap" hidden>
           <div class="cvloghead edsub">
             <h4>Log</h4><span class="hint" id="cvLogInfo"></span>

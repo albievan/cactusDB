@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.41.0
+cactusdb 1.41.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -795,7 +795,9 @@ volume or volume claim is kept.
 **A container's page.** **View** (or its name) opens the page of a deployed container in
 the main area, under its own **Container · name** tab beside Data, Logs and Compare, not as
 a dialog. Other tabs can be used meanwhile (it stops measuring while hidden); **All
-containers** opens the list again and **Close** closes the page and its tab. It shows:
+containers** opens the list again and **Close** closes the page and its tab. The page uses
+the whole width of the main area; on a wide screen the settings and the environment are side
+by side, and the log is as tall as the window allows. It shows:
 
 - **Usage**, measured again every 5 seconds: **CPU** (percent of one core, as `docker
   stats` counts it, with the cores it can use), **memory** (used, of its limit or of all
