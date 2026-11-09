@@ -2283,7 +2283,8 @@ async function savedClick(ev) {
   if (!li) return;
   const id = +li.dataset.id;
   const c = state.saved.find((x) => x.id === id);
-  const act = ev.target.dataset.act;
+  // The click may land on the icon inside a button, so look for the button.
+  const act = ev.target.closest("[data-act]")?.dataset.act;
   if (act === "edit") { editConnection(c); return; }
   if (act === "del") { deleteConnection(c); return; }
   fillForm(c);
@@ -3541,7 +3542,7 @@ const prevFile = () => files.list.find((x) => fileKey(x) === fPrevKey);
 $("fpClose").addEventListener("click", () => $("fPrevDialog").close());
 $("fpDownload").addEventListener("click", () => { const f = prevFile(); if (f) downloadFiles([f]); });
 $("fpDelete").addEventListener("click", () => { const f = prevFile(); if (f) askDelete([f]); });
-$("fNote").addEventListener("click", (ev) => { if (ev.target.dataset.act === "close-fnote") $("fNote").hidden = true; });
+$("fNote").addEventListener("click", (ev) => { if (ev.target.closest("[data-act]")?.dataset.act === "close-fnote") $("fNote").hidden = true; });
 
 // ---- tabs & definition -----------------------------------------------------
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));

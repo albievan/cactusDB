@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.42.1 — 2026-11-09
+
+- **Fixed:** a saved connection's **edit** (pencil) and **delete** (bin) buttons connected to
+  the database instead, asking for the password to connect, when the click landed on the
+  icon. They now open the connection for editing and ask before deleting, whichever part of
+  the button is clicked. The Clear button of the export folder note had the same fault.
+
 ## 1.42.0 — 2026-11-09
 
 - **A container's log**: lines about an error, a failure or a warning are shown in **red**,
