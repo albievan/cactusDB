@@ -701,6 +701,17 @@
   .dashtable td.empty { color: var(--muted); text-align: center; }
   .dashtable .progress { --bs-progress-height: 6px; min-width: 80px; }
   .dashna { margin-top: 16px; font-size: 12px; color: var(--muted); }
+  /* A potential issue: red, with a glow like a focus ring. */
+  .dashissues { margin-top: 12px; }
+  .dashissues ul { margin: 4px 0 0; padding-left: 20px; }
+  .dashissues a { color: inherit; font-weight: 600; }
+  .dashtile.issue { --bs-card-bg: var(--danger-soft); --bs-card-border-color: var(--danger); box-shadow: 0 0 0 .2rem rgba(var(--bs-danger-rgb), .25); }
+  .dashtile.issue .lbl, .dashtile.issue .val { color: var(--danger); }
+  .dashtile.issue .progress, .dashtable tr.issue .progress { --bs-progress-bar-bg: var(--danger); }
+  .dashtable tr.issue > td { --bs-table-bg: var(--danger-soft); box-shadow: inset 0 0 0 9999px var(--danger-soft); }
+  .dashtable tr.issue > td:first-child { box-shadow: inset 3px 0 0 var(--danger), inset 0 0 0 9999px var(--danger-soft); }
+  .dashtable td.issue { color: var(--danger); font-weight: 600; }
+  .dashtile.issue:focus, .dashtable tr.issue:focus { outline: 2px solid var(--danger); outline-offset: 2px; box-shadow: 0 0 0 .3rem rgba(var(--bs-danger-rgb), .35); }
   .dashna li { overflow-wrap: anywhere; }
   /* The container's page: a pane of its own, scrolling as a whole. */
   #ctrPane { overflow-y: auto; background: var(--panel); }
@@ -1952,6 +1963,14 @@ async function dashLoad() {
   if (seq === dash.seq && $("dashLive").checked && !$("dashPane").hidden) dash.timer = setTimeout(dashLoad, DASH_MS);
 }
 $("dashRefresh").addEventListener("click", () => { dash.seq++; dashLoad(); });
+// An issue in the list: scroll to its figure or row and focus it.
+$("dashBody").addEventListener("click", (ev) => {
+  const a = ev.target.closest("[data-dashgo]");
+  if (!a) return;
+  ev.preventDefault();
+  const el = document.getElementById(a.dataset.dashgo);
+  if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus({ preventScroll: true }); }
+});
 $("dashLive").addEventListener("change", () => { if ($("dashLive").checked) dashLoad(); else clearTimeout(dash.timer); });
 // fmtSecs: a duration in days, hours, minutes and seconds.
 function fmtSecs(s) {
@@ -1974,6 +1993,31 @@ function dashCell(col, v) {
   else text = String(v);
   return { label, text, num, pct: /%$/.test(col) && num ? Math.max(0, Math.min(100, +v)) : null };
 }
+// dashIssue says why a figure may be a problem, or "" when it looks fine.
+// label is the column without its unit; get(name) reads another column of the
+// same row (a table) or card section.
+function dashIssue(col, v, get) {
+  const label = col.replace(/\s*\((bytes|seconds)\)$/, ""), n = +v;
+  if (v === null || v === undefined || v === "" || typeof v === "boolean") return "";
+  if (!isNaN(n)) {
+    if (/used %$/i.test(label) && n > 85) return `${label.replace(/ %$/, "")} is at ${n.toLocaleString()} %`;
+    if (/hit %$/i.test(label) && n < 90) return `${label.replace(/ %$/, "")} is only ${n.toLocaleString()} %: reads often go to disk (more memory for the cache may help)`;
+    if (/^(deadlocks|conflicts)$/i.test(label) && n > 0) return `${n.toLocaleString()} ${label.toLowerCase()} since the statistics were reset`;
+    if (/^slow queries$/i.test(label) && n > 0) return `${n.toLocaleString()} slow ${n === 1 ? "query" : "queries"} since the server started`;
+    if (/^blocked requests$/i.test(label) && n > 0) return `${n} request${n === 1 ? " is" : "s are"} blocked by another session`;
+    if (/^waiting$/i.test(label) && n > 0) return `${n} lock${n === 1 ? " is" : "s are"} waited for`;
+    if (/^failed connections$/i.test(label) && n > 100) return `${n.toLocaleString()} failed connection attempts (wrong passwords or network trouble?)`;
+    if (/^running$/i.test(label) && col.endsWith("(seconds)") && n > 60) return `running for ${fmtSecs(n)}`;
+    if (/^transactions since oldest$/i.test(label) && n > 10000) return `${n.toLocaleString()} transactions since the oldest active one: a long-open transaction keeps old record versions (sweep or commit it)`;
+    if (/^dead rows$/i.test(label)) { const live = +get("Rows (estimate)") || 0; if (n > 1000 && n > live * 0.2) return `${n.toLocaleString()} dead rows (${live ? Math.round(n * 100 / live) + " % of the live ones" : "no live ones"}): VACUUM it`; }
+    if (/^scans$/i.test(label) && n === 0 && (+get("Size (bytes)") || 0) > 1048576) return "never used, yet it takes space and slows writes";
+    if (/^free$/i.test(label) && col.endsWith("(bytes)")) { const size = +get("Size (bytes)") || 0; if (size > 10485760 && n > size * 0.25) return `${fmtSize(n)} of the file is free: VACUUM would shrink it`; }
+  }
+  if (/^blocked by$/i.test(label)) return `blocked by session ${v}`;
+  if (/^forced writes$/i.test(label) && String(v).toLowerCase() === "off") return "forced writes are off: a crash can lose or damage data";
+  return "";
+}
+
 // A bar for a percentage; one of how much is used turns red above 90%
 // (a hit rate is good when high).
 const dashBar = (pct, label) => `<div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar${/used/i.test(label) && pct > 90 ? " bg-danger" : ""}" style="width:${pct}%"></div></div>`;
@@ -1982,12 +2026,17 @@ function dashRender(d) {
     ($("dashLive").checked ? " · live, every 10 seconds" : "");
   const ok = d.sections.filter((x) => !x.error), na = d.sections.filter((x) => x.error);
   const head = (x) => `<h4>${esc(x.title)}${x.note ? `<span class="note">· ${esc(x.note)}</span>` : ""}</h4>`;
+  // Potential issues: drawn in red, and listed at the top.
+  const issues = [];
+  const flag = (x, label, why, what) => { issues.push({ id: "dashiss" + issues.length, sec: x.title, label, why, what }); return issues[issues.length - 1].id; };
   let html = ok.map((x) => {
     if (x.kind === "cards") {
       const row = (x.rows || [])[0] || [];
+      const get = (name) => row[(x.columns || []).indexOf(name)];
       return `<section class="dashsec">${head(x)}<div class="dashtiles">${(x.columns || []).map((c, i) => {
-        const cell = dashCell(c, row[i]);
-        return `<div class="card card-body dashtile"><div class="lbl">${esc(cell.label)}</div>` +
+        const cell = dashCell(c, row[i]), why = dashIssue(c, row[i], get);
+        const id = why ? flag(x, cell.label, why, cell.text) : "";
+        return `<div class="card card-body dashtile${why ? " issue" : ""}"${id ? ` id="${id}" tabindex="-1" title="${esc(why)}"` : ""}><div class="lbl">${why ? '<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> ' : ""}${esc(cell.label)}</div>` +
           `<div class="val${cell.num || cell.text === "–" ? "" : " text"}" title="${esc(cell.text)}">${esc(cell.text)}</div>${cell.pct !== null ? dashBar(cell.pct, cell.label) : ""}</div>`;
       }).join("")}</div></section>`;
     }
@@ -1995,12 +2044,20 @@ function dashRender(d) {
     const numCol = cols.map((c, i) => rows.length > 0 && rows.every((r) => r[i] === null || (!isNaN(+r[i]) && r[i] !== "" && typeof r[i] !== "boolean")));
     return `<section class="dashsec">${head(x)}<div class="dashtable"><table class="table table-sm table-hover">` +
       `<thead><tr>${cols.map((c, i) => `<th class="${numCol[i] ? "num" : ""}">${esc(dashCell(c, null).label)}</th>`).join("")}</tr></thead><tbody>` +
-      (rows.length ? rows.map((r) => `<tr>${r.map((v, i) => {
-        const cell = dashCell(cols[i], v);
-        return `<td class="${numCol[i] ? "num" : ""}" title="${esc(cell.text)}">${cell.pct !== null ? `${esc(cell.text)}${dashBar(cell.pct, cell.label)}` : esc(cell.text)}</td>`;
-      }).join("")}</tr>`).join("") : `<tr><td colspan="${Math.max(1, cols.length)}" class="empty">none right now</td></tr>`) +
+      (rows.length ? rows.map((r) => {
+        const get = (name) => r[cols.indexOf(name)];
+        const whys = r.map((v, i) => dashIssue(cols[i], v, get));
+        const id = whys.some(Boolean) ? flag(x, String(r[0] ?? ""), whys.filter(Boolean).join("; "), "") : "";
+        return `<tr${id ? ` id="${id}" class="issue" tabindex="-1"` : ""}>${r.map((v, i) => {
+          const cell = dashCell(cols[i], v), why = whys[i];
+          return `<td class="${numCol[i] ? "num" : ""}${why ? " issue" : ""}" title="${esc(why || cell.text)}">${cell.pct !== null ? `${esc(cell.text)}${dashBar(cell.pct, cell.label)}` : esc(cell.text)}</td>`;
+        }).join("")}</tr>`;
+      }).join("") : `<tr><td colspan="${Math.max(1, cols.length)}" class="empty">none right now</td></tr>`) +
       `</tbody></table></div></section>`;
   }).join("");
+  if (issues.length) html = `<div class="alert alert-danger dashissues" role="alert"><b><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> ${issues.length} potential issue${issues.length === 1 ? "" : "s"}</b><ul>` +
+    issues.map((i) => `<li><a href="#${i.id}" data-dashgo="${i.id}">${esc(i.sec)} · ${esc(i.label)}${i.what ? ` (${esc(i.what)})` : ""}</a>: ${esc(i.why)}</li>`).join("") + `</ul></div>` + html;
+  else if (ok.length) html = `<div class="alert alert-success dashissues"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> No potential issues found in these figures.</div>` + html;
   if (na.length) html += `<div class="dashna">Not available here (often a missing privilege):<ul>${na.map((x) => `<li><b>${esc(x.title)}</b>${x.note ? ` (${esc(x.note)})` : ""}: ${esc(x.error)}</li>`).join("")}</ul></div>`;
   // Keep the scroll position while the numbers are replaced.
   const top = $("dashPane").scrollTop;

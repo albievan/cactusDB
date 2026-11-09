@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.41.0 — 2026-11-09
+
+- **Dashboard: potential issues in red.** Figures and rows that may be a problem are drawn
+  in red with a red glow and listed at the top (click one to scroll to it and focus it):
+  connections or space over 85 % used, cache or buffer pool hit rates under 90 %, deadlocks,
+  conflicts, slow queries, blocked requests, waiting locks, many failed connections,
+  statements running over a minute, tables with many dead rows, large unused indexes,
+  Firebird forced writes off or a long-open transaction, and SQLite files that are mostly
+  free space. Otherwise it says no potential issues were found.
+
 ## 1.40.1 — 2026-11-09
 
 - Connected but no table picked yet: the Data tab shows an animation instead of the still

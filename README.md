@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.40.1
+cactusdb 1.41.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -633,6 +633,14 @@ database.
 A part the connection may not read (SQL Server's activity needs *VIEW SERVER STATE*, Oracle's
 `v$` views need a grant…) is listed at the bottom as not available, with the reason; the rest
 still shows. Sizes, durations and percentages are shown as such, with a bar for percentages.
+
+**Potential issues are shown in red**, with a red glow like a focused field, and listed at
+the top (click one to go to it): connections or space more than 85 % used, a cache or
+buffer pool hit rate under 90 %, deadlocks, conflicts, slow queries, blocked requests or
+waiting locks, more than 100 failed connections, a statement running for more than a
+minute, a table with many dead rows (VACUUM it), a large index that is never used, forced
+writes off or a long-open transaction (Firebird), and a SQLite file that is mostly free
+space. Without any, the top says *No potential issues found*.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
