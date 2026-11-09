@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.42.2 — 2026-11-09
+
+- **Show password** (eye) buttons in the connection dialog when **editing** a saved
+  connection, as well as when adding one: on the database password, the new connection
+  password and its confirmation. They show only what you type (the saved password is never
+  sent to the browser), and everything is masked again when the dialog closes.
+
 ## 1.42.1 — 2026-11-09
 
 - **Fixed:** a saved connection's **edit** (pencil) and **delete** (bin) buttons connected to

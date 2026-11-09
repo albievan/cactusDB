@@ -1262,9 +1262,9 @@
     <p class="hint" id="dHelp" hidden></p>
     <div class="dlock" id="dLockWrap">
       <label class="form-label" for="dLock" id="dLockLabel">Connection password</label>
-      <input class="form-control form-control-sm" id="dLock" type="password" autocomplete="new-password" placeholder="at least 6 characters">
+      <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="dLock" type="password" autocomplete="new-password" placeholder="at least 6 characters"><button type="button" class="btn btn-outline-secondary eye" data-pw="dLock" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
       <label class="form-label" for="dLock2">Confirm connection password</label>
-      <input class="form-control form-control-sm" id="dLock2" type="password" autocomplete="new-password">
+      <span class="input-group input-group-sm pwwrap"><input class="form-control form-control-sm" id="dLock2" type="password" autocomplete="new-password"><button type="button" class="btn btn-outline-secondary eye" data-pw="dLock2" title="Show password" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></span>
       <p class="hint" id="dLockHint">Every saved connection has its own password. You need it to connect, edit or delete
         the connection, and to download its exported files. It also encrypts the saved username, password and queries.</p>
     </div>
@@ -1744,9 +1744,11 @@ function fillForm(c) {
   $("connName").value = c.name;
 }
 
-// A password can be shown while a new connection is typed in, but not once
-// the form belongs to a saved connection (opened or being edited): the field
-// is masked again and its show button removed.
+// A password can be shown while it is typed in. Once the main form belongs to
+// a saved connection (opened from the list) its field is masked again and its
+// show button removed. Editing a saved connection keeps the button: the field
+// starts empty (the saved password is never sent to the page), so it only
+// shows what is typed there.
 function allowShowPassword(id, allowed) {
   const btn = document.querySelector(`.eye[data-pw="${id}"]`);
   showPassword(btn, false);
@@ -1761,7 +1763,8 @@ function showPassword(btn, show) {
 document.querySelectorAll(".eye").forEach((btn) => btn.addEventListener("click", () => {
   if (!btn.hidden) showPassword(btn, $(btn.dataset.pw).type === "password");
 }));
-$("connDialog").addEventListener("close", () => allowShowPassword("dPass", false));
+// Every password in the dialog is masked again when it closes.
+$("connDialog").addEventListener("close", () => $("connDialog").querySelectorAll(".eye").forEach((b) => showPassword(b, false)));
 
 // ---- export folder ---------------------------------------------------------
 // Chosen here, saved by the server in cactus.conn.db and used after a restart
@@ -2478,7 +2481,7 @@ function openConnDialog(c, creds = {}) {
   $("dUser").value = c ? c.username : "";
   $("dPass").value = "";
   $("dPass").placeholder = dlg.hasPassword ? "saved – leave blank to keep" : "";
-  allowShowPassword("dPass", !c); // new connections only, never when editing
+  allowShowPassword("dPass", true);
   $("dFile").value = c && isFileEngine(c.engine) ? c.database : "";
   $("dDb").value = c && !isFileEngine(c.engine) ? c.database : "";
   $("dOpts").value = c ? c.options || "" : "";

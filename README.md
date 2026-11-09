@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.42.1
+cactusdb 1.42.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -493,10 +493,11 @@ is: delete it before migrating again.
 to open the connection dialog: a name, the database type and the connection details. Click
 **Test connection** to check them before saving. cactusdb connects, reports the server
 version and the number of tables (or the exact error), and disconnects again. Nothing is
-saved until you click **Save**. While you type a **new** connection, the eye button in
-the password field shows what you typed. When you edit or open a saved connection the
-password can't be shown: the button isn't there, and the saved password never reaches
-the browser anyway (leave the field blank to keep it). **Edit** on a saved connection opens the same form, where
+saved until you click **Save**. The eye button in the password field, and in the
+connection password and its confirmation, shows what you typed there; each is masked
+again when the form closes. When you edit a saved connection the eye only ever shows what
+you type: the saved password never reaches the browser (leave the field blank to keep
+it). **Edit** on a saved connection opens the same form, where
 you can test it, change it or rename it. Saved passwords are never sent to the browser:
 the password box shows *saved – leave blank to keep*. Leave it empty to keep the stored
 password (testing uses it too), or type a new one to replace it.
