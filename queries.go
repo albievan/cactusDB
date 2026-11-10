@@ -245,16 +245,16 @@ func (s *server) handleCheckQuery(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(strings.TrimRight(strings.TrimSpace(req.SQL), ";"))
 	switch {
 	case q == "":
-		writeJSON(w, 200, map[string]any{"valid": false, "error": "the query is empty"})
+		writeOpaqueErr(w, 200, map[string]string{"valid": "false"}, "the query is empty")
 		return
 	case len(q) > maxQuerySQL:
-		writeJSON(w, 200, map[string]any{"valid": false, "error": "the query is too long"})
+		writeOpaqueErr(w, 200, map[string]string{"valid": "false"}, "the query is too long")
 		return
 	}
 	how, err := checkQuery(r.Context(), ss.engine, ss.db, q)
 	if err != nil {
 		logAction(r, "[%s] check query: NOT VALID: %v", ss.label, err)
-		writeJSON(w, 200, map[string]any{"valid": false, "error": err.Error()})
+		writeOpaqueErr(w, 200, map[string]string{"valid": "false"}, err.Error())
 		return
 	}
 	logAction(r, "[%s] check query: valid (%s)", ss.label, how)

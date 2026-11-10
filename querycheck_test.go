@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -108,5 +112,37 @@ func TestQueryVersions(t *testing.T) {
 	st.DB().QueryRow(`SELECT COUNT(*) FROM query_versions`).Scan(&n)
 	if n != 0 {
 		t.Errorf("%d versions kept after the query was deleted", n)
+	}
+}
+
+// To the page, a database's error doesn't appear in the answer as plain text,
+// but reads the same once decoded; other clients get it plain.
+func TestErrorsAreOpaque(t *testing.T) {
+	msg := "Error 1064 (42000): You have an error in your SQL syntax near 'FORM x' — é 😀"
+	answer := func(fromPage bool, write func(w http.ResponseWriter)) (string, map[string]any) {
+		t.Helper()
+		h := statusInHeader(logRequests(recoverPanics(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { write(w) }))))
+		r := httptest.NewRequest("POST", "/api/query", nil)
+		if fromPage {
+			r.Header.Set(statusInHeaderReq, "in-header")
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var got map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("%s: %v", w.Body, err)
+		}
+		return w.Body.String(), got
+	}
+	body, got := answer(true, func(w http.ResponseWriter) { writeErr(w, 400, errors.New(msg)) })
+	if strings.Contains(body, "SQL syntax") || strings.Contains(body, "error in") || got["error"] != msg {
+		t.Errorf("to the page: %s -> %v", body, got)
+	}
+	body, got = answer(true, func(w http.ResponseWriter) { writeOpaqueErr(w, 200, map[string]string{"valid": "false"}, msg) })
+	if strings.Contains(body, "SQL syntax") || got["valid"] != false || got["error"] != msg {
+		t.Errorf("check answer: %s -> %v", body, got)
+	}
+	if body, got = answer(false, func(w http.ResponseWriter) { writeErr(w, 400, errors.New(msg)) }); !strings.Contains(body, "SQL syntax") || got["error"] != msg {
+		t.Errorf("to a script: %s", body)
 	}
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.46.1 — 2026-11-10
+
+- **Fixed: cactusdb on a server stopped answering for about five minutes after Check syntax
+  showed a MariaDB syntax error.** cactusdb answered in 1 ms; then a firewall or
+  intrusion-prevention device on the way blocked the computer from cactusdb's port for five
+  minutes (the server's log has no line from it in that time), as it does after an HTTP 403.
+  MySQL's and MariaDB's *You have an error in your SQL syntax* is a classic sign of SQL
+  injection to such devices. The page now receives every error message escaped
+  (`\u0059\u006f…`): it shows the same text, but the device doesn't find it. Other clients,
+  such as scripts, still get errors as plain text.
+
 ## 1.46.0 — 2026-11-10
 
 - **Query versions**: every save of a saved query is kept as a version (v1, v2, …, the newest

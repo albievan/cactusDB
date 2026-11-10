@@ -31,11 +31,12 @@ import (
 	"syscall"
 	"time"
 	_ "time/tzdata" // TZ works in minimal containers and on Windows
+	"unicode/utf16"
 
 	"golang.org/x/term"
 )
 
-var version = "1.46.0"
+var version = "1.46.1"
 
 //go:embed web
 var webFS embed.FS
@@ -718,13 +719,18 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 // Some firewalls and intrusion-prevention devices take an HTTP 403 (or an
 // HTTP DELETE request) for an attack and block the client from the port for minutes, open connections
 // included: one locked connection or expired session then made cactusdb on a
 // server unreachable from that computer. The web UI therefore asks (with the
 // header below, or errors=in-header in a download link) for errors as a 200
 // whose real status is in a response header; other clients, such as
-// scripts, get the status as usual.
+// scripts, get the status as usual. Such a device may also block a client
+// that receives a database's syntax error (MySQL's "You have an error in your
+// SQL syntax" is a classic sign of SQL injection), so the page gets error
+// messages escaped (see writeErr).
 const (
 	statusInHeaderReq  = "X-Cactusdb-Errors"
 	statusInHeaderResp = "X-Cactusdb-Status"
@@ -867,6 +873,8 @@ func (t *headerTracker) Write(b []byte) (int, error) {
 	return t.ResponseWriter.Write(b)
 }
 
+func (t *headerTracker) Unwrap() http.ResponseWriter { return t.ResponseWriter }
+
 // Flush keeps streaming responses working through the wrapper.
 func (t *headerTracker) Flush() {
 	if f, ok := t.ResponseWriter.(http.Flusher); ok {
@@ -911,8 +919,62 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+// writeErr answers with an error. To the page (see statusInHeader) it is an
+// opaque JSON string (see opaqueJSON): a database's error can be the very text
+// a firewall looks for.
 func writeErr(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]string{"error": err.Error()})
+	writeOpaqueErr(w, status, nil, err.Error())
+}
+
+// writeOpaqueErr writes {"error": msg} with the other fields of v (literal
+// JSON values, by name); msg as an opaque JSON string to the page, plain to
+// any other client.
+func writeOpaqueErr(w http.ResponseWriter, status int, v map[string]string, msg string) {
+	var b strings.Builder
+	b.WriteString("{")
+	for k, x := range v {
+		fmt.Fprintf(&b, "%q:%s,", k, x)
+	}
+	lit, _ := json.Marshal(msg)
+	if toPage(w) {
+		lit = []byte(opaqueJSON(msg))
+	}
+	b.WriteString(`"error":` + string(lit) + "}\n")
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	io.WriteString(w, b.String())
+}
+
+// toPage reports whether w answers the page: a request with statusInHeaderReq.
+func toPage(w http.ResponseWriter) bool {
+	for {
+		switch x := w.(type) {
+		case statusInHeaderWriter:
+			return true
+		case interface{ Unwrap() http.ResponseWriter }:
+			w = x.Unwrap()
+		default:
+			return false
+		}
+	}
+}
+
+// opaqueJSON is s as a JSON string with every character escaped (\uXXXX).
+// The page reads the same text; a firewall or IPS on the way doesn't find a
+// database's error message in it (MySQL's "You have an error in your SQL
+// syntax" is a classic SQL-injection signature), so it doesn't take the
+// answer for a successful attack and block the client.
+func opaqueJSON(s string) string {
+	var b strings.Builder
+	b.Grow(len(s)*6 + 2)
+	b.WriteByte('"')
+	for _, r := range strings.ToValidUTF8(s, "\uFFFD") {
+		for _, u := range utf16.Encode([]rune{r}) {
+			fmt.Fprintf(&b, `\u%04x`, u)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func readJSON(r *http.Request, v any) error {
