@@ -16,149 +16,202 @@
   })();
 </script>
 <style>
+  /* As cactusInv's sign-in: a green panel saying what cactusdb is, and the form on paper. */
   :root {
-    --bg: #f6f7f5; --panel: #ffffff; --panel-2: #f0f2ee; --border: #dde1da;
-    --text: #1d2420; --muted: #66706a; --accent: #2f7d4f; --accent-2: #24643f; --accent-soft: #e3f1e8;
-    --danger: #b3261e; --danger-soft: #fbe9e7;
+    --paper: #f3ece0; --text: #1d2420; --muted: #66706a; --border: #ddd3c0; --field: #ffffff;
+    --accent: #2f7d4f; --accent-2: #24643f; --brand-ink: #2f5d46; --cream: #f1ead9; --cream-muted: rgba(233, 223, 201, .8);
+    --danger: #b3261e; --notice: #ffffff; --notice-edge: #c7b48a;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141816; --panel: #1b201d; --panel-2: #222824; --border: #2f3732;
-      --text: #e3e8e4; --muted: #95a099; --accent: #4fb57a; --accent-2: #63c78c; --accent-soft: #1f3328;
-      --danger: #f2867c; --danger-soft: #3a1f1d;
-    }
+    :root { --paper: #1b201d; --text: #e3e8e4; --muted: #95a099; --border: #2f3732; --field: #141816;
+      --accent: #4fb57a; --accent-2: #63c78c; --brand-ink: #8fcbb0; --danger: #f2867c; --notice: #222824; --notice-edge: #8a7a55; }
   }
   :root, [data-bs-theme=light], [data-bs-theme=dark] {
-    --bs-body-bg: var(--bg); --bs-body-color: var(--text); --bs-emphasis-color: var(--text);
-    --bs-secondary-color: var(--muted); --bs-secondary-bg: var(--panel-2); --bs-tertiary-bg: var(--panel-2);
-    --bs-border-color: var(--border); --bs-body-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --bs-body-font-size: 14px; --bs-primary: var(--accent); --bs-primary-rgb: 47, 125, 79;
-    --bs-link-color: var(--accent); --bs-link-color-rgb: 47, 125, 79; --bs-link-hover-color: var(--accent-2);
-    --bs-danger: var(--danger); --bs-danger-rgb: 179, 38, 30; --bs-danger-text-emphasis: var(--danger);
-    --bs-danger-bg-subtle: var(--danger-soft); --bs-danger-border-subtle: var(--danger);
-    --bs-success-text-emphasis: var(--accent); --bs-success-bg-subtle: var(--accent-soft); --bs-success-border-subtle: var(--accent);
-    --bs-focus-ring-color: rgba(var(--bs-primary-rgb), .25);
+    --bs-body-bg: var(--paper); --bs-body-color: var(--text); --bs-emphasis-color: var(--text); --bs-secondary-color: var(--muted);
+    --bs-border-color: var(--border); --bs-body-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --bs-body-font-size: 15px;
+    --bs-primary-rgb: 47, 125, 79; --bs-link-color: var(--accent); --bs-link-color-rgb: 47, 125, 79; --bs-link-hover-color: var(--accent-2);
+    --bs-focus-ring-color: rgba(47, 125, 79, .25);
   }
-  @media (prefers-color-scheme: dark) {
-    :root, [data-bs-theme=light], [data-bs-theme=dark] { --bs-primary-rgb: 79, 181, 122; --bs-link-color-rgb: 79, 181, 122; --bs-danger-rgb: 242, 134, 124; }
-  }
-  .btn-primary { --bs-btn-bg: var(--accent); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: var(--accent-2); --bs-btn-hover-border-color: var(--accent-2);
-    --bs-btn-active-bg: var(--accent-2); --bs-btn-disabled-bg: var(--accent); --bs-btn-disabled-border-color: var(--accent); --bs-btn-color: #fff; }
-  [data-bs-theme=dark] .btn-primary { --bs-btn-color: #0c1a12; --bs-btn-hover-color: #0c1a12; --bs-btn-active-color: #0c1a12; }
-  body { min-height: 100dvh; display: grid; place-items: center; padding: 16px; background: var(--bg); }
-  .card { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, .08); }
-  .card-body { padding: 28px; }
-  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-  .brand b { font-size: 20px; font-family: var(--mono); letter-spacing: -.5px; }
-  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
-  .lead { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-  .form-label { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
-  .form-control { font-size: 14px; }
+  @media (prefers-color-scheme: dark) { :root, [data-bs-theme=light], [data-bs-theme=dark] { --bs-link-color-rgb: 79, 181, 122; } }
+  .btn-primary { --bs-btn-bg: #3b6b52; --bs-btn-border-color: #3b6b52; --bs-btn-hover-bg: #2f5d46; --bs-btn-hover-border-color: #2f5d46;
+    --bs-btn-active-bg: #244a38; --bs-btn-disabled-bg: #3b6b52; --bs-btn-disabled-border-color: #3b6b52; --bs-btn-color: #fff; --bs-btn-hover-color: #fff;
+    --bs-btn-font-weight: 600; border-radius: 10px; }
+  [data-bs-theme=dark] .btn-primary { --bs-btn-bg: #4fb57a; --bs-btn-border-color: #4fb57a; --bs-btn-hover-bg: #63c78c; --bs-btn-hover-border-color: #63c78c;
+    --bs-btn-disabled-bg: #4fb57a; --bs-btn-disabled-border-color: #4fb57a; --bs-btn-color: #0c1a12; --bs-btn-hover-color: #0c1a12; }
+  body { margin: 0; background: var(--paper); }
+  .login { display: flex; min-height: 100dvh; }
+  /* The green side. */
+  .hero { position: relative; overflow: hidden; flex: 1; padding: 13vh 48px 48px; color: var(--cream);
+    background: linear-gradient(to bottom right, #244a38, #1b382b, #0d1d16); }
+  .hero .inner { position: relative; z-index: 1; max-width: 36rem; }
+  .hero h1 { font-size: 2.4rem; font-weight: 700; line-height: 1.15; color: #fff; margin: 0; }
+  .hero p { margin: 1.5rem 0 0; font-size: 16px; line-height: 1.7; color: var(--cream); }
+  .hero ul { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-wrap: wrap; gap: 8px; font-size: 13.5px; }
+  .hero li { border: 1px solid rgba(255, 255, 255, .25); border-radius: 999px; padding: 4px 14px; }
+  .hero .src { font-size: 13.5px; margin-top: 1.5rem; }
+  .hero .src a { color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, .5); }
+  .hero .src a:hover { text-decoration-color: #fff; }
+  .hero .src a { white-space: nowrap; }
+  .hero .waves { position: absolute; left: 0; bottom: 0; width: 100%; height: 33.333%; pointer-events: none; }
+  .hero .mobilemark { display: none; margin-bottom: 2.5rem; }
+  /* The form side. */
+  .side { width: min(460px, 100%); flex: none; display: flex; flex-direction: column; padding: 48px 40px 32px; background: var(--paper); color: var(--text); }
+  .wordmark { display: flex; align-items: center; gap: 10px; }
+  .wordmark .name { font-size: 24px; font-weight: 700; line-height: 1; color: var(--brand-ink); }
+  .wordmark .name span { color: var(--accent); }
+  .wordmark .tag { margin-top: 6px; font-size: 10px; font-weight: 600; letter-spacing: .25em; text-transform: uppercase; color: var(--brand-ink); }
+  .hero .wordmark .name { color: var(--cream); } .hero .wordmark .name span { color: #d9c89f; } .hero .wordmark .tag { color: var(--cream-muted); }
+  .forms { margin-top: 56px; }
+  h2 { font-size: 22px; font-weight: 700; margin: 0 0 16px; }
+  .lead { color: var(--muted); font-size: 14px; margin: -8px 0 16px; }
+  .notice { margin-bottom: 16px; }
+  .links { margin-top: 16px; }
+  .form-label { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .form-control { font-size: 15px; padding: 9px 12px; background: var(--field); border-color: var(--border); border-radius: 8px; }
+  .form-check { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; padding-left: 0; }
+  .form-check .form-check-input { margin: 0; float: none; }
+  .btn-big { padding: 12px; font-size: 15px; }
   .code { font: 600 24px/1.2 var(--mono); letter-spacing: 6px; text-align: center; }
-  .links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; }
-  .links button { padding: 0; font-size: 13px; }
-  .who { font-family: var(--mono); font-size: 13px; word-break: break-all; }
-  .alert { font-size: 13px; padding: 8px 12px; margin-bottom: 12px; }
-  .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+  .links button { padding: 0; font-size: 14px; }
+  .who { font-family: var(--mono); font-size: 13px; word-break: break-all; color: var(--text); }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  /* The message box: a card with a coloured edge. */
+  .notice { background: var(--notice); border-left: 4px solid var(--notice-edge); border-radius: 8px; padding: 12px 16px; font-size: 14px; font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+  .notice.error { border-left-color: var(--danger); color: var(--danger); }
+  .foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    font-size: 12.5px; color: var(--muted); }
+  .foot a { font-weight: 500; text-decoration: none; display: inline-flex; gap: 5px; align-items: center; }
   [hidden] { display: none !important; }
+  @media (max-width: 991px) {
+    .login { flex-direction: column; }
+    .hero { flex: none; padding: 40px 24px; }
+    .hero .mobilemark { display: block; }
+    .side { width: 100%; padding: 32px 24px; }
+    .side > .wordmark { display: none; }
+    .forms { margin-top: 0; }
+    .foot { margin-top: 32px; }
+  }
 </style>
 </head>
 <body>
-<main class="card">
-  <div class="card-body">
-    <div class="brand"><img src="cactusdb.svg" alt="" width="32" height="32"><b>cactusdb</b></div>
-    <div class="alert" id="msg" role="alert" hidden></div>
-
-    <!-- Sign in -->
-    <form id="vSignin" data-view>
-      <h1>Sign in</h1>
-      <p class="lead">This cactusdb asks everyone to sign in first.</p>
-      <label class="form-label" for="siUser">User name</label>
-      <input class="form-control mb-3" id="siUser" autocomplete="username" placeholder="you@example.com" required autofocus>
-      <label class="form-label" for="siPass">Password</label>
-      <input class="form-control mb-3" id="siPass" type="password" autocomplete="current-password" required>
-      <button class="btn btn-primary w-100" type="submit">Sign in</button>
-      <div class="links">
-        <button type="button" class="btn btn-link" data-go="vForgot">Forgot your password?</button>
-        <button type="button" class="btn btn-link" data-go="vRegister">Request access</button>
-      </div>
-    </form>
-
-    <!-- New password (admin with the password admin) -->
-    <form id="vChange" data-view hidden>
-      <h1>Choose a new password</h1>
-      <p class="lead"><span class="who" id="chUser"></span> still has its first password. Choose a new one to go on.</p>
-      <label class="form-label" for="chPass">New password</label>
-      <input class="form-control" id="chPass" type="password" autocomplete="new-password" minlength="8" required>
-      <div class="hint mb-3">At least 8 characters, not the user name.</div>
-      <label class="form-label" for="chPass2">New password again</label>
-      <input class="form-control mb-3" id="chPass2" type="password" autocomplete="new-password" required>
-      <button class="btn btn-primary w-100" type="submit">Save and sign in</button>
-      <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
-    </form>
-
-    <!-- The e-mailed code -->
-    <form id="vCode" data-view hidden>
-      <h1>Enter the code</h1>
-      <p class="lead">We e-mailed an 8-digit code to <span class="who" id="cdUser"></span>. Type or paste it here. It works for 10 minutes.</p>
-      <label class="form-label" for="cdCode">Security code</label>
-      <input class="form-control code mb-3" id="cdCode" inputmode="numeric" autocomplete="one-time-code" placeholder="12345678" maxlength="12" required>
-      <button class="btn btn-primary w-100" type="submit">Sign in</button>
-      <div class="links">
-        <button type="button" class="btn btn-link" id="cdResend">Send a new code</button>
-        <button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button>
-      </div>
-    </form>
-
-    <!-- Forgot the password -->
-    <form id="vForgot" data-view hidden>
-      <h1>Reset your password</h1>
-      <p class="lead">Enter the e-mail address you sign in with. We'll e-mail you a link to set a new password; it works for one hour.</p>
-      <label class="form-label" for="fgUser">E-mail address</label>
-      <input class="form-control mb-3" id="fgUser" type="email" autocomplete="username" required>
-      <button class="btn btn-primary w-100" type="submit">E-mail me a link</button>
-      <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
-    </form>
-
-    <!-- Request access -->
-    <form id="vRegister" data-view hidden>
-      <h1>Request access</h1>
-      <p class="lead">Someone who uses this cactusdb approves your request. You'll get an e-mail when they do.</p>
-      <label class="form-label" for="rgEmail">E-mail address</label>
-      <input class="form-control mb-3" id="rgEmail" type="email" autocomplete="email" required>
-      <label class="form-label" for="rgName">Your name</label>
-      <input class="form-control mb-3" id="rgName" autocomplete="name" maxlength="40">
-      <label class="form-label" for="rgPass">Password</label>
-      <input class="form-control" id="rgPass" type="password" autocomplete="new-password" minlength="8" required>
-      <div class="hint mb-3">At least 8 characters. You'll sign in with it once approved.</div>
-      <label class="form-label" for="rgPass2">Password again</label>
-      <input class="form-control mb-3" id="rgPass2" type="password" autocomplete="new-password" required>
-      <label class="form-label" for="rgReason">Why you need access <span class="text-body-secondary fw-normal">(optional)</span></label>
-      <textarea class="form-control mb-3" id="rgReason" rows="2" maxlength="500"></textarea>
-      <button class="btn btn-primary w-100" type="submit">Send the request</button>
-      <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
-    </form>
-
-    <!-- Set a password from an e-mailed link -->
-    <form id="vSet" data-view hidden>
-      <h1 id="stTitle">Set your password</h1>
-      <p class="lead">For <span class="who" id="stUser"></span>.</p>
-      <label class="form-label" for="stPass">New password</label>
-      <input class="form-control" id="stPass" type="password" autocomplete="new-password" minlength="8" required>
-      <div class="hint mb-3">At least 8 characters, not your e-mail address.</div>
-      <label class="form-label" for="stPass2">New password again</label>
-      <input class="form-control mb-3" id="stPass2" type="password" autocomplete="new-password" required>
-      <button class="btn btn-primary w-100" type="submit">Set the password</button>
-    </form>
-
-    <!-- A message, with the way back -->
-    <div id="vDone" data-view hidden>
-      <h1 id="dnTitle"></h1>
-      <p class="lead" id="dnText"></p>
-      <button class="btn btn-primary w-100" type="button" data-go="vSignin">Sign in</button>
+<main class="login">
+  <section class="hero">
+    <div class="inner">
+      <div class="mobilemark"><div class="wordmark"><img src="cactusdb.svg" alt="" width="44" height="44"><div><div class="name">cactus<span>db</span></div><div class="tag">Read-only database browser</div></div></div></div>
+      <h1>Every database, one read-only window</h1>
+      <p>cactusdb opens SQL Server, PostgreSQL, MySQL and MariaDB, Oracle, Firebird, SQLite, MongoDB, Redis, Neo4j and
+        more from one browser page. Browse tables, views and procedures, run queries, and export to Excel, CSV, JSON or
+        XML, without ever changing a row of your data.</p>
+      <ul>
+        <li>20+ database engines</li><li>Read-only by design</li><li>Excel, CSV, JSON &amp; XML exports</li>
+        <li>Saved queries with versions</li><li>Compare &amp; migrate databases</li><li>Backups &amp; DDL scripts</li>
+      </ul>
+      <p class="src">Free and open source: <a href="https://github.com/albievan/cactusDB" target="_blank" rel="noreferrer"><i class="bi bi-github" aria-hidden="true"></i> github.com/albievan/cactusDB</a></p>
     </div>
-  </div>
+    <svg class="waves" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true" id="waves"></svg>
+  </section>
+
+  <section class="side">
+    <div class="wordmark"><img src="cactusdb.svg" alt="" width="44" height="44"><div><div class="name">cactus<span>db</span></div><div class="tag">Read-only database browser</div></div></div>
+    <div class="forms">
+    <div class="notice" id="msg" role="alert" hidden></div>
+      <!-- Sign in -->
+      <form id="vSignin" data-view>
+        <h2>Sign in</h2>
+        <label class="form-label" for="siUser">User name</label>
+        <input class="form-control mb-3" id="siUser" autocomplete="username" autocapitalize="none" required autofocus>
+        <label class="form-label" for="siPass">Password</label>
+        <input class="form-control mb-3" id="siPass" type="password" autocomplete="current-password" required>
+        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <button class="btn btn-primary btn-big w-100" type="submit">Sign in</button>
+        <div class="links">
+          <button type="button" class="btn btn-link" data-go="vForgot">Forgot your password?</button>
+          <button type="button" class="btn btn-link" data-go="vRegister">Request access</button>
+        </div>
+      </form>
+
+      <!-- New password (admin with the password admin) -->
+      <form id="vChange" data-view hidden>
+        <h2>Choose a new password</h2>
+        <p class="lead"><span class="who" id="chUser"></span> still has its first password. Choose a new one to go on.</p>
+        <label class="form-label" for="chPass">New password</label>
+        <input class="form-control" id="chPass" type="password" autocomplete="new-password" minlength="8" required>
+        <div class="hint mb-3">At least 8 characters, not the user name.</div>
+        <label class="form-label" for="chPass2">New password again</label>
+        <input class="form-control mb-2" id="chPass2" type="password" autocomplete="new-password" required>
+        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <button class="btn btn-primary btn-big w-100" type="submit">Save and sign in</button>
+        <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
+      </form>
+
+      <!-- The e-mailed code -->
+      <form id="vCode" data-view hidden>
+        <h2>Enter the code</h2>
+        <p class="lead">We e-mailed an 8-digit code to <span class="who" id="cdUser"></span>. Type or paste it here. It works for 10 minutes.</p>
+        <label class="form-label" for="cdCode">Security code</label>
+        <input class="form-control code mb-3" id="cdCode" inputmode="numeric" autocomplete="one-time-code" placeholder="12345678" maxlength="12" required>
+        <button class="btn btn-primary btn-big w-100" type="submit">Sign in</button>
+        <div class="links">
+          <button type="button" class="btn btn-link" id="cdResend">Send a new code</button>
+          <button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button>
+        </div>
+      </form>
+
+      <!-- Forgot the password -->
+      <form id="vForgot" data-view hidden>
+        <h2>Reset your password</h2>
+        <p class="lead">Enter the e-mail address you sign in with. We'll e-mail you a link to set a new password; it works for one hour.</p>
+        <label class="form-label" for="fgUser">E-mail address</label>
+        <input class="form-control mb-3" id="fgUser" type="email" autocomplete="username" required>
+        <button class="btn btn-primary btn-big w-100" type="submit">E-mail me a link</button>
+        <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
+      </form>
+
+      <!-- Request access -->
+      <form id="vRegister" data-view hidden>
+        <h2>Request access</h2>
+        <p class="lead">Someone who uses this cactusdb approves your request. You'll get an e-mail when they do.</p>
+        <label class="form-label" for="rgEmail">E-mail address</label>
+        <input class="form-control mb-3" id="rgEmail" type="email" autocomplete="email" required>
+        <label class="form-label" for="rgName">Your name</label>
+        <input class="form-control mb-3" id="rgName" autocomplete="name" maxlength="40">
+        <label class="form-label" for="rgPass">Password</label>
+        <input class="form-control" id="rgPass" type="password" autocomplete="new-password" minlength="8" required>
+        <div class="hint mb-3">At least 8 characters. You'll sign in with it once approved.</div>
+        <label class="form-label" for="rgPass2">Password again</label>
+        <input class="form-control mb-2" id="rgPass2" type="password" autocomplete="new-password" required>
+        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <label class="form-label" for="rgReason">Why you need access <span class="text-body-secondary fw-normal">(optional)</span></label>
+        <textarea class="form-control mb-3" id="rgReason" rows="2" maxlength="500"></textarea>
+        <button class="btn btn-primary btn-big w-100" type="submit">Send the request</button>
+        <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
+      </form>
+
+      <!-- Set a password from an e-mailed link -->
+      <form id="vSet" data-view hidden>
+        <h2 id="stTitle">Set your password</h2>
+        <p class="lead">For <span class="who" id="stUser"></span>.</p>
+        <label class="form-label" for="stPass">New password</label>
+        <input class="form-control" id="stPass" type="password" autocomplete="new-password" minlength="8" required>
+        <div class="hint mb-3">At least 8 characters, not your e-mail address.</div>
+        <label class="form-label" for="stPass2">New password again</label>
+        <input class="form-control mb-2" id="stPass2" type="password" autocomplete="new-password" required>
+        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <button class="btn btn-primary btn-big w-100" type="submit">Set the password</button>
+      </form>
+
+      <!-- A message, with the way back -->
+      <div id="vDone" data-view hidden>
+        <h2 id="dnTitle"></h2>
+        <p class="lead" id="dnText"></p>
+        <button class="btn btn-primary btn-big w-100" type="button" data-go="vSignin">Sign in</button>
+      </div>
+    </div>
+    <div class="foot"><span id="ver"></span><a href="https://github.com/albievan/cactusDB" target="_blank" rel="noreferrer"><i class="bi bi-github" aria-hidden="true"></i> Source on GitHub</a></div>
+  </section>
 </main>
 
 <script>
@@ -173,11 +226,23 @@ async function api(path, body) {
   if (status >= 400) { const e = new Error(data.error || `error ${status}`); e.data = data; throw e; }
   return data;
 }
+// The message box goes under the heading of the form shown.
 function say(text, ok) {
-  const m = $("msg");
+  const m = $("msg"), h = document.querySelector("[data-view]:not([hidden]) h2");
+  if (h) h.after(m);
   m.hidden = !text; m.textContent = text || "";
-  m.className = "alert " + (ok ? "alert-success" : "alert-danger");
+  m.className = "notice" + (ok ? "" : " error");
 }
+// "Show what I type": the passwords of that form as plain text.
+document.addEventListener("change", (ev) => {
+  if (!ev.target.matches("[data-show]")) return;
+  ev.target.closest("form").querySelectorAll("input[type=password], input[data-pw]").forEach((i) => {
+    i.dataset.pw = "1"; i.type = ev.target.checked ? "text" : "password";
+  });
+});
+// The wavy lines at the bottom of the green side.
+$("waves").innerHTML = Array.from({ length: 14 }, (_, i) =>
+  `<path d="M0 ${120 + i * 12} C 300 ${40 + i * 14}, 600 ${220 + i * 6}, 900 ${110 + i * 10} S 1200 ${150 + i * 9}, 1200 ${150 + i * 9}" fill="none" stroke="#d9c89f" stroke-opacity="${(0.08 + i * 0.012).toFixed(3)}" stroke-width="1"/>`).join("");
 function show(view, keepMsg) {
   document.querySelectorAll("[data-view]").forEach((v) => (v.hidden = v.id !== view));
   if (!keepMsg) say("");
@@ -247,8 +312,14 @@ onSubmit("vSet", async () => {
 (async () => {
   const m = location.hash.match(/^#set=([\w-]+)$/);
   if (!m) {
-    try { const me = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()); if (me.user) return done(); } catch (e) { /* stay */ }
-    return show("vSignin");
+    try {
+      const me = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json());
+      if (me.user) return done();
+      if (me.version) $("ver").textContent = "v" + me.version;
+    } catch (e) { /* stay */ }
+    show("vSignin");
+    if (new URLSearchParams(location.search).has("signedout")) { say("You signed out.", true); history.replaceState(null, "", "/login"); }
+    return;
   }
   setToken = m[1];
   try {

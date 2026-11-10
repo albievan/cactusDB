@@ -482,7 +482,7 @@ func (s *server) sendCode(r *http.Request, t string, u appUser) error {
 // ---- the sign-in API ---------------------------------------------------------
 
 func (s *server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
-	out := map[string]any{"remoteLogin": s.remoteLogin}
+	out := map[string]any{"remoteLogin": s.remoteLogin, "version": version}
 	if u, ok := s.sessionUser(w, r); ok && s.remoteLogin {
 		out["user"] = map[string]any{"username": u.Username, "name": u.Name, "email": u.email()}
 		var n int

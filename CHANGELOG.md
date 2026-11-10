@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.48.1 — 2026-11-10
+
+- **The `--remotelogin` sign-in page looks like cactusInv's**: a green side with what cactusdb
+  does (24 database engines, read-only, exports, saved queries, compare and migrate,
+  backups) and its source, github.com/albievan/cactusDB, with the wave lines; the form on
+  paper with cactusdb's logo, *Show what I type*, the version and *Source on GitHub*. Also
+  for the code, new password, reset, request-access and set-password steps. Dark when the
+  system is, and one column on a phone. Signing out says *You signed out.*
+
 ## 1.48.0 — 2026-11-10
 
 - **Signing in first: `--remotelogin`.** Started with it, cactusdb shows only its sign-in

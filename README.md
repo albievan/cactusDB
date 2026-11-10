@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.48.0
+cactusdb 1.48.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -681,7 +681,9 @@ forgotten once both pages are closed. Reloading a page starts a new conversation
 ### Signing in first: `--remotelogin`
 
 Start cactusdb with **`--remotelogin`** and nothing of it can be seen or used before signing
-in: opening it shows the sign-in page, and every request without a sign-in is refused.
+in: opening it shows the sign-in page, and every request without a sign-in is refused. The
+sign-in page looks like cactusInv's: on the left, in green, what cactusdb does and its
+source on GitHub; on the right the form (with *Show what I type*), and the version.
 
 ```sh
 cactusdb --port 8087 --remotelogin --runas background

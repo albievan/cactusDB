@@ -2054,7 +2054,7 @@ loadAuth();
 $("signOutBtn").addEventListener("click", async () => {
   setNavMenu(false);
   try { await api("POST", "/api/auth/logout", {}); } catch (e) { /* signed out anyway */ }
-  location.replace("/login");
+  location.replace("/login?signedout");
 });
 
 // ---- ☰ → Users (auth.go) ----------------------------------------------------------
