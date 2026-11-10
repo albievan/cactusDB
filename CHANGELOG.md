@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.46.0 — 2026-11-10
+
+- **Query versions**: every save of a saved query is kept as a version (v1, v2, …, the newest
+  100), encrypted like the query. The list shows each query's version and has a 🕘
+  **Versions** button; *Edit saved query* has a **Version** list: pick one to load it into
+  the form, and **Save** to make it current again (as a new version, so none is lost).
+- **Save or discard**: **Cancel** or Esc after changing anything in the save query dialog
+  asks whether to save the changes, discard them or keep editing.
+- **Save checks the query first**: the database checks it (as **Check syntax** does), and a
+  query that isn't valid isn't saved.
+- **Check syntax on Firebird** no longer starts the query: Firebird prepares it, as SQLite,
+  PostgreSQL, MySQL and MariaDB do, so a sorted query over a large table is checked at once
+  instead of running until the time limit. The time limit of the databases that still have
+  to start a query (Oracle and the others) is 15 seconds instead of 30.
+
 ## 1.45.0 — 2026-11-10
 
 - **Check syntax** in the Save query / Edit saved query dialog: asks the connected database

@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.45.0
+cactusdb 1.46.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -367,13 +367,25 @@ be saved: cactusdb checks it with the same rules as running a query, so `INSERT`
 `UPDATE`, `DELETE`, schema changes and several statements at once are refused.
 **Check syntax**, in the same dialog, asks the database whether the query is valid (its
 syntax, and that its tables and columns exist) without running it: SQLite, PostgreSQL and
-its relatives, MySQL and MariaDB prepare it, and SQL Server describes it. Other databases
-start it, read-only, and it is stopped as soon as its columns are known, before any row is
-read. The database's own error is shown when it isn't valid.
+its relatives, MySQL, MariaDB and Firebird prepare it, and SQL Server describes it. Other
+databases (Oracle among them) start it, read-only, and it is stopped as soon as its columns
+are known, before any row is read, or after 15 seconds. The database's own error is shown
+when it isn't valid. **Save** does the same check first: a query that isn't valid isn't
+saved (one the database couldn't check in time is saved, and the notice says so).
+
+**Closing with changes.** **Cancel** or Esc after changing anything in the dialog asks
+whether to **Save** the changes, **Discard** them or **Keep editing**.
+
+**Versions.** Every save of a query is kept as a version (v1, v2, …, the newest 100), shown
+next to its name in the list. The **Version** list at the top of *Edit saved query* (or the
+🕘 **Versions** button of a query) shows them with when each was saved; pick one to load it
+into the form, and **Save** to make it the current version again: as a new version, so no
+version is ever lost. Versions are encrypted like the query, and deleted with it. A query
+saved before 1.46.0 starts with its contents then as v1.
 
 The **Saved queries** tab, shown while you're connected, lists the connection's queries.
 Filter them by name or description, then **Run** a query (it opens in the editor and
-runs), **Edit** it, or **Delete** it. Saved queries are kept in `cactus.conn.db`, encrypted
+runs), **Edit** it, see its **Versions**, or **Delete** it. Saved queries are kept in `cactus.conn.db`, encrypted
 with the connection's password, and are deleted with the connection.
 
 **Exporting saved queries.** Each saved query has a **Export…** menu: Excel, CSV, JSON,

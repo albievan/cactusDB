@@ -122,7 +122,17 @@ func (s *Store) migrateLocks() error {
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	);
-	CREATE INDEX IF NOT EXISTS queries_conn ON queries(conn_id)`)
+	CREATE INDEX IF NOT EXISTS queries_conn ON queries(conn_id);
+	-- Each saved version of a query, sealed like the query (since 1.46.0).
+	CREATE TABLE IF NOT EXISTS query_versions (
+		id       INTEGER PRIMARY KEY AUTOINCREMENT,
+		query_id INTEGER NOT NULL,
+		conn_id  INTEGER NOT NULL,
+		version  INTEGER NOT NULL,
+		data     TEXT NOT NULL,
+		saved_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS query_versions_query ON query_versions(query_id)`)
 	return err
 }
 
@@ -280,7 +290,20 @@ type SavedQuery struct {
 	SQL         string `json:"sql"`
 	Created     string `json:"created"`
 	Updated     string `json:"updated"`
+	Version     int    `json:"version"` // the current version's number
 }
+
+// QueryVersion is one saved version of a query.
+type QueryVersion struct {
+	Version     int    `json:"version"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	SQL         string `json:"sql"`
+	Saved       string `json:"saved"`
+}
+
+// maxQueryVersions is how many versions of a query are kept: the oldest go.
+const maxQueryVersions = 100
 
 type queryData struct {
 	Name        string `json:"name"`
@@ -317,7 +340,9 @@ func (s *Store) openQuery(box *secretBox, data string) (queryData, error) {
 
 // Queries lists a connection's saved queries by name.
 func (s *Store) Queries(connID int64, box *secretBox) ([]SavedQuery, error) {
-	rows, err := s.DB().Query(`SELECT id, data, created_at, updated_at FROM queries WHERE conn_id = ?`, connID)
+	rows, err := s.DB().Query(`SELECT id, data, created_at, updated_at,
+		(SELECT COALESCE(MAX(version), 1) FROM query_versions v WHERE v.query_id = queries.id)
+		FROM queries WHERE conn_id = ?`, connID)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +351,7 @@ func (s *Store) Queries(connID int64, box *secretBox) ([]SavedQuery, error) {
 	for rows.Next() {
 		var q SavedQuery
 		var data string
-		if err := rows.Scan(&q.ID, &data, &q.Created, &q.Updated); err != nil {
+		if err := rows.Scan(&q.ID, &data, &q.Created, &q.Updated, &q.Version); err != nil {
 			return nil, err
 		}
 		d, err := s.openQuery(box, data)
@@ -343,34 +368,111 @@ func (s *Store) Queries(connID int64, box *secretBox) ([]SavedQuery, error) {
 	return out, nil
 }
 
-// SaveQuery adds a query (q.ID 0) or changes one of the connection's.
-func (s *Store) SaveQuery(connID int64, box *secretBox, q SavedQuery) (int64, error) {
+// SaveQuery adds a query (q.ID 0) or changes one of the connection's. Each
+// save is kept as a new version (see QueryVersions); saving a query unchanged
+// makes none. It returns the query's id and current version.
+func (s *Store) SaveQuery(connID int64, box *secretBox, q SavedQuery) (int64, int, error) {
 	existing, err := s.Queries(connID, box)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	for _, e := range existing {
-		if e.ID != q.ID && strings.EqualFold(strings.TrimSpace(e.Name), strings.TrimSpace(q.Name)) {
-			return 0, fmt.Errorf("this connection already has a query named %q", e.Name)
+	var old *SavedQuery
+	for i, e := range existing {
+		if e.ID == q.ID {
+			old = &existing[i]
+		} else if strings.EqualFold(strings.TrimSpace(e.Name), strings.TrimSpace(q.Name)) {
+			return 0, 0, fmt.Errorf("this connection already has a query named %q", e.Name)
 		}
 	}
-	data := s.sealQuery(box, queryData{Name: q.Name, Description: q.Description, SQL: q.SQL})
+	if q.ID != 0 && old == nil {
+		return 0, 0, sql.ErrNoRows
+	}
+	if old != nil && old.Name == q.Name && old.Description == q.Description && old.SQL == q.SQL {
+		return q.ID, old.Version, nil
+	}
+	d := queryData{Name: q.Name, Description: q.Description, SQL: q.SQL}
 	now := time.Now().Format(time.RFC3339)
-	if q.ID == 0 {
-		res, err := s.DB().Exec(`INSERT INTO queries (conn_id, data, created_at, updated_at) VALUES (?, ?, ?, ?)`, connID, data, now, now)
-		if err != nil {
-			return 0, err
-		}
-		return res.LastInsertId()
-	}
-	res, err := s.DB().Exec(`UPDATE queries SET data = ?, updated_at = ? WHERE id = ? AND conn_id = ?`, data, now, q.ID, connID)
+	tx, err := s.DB().Begin()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return 0, sql.ErrNoRows
+	defer tx.Rollback()
+	id, version := q.ID, 1
+	if old == nil {
+		res, err := tx.Exec(`INSERT INTO queries (conn_id, data, created_at, updated_at) VALUES (?, ?, ?, ?)`, connID, s.sealQuery(box, d), now, now)
+		if err != nil {
+			return 0, 0, err
+		}
+		if id, err = res.LastInsertId(); err != nil {
+			return 0, 0, err
+		}
+	} else {
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM query_versions WHERE query_id = ?`, id).Scan(&n); err != nil {
+			return 0, 0, err
+		}
+		if n == 0 { // saved before versions were kept: its contents so far are version 1
+			first := queryData{Name: old.Name, Description: old.Description, SQL: old.SQL}
+			if _, err := tx.Exec(`INSERT INTO query_versions (query_id, conn_id, version, data, saved_at) VALUES (?, ?, 1, ?, ?)`,
+				id, connID, s.sealQuery(box, first), old.Updated); err != nil {
+				return 0, 0, err
+			}
+		}
+		if _, err := tx.Exec(`UPDATE queries SET data = ?, updated_at = ? WHERE id = ? AND conn_id = ?`, s.sealQuery(box, d), now, id, connID); err != nil {
+			return 0, 0, err
+		}
+		if err := tx.QueryRow(`SELECT MAX(version) + 1 FROM query_versions WHERE query_id = ?`, id).Scan(&version); err != nil {
+			return 0, 0, err
+		}
 	}
-	return q.ID, nil
+	if _, err := tx.Exec(`INSERT INTO query_versions (query_id, conn_id, version, data, saved_at) VALUES (?, ?, ?, ?, ?)`,
+		id, connID, version, s.sealQuery(box, d), now); err != nil {
+		return 0, 0, err
+	}
+	if _, err := tx.Exec(`DELETE FROM query_versions WHERE query_id = ? AND version <= ?`, id, version-maxQueryVersions); err != nil {
+		return 0, 0, err
+	}
+	return id, version, tx.Commit()
+}
+
+// QueryVersions lists the saved versions of one of the connection's queries,
+// newest first. A query saved before versions were kept has one, its current.
+func (s *Store) QueryVersions(connID int64, box *secretBox, id int64) ([]QueryVersion, error) {
+	rows, err := s.DB().Query(`SELECT version, data, saved_at FROM query_versions WHERE query_id = ? AND conn_id = ? ORDER BY version DESC`, id, connID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []QueryVersion{}
+	for rows.Next() {
+		var v QueryVersion
+		var data string
+		if err := rows.Scan(&v.Version, &data, &v.Saved); err != nil {
+			return nil, err
+		}
+		d, err := s.openQuery(box, data)
+		if err != nil {
+			return nil, err
+		}
+		v.Name, v.Description, v.SQL = d.Name, d.Description, d.SQL
+		out = append(out, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		var data, updated string
+		err := s.DB().QueryRow(`SELECT data, updated_at FROM queries WHERE id = ? AND conn_id = ?`, id, connID).Scan(&data, &updated)
+		if err != nil {
+			return nil, err
+		}
+		d, err := s.openQuery(box, data)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, QueryVersion{Version: 1, Name: d.Name, Description: d.Description, SQL: d.SQL, Saved: updated})
+	}
+	return out, nil
 }
 
 // DeleteQuery deletes one of the connection's saved queries.
@@ -382,12 +484,23 @@ func (s *Store) DeleteQuery(connID, id int64) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return sql.ErrNoRows
 	}
+	_, err = s.DB().Exec(`DELETE FROM query_versions WHERE query_id = ?`, id)
+	return err
+}
+
+// resealQueries re-encrypts a connection's queries, and their versions, from
+// oldBox to newBox.
+func (s *Store) resealQueries(tx *sql.Tx, connID int64, oldBox, newBox *secretBox) error {
+	for _, table := range []string{"queries", "query_versions"} {
+		if err := s.resealTable(tx, table, connID, oldBox, newBox); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// resealQueries re-encrypts a connection's queries from oldBox to newBox.
-func (s *Store) resealQueries(tx *sql.Tx, connID int64, oldBox, newBox *secretBox) error {
-	rows, err := tx.Query(`SELECT id, data FROM queries WHERE conn_id = ?`, connID)
+func (s *Store) resealTable(tx *sql.Tx, table string, connID int64, oldBox, newBox *secretBox) error {
+	rows, err := tx.Query(`SELECT id, data FROM `+table+` WHERE conn_id = ?`, connID)
 	if err != nil {
 		return err
 	}
@@ -408,9 +521,9 @@ func (s *Store) resealQueries(tx *sql.Tx, connID int64, oldBox, newBox *secretBo
 	for _, r := range all {
 		d, err := s.openQuery(oldBox, r.data)
 		if err != nil {
-			return fmt.Errorf("saved query %d: %w", r.id, err)
+			return fmt.Errorf("saved query (%s %d): %w", table, r.id, err)
 		}
-		if _, err := tx.Exec(`UPDATE queries SET data = ? WHERE id = ?`, s.sealQuery(newBox, d), r.id); err != nil {
+		if _, err := tx.Exec(`UPDATE `+table+` SET data = ? WHERE id = ?`, s.sealQuery(newBox, d), r.id); err != nil {
 			return err
 		}
 	}

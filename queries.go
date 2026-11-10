@@ -92,12 +92,18 @@ func (s *server) handleSaveQuery(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("the query is too long"))
 		return
 	}
-	if err := checkReadOnly(ss.engine, q.SQL); err != nil {
+	// The database checks it first (see checkQuery); one it couldn't check in
+	// time is saved all the same, and the answer says so.
+	how, err := checkQuery(r.Context(), ss.engine, ss.db, q.SQL)
+	if err != nil && !errors.Is(err, errCheckTimeout) {
 		logAction(r, "[%s] save query %q REFUSED: %v", ss.label, q.Name, err)
-		writeErr(w, 400, fmt.Errorf("only read-only queries can be saved: %w", err))
+		writeErr(w, 400, fmt.Errorf("not saved: the query isn't valid: %w", err))
 		return
 	}
-	id, err := s.store.SaveQuery(ss.savedID, ss.connBox, q)
+	if err != nil {
+		how = ""
+	}
+	id, version, err := s.store.SaveQuery(ss.savedID, ss.connBox, q)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		writeErr(w, 404, errors.New("saved query not found"))
@@ -106,14 +112,36 @@ func (s *server) handleSaveQuery(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	logAction(r, "[%s] saved query %q", ss.label, q.Name)
+	logAction(r, "[%s] saved query %q (version %d)", ss.label, q.Name, version)
 	// Not the query's name: it is kept encrypted with the connection password.
 	if req.ID == 0 {
 		s.notify(r, "queries", ss.savedID, "added a saved query to “%s”", ss.label)
 	} else {
 		s.notify(r, "queries", ss.savedID, "changed a saved query of “%s”", ss.label)
 	}
-	writeJSON(w, 200, map[string]any{"id": id})
+	writeJSON(w, 200, map[string]any{"id": id, "version": version, "checked": how})
+}
+
+// handleQueryVersions lists the saved versions of a query, newest first.
+func (s *server) handleQueryVersions(w http.ResponseWriter, r *http.Request) {
+	ss, ok := s.querySession(w, r, r.URL.Query().Get("session"))
+	if !ok {
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, errors.New("bad id"))
+		return
+	}
+	vs, err := s.store.QueryVersions(ss.savedID, ss.connBox, id)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		writeErr(w, 404, errors.New("saved query not found"))
+	case err != nil:
+		writeErr(w, 500, err)
+	default:
+		writeJSON(w, 200, map[string]any{"versions": vs})
+	}
 }
 
 func (s *server) handleDeleteQuery(w http.ResponseWriter, r *http.Request) {
@@ -141,15 +169,20 @@ func (s *server) handleDeleteQuery(w http.ResponseWriter, r *http.Request) {
 
 // checkTimeout bounds checking a query: one that has to be started to be
 // checked is stopped once its columns are known, or after this long.
-const checkTimeout = 30 * time.Second
+const checkTimeout = 15 * time.Second
 
-var errChecked = errors.New("checked")
+var (
+	errChecked      = errors.New("checked")
+	errCheckTimeout = fmt.Errorf("the database took more than %s to start the query: it couldn't be checked", checkTimeout)
+)
 
 // checkQuery asks the database whether q is a valid query, after
 // checkReadOnly, without running it where the database can: SQLite,
-// PostgreSQL and its relatives, and MySQL and MariaDB prepare it; SQL Server
-// describes it. Any other database starts it, read-only like any query, and
-// it is stopped as soon as its columns are known. how says which was done.
+// PostgreSQL and its relatives, MySQL, MariaDB and Firebird prepare it; SQL
+// Server describes it. Any other database (Oracle's driver prepares only in
+// the client) starts it, read-only like any query, and it is stopped as soon
+// as its columns are known: errCheckTimeout if that takes too long, as it can
+// for a sorted query over a large table. how says which was done.
 func checkQuery(ctx context.Context, engine string, db *sql.DB, q string) (how string, err error) {
 	if err := checkReadOnly(engine, q); err != nil {
 		return "", fmt.Errorf("only read-only queries can be saved: %w", err)
@@ -158,7 +191,7 @@ func checkQuery(ctx context.Context, engine string, db *sql.DB, q string) (how s
 	defer cancel()
 	if backendOf(db) == nil {
 		switch engine {
-		case EngineSQLite, EnginePostgres, EngineMySQL, EngineMariaDB:
+		case EngineSQLite, EnginePostgres, EngineMySQL, EngineMariaDB, EngineFirebird:
 			st, err := db.PrepareContext(ctx, q)
 			var me *mysql.MySQLError
 			if errors.As(err, &me) && me.Number == 1295 { // a statement MySQL can't prepare (some SHOWs): start it instead
@@ -185,8 +218,8 @@ func checkQuery(ctx context.Context, engine string, db *sql.DB, q string) (how s
 	}
 	err = streamRows(ctx, engine, db, q, func(cols, types []string) error { return errChecked }, nil)
 	if err != nil && !errors.Is(err, errChecked) {
-		if ctx.Err() != nil {
-			return "", fmt.Errorf("the database took more than %s to start the query: it couldn't be checked", checkTimeout)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", errCheckTimeout
 		}
 		return "", err
 	}

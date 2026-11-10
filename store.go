@@ -286,6 +286,9 @@ func (s *Store) Delete(id int64) error {
 	if _, err := s.DB().Exec(`DELETE FROM queries WHERE conn_id = ?`, id); err != nil {
 		return err
 	}
+	if _, err := s.DB().Exec(`DELETE FROM query_versions WHERE conn_id = ?`, id); err != nil {
+		return err
+	}
 	_, err := s.DB().Exec(`DELETE FROM connections WHERE id = ?`, id)
 	return err
 }

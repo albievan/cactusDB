@@ -22,7 +22,7 @@ func TestConnectionPasswordProtectsCredentialsAndQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.SaveQuery(id, box, SavedQuery{Name: "Open orders", Description: "orders not shipped", SQL: "SELECT * FROM orders WHERE shipped = 0"}); err != nil {
+	if _, _, err := st.SaveQuery(id, box, SavedQuery{Name: "Open orders", Description: "orders not shipped", SQL: "SELECT * FROM orders WHERE shipped = 0"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := st.SaveLocked(SavedConn{Name: "short", ConnParams: ConnParams{Engine: EngineMySQL}}, "abc", nil); err == nil {
