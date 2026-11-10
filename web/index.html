@@ -601,6 +601,11 @@
   dialog.dlg::backdrop { background: rgba(0,0,0,.5); }
   dialog.dlg h3 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
   dialog.dlg.wide { width: min(640px, calc(100vw - 32px)); }
+  /* .max fills the window (less a margin) and follows it when it is resized; the .grow field takes the height. */
+  dialog.dlg.max { width: calc(100vw - 32px); height: calc(100dvh - 32px); max-width: none; max-height: none; }
+  dialog.dlg.max[open], dialog.dlg.max > form { display: flex; flex-direction: column; min-height: 0; }
+  dialog.dlg.max > form { flex: 1; }
+  dialog.dlg.max .grow { flex: 1; min-height: 120px; resize: none; }
   .lgtext { font-family: var(--mono); font-size: 11.5px; line-height: 1.45; background: var(--panel-2);
     padding: 8px 12px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 0; }
   .lgtext .bad { color: var(--danger); }
@@ -1536,7 +1541,7 @@
   </form>
 </dialog>
 
-<dialog id="sqDialog" class="dlg" aria-labelledby="sqTitle">
+<dialog id="sqDialog" class="dlg max" aria-labelledby="sqTitle">
   <form method="dialog" id="sqForm">
     <h3 id="sqTitle">Save query</h3>
     <label class="form-label" for="sqName">Name</label>
@@ -1544,7 +1549,7 @@
     <label class="form-label" for="sqDesc">Description</label>
     <textarea class="form-control form-control-sm" id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
     <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
-    <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono"></textarea>
+    <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono grow"></textarea>
     <div id="sqResult" class="dresult alert alert-danger" hidden></div>
     <div class="dactions">
       <span class="spacer"></span>

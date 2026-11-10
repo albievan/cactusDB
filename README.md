@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.44.0
+cactusdb 1.44.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -361,7 +361,8 @@ page.
 
 <a id="saved-queries"></a>
 **Saved queries.** For a saved connection, write a query on the *Data* tab and click
-**💾 Save query**, then give it a **name** and a **description**. Only read-only queries can
+**💾 Save query**, then give it a **name** and a **description** (the dialog fills the window,
+and follows it as you resize it, so a long query has room). Only read-only queries can
 be saved: cactusdb checks it with the same rules as running a query, so `INSERT`,
 `UPDATE`, `DELETE`, schema changes and several statements at once are refused.
 

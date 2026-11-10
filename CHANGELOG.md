@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.44.1 — 2026-11-10
+
+- The **Save query** / **Edit saved query** dialog fills the browser window and resizes with
+  it; the query box takes all the extra height, so a long query is easy to read and edit.
+
 ## 1.44.0 — 2026-11-09
 
 - **Direct messages** between the people using cactusdb: pick someone in the people list
