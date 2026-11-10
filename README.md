@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.44.1
+cactusdb 1.45.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -365,6 +365,11 @@ page.
 and follows it as you resize it, so a long query has room). Only read-only queries can
 be saved: cactusdb checks it with the same rules as running a query, so `INSERT`,
 `UPDATE`, `DELETE`, schema changes and several statements at once are refused.
+**Check syntax**, in the same dialog, asks the database whether the query is valid (its
+syntax, and that its tables and columns exist) without running it: SQLite, PostgreSQL and
+its relatives, MySQL and MariaDB prepare it, and SQL Server describes it. Other databases
+start it, read-only, and it is stopped as soon as its columns are known, before any row is
+read. The database's own error is shown when it isn't valid.
 
 The **Saved queries** tab, shown while you're connected, lists the connection's queries.
 Filter them by name or description, then **Run** a query (it opens in the editor and
@@ -1631,7 +1636,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `settings.go` | Changing the export folder from the web UI |
 | `lock.go` | Connection passwords (Argon2id keys), saved queries in the store, the wrong-password throttle |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
-| `queries.go` | The saved-queries API (read-only check) |
+| `queries.go` | The saved-queries API (read-only check) and Check syntax |
 | `files.go` | The *Exported files* page: listing, previews, deleting, and compressed downloads of a selection |
 | `Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
 | `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |

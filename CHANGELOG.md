@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.45.0 — 2026-11-10
+
+- **Check syntax** in the Save query / Edit saved query dialog: asks the connected database
+  whether the query is valid (syntax, tables, columns) without running it. SQLite,
+  PostgreSQL and its relatives, MySQL and MariaDB prepare it; SQL Server describes it
+  (`sp_describe_first_result_set`); other databases start it read-only and stop it as soon
+  as its columns are known. Shows the database's own error, or that the query is valid.
+  The read-only check comes first, as when saving or running a query.
+
 ## 1.44.1 — 2026-11-10
 
 - The **Save query** / **Edit saved query** dialog fills the browser window and resizes with

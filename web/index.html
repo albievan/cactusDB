@@ -1552,6 +1552,7 @@
     <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono grow"></textarea>
     <div id="sqResult" class="dresult alert alert-danger" hidden></div>
     <div class="dactions">
+      <button class="btn btn-outline-secondary" type="button" id="sqCheck" title="Ask the database whether the query is valid, without running it"><i class="bi bi-check2-circle" aria-hidden="true"></i> Check syntax</button>
       <span class="spacer"></span>
       <button class="btn btn-outline-secondary" type="button" id="sqCancel">Cancel</button>
       <button type="submit" class="btn btn-primary" id="sqSave">Save</button>
@@ -3061,10 +3062,26 @@ function openQueryDialog(x) {
 $("saveQueryBtn").addEventListener("click", () => openQueryDialog(null));
 $("qNew").addEventListener("click", () => openQueryDialog(null));
 $("sqCancel").addEventListener("click", () => $("sqDialog").close());
+// sqShow shows a result under the query: kind is danger, success or busy.
+function sqShow(kind, text) {
+  const r = $("sqResult");
+  r.className = "dresult alert " + (kind === "busy" ? "busy" : "alert-" + kind);
+  r.textContent = text; r.hidden = false;
+}
+$("sqCheck").addEventListener("click", async () => {
+  $("sqCheck").disabled = true; sqShow("busy", "Checking the query with the database…");
+  try {
+    const res = await api("POST", "/api/queries/check", { session: state.session, sql: $("sqSql").value });
+    if (res.valid) sqShow("success", `The query is valid: ${res.how}.`);
+    else sqShow("danger", "The query isn't valid: " + res.error);
+  } catch (e) { sqShow("danger", e.message); }
+  finally { $("sqCheck").disabled = false; }
+});
+$("sqSql").addEventListener("input", () => { $("sqResult").hidden = true; }); // a result is of the query as it was
 $("sqForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const body = { session: state.session, id: sqEdit, name: $("sqName").value, description: $("sqDesc").value, sql: $("sqSql").value };
-  if (!body.name.trim()) { $("sqResult").textContent = "Give the query a name."; $("sqResult").hidden = false; return; }
+  if (!body.name.trim()) { sqShow("danger", "Give the query a name."); return; }
   $("sqSave").disabled = true;
   try {
     await api("POST", "/api/queries", body);
@@ -3072,7 +3089,7 @@ $("sqForm").addEventListener("submit", async (ev) => {
     toast(`Saved “${body.name.trim()}”`);
     loadQueries();
   } catch (e) {
-    $("sqResult").textContent = e.message; $("sqResult").hidden = false;
+    sqShow("danger", e.message);
   } finally { $("sqSave").disabled = false; }
 });
 
