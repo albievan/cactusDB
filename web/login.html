@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · cactusdb</title>
+<link rel="icon" type="image/svg+xml" href="cactusdb.svg">
+<link rel="stylesheet" href="vendor/bootstrap-5.3.8/bootstrap.min.css">
+<link rel="stylesheet" href="vendor/bootstrap-icons-1.13.2/bootstrap-icons.min.css">
+<script>
+  // Bootstrap's light or dark theme follows the system's, as on the main page.
+  (() => {
+    const dark = matchMedia("(prefers-color-scheme: dark)");
+    const set = () => document.documentElement.setAttribute("data-bs-theme", dark.matches ? "dark" : "light");
+    set(); dark.addEventListener("change", set);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #f6f7f5; --panel: #ffffff; --panel-2: #f0f2ee; --border: #dde1da;
+    --text: #1d2420; --muted: #66706a; --accent: #2f7d4f; --accent-2: #24643f; --accent-soft: #e3f1e8;
+    --danger: #b3261e; --danger-soft: #fbe9e7;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141816; --panel: #1b201d; --panel-2: #222824; --border: #2f3732;
+      --text: #e3e8e4; --muted: #95a099; --accent: #4fb57a; --accent-2: #63c78c; --accent-soft: #1f3328;
+      --danger: #f2867c; --danger-soft: #3a1f1d;
+    }
+  }
+  :root, [data-bs-theme=light], [data-bs-theme=dark] {
+    --bs-body-bg: var(--bg); --bs-body-color: var(--text); --bs-emphasis-color: var(--text);
+    --bs-secondary-color: var(--muted); --bs-secondary-bg: var(--panel-2); --bs-tertiary-bg: var(--panel-2);
+    --bs-border-color: var(--border); --bs-body-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --bs-body-font-size: 14px; --bs-primary: var(--accent); --bs-primary-rgb: 47, 125, 79;
+    --bs-link-color: var(--accent); --bs-link-color-rgb: 47, 125, 79; --bs-link-hover-color: var(--accent-2);
+    --bs-danger: var(--danger); --bs-danger-rgb: 179, 38, 30; --bs-danger-text-emphasis: var(--danger);
+    --bs-danger-bg-subtle: var(--danger-soft); --bs-danger-border-subtle: var(--danger);
+    --bs-success-text-emphasis: var(--accent); --bs-success-bg-subtle: var(--accent-soft); --bs-success-border-subtle: var(--accent);
+    --bs-focus-ring-color: rgba(var(--bs-primary-rgb), .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root, [data-bs-theme=light], [data-bs-theme=dark] { --bs-primary-rgb: 79, 181, 122; --bs-link-color-rgb: 79, 181, 122; --bs-danger-rgb: 242, 134, 124; }
+  }
+  .btn-primary { --bs-btn-bg: var(--accent); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: var(--accent-2); --bs-btn-hover-border-color: var(--accent-2);
+    --bs-btn-active-bg: var(--accent-2); --bs-btn-disabled-bg: var(--accent); --bs-btn-disabled-border-color: var(--accent); --bs-btn-color: #fff; }
+  [data-bs-theme=dark] .btn-primary { --bs-btn-color: #0c1a12; --bs-btn-hover-color: #0c1a12; --bs-btn-active-color: #0c1a12; }
+  body { min-height: 100dvh; display: grid; place-items: center; padding: 16px; background: var(--bg); }
+  .card { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, .08); }
+  .card-body { padding: 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .brand b { font-size: 20px; font-family: var(--mono); letter-spacing: -.5px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .form-label { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .form-control { font-size: 14px; }
+  .code { font: 600 24px/1.2 var(--mono); letter-spacing: 6px; text-align: center; }
+  .links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; }
+  .links button { padding: 0; font-size: 13px; }
+  .who { font-family: var(--mono); font-size: 13px; word-break: break-all; }
+  .alert { font-size: 13px; padding: 8px 12px; margin-bottom: 12px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="card-body">
+    <div class="brand"><img src="cactusdb.svg" alt="" width="32" height="32"><b>cactusdb</b></div>
+    <div class="alert" id="msg" role="alert" hidden></div>
+
+    <!-- Sign in -->
+    <form id="vSignin" data-view>
+      <h1>Sign in</h1>
+      <p class="lead">This cactusdb asks everyone to sign in first.</p>
+      <label class="form-label" for="siUser">User name</label>
+      <input class="form-control mb-3" id="siUser" autocomplete="username" placeholder="you@example.com" required autofocus>
+      <label class="form-label" for="siPass">Password</label>
+      <input class="form-control mb-3" id="siPass" type="password" autocomplete="current-password" required>
+      <button class="btn btn-primary w-100" type="submit">Sign in</button>
+      <div class="links">
+        <button type="button" class="btn btn-link" data-go="vForgot">Forgot your password?</button>
+        <button type="button" class="btn btn-link" data-go="vRegister">Request access</button>
+      </div>
+    </form>
+
+    <!-- New password (admin with the password admin) -->
+    <form id="vChange" data-view hidden>
+      <h1>Choose a new password</h1>
+      <p class="lead"><span class="who" id="chUser"></span> still has its first password. Choose a new one to go on.</p>
+      <label class="form-label" for="chPass">New password</label>
+      <input class="form-control" id="chPass" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="hint mb-3">At least 8 characters, not the user name.</div>
+      <label class="form-label" for="chPass2">New password again</label>
+      <input class="form-control mb-3" id="chPass2" type="password" autocomplete="new-password" required>
+      <button class="btn btn-primary w-100" type="submit">Save and sign in</button>
+      <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
+    </form>
+
+    <!-- The e-mailed code -->
+    <form id="vCode" data-view hidden>
+      <h1>Enter the code</h1>
+      <p class="lead">We e-mailed an 8-digit code to <span class="who" id="cdUser"></span>. Type or paste it here. It works for 10 minutes.</p>
+      <label class="form-label" for="cdCode">Security code</label>
+      <input class="form-control code mb-3" id="cdCode" inputmode="numeric" autocomplete="one-time-code" placeholder="12345678" maxlength="12" required>
+      <button class="btn btn-primary w-100" type="submit">Sign in</button>
+      <div class="links">
+        <button type="button" class="btn btn-link" id="cdResend">Send a new code</button>
+        <button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button>
+      </div>
+    </form>
+
+    <!-- Forgot the password -->
+    <form id="vForgot" data-view hidden>
+      <h1>Reset your password</h1>
+      <p class="lead">Enter the e-mail address you sign in with. We'll e-mail you a link to set a new password; it works for one hour.</p>
+      <label class="form-label" for="fgUser">E-mail address</label>
+      <input class="form-control mb-3" id="fgUser" type="email" autocomplete="username" required>
+      <button class="btn btn-primary w-100" type="submit">E-mail me a link</button>
+      <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
+    </form>
+
+    <!-- Request access -->
+    <form id="vRegister" data-view hidden>
+      <h1>Request access</h1>
+      <p class="lead">Someone who uses this cactusdb approves your request. You'll get an e-mail when they do.</p>
+      <label class="form-label" for="rgEmail">E-mail address</label>
+      <input class="form-control mb-3" id="rgEmail" type="email" autocomplete="email" required>
+      <label class="form-label" for="rgName">Your name</label>
+      <input class="form-control mb-3" id="rgName" autocomplete="name" maxlength="40">
+      <label class="form-label" for="rgPass">Password</label>
+      <input class="form-control" id="rgPass" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="hint mb-3">At least 8 characters. You'll sign in with it once approved.</div>
+      <label class="form-label" for="rgPass2">Password again</label>
+      <input class="form-control mb-3" id="rgPass2" type="password" autocomplete="new-password" required>
+      <label class="form-label" for="rgReason">Why you need access <span class="text-body-secondary fw-normal">(optional)</span></label>
+      <textarea class="form-control mb-3" id="rgReason" rows="2" maxlength="500"></textarea>
+      <button class="btn btn-primary w-100" type="submit">Send the request</button>
+      <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
+    </form>
+
+    <!-- Set a password from an e-mailed link -->
+    <form id="vSet" data-view hidden>
+      <h1 id="stTitle">Set your password</h1>
+      <p class="lead">For <span class="who" id="stUser"></span>.</p>
+      <label class="form-label" for="stPass">New password</label>
+      <input class="form-control" id="stPass" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="hint mb-3">At least 8 characters, not your e-mail address.</div>
+      <label class="form-label" for="stPass2">New password again</label>
+      <input class="form-control mb-3" id="stPass2" type="password" autocomplete="new-password" required>
+      <button class="btn btn-primary w-100" type="submit">Set the password</button>
+    </form>
+
+    <!-- A message, with the way back -->
+    <div id="vDone" data-view hidden>
+      <h1 id="dnTitle"></h1>
+      <p class="lead" id="dnText"></p>
+      <button class="btn btn-primary w-100" type="button" data-go="vSignin">Sign in</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+// The answers come with their status in a header (see statusInHeader in
+// main.go): a firewall on the way may block a computer after an HTTP 401 or 403.
+async function api(path, body) {
+  const r = await fetch(path, { method: "POST", cache: "no-store", body: JSON.stringify(body || {}),
+    headers: { "Content-Type": "application/json", "X-Cactusdb-Errors": "in-header" } });
+  const status = +(r.headers.get("X-Cactusdb-Status") || r.status);
+  const data = await r.json().catch(() => ({}));
+  if (status >= 400) { const e = new Error(data.error || `error ${status}`); e.data = data; throw e; }
+  return data;
+}
+function say(text, ok) {
+  const m = $("msg");
+  m.hidden = !text; m.textContent = text || "";
+  m.className = "alert " + (ok ? "alert-success" : "alert-danger");
+}
+function show(view, keepMsg) {
+  document.querySelectorAll("[data-view]").forEach((v) => (v.hidden = v.id !== view));
+  if (!keepMsg) say("");
+  const first = $(view).querySelector("input:not([type=hidden])");
+  if (first) setTimeout(() => first.focus(), 0);
+  if (view !== "vSet" && location.hash) history.replaceState(null, "", "/login");
+}
+document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-go]"); if (b) show(b.dataset.go); });
+// Every form: one request at a time, its button busy meanwhile.
+function onSubmit(id, fn) {
+  $(id).addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const b = $(id).querySelector("button[type=submit]");
+    b.disabled = true;
+    try { await fn(); } catch (e) {
+      say(e.message);
+      if (e.data && e.data.restart) setTimeout(() => show("vSignin", true), 0);
+    } finally { b.disabled = false; }
+  });
+}
+const done = () => location.replace("/");
+function next(res) {
+  if (res.next === "done") return done();
+  if (res.next === "change") { $("chUser").textContent = res.username; $("chPass").value = $("chPass2").value = ""; show("vChange"); }
+  if (res.next === "code") { $("cdUser").textContent = res.username; $("cdCode").value = ""; show("vCode"); }
+}
+const same = (a, b) => { if ($(a).value !== $(b).value) throw new Error("The two passwords aren't the same."); };
+
+onSubmit("vSignin", async () => next(await api("/api/auth/login", { username: $("siUser").value, password: $("siPass").value })));
+onSubmit("vChange", async () => { same("chPass", "chPass2"); next(await api("/api/auth/login/password", { password: $("chPass").value })); });
+onSubmit("vCode", async () => next(await api("/api/auth/login/code", { code: $("cdCode").value })));
+// A pasted code signs in straight away.
+$("cdCode").addEventListener("input", () => { if ($("cdCode").value.replace(/\D/g, "").length === 8 && !$("vCode").querySelector("button[type=submit]").disabled) $("vCode").requestSubmit(); });
+$("cdResend").addEventListener("click", async () => {
+  const b = $("cdResend");
+  b.disabled = true;
+  try { await api("/api/auth/login/resend"); $("cdCode").value = ""; say("A new code is on its way. The earlier one no longer works.", true); $("cdCode").focus(); }
+  catch (e) { say(e.message); if (e.data && e.data.restart) show("vSignin", true); }
+  finally { setTimeout(() => (b.disabled = false), 3000); }
+});
+onSubmit("vForgot", async () => {
+  await api("/api/auth/forgot", { username: $("fgUser").value });
+  $("dnTitle").textContent = "Check your e-mail";
+  $("dnText").textContent = `If ${$("fgUser").value.trim()} can sign in here, a link to set a new password is on its way. It works for one hour.`;
+  show("vDone");
+});
+onSubmit("vRegister", async () => {
+  same("rgPass", "rgPass2");
+  await api("/api/auth/register", { email: $("rgEmail").value, name: $("rgName").value, password: $("rgPass").value, reason: $("rgReason").value });
+  $("dnTitle").textContent = "Request sent";
+  $("dnText").textContent = `You'll get an e-mail at ${$("rgEmail").value.trim()} once someone approves it. Then sign in with that address and your password.`;
+  show("vDone");
+});
+let setToken = "";
+onSubmit("vSet", async () => {
+  same("stPass", "stPass2");
+  const res = await api("/api/auth/setpassword", { token: setToken, password: $("stPass").value });
+  history.replaceState(null, "", "/login");
+  $("dnTitle").textContent = "Password set";
+  $("dnText").textContent = `Sign in with ${res.username} and your new password. We'll e-mail you a code to finish signing in.`;
+  $("siUser").value = res.username;
+  show("vDone");
+});
+
+// A link from an e-mail: /login#set=<token>. The token stays in the address's
+// fragment, so it never reaches a server's log.
+(async () => {
+  const m = location.hash.match(/^#set=([\w-]+)$/);
+  if (!m) {
+    try { const me = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()); if (me.user) return done(); } catch (e) { /* stay */ }
+    return show("vSignin");
+  }
+  setToken = m[1];
+  try {
+    const info = await api("/api/auth/setpassword/info", { token: setToken });
+    $("stUser").textContent = info.username;
+    $("stTitle").textContent = info.purpose === "invite" ? "Welcome: set your password" : "Set a new password";
+    show("vSet");
+  } catch (e) {
+    history.replaceState(null, "", "/login");
+    show("vSignin"); say(e.message);
+  }
+})();
+</script>
+</body>
+</html>

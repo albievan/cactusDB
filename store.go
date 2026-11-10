@@ -87,6 +87,9 @@ func (s *Store) init(path, keyFile string) error {
 	if err := s.migrateSuperuser(); err != nil {
 		return err
 	}
+	if err := s.migrateUsers(); err != nil {
+		return err
+	}
 
 	// Per-store random salt for passphrase-derived keys.
 	saltB64, err := s.meta("salt")

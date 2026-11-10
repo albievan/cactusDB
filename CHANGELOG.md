@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.48.0 — 2026-11-10
+
+- **Signing in first: `--remotelogin`.** Started with it, cactusdb shows only its sign-in
+  page until you sign in; every other request is refused.
+  - The first user is **admin / admin**, and signing in with it asks for a new password
+    straight away. `cactusdb --resetadmin` sets it back to admin.
+  - Every other user is an **e-mail address**. After the password, cactusdb e-mails an
+    **8-digit code**, asked for on the next screen; **Send a new code** sends another.
+  - **☰ → Users** (any signed-in user): add a user by e-mail address, and they are e-mailed
+    a link to set their password, valid for one hour. Approve or reject requests for
+    access, send a link again, delete users, change your own password.
+  - The sign-in page has **Forgot your password?** (an e-mailed reset link, one hour) and
+    **Request access** (approved by a signed-in user; the person is then e-mailed).
+  - ☰ → **Sign out**. Passwords are stored as Argon2id hashes, codes and links as hashes of
+    random tokens; wrong passwords are slowed down. Errors reach the page as 200 with the
+    status in a header, as everywhere in cactusdb.
+- **☰ → E-mail server**, set up as in cactusInv: Gmail, Outlook / Microsoft 365 or Custom
+  presets with a hint, host, port, security, user name, password (stored encrypted),
+  Send as (with Gmail's and Microsoft 365's warnings), *Use this server for all e-mail*, a
+  setup guide per provider, and a test e-mail. Plus the address cactusdb's e-mailed links
+  start with.
+- Fixed in the README: a page that goes quiet leaves the people list after about two and a
+  half minutes (since 1.47.0), not one.
+
 ## 1.47.0 — 2026-11-10
 
 - **JSON and XML previews in their own format**: the preview of an exported JSON or XML file

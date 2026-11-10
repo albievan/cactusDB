@@ -36,7 +36,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.47.0"
+var version = "1.48.0"
 
 //go:embed web
 var webFS embed.FS
@@ -100,6 +100,9 @@ type server struct {
 	crashPath   string
 
 	presence presence // the pages using cactusdb, and the notices to them (presence.go)
+
+	remoteLogin  bool         // --remotelogin: sign in before anything (auth.go)
+	authThrottle authThrottle // slows down guessing sign-in passwords
 }
 
 func main() {
@@ -126,11 +129,14 @@ func main() {
 	runAs := flag.String("runas", "foreground", "web UI: foreground, or background to keep running after the terminal closes (logs to --logfile)")
 	logFile := flag.String("logfile", "", "web UI: file every action is logged to (default with --runas background: cactusdb.log next to the binary)")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	remoteLogin := flag.Bool("remotelogin", false, "web UI: sign in with a user name and password before anything can be seen (first user admin, password admin; other users are e-mail addresses and get an e-mailed code)")
+	resetAdmin := flag.Bool("resetadmin", false, "set the --remotelogin user admin's password back to admin (to be changed at the next sign-in) and exit")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "cactusdb %s - browse and export relational, cloud, NoSQL and vector databases, read-only\n\n", version)
 		fmt.Fprintf(os.Stderr, "Usage:\n"+
 			"  cactusdb --port 8080 [--web yes]                    start the web UI\n"+
 			"  cactusdb --port 8080 --runas background             start the web UI in the background\n"+
+			"  cactusdb --port 8080 --remotelogin                  the web UI, signing in first (admin / admin)\n"+
 			"  cactusdb --dbtype mariadb --host 10.66.1.136 --dbport 3306 --user root --dbname optima \\\n"+
 			"           --dbtable orders|t1,t2|all --exportas csv|json|xml|excel [--exportto ./export]\n"+
 			"                                                      export tables without the web UI\n"+
@@ -198,6 +204,21 @@ func main() {
 	if *keyFile == "" {
 		*keyFile = filepath.Join(filepath.Dir(*connDB), keyFileName)
 	}
+	if *resetAdmin {
+		st, err := openStore(*connDB, *keyFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cactusdb: cannot open %s: %v\n", *connDB, err)
+			os.Exit(1)
+		}
+		err = st.resetAdmin()
+		st.DB().Close()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "cactusdb:", err)
+			os.Exit(1)
+		}
+		fmt.Println("admin's password is admin again: sign in with it to choose a new one (with --remotelogin)")
+		return
+	}
 	if set["superuser"] {
 		st, err := openStore(*connDB, *keyFile)
 		if err != nil {
@@ -214,7 +235,7 @@ func main() {
 	}
 
 	if cliMode {
-		for _, f := range []string{"port", "logfile"} {
+		for _, f := range []string{"port", "logfile", "remotelogin"} {
 			if set[f] {
 				fatalUsage("--" + f + " only applies to the web UI (the database port is --dbport)")
 			}
@@ -397,7 +418,14 @@ func main() {
 	}
 	s := &server{store: store, sessions: map[string]*session{}, defaultExportDir: defaultExportDir,
 		defaultConnDB: defaultConnDB, connDBFlag: flagValueIf(set["conn-db"], *connDB),
-		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{}), port: *port}
+		exportToFlag: exportToFlag, background: childLog != "", shutdown: make(chan struct{}), port: *port, remoteLogin: *remoteLogin}
+	if *remoteLogin {
+		if added, err := store.ensureAdmin(); err != nil {
+			log.Fatalf("--remotelogin: cannot set up the users: %v", err)
+		} else if added {
+			log.Printf("--remotelogin: added the user admin with the password admin: sign in with it to choose a new one")
+		}
+	}
 	s.setExportFolder(exportDir)
 
 	static, _ := fs.Sub(webFS, "web")
@@ -408,6 +436,32 @@ func main() {
 		w.Header().Set("Cache-Control", "no-cache")
 		files.ServeHTTP(w, r)
 	}))
+	// The sign-in page of --remotelogin (auth.go).
+	mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
+		if !s.remoteLogin {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFileFS(w, r, static, "login.html")
+	})
+	mux.HandleFunc("GET /api/auth/me", s.handleAuthMe)
+	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/auth/login/password", s.handleLoginPassword)
+	mux.HandleFunc("POST /api/auth/login/code", s.handleLoginCode)
+	mux.HandleFunc("POST /api/auth/login/resend", s.handleLoginResend)
+	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
+	mux.HandleFunc("POST /api/auth/forgot", s.handleForgot)
+	mux.HandleFunc("POST /api/auth/setpassword/info", s.handleSetPasswordInfo)
+	mux.HandleFunc("POST /api/auth/setpassword", s.handleSetPassword)
+	mux.HandleFunc("POST /api/auth/register", s.handleRegister)
+	mux.HandleFunc("GET /api/users", s.handleListUsers)
+	mux.HandleFunc("POST /api/users", s.handleAddUser)
+	mux.HandleFunc("POST /api/users/{id}/{action}", s.handleUserAction)
+	mux.HandleFunc("POST /api/account/password", s.handleChangePassword)
+	mux.HandleFunc("GET /api/email", s.handleGetSMTP)
+	mux.HandleFunc("POST /api/email", s.handleSaveSMTP)
+	mux.HandleFunc("POST /api/email/test", s.handleTestSMTP)
 	mux.HandleFunc("GET /api/engines", s.handleEngines)
 	mux.HandleFunc("GET /api/drivers", s.handleDrivers)
 	mux.HandleFunc("GET /api/info", s.handleInfo)
@@ -513,7 +567,7 @@ func main() {
 	// firewall, VPN or NAT between it and cactusdb silently drops it: the
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
-	srv := &http.Server{Handler: statusInHeader(logRequests(recoverPanics(mux))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
+	srv := &http.Server{Handler: statusInHeader(logRequests(recoverPanics(s.requireLogin(mux)))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
 	go s.expireSessions()
 	go logUpdate()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
@@ -534,6 +588,9 @@ func main() {
 		fmt.Println("  superuser:         set (opens every saved connection)")
 	} else {
 		fmt.Println("  superuser:         not set (cactusdb --superuser set)")
+	}
+	if *remoteLogin {
+		fmt.Println("  remote login:      on: sign in first (users under ☰ → Users, e-mail under ☰ → E-mail server)")
 	}
 	for _, u := range browseURLs(*host, *port) {
 		fmt.Printf("  open %s\n", u)
@@ -770,6 +827,7 @@ func statusInHeader(h http.Handler) http.Handler {
 // set when the handler looks the session up (or connect creates it).
 type reqLog struct {
 	session string
+	user    string // signed in, with --remotelogin
 
 	// For the usage log (usage.go): the session's connection, and what the
 	// handler logged with logAction.
@@ -802,10 +860,17 @@ func noteConn(r *http.Request, ss *session) {
 // session lasts, and ☰ → Logs shows the log.
 func sessionTag(r *http.Request) string {
 	l, ok := r.Context().Value(reqLogKey{}).(*reqLog)
-	if !ok || l.session == "" {
+	if !ok {
 		return ""
 	}
-	return " session=" + l.session[:min(8, len(l.session))]
+	tag := ""
+	if l.user != "" {
+		tag = " user=" + l.user
+	}
+	if l.session != "" {
+		tag += " session=" + l.session[:min(8, len(l.session))]
+	}
+	return tag
 }
 
 // logRequests logs every API call with its result, duration, client and

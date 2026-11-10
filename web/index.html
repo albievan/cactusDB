@@ -807,6 +807,35 @@
   table.cvset td { padding: 3px 0; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; white-space: normal; max-width: none; text-overflow: clip; }
   .cvask { margin-top: 12px; --bs-card-spacer-y: 10px; --bs-card-spacer-x: 12px; }
   .cvask ul { margin: 6px 0; padding-left: 20px; font-size: 13px; }
+  /* ☰ → E-mail server and ☰ → Users. */
+  .emhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .empresets { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 8px; }
+  .emhint { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  #emailDialog .row2.half { gap: 10px 14px; align-items: start; }
+  #emailDialog .row2.half .row2.half { gap: 8px; }
+  .emenable { display: flex; align-items: center; padding-top: 22px; }
+  .emwarn { font-size: 12px; padding: 6px 10px; margin: 6px 0 0; }
+  .emtest { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .emtest > div { flex: 0 1 260px; }
+  .emtest .hint { margin: 0 0 6px; }
+  .egsteps { display: flex; flex-direction: column; gap: 6px; padding-left: 22px; font-size: 13px; color: var(--muted); }
+  .egsteps b, .egtrouble b { color: var(--text); font-weight: 500; }
+  .egtrouble { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--muted); }
+  .egtrouble ul { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+  .usadd { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 8px; align-items: end; }
+  @media (max-width: 600px) { .usadd { grid-template-columns: 1fr; } }
+  #usersDialog { width: min(900px, calc(100vw - 32px)); }
+  .ustable td.uname { min-width: 220px; }
+  .ustable { margin-top: 10px; max-height: 45vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .ustable table { margin: 0; font-size: 13px; }
+  .ustable td, .ustable th { vertical-align: middle; white-space: nowrap; }
+  .ustable td.uname { white-space: normal; overflow-wrap: break-word; }
+  .ustable .reason { display: block; color: var(--muted); font-size: 12px; white-space: normal; }
+  .ustable .uacts { text-align: right; }
+  .ustable .uacts .btn { margin-left: 4px; }
+  .ustable tr.req { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  #signOutBtn { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .signedas { color: var(--muted); font-size: 11px; margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .edsub { margin: 22px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
   .dresult.busy { background: var(--panel-2); color: var(--muted); }
   .sdtext { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 6px 0 0; }
@@ -897,11 +926,14 @@
       <button class="btn btn-outline-secondary text-start" data-menu="folder" title="Choose where exports and backups are saved"><i class="bi bi-folder2-open" aria-hidden="true"></i> Folder setup</button>
       <button class="btn btn-outline-secondary text-start" data-menu="drivers" title="The databases cactusdb supports and their drivers"><i class="bi bi-puzzle" aria-hidden="true"></i> Drivers</button>
       <button class="btn btn-outline-secondary text-start" data-menu="settings" title="When to disconnect an unused connection"><i class="bi bi-gear" aria-hidden="true"></i> Settings</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="email" title="The mail server cactusdb sends e-mail through: sign-in codes, invitations and password resets"><i class="bi bi-envelope-at" aria-hidden="true"></i> E-mail server</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="users" id="usersMenuBtn" hidden title="Who can sign in to this cactusdb: add users, approve requests for access, your own password"><i class="bi bi-person-gear" aria-hidden="true"></i> Users<span class="badge rounded-pill text-bg-danger ms-2" id="usersReqN" hidden></span></button>
       <button class="btn btn-outline-secondary text-start" data-menu="logs" title="cactusdb's log: connections, tables opened, queries, exports and every request"><i class="bi bi-journal-text" aria-hidden="true"></i> Logs</button>
       <button class="btn btn-outline-secondary text-start" data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes"><i class="bi bi-box-seam" aria-hidden="true"></i> DB container deployment</button>
       <button class="btn btn-outline-secondary text-start" data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Compare databases</button>
       <button class="btn btn-outline-secondary text-start" data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate database</button>
       <button class="btn btn-outline-secondary text-start" data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i> Check for update<span class="updot" id="updateDot" hidden></span></button>
+      <button class="btn btn-outline-secondary text-start" id="signOutBtn" hidden title="Sign out of cactusdb in this browser"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sign out <span class="signedas" id="signedAs"></span></button>
       <button class="btn btn-outline-danger text-start" id="shutdownBtn" hidden title="Stop this background cactusdb (asks first)"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
@@ -1460,6 +1492,81 @@
   </form>
 </dialog>
 
+<!-- ☰ → E-mail server (mail.go): set up as in cactusInv. -->
+<dialog id="emailDialog" class="dlg wide" aria-labelledby="emTitle">
+  <form id="emForm">
+    <div class="emhead">
+      <h3 id="emTitle">E-mail server</h3>
+      <button type="button" class="btn btn-outline-primary" id="emGuideBtn" aria-haspopup="dialog"><i class="bi bi-info-circle" aria-hidden="true"></i> Setup guide</button>
+    </div>
+    <p class="hint mt-0">The server cactusdb sends e-mail through: the sign-in codes, invitations, password reset links and
+      approvals of <code>--remotelogin</code>. Nothing is sent until it is enabled.</p>
+    <div class="empresets" role="radiogroup" aria-label="Provider" id="emPresets"></div>
+    <p class="emhint" id="emPresetHint"></p>
+    <div class="row2 half">
+      <div><label class="form-label" for="emHost">SMTP host</label><input class="form-control form-control-sm" id="emHost" placeholder="smtp.gmail.com" spellcheck="false" autocomplete="off"></div>
+      <div class="row2 half">
+        <div><label class="form-label" for="emPort">Port</label><input class="form-control form-control-sm" id="emPort" type="number" min="1" max="65535"></div>
+        <div><label class="form-label" for="emTls">Security</label>
+          <select class="form-select form-select-sm" id="emTls"><option value="starttls">STARTTLS</option><option value="tls">SSL/TLS</option><option value="none">None</option></select></div>
+      </div>
+      <div><label class="form-label" for="emUser">User name</label><input class="form-control form-control-sm" id="emUser" autocomplete="off" spellcheck="false">
+        <p class="hint">For Gmail: your full Gmail address.</p></div>
+      <div><label class="form-label" for="emPass">Password</label><input class="form-control form-control-sm" id="emPass" type="password" autocomplete="new-password">
+        <p class="hint" id="emPassHint">Stored encrypted.</p></div>
+      <div><label class="form-label" for="emFrom">Send as</label><input class="form-control form-control-sm" id="emFrom" spellcheck="false">
+        <p class="hint">e.g. "Example Ltd &lt;it@example.com&gt;". Defaults to the user name. The provider decides the sender it shows; see the setup guide.</p>
+        <div class="alert alert-warning emwarn" id="emWarn" hidden></div></div>
+      <div class="emenable"><label class="form-check"><input class="form-check-input" type="checkbox" id="emEnabled"> Use this server for all e-mail</label></div>
+    </div>
+    <label class="form-label" for="emLink">Address in e-mailed links</label>
+    <input class="form-control form-control-sm" id="emLink" spellcheck="false" placeholder="http://server:8080">
+    <p class="hint">How the people cactusdb e-mails reach this cactusdb: the invitation and password reset links start with it.</p>
+    <div class="emtest">
+      <div><label class="form-label" for="emTestTo">Send a test e-mail to</label><input class="form-control form-control-sm" id="emTestTo" type="email" placeholder="you@example.com"></div>
+      <button class="btn btn-outline-primary" type="button" id="emTest">Send test e-mail</button>
+      <span class="hint" id="emTestNote" hidden>Save first — the test uses the saved settings.</span>
+    </div>
+    <div id="emResult" class="dresult alert" hidden></div>
+    <div class="dactions">
+      <span class="spacer"></span>
+      <button class="btn btn-outline-secondary" type="button" id="emClose">Close</button>
+      <button type="submit" class="btn btn-primary" id="emSave">Save e-mail server</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="emGuideDialog" class="dlg wide" aria-labelledby="egTitle">
+  <h3 id="egTitle">Set up the e-mail server</h3>
+  <div class="empresets" role="tablist" aria-label="Provider" id="egTabs"></div>
+  <ol class="egsteps" id="egSteps"></ol>
+  <div class="egtrouble"><b>If the test e-mail fails</b><ul id="egTrouble"></ul></div>
+  <div class="dactions"><span class="spacer"></span><button class="btn btn-primary" type="button" id="egClose">Close</button></div>
+</dialog>
+
+<!-- ☰ → Users (auth.go): with --remotelogin. -->
+<dialog id="usersDialog" class="dlg wide" aria-labelledby="usTitle">
+  <h3 id="usTitle">Users</h3>
+  <p class="hint mt-0">Who can sign in to this cactusdb. Every user can add users and approve requests for access. You are signed in as <b id="usMe"></b>.</p>
+  <form id="usAddForm" class="usadd">
+    <div><label class="form-label" for="usEmail">Add a user: e-mail address</label><input class="form-control form-control-sm" id="usEmail" type="email" required placeholder="name@example.com" autocomplete="off"></div>
+    <div><label class="form-label" for="usName">Name <span class="hint">optional</span></label><input class="form-control form-control-sm" id="usName" maxlength="40" autocomplete="off"></div>
+    <button class="btn btn-primary" type="submit" id="usAdd"><i class="bi bi-envelope-plus" aria-hidden="true"></i> Add and e-mail a link</button>
+  </form>
+  <p class="hint">They are e-mailed a link to set their password. It works for one hour; <b>Send link</b> e-mails a new one.</p>
+  <div id="usResult" class="dresult alert" hidden></div>
+  <div class="ustable" id="usTable"></div>
+  <h4 class="edsub">Your password</h4>
+  <form id="usPwForm" class="row2 half">
+    <div><label class="form-label" for="usPwCur">Current password</label><input class="form-control form-control-sm" id="usPwCur" type="password" autocomplete="current-password" required></div>
+    <div></div>
+    <div><label class="form-label" for="usPwNew">New password</label><input class="form-control form-control-sm" id="usPwNew" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div><label class="form-label" for="usPwNew2">New password again</label><input class="form-control form-control-sm" id="usPwNew2" type="password" autocomplete="new-password" required></div>
+    <div><button class="btn btn-outline-primary" type="submit">Change my password</button></div>
+  </form>
+  <div id="usPwResult" class="dresult alert" hidden></div>
+  <div class="dactions"><span class="spacer"></span><button class="btn btn-primary" type="button" id="usClose">Close</button></div>
+</dialog>
+
 <div id="verBanner" class="gabanner card shadow" role="status" hidden>
   <span id="verBannerText"></span>
   <button type="button" class="btn btn-primary" id="verReload">Reload</button>
@@ -1698,6 +1805,8 @@ async function api(method, url, body, retried = false) {
   const data = await res.json().catch(() => ({}));
   const status = +(res.headers.get("X-Cactusdb-Status") || res.status);
   gaApi(method, url, body, status, performance.now() - t0);
+  // Signed out meanwhile (--remotelogin): to the sign-in page.
+  if (status === 401 && data.signin) { location.replace("/login"); throw new Error("Signed out: sign in again"); }
   if (status >= 400 || !res.ok) {
     const err = new Error(data.error || res.statusText || `error ${status}`);
     err.status = status; err.data = data;
@@ -1927,6 +2036,212 @@ function openSettingsDialog() {
   $("settingsDialog").showModal();
   $("stIdle").select();
 }
+// ---- --remotelogin: who is signed in (auth.go) ------------------------------------
+const auth = { remoteLogin: false, user: null, requests: 0 };
+async function loadAuth() {
+  try {
+    const r = await fetch("/api/auth/me", { cache: "no-store" }).then((x) => x.json());
+    Object.assign(auth, { remoteLogin: !!r.remoteLogin, user: r.user || null, requests: r.requests || 0 });
+  } catch (e) { return; }
+  if (auth.remoteLogin && !auth.user) { location.replace("/login"); return; }
+  $("usersMenuBtn").hidden = $("signOutBtn").hidden = !auth.remoteLogin;
+  $("signedAs").textContent = auth.user ? auth.user.username : "";
+  $("usersReqN").hidden = !auth.requests;
+  $("usersReqN").textContent = auth.requests;
+  $("usersReqN").title = `${auth.requests} request${auth.requests === 1 ? "" : "s"} for access to approve`;
+}
+loadAuth();
+$("signOutBtn").addEventListener("click", async () => {
+  setNavMenu(false);
+  try { await api("POST", "/api/auth/logout", {}); } catch (e) { /* signed out anyway */ }
+  location.replace("/login");
+});
+
+// ---- ☰ → Users (auth.go) ----------------------------------------------------------
+const US_STATUS = { active: ["Active", "text-bg-success"], invited: ["Invited: no password yet", "text-bg-secondary"], requested: ["Requests access", "text-bg-warning"] };
+let usList = [];
+function usShow(id, kind, text) { const r = $(id); r.className = resultClass(kind); r.textContent = text; r.hidden = !text; }
+async function openUsersDialog() {
+  usShow("usResult", "", ""); usShow("usPwResult", "", "");
+  $("usAddForm").reset(); $("usPwForm").reset();
+  $("usMe").textContent = auth.user ? auth.user.username : "";
+  $("usTable").innerHTML = `<p class="emptymsg p-3"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>  Loading…</p>`;
+  $("usersDialog").showModal();
+  await loadUsers();
+  $("usEmail").focus();
+}
+async function loadUsers() {
+  try {
+    const res = await api("GET", "/api/users");
+    usList = res.users;
+    const when = (t) => t ? new Date(t).toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–";
+    $("usTable").innerHTML = `<table class="table table-sm table-hover"><thead><tr><th>User</th><th>Status</th><th>Added</th><th>Last sign-in</th><th></th></tr></thead><tbody>` +
+      usList.map((u) => {
+        const [label, cls] = US_STATUS[u.status] || [u.status, "text-bg-secondary"];
+        const me = u.username === res.me, email = u.username !== "admin";
+        const acts = u.status === "requested"
+          ? `<button class="btn btn-sm btn-primary" data-uact="approve" title="Give access and e-mail them"><i class="bi bi-check-lg" aria-hidden="true"></i> Approve</button>` +
+            `<button class="btn btn-sm btn-outline-danger" data-uact="reject" title="Turn the request down"><i class="bi bi-x-lg" aria-hidden="true"></i> Reject</button>`
+          : (email ? `<button class="btn btn-sm btn-outline-secondary" data-uact="resend" title="${u.status === "invited" ? "E-mail a new invitation link" : "E-mail a password reset link"} (works for one hour)"><i class="bi bi-envelope" aria-hidden="true"></i> Send link</button>` : "") +
+            (me ? "" : `<button class="btn btn-sm btn-outline-danger" data-uact="delete" title="Delete this user (asks first)" aria-label="Delete ${esc(u.username)}"><i class="bi bi-trash" aria-hidden="true"></i></button>`);
+        return `<tr data-uid="${u.id}" class="${u.status === "requested" ? "req" : ""}"><td class="uname"><b>${esc(u.username)}</b>${u.name ? ` · ${esc(u.name)}` : ""}${me ? ` <span class="badge text-bg-primary">you</span>` : ""}` +
+          `${u.reason ? `<span class="reason">“${esc(u.reason)}”</span>` : ""}</td>` +
+          `<td><span class="badge ${cls}">${esc(label)}</span></td><td title="${esc(u.addedBy ? "by " + u.addedBy : "")}">${esc(when(u.created))}${u.addedBy ? `<br><small class="text-body-secondary">by ${esc(u.addedBy)}</small>` : ""}</td>` +
+          `<td>${esc(when(u.lastLogin))}</td><td class="uacts">${acts}</td></tr>`;
+      }).join("") + "</tbody></table>";
+  } catch (e) { $("usTable").innerHTML = `<p class="emptymsg p-3">${esc(e.message)}</p>`; }
+}
+$("usAddForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const email = $("usEmail").value.trim();
+  $("usAdd").disabled = true;
+  usShow("usResult", "busy", `Adding ${email} and e-mailing the link…`);
+  try {
+    await api("POST", "/api/users", { email, name: $("usName").value });
+    usShow("usResult", "ok", `Added ${email}. They were e-mailed a link to set their password (it works for one hour).`);
+    $("usAddForm").reset();
+    loadUsers();
+  } catch (e) { usShow("usResult", "bad", e.message); }
+  finally { $("usAdd").disabled = false; }
+});
+$("usTable").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-uact]"), tr = ev.target.closest("tr[data-uid]");
+  if (!b || !tr) return;
+  const u = usList.find((x) => String(x.id) === tr.dataset.uid), act = b.dataset.uact;
+  if (act === "delete" && b.dataset.armed !== "1") {
+    // Asks first: a second click within 4 seconds deletes.
+    b.dataset.armed = "1"; b.classList.replace("btn-outline-danger", "btn-danger"); b.innerHTML = "Delete?";
+    setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.classList.replace("btn-danger", "btn-outline-danger"); b.innerHTML = `<i class="bi bi-trash" aria-hidden="true"></i>`; } }, 4000);
+    return;
+  }
+  const busy = { approve: `Approving ${u.username} and e-mailing them…`, reject: `Rejecting the request of ${u.username}…`, resend: `E-mailing ${u.username} a new link…`, delete: `Deleting ${u.username}…` };
+  const ok = { approve: `Approved: ${u.username} was e-mailed and can sign in now.`, reject: `Rejected the request of ${u.username}.`,
+    resend: `E-mailed ${u.username} a new link (it works for one hour).`, delete: `Deleted ${u.username}.` };
+  tr.querySelectorAll("button").forEach((x) => (x.disabled = true));
+  usShow("usResult", "busy", busy[act]);
+  try {
+    await api("POST", `/api/users/${u.id}/${act}`, {});
+    usShow("usResult", "ok", ok[act]);
+  } catch (e) { usShow("usResult", "bad", e.message); }
+  loadUsers(); loadAuth();
+});
+$("usPwForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if ($("usPwNew").value !== $("usPwNew2").value) return usShow("usPwResult", "bad", "The two new passwords aren't the same.");
+  try {
+    await api("POST", "/api/account/password", { current: $("usPwCur").value, password: $("usPwNew").value });
+    $("usPwForm").reset();
+    usShow("usPwResult", "ok", "Your password is changed. Other browsers signed in as you were signed out.");
+  } catch (e) { usShow("usPwResult", "bad", e.message); }
+});
+$("usClose").addEventListener("click", () => $("usersDialog").close());
+
+// ---- ☰ → E-mail server (mail.go): as cactusInv's Settings → E-mail server -------------
+const EM_PRESETS = {
+  "Gmail": { host: "smtp.gmail.com", port: 587, tls: "starttls", hint: "Use your Gmail address as user name and a Google App password (Google Account → Security → 2-Step Verification → App passwords), not your normal password." },
+  "Outlook / Microsoft 365": { host: "smtp.office365.com", port: 587, tls: "starttls", hint: "Use your Microsoft 365 address and password (SMTP AUTH must be enabled for the mailbox)." },
+  "Custom": { host: "", port: 587, tls: "starttls", hint: "Enter your provider's SMTP host, port and security." },
+};
+const EM_GUIDE = {
+  "Gmail": [
+    "Turn on 2-Step Verification for the Google account: <b>Google Account → Security → 2-Step Verification</b>. Google offers App passwords only to accounts that have it.",
+    "Create an App password: <b>Google Account → Security → 2-Step Verification → App passwords</b>. Name it “cactusdb” and copy the 16-letter password Google shows. You see it once.",
+    "Here, choose <b>Gmail</b>. The host <b>smtp.gmail.com</b>, port <b>587</b> and <b>STARTTLS</b> are filled in.",
+    "User name: your full Gmail address. Password: the App password, without the spaces — not your normal password.",
+    "Send as: your Gmail address. To send as another address, first add it in Gmail under <b>Settings → Accounts → Send mail as</b> and verify it; otherwise Gmail sends as your Gmail address and the page warns you.",
+    "Tick <b>Use this server for all e-mail</b>, press <b>Save e-mail server</b>, then <b>Send test e-mail</b> and check the inbox.",
+  ],
+  "Outlook / Microsoft 365": [
+    "Make sure the mailbox may send through SMTP. An administrator turns it on in the <b>Microsoft 365 admin center → Users → Active users → the user → Mail → Manage email apps → Authenticated SMTP</b>. Some tenants switch it off for everyone; ask your administrator if the test is refused.",
+    "Here, choose <b>Outlook / Microsoft 365</b>. The host <b>smtp.office365.com</b>, port <b>587</b> and <b>STARTTLS</b> are filled in.",
+    "User name: the full e-mail address of the mailbox. Password: its password (or an app password, if your organisation uses them).",
+    "Send as: the mailbox address, or an address the mailbox has been given “Send As” permission for by an administrator; otherwise Microsoft 365 may refuse to send and the page warns you.",
+    "Tick <b>Use this server for all e-mail</b>, press <b>Save e-mail server</b>, then <b>Send test e-mail</b> and check the inbox.",
+  ],
+  "Custom": [
+    "Look up your provider's SMTP settings (their help pages call them “SMTP” or “outgoing mail server”): the host, the port and the security.",
+    "Choose <b>Custom</b> and enter them. Port <b>587</b> goes with <b>STARTTLS</b>, port <b>465</b> with <b>SSL/TLS</b>. Use <b>None</b> only for a test mail server on your own network: it sends the password unencrypted.",
+    "User name and password as the provider gives them — often the full e-mail address and its password; some services use a fixed user name and an API key instead.",
+    "Send as: an address on a domain the provider allows you to send from. Set up the SPF and DKIM records the provider asks for, so that the e-mails are not marked as spam.",
+    "Tick <b>Use this server for all e-mail</b>, press <b>Save e-mail server</b>, then <b>Send test e-mail</b> and check the inbox.",
+  ],
+};
+const EM_TROUBLE = [
+  "<b>The password is refused:</b> for Gmail use an App password, not your normal one; for Microsoft 365 check that Authenticated SMTP is on for the mailbox.",
+  "<b>The test times out:</b> the network may block outgoing mail ports — try the other port (587 or 465) with its matching security, or ask whoever runs the network.",
+  "<b>The test e-mail comes from your Gmail address:</b> Gmail sends as the signed-in account unless the Send as address is added under <b>Settings → Accounts → Send mail as</b> and verified. The provider decides the sender it shows.",
+  "<b>The test e-mail does not arrive:</b> look in the spam folder, and check the Send as address is one the provider lets you use.",
+];
+let emSaved = "", emPasswordSet = false;
+const emForm = () => ({ enabled: $("emEnabled").checked, host: $("emHost").value.trim(), port: +$("emPort").value || 0, tls: $("emTls").value,
+  username: $("emUser").value.trim(), from: $("emFrom").value.trim(), linkBase: $("emLink").value.trim() });
+const emPreset = () => Object.keys(EM_PRESETS).find((k) => EM_PRESETS[k].host && EM_PRESETS[k].host === $("emHost").value.trim()) || "Custom";
+function emRender() {
+  const p = emPreset();
+  $("emPresets").innerHTML = Object.keys(EM_PRESETS).map((k) =>
+    `<button type="button" role="radio" aria-checked="${k === p}" class="btn btn-sm ${k === p ? "btn-primary" : "btn-outline-primary"}" data-preset="${esc(k)}">${esc(k)}</button>`).join("");
+  $("emPresetHint").textContent = EM_PRESETS[p].hint;
+  const dirty = JSON.stringify(emForm()) !== emSaved || $("emPass").value !== "";
+  $("emTest").disabled = dirty; $("emTestNote").hidden = !dirty;
+  $("emTest").title = dirty ? "Save first: the test uses the saved settings" : "";
+}
+function emFill(v) {
+  $("emEnabled").checked = v.enabled; $("emHost").value = v.host; $("emPort").value = v.port || ""; $("emTls").value = v.tls || "starttls";
+  $("emUser").value = v.username; $("emFrom").value = v.from; $("emLink").value = v.linkBase || location.origin; $("emPass").value = "";
+  emPasswordSet = v.passwordSet;
+  $("emPass").placeholder = v.passwordSet ? "•••••••• saved" : "";
+  $("emPassHint").textContent = v.passwordSet ? "A password is saved (encrypted). Leave empty to keep it." : "Stored encrypted.";
+  $("emWarn").hidden = !v.warnings.length;
+  $("emWarn").innerHTML = v.warnings.length ? `<b>For the saved settings:</b><ul class="mb-0 ps-3">${v.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : "";
+  emSaved = JSON.stringify({ ...emForm(), linkBase: v.linkBase || "" });
+  emRender();
+}
+async function openEmailDialog() {
+  usShow("emResult", "", "");
+  try { emFill(await api("GET", "/api/email")); } catch (e) { return toast(e.message, true); }
+  if (!$("emTestTo").value) $("emTestTo").value = auth.user && auth.user.email ? auth.user.username : "";
+  $("emailDialog").showModal();
+}
+$("emPresets").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-preset]"); if (!b) return;
+  const p = EM_PRESETS[b.dataset.preset];
+  $("emHost").value = p.host; $("emPort").value = p.port; $("emTls").value = p.tls;
+  emRender();
+});
+$("emForm").addEventListener("input", emRender);
+$("emForm").addEventListener("change", emRender);
+$("emForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("emSave").disabled = true;
+  usShow("emResult", "busy", "Saving…");
+  try {
+    const pw = $("emPass").value;
+    emFill(await api("POST", "/api/email", { ...emForm(), password: pw === "" ? null : pw }));
+    usShow("emResult", "ok", "Saved.");
+  } catch (e) { usShow("emResult", "bad", e.message); }
+  finally { $("emSave").disabled = false; }
+});
+$("emTest").addEventListener("click", async () => {
+  const to = $("emTestTo").value.trim() || $("emUser").value.trim();
+  $("emTest").disabled = true;
+  usShow("emResult", "busy", `Sending a test e-mail to ${to}…`);
+  try {
+    const r = await api("POST", "/api/email/test", { to });
+    usShow("emResult", r.warnings.length ? "busy" : "ok", r.warnings.length ? `Test e-mail sent — but: ${r.warnings.join(" ")}` : "Test e-mail sent — check the inbox.");
+  } catch (e) { usShow("emResult", "bad", e.message); }
+  finally { emRender(); }
+});
+$("emClose").addEventListener("click", () => $("emailDialog").close());
+function emGuide(p) {
+  $("egTabs").innerHTML = Object.keys(EM_GUIDE).map((k) =>
+    `<button type="button" role="tab" aria-selected="${k === p}" class="btn btn-sm ${k === p ? "btn-primary" : "btn-outline-primary"}" data-guide="${esc(k)}">${esc(k)}</button>`).join("");
+  $("egSteps").innerHTML = EM_GUIDE[p].map((x) => `<li>${x}</li>`).join("");
+  $("egTrouble").innerHTML = EM_TROUBLE.map((x) => `<li>${x}</li>`).join("");
+}
+$("emGuideBtn").addEventListener("click", () => { emGuide(emPreset()); $("emGuideDialog").showModal(); });
+$("egTabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-guide]"); if (b) emGuide(b.dataset.guide); });
+$("egClose").addEventListener("click", () => $("emGuideDialog").close());
+
 // ---- usage log housekeeping: delete the events of a date range ----------------
 function showUsageSummary(u) {
   $("stUsageSum").textContent = !u.count ? "The usage log is empty."
@@ -2703,6 +3018,8 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "folder": setNavMenu(false); openFolderDialog(); break;
     case "drivers": setNavMenu(false); $("driversDialog").showModal(); break;
     case "settings": setNavMenu(false); openSettingsDialog(); break;
+    case "email": setNavMenu(false); openEmailDialog(); break;
+    case "users": setNavMenu(false); openUsersDialog(); break;
     case "update": setNavMenu(false); openUpdateDialog(); break;
     case "logs": setNavMenu(false); showTab("logs"); break;
     case "compare": setNavMenu(false); showTab("compare"); break;
@@ -4660,7 +4977,9 @@ async function presenceCheck() {
   try {
     const r = await fetch("/api/presence", { method: "POST", cache: "no-store", body: JSON.stringify({ client: presence.id, name: msg.name }),
       headers: { "Content-Type": "application/json", "X-Cactusdb-Errors": "in-header" } });
-    if (+(r.headers.get("X-Cactusdb-Status") || r.status) >= 400) return;
+    const st = +(r.headers.get("X-Cactusdb-Status") || r.status);
+    if (st === 401 && auth.remoteLogin) { location.replace("/login"); return; } // signed out elsewhere, or expired
+    if (st >= 400) return;
     data = await r.json();
   } catch (e) { return; } // restarting, or the network: next time
   presence.clients = data.clients || [];
@@ -4687,6 +5006,7 @@ function presenceNotice(n) {
   if (n.kind === "connections") loadSaved();
   else if (n.kind === "queries" && state.savedConn && state.savedConn === n.savedId) loadQueries();
   else if (n.kind === "containers" && $("ctrDialog").open) loadContainersList();
+  else if (n.kind === "users") { loadAuth(); if ($("usersDialog").open) loadUsers(); }
 }
 const noticeText = (n) => n.ip ? n.text : n.text.charAt(0).toUpperCase() + n.text.slice(1);
 const NOTICE_ICON = { connections: "bi-plug", queries: "bi-journal-code", containers: "bi-box-seam", upgrade: "bi-cloud-arrow-down" };

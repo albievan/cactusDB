@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.47.0
+cactusdb 1.48.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -645,7 +645,8 @@ another. It turns green when someone else is using it too. Hover over it for the
 IPs, or click it for the list: each page's **client IP**, its browser, when it was opened and
 when it was last heard from, with *this page* marked. A page checks in every 5 seconds; one
 that is closed or reloaded leaves the list straight away, and one that goes quiet (the
-computer asleep, the network gone) after about a minute. cactusdb's log notes each page
+computer asleep, the network gone) after about two and a half minutes. With
+[`--remotelogin`](#remote-login) the list shows each page's user. cactusdb's log notes each page
 opening and closing, with its IP and how many are using it.
 
 **Notices of other people's changes.** When someone, on another page, **adds, changes,
@@ -675,6 +676,73 @@ a handle that isn't the secret id a page checks in with, so no page can read ano
 messages. Messages are kept in memory only, are never logged or written to disk, and are
 forgotten once both pages are closed. Reloading a page starts a new conversation. Under
 **Your name** you can give a name the others see next to your IP (kept in this browser).
+
+<a id="remote-login"></a>
+### Signing in first: `--remotelogin`
+
+Start cactusdb with **`--remotelogin`** and nothing of it can be seen or used before signing
+in: opening it shows the sign-in page, and every request without a sign-in is refused.
+
+```sh
+cactusdb --port 8087 --remotelogin --runas background
+```
+
+- **The first user is `admin`, password `admin`.** Signing in with it asks for a new
+  password straight away (at least 8 characters, not `admin`). Forgot it? On the server,
+  `cactusdb --resetadmin` sets it back to `admin`, to be changed at the next sign-in.
+- **Every other user is an e-mail address.** After the right password, cactusdb e-mails an
+  **8-digit security code**; the next screen asks for it (typing or pasting it, it signs in
+  as soon as the 8 digits are there). A code works for 10 minutes; **Send a new code**
+  e-mails another one (at most every 30 seconds) and the earlier one stops working. After 5
+  wrong codes the sign-in starts again. `admin` has no address, so it gets no code.
+- **Adding users:** any signed-in user can add one under ☰ → **Users**. The user name must
+  be a valid e-mail address. cactusdb e-mails them a link to set their password, which
+  **works for one hour** and once; **Send link** e-mails a new one (for a user who already
+  has a password, a password reset link).
+- **Forgot your password?** on the sign-in page e-mails a link to set a new password (one
+  hour). The answer is the same whether or not the address has an account. Setting the new
+  password signs that user out everywhere.
+- **Request access:** on the sign-in page anyone can request access with their e-mail
+  address, name, a password and why they need it. They can't sign in until a signed-in user
+  approves the request under ☰ → **Users** (the open pages are told, and ☰ → Users shows
+  how many are waiting). Approving e-mails them that they can sign in now; **Reject** removes
+  the request.
+- ☰ → **Users** also lists everyone with their status (*Active*, *Invited: no password yet*,
+  *Requests access*), who added them and their last sign-in, deletes users (asks first; not
+  yourself, nor the last user who can sign in), and changes your own password. ☰ →
+  **Sign out** signs this browser out. A sign-in ends after 12 hours unused.
+- The e-mails go through the mail server of ☰ → [**E-mail server**](#email-server), which
+  must be set up first (sign in as `admin` to do it).
+
+Wrong passwords are slowed down: after 5 for a user name or from one computer, each further
+try waits 2 seconds, doubling up to 5 minutes. Passwords are stored as Argon2id hashes;
+codes, links and sign-ins as SHA-256 hashes of random tokens, so the connection file never
+holds one that works. The browser holds its sign-in in an HttpOnly cookie. The log notes
+every sign-in, failed sign-in and user change with the client IP, never a password or code.
+
+<a id="email-server"></a>
+### E-mail server
+
+☰ → **E-mail server** sets up the mail server cactusdb sends e-mail through: the sign-in
+codes, invitations, password reset links and approvals of `--remotelogin`. It works like
+cactusInv's *Settings → E-mail server*:
+
+- **Gmail**, **Outlook / Microsoft 365** or **Custom** fills in the host, port and security,
+  with a hint for that provider. **Setup guide** explains step by step what to do at the
+  provider (for Gmail: an App password), and what to try if the test fails.
+- **SMTP host**, **Port**, **Security** (STARTTLS, SSL/TLS or None), **User name** and
+  **Password**. The password is stored encrypted with cactusdb's key and never shown again;
+  leave it empty to keep it. *None* sends nothing encrypted, so it is only allowed without a
+  user name (a test mail server on your own network).
+- **Send as**, e.g. `IT <it@example.com>` (the user name when empty). cactusdb warns when
+  Gmail or Microsoft 365 is known not to send as that address.
+- **Use this server for all e-mail**: nothing is sent until it is ticked.
+- **Address in e-mailed links**: how the people cactusdb e-mails reach it, e.g.
+  `http://10.66.1.136:8087`; the links start with it. It is filled in with the address you
+  opened cactusdb at. cactusdb never takes it from a request, which anyone can fake to make a
+  reset link point elsewhere.
+- **Send test e-mail** (after saving) sends a test message through the saved settings and
+  shows the mail server's answer if it is refused.
 
 <a id="dashboard"></a>
 ### The database's dashboard
@@ -1137,6 +1205,8 @@ cactusdb --port 8087 --web yes --exportto ./export
 | `--host` | `0.0.0.0` (every network interface) | The address to listen on. By default other computers on your network can use cactusdb at `http://<this computer's IP address>:<port>`; the addresses are printed at startup. Use `127.0.0.1` to allow only this computer, `::` to listen on IPv6 too, or one of this computer's IP addresses to listen on that network only. See [Security](#7-security). |
 | `--runas` | `foreground` | `background` starts the web UI in the background: it keeps running after you close the terminal and logs to `--logfile`. See below. |
 | `--logfile` | `cactusdb.log` next to the program, with `--runas background` | Every action is logged here: connections (never passwords), tables opened, queries, exports, saved connections, and every request with its result and session (`session=` and the first 8 characters of its id, so you can follow one browser's requests). In the foreground, the log goes to the terminal and, if you give `--logfile`, to that file too. A new file starts every day: earlier days are renamed to `cactusdb-YYYY-MM-DD.log` and kept for 30 days. |
+| `--remotelogin` | off | Everyone signs in before anything can be seen: the first user is `admin` / `admin`, other users are e-mail addresses and get an e-mailed code. See [Signing in first](#remote-login). |
+| `--resetadmin` | | Set the `--remotelogin` user `admin`'s password back to `admin` (to be changed at the next sign-in), then exit. Use the same `--conn-db` as the running cactusdb. |
 | `--version` | | Print the version and exit |
 | `--help` | | List the options |
 
@@ -1147,6 +1217,7 @@ cactusdb --port 8087 --exportto D:\Reports\exports    # exports to another drive
 cactusdb --port 8087 --exportto ~/Desktop/exports     # exports to your Desktop (macOS/Linux)
 cactusdb --port 8087 --web yes                        # open from any machine: http://<ip address>:8087
 cactusdb --port 8087 --host 127.0.0.1                 # this computer only
+cactusdb --port 8087 --remotelogin                    # everyone signs in first (admin / admin)
 CACTUSDB_PASSPHRASE='my long passphrase' cactusdb --port 8080   # encrypt with a passphrase (macOS/Linux)
 ```
 
@@ -1456,6 +1527,10 @@ is sent and how to set it up. In short:
 
 ## 7. Security
 
+- **Who can open cactusdb:** anyone who can reach its port, unless it is started with
+  [`--remotelogin`](#remote-login): then only signed-in users, with an e-mailed code for
+  each sign-in.
+
 - **Saved usernames and passwords are encrypted** in `cactus.conn.db` with AES-256-GCM.
   Each value has its own random nonce and is tied to its column. The other connection
   details (name, engine, host, port, database) are not secret and stay readable.
@@ -1539,6 +1614,9 @@ is sent and how to set it up. In short:
 | A saved connection asks for a password I don't have | Since 1.14 every saved connection has its own connection password. If you forgot it, the superuser can open it (🛡), provided a superuser password was set before the connection's password and the connection has been opened since. Otherwise delete it (✕) and save it again. |
 | *wrong connection password* / *try again in N seconds* | After five wrong passwords for a connection, each further try has to wait (2 seconds, doubling up to 5 minutes). Wait, then type the password carefully. |
 | *No superuser password has been set* | Set one on the computer running cactusdb: `cactusdb --superuser set` (in a container: `docker exec -it cactusdb cactusdb --conn-db /opt/cactusdb/conn/cactus.conn.db --superuser set`). |
+| `--remotelogin`: *cactusdb couldn't e-mail your sign-in code* or *no e-mail server is set up* | The e-mail users need e-mail to sign in. Sign in as `admin` (it gets no code), open ☰ → **E-mail server**, set it up, tick *Use this server for all e-mail*, save and **Send test e-mail**. If the test fails, the message is the mail server's answer; the **Setup guide** lists the usual causes. |
+| `--remotelogin`: forgot `admin`'s password | On the server, with the same `--conn-db`: `cactusdb --resetadmin`. Then sign in with `admin` / `admin` and choose a new password. |
+| `--remotelogin`: the link in the e-mail doesn't open cactusdb | Set **Address in e-mailed links** under ☰ → E-mail server to the address the others use for cactusdb (e.g. `http://10.66.1.136:8087`), then **Send link** again under ☰ → Users. A link works for one hour, and once. |
 | `cannot listen on 0.0.0.0:8080: …` | Another program uses that port. Pick another: `--port 8090`. |
 | Other computers can't open `http://<ip address>:<port>` | Check the address is one printed at startup and that cactusdb wasn't started with `--host 127.0.0.1`. Then allow the port in the firewall: on Windows accept the *Windows Defender Firewall* prompt on first start (or `netsh advfirewall firewall add rule name=cactusdb dir=in action=allow protocol=TCP localport=8080`); on macOS allow cactusdb under *System Settings › Network › Firewall*; on Linux e.g. `sudo ufw allow 8080/tcp` or `sudo firewall-cmd --add-port=8080/tcp`. |
 | `the background server stopped:` followed by log lines | The background copy couldn't start; the lines say why (often the port or the connection file). |
@@ -1658,6 +1736,8 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `store.go` | Saved connections and settings (`cactus.conn.db`) |
 | `settings.go` | Changing the export folder from the web UI |
 | `lock.go` | Connection passwords (Argon2id keys), saved queries in the store, the wrong-password throttle |
+| `auth.go` | `--remotelogin`: users, signing in with the e-mailed code, invitations, password resets, requests for access, the sign-in gate in front of everything (`/api/auth/…`, `/api/users`); the sign-in page is `web/login.html` |
+| `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |
 | `files.go` | The *Exported files* page: listing, previews, deleting, and compressed downloads of a selection |
