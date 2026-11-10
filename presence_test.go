@@ -134,6 +134,18 @@ func TestDirectMessages(t *testing.T) {
 		t.Errorf("a third page was given the reply: %+v", m)
 	}
 
+	// A page that went quiet (a tab in the background) and checks in again
+	// keeps its handle and is given what was sent to it meanwhile (with the
+	// rest of its conversation: the page skips the ones it has).
+	if code, _ := send("page-aaaa", b, "while you were away"); code != 200 {
+		t.Fatalf("send: %d", code)
+	}
+	s.presence.clients["page-bbbb"].seen = time.Now().Add(-2 * presenceGone)
+	back := checkIn("page-bbbb", "10.0.0.2", "")
+	if n := len(back.Messages); handle(back) != b || n == 0 || back.Messages[n-1].Text != "while you were away" {
+		t.Errorf("back from the background: handle %q (was %q), messages %+v", handle(back), b, back.Messages)
+	}
+
 	// Not from an unknown page, not to itself, not to a closed one, not empty.
 	if code, _ := send("page-zzzz", b, "x"); code != 409 {
 		t.Errorf("from an unknown page: %d", code)

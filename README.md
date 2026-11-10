@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.46.2
+cactusdb 1.47.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -554,20 +554,27 @@ and its size (uncompressed).
 - **Filter by connection:** the **Connection** list shows every connection with its number
   of files. Older exports appear as *(older exports)*. The type counts follow the chosen
   connection, and a download of one connection's files is named after it.
+- **Filter by date:** the **Exported** list shows every day files were exported on, newest
+  first, with the number of files of that day (for the chosen connection). Pick a day to show
+  only the files exported on it; **All dates** shows them all again. Days are in your
+  browser's time zone.
 - **Filter by type:** the **Type** buttons show how many files of each type there are
   (Excel, CSV, JSON, XML, DDL, Backup). Click one to show only that type, or click several
   to combine them, for example CSV and JSON. **All** shows every type again.
 - **Search by name:** the **Name** box shows files whose name contains what you type,
   ignoring case. With several words, for example `order 2026`, a name must contain all of
   them, in any order. The matching text is highlighted. **Esc** or **✕** clears the box.
-- Type, name and search filters combine. The footer shows how many files are shown and
+- Connection, date, type and name filters combine. The footer shows how many files are shown and
   their size. If nothing matches, **Clear the filters** resets them. The filters and the
   sort order are remembered in your browser.
 - **Select:** tick the files you want, or click their rows. The heading checkbox selects every
   file shown.
 - **Preview** (the 👁 button after a file's checkbox) opens the file in a window:
-  - CSV and Excel files (the first sheet) as a table; JSON exports as a table of their objects
-  - XML, DDL scripts and other text as text
+  - CSV and Excel files (the first sheet) as a table
+  - JSON and XML files in their own format, as they are written in the file, coloured: keys,
+    strings, numbers, tags and attributes. A JSON file written on one line is laid out on
+    lines of its own, indented, with every value kept exactly as written
+  - DDL scripts and other text as text
   - a backup as the list of files inside, followed by the start of its SQL script
 
   A preview shows at most the first 200 rows or 256 KB, and says when there is more.
@@ -656,9 +663,13 @@ notices are listed under *Changes by others* in the people button's list.
 **Direct messages.** To write to someone using cactusdb, open the people button's list and
 click the 💬 button on their row, or click 💬 **Messages** in the top bar (shown when someone
 else has cactusdb open) and pick them under **To**. Type the message and press **Enter**
-(**Shift+Enter** starts a new line). It reaches their page within a few seconds as a notice
-with **Reply**, and the 💬 button shows how many are unread; **Reply** opens the conversation
-so they can answer. Messages are **private**: only the page you picked, and yours, are given
+(**Shift+Enter** starts a new line). It pops up on their screen within a few seconds,
+whatever they are doing: they don't need to be connected to a database, or to the same one as
+you, only to have cactusdb open. The message shows on top of an open window (such as the Save
+query window) too, and stays until it is read: **Reply** opens the conversation so they can
+answer, **✕** closes it. The 💬 button shows how many are unread, and while the cactusdb tab is
+in the background its title says so, for example *(1) New message · cactusdb*; the message is
+there when they come back to the tab. Messages are **private**: only the page you picked, and yours, are given
 a message. Other pages, from the same computer or another, never see it. Pages are addressed by
 a handle that isn't the secret id a page checks in with, so no page can read another's
 messages. Messages are kept in memory only, are never logged or written to disk, and are

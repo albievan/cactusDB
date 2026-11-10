@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -29,7 +31,7 @@ import (
 // and are dropped once neither page is open.
 
 const (
-	presenceGone = 75 * time.Second // a page not heard from for this long has gone (a hidden tab checks in slowly)
+	presenceGone = 150 * time.Second // a page not heard from for this long has gone (a browser checks in from a background tab about once a minute)
 	maxNotices   = 200
 	maxPresence  = 1000
 	maxMessages  = 2000 // kept in all
@@ -110,6 +112,13 @@ func (p *presence) dropMessages() {
 	p.messages = kept
 }
 
+// presenceHandle is a page's public handle: from its secret id, which it
+// doesn't give away.
+func presenceHandle(id string) string {
+	sum := sha256.Sum256([]byte("cactusdb presence handle\x00" + id))
+	return hex.EncodeToString(sum[:8])
+}
+
 // byHandle finds an open page by its public handle. The caller holds p.mu.
 func (p *presence) byHandle(h string) *presenceClient {
 	for _, c := range p.clients {
@@ -185,7 +194,10 @@ func (s *server) handlePresence(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 429, errors.New("too many pages are open"))
 			return
 		}
-		c = &presenceClient{id: req.Client, handle: newID()[:16], ip: clientIP(r), agent: r.UserAgent(), since: now, notice: p.seq, msg: p.msgSeq}
+		// A page that went quiet and checks in again (a tab in the
+		// background) gets the same handle back, and the messages sent
+		// to it meanwhile.
+		c = &presenceClient{id: req.Client, handle: presenceHandle(req.Client), ip: clientIP(r), agent: r.UserAgent(), since: now, notice: p.seq}
 		p.clients[req.Client] = c
 		log.Printf("%s opened cactusdb (%d using it now)", c.ip, len(p.clients))
 	}

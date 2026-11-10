@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.47.0 — 2026-11-10
+
+- **JSON and XML previews in their own format**: the preview of an exported JSON or XML file
+  shows the file as it is written, coloured (keys, strings, numbers, true/false/null; tags,
+  attributes and values), instead of a table. A JSON file written on one line is laid out
+  indented, keeping every value exactly as written.
+- **Exported files: filter by date**: the new **Exported** list next to *Connection* shows
+  every day files were exported on, newest first, with their number (for the chosen
+  connection). Pick one to show only that day's files. Remembered in the browser like the
+  other filters.
+- **Fixed: a direct message didn't always pop up on the other person's screen.**
+  - A message that came while a window was open (Save query, Drivers…) went away with the
+    window when it was closed, and one shown on the page was hidden under a window opened
+    afterwards. Messages, and the conversation opened with **Reply**, now always show on
+    top, moving with the windows as they open and close.
+  - A message closed itself after 20 seconds, so it was missed by anyone not looking. It now
+    stays until it is read (**Reply**, or **✕**).
+  - A tab in the background shows the number of new messages in its title, and checks for
+    messages as soon as it is shown again.
+  - A browser checks in from a background tab only about once a minute, and after 75 seconds
+    cactusdb counted the page as closed: messages to it were refused, and it came back under
+    a new address. cactusdb now waits 150 seconds, and a page that comes back keeps its
+    address and is given the messages sent to it meanwhile.
+
 ## 1.46.2 — 2026-11-10
 
 - **⏻ Shutdown moved to the ☰ menu**: it is the last item of the menu at the bottom left,

@@ -446,8 +446,9 @@ func (s *server) findExportedFile(ref fileRef) (exportedFile, bool) {
 }
 
 // handlePreviewFile returns the start of an exported file for the preview:
-// rows for CSV, Excel and JSON arrays, the list of files for a backup .zip
-// (with the start of its SQL script), and text for everything else.
+// rows for CSV and Excel, the list of files for a backup .zip (with the
+// start of its SQL script), and text for everything else: JSON and XML are
+// shown as written, in their own format.
 func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		fileRef
@@ -472,10 +473,6 @@ func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
 		err = previewCSV(f.path, out)
 	case "xlsx":
 		err = previewXLSX(f.path, out)
-	case "json":
-		if previewJSONRows(f.path, out) != nil {
-			err = previewText(f.path, out)
-		}
 	case "zip", "backup":
 		if strings.HasSuffix(f.Name, ".zip") {
 			err = previewZip(f.path, out)
@@ -562,37 +559,6 @@ func tableOut(rows [][]string, out map[string]any, more func() bool) error {
 		truncated = more()
 	}
 	out["columns"], out["rows"], out["truncated"] = rows[0], body, truncated
-	return nil
-}
-
-// previewJSONRows reads the first objects of a JSON array (the shape of
-// cactusdb's JSON exports). The page turns them into a table, keeping the
-// key order of the file.
-func previewJSONRows(path string, out map[string]any) error {
-	fh, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	dec := json.NewDecoder(fh)
-	if t, err := dec.Token(); err != nil || t != json.Delim('[') {
-		return errors.New("not an array")
-	}
-	var items []json.RawMessage
-	for dec.More() && len(items) < previewRows {
-		var m json.RawMessage
-		if err := dec.Decode(&m); err != nil {
-			return err
-		}
-		if len(m) == 0 || m[0] != '{' {
-			return errors.New("not an array of objects")
-		}
-		items = append(items, m)
-	}
-	out["mode"], out["items"], out["truncated"] = "json", items, dec.More()
-	if items == nil {
-		out["items"] = []json.RawMessage{}
-	}
 	return nil
 }
 

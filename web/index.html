@@ -172,6 +172,9 @@
   [data-bs-theme=dark] .toast.notice { --bs-btn-close-filter: invert(1) grayscale(100%) brightness(200%); }
   .toast.notice .toast-header { gap: 6px; }
   .toast.notice .toast-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+  /* A message: stands out from the notices, and stays until it is closed. */
+  .toast.notice.sticky { --bs-toast-border-color: var(--accent); border-width: 2px; box-shadow: 0 8px 28px rgba(0, 0, 0, .28); }
+  .toast.notice.sticky .toast-body .text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
   /* Direct messages. */
   #msgBtn { flex: none; }
   .msgunread { position: absolute; top: -6px; right: -8px; font-size: 10px; }
@@ -501,6 +504,7 @@
   .filesbar .spacer { flex: 1; }
   #fFilter { width: 180px; max-width: 100%; }
   #fConn { width: auto; max-width: 220px; }
+  #fDate { width: auto; max-width: 200px; }
   .filesbar .form-control[type=search] { width: auto; }
   .ftable td.fconn { font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
   .ftable td.fconn .none { color: var(--muted); font-style: italic; }
@@ -535,6 +539,12 @@
   .fpbody { overflow: auto; min-height: 0; background: var(--panel); }
   .fpbody pre { margin: 0; padding: 12px 16px; font: 12px/1.5 var(--mono); white-space: pre; tab-size: 4; }
   .fpbody table td { font-size: 12px; }
+  /* JSON and XML in their own format, coloured. */
+  .fpbody pre .jk, .fpbody pre .xt { color: #1d4ed8; } .fpbody pre .js, .fpbody pre .xv { color: #047857; }
+  .fpbody pre .jn { color: #b45309; } .fpbody pre .jl { color: #7c3aed; } .fpbody pre .xa { color: #9d174d; } .fpbody pre .xc { color: var(--muted); }
+  [data-bs-theme=dark] .fpbody pre .jk, [data-bs-theme=dark] .fpbody pre .xt { color: #7cb4ff; }
+  [data-bs-theme=dark] .fpbody pre .js, [data-bs-theme=dark] .fpbody pre .xv { color: #5fd3a2; }
+  [data-bs-theme=dark] .fpbody pre .jn { color: #f5b25c; } [data-bs-theme=dark] .fpbody pre .jl { color: #c4a5ff; } [data-bs-theme=dark] .fpbody pre .xa { color: #f08cb8; }
   .fpbody .fpzip { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .fpbody .fpzip table { margin-top: 6px; }
   .fpfoot { padding: 6px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--panel-2); }
@@ -1015,6 +1025,8 @@
         <div class="ftypes" id="fTypes" role="group" aria-label="Show file types"></div>
         <label class="flabel" for="fConn">Connection</label>
         <select class="form-select form-select-sm" id="fConn" title="Show the files of one connection"></select>
+        <label class="flabel" for="fDate">Exported</label>
+        <select class="form-select form-select-sm" id="fDate" title="Show the files exported on one day"></select>
         <label class="flabel" for="fFilter">Name</label>
         <input class="form-control form-control-sm" id="fFilter" type="search" placeholder="contains…" spellcheck="false" autocomplete="off"
           title="Shows files whose name contains this text (any case). Several words: all must appear. Esc clears.">
@@ -1764,11 +1776,22 @@ function esc(s) {
 }
 
 // A Bootstrap toast at the bottom right.
+// The toasts and the messages panel are shown in the topmost open modal
+// dialog (it covers the page, which can't be clicked meanwhile), else on the
+// page. They move whenever a dialog opens or closes, so a toast never goes
+// away with the dialog it was in.
+function placeToasts() {
+  const d = [...document.querySelectorAll("dialog[open]")].filter((x) => x.matches(":modal")).pop() || document.body;
+  for (const el of [$("toastBox"), $("msgPanel")]) if (el && el.parentElement !== d) d.appendChild(el);
+}
+document.addEventListener("close", placeToasts, true);
+{
+  const showModal = HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal = function () { showModal.call(this); placeToasts(); };
+}
 function toast(msg, isErr) {
-  const box = $("toastBox"), t = $("toast");
-  // An open modal dialog covers the page: show the message inside it.
-  const d = document.querySelector("dialog[open]");
-  if (box.parentElement !== (d || document.body)) (d || document.body).appendChild(box);
+  const t = $("toast");
+  placeToasts();
   bootstrap.Toast.getInstance(t)?.dispose();
   $("toastText").textContent = msg;
   t.classList.toggle("text-bg-danger", !!isErr);
@@ -3371,17 +3394,21 @@ async function loadTable(name) {
 // ---- exported files ----------------------------------------------------------
 // Lists the files in the export folder; the selected ones are compressed on
 // the server into one .zip (highest compression) and then downloaded.
-const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, types: new Set(), q: "", conn: null };
+const files = { list: [], sel: new Set(), sortKey: "modified", sortDir: -1, types: new Set(), q: "", conn: null, day: null };
 // The filters are remembered in this browser (when it allows storage).
 try {
   const saved = JSON.parse(localStorage.getItem("cactusdb.fileFilters") || "{}");
   files.types = new Set(saved.types || []); files.q = saved.q || "";
   if (typeof saved.conn === "string") files.conn = saved.conn;
+  if (typeof saved.day === "string") files.day = saved.day;
   if (saved.sortKey) { files.sortKey = saved.sortKey; files.sortDir = saved.sortDir || -1; }
 } catch (e) { /* no storage: start unfiltered */ }
 function saveFileFilters() {
-  try { localStorage.setItem("cactusdb.fileFilters", JSON.stringify({ types: [...files.types], q: files.q, conn: files.conn, sortKey: files.sortKey, sortDir: files.sortDir })); } catch (e) { /* not stored */ }
+  try { localStorage.setItem("cactusdb.fileFilters", JSON.stringify({ types: [...files.types], q: files.q, conn: files.conn, day: files.day, sortKey: files.sortKey, sortDir: files.sortDir })); } catch (e) { /* not stored */ }
 }
+// The day a file was exported, in this browser's time zone: 2026-11-10.
+const fileDay = (f) => { const d = new Date(f.modified); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const dayLabel = (day) => new Date(day + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "2-digit" });
 // The search words: a name matches when it contains every one (any case).
 const fileTerms = () => files.q.toLowerCase().split(/\s+/).filter(Boolean);
 function highlightName(name, terms) {
@@ -3442,7 +3469,7 @@ async function loadFiles() {
 
 function visibleFiles() {
   const terms = fileTerms();
-  const out = files.list.filter((f) => (files.conn === null || f.conn === files.conn) && (!files.types.size || files.types.has(f.kind)) &&
+  const out = files.list.filter((f) => (files.conn === null || f.conn === files.conn) && (files.day === null || fileDay(f) === files.day) && (!files.types.size || files.types.has(f.kind)) &&
     terms.every((t) => f.name.toLowerCase().includes(t)));
   const k = files.sortKey, d = files.sortDir;
   out.sort((a, b) => {
@@ -3460,9 +3487,18 @@ function visibleFiles() {
 function renderFiles() {
   // A connection whose files are all gone is no longer a filter.
   if (files.conn !== null && !files.list.some((f) => f.conn === files.conn)) files.conn = null;
-  // Type counts are for the chosen connection.
+  // The days with files of the chosen connection, newest first; a day with
+  // none left is no longer a filter.
+  const connFiles = files.list.filter((f) => files.conn === null || f.conn === files.conn);
+  const byDay = {};
+  connFiles.forEach((f) => { const d = fileDay(f); byDay[d] = (byDay[d] || 0) + 1; });
+  if (files.day !== null && !byDay[files.day]) files.day = null;
+  $("fDate").innerHTML = `<option value="*">All dates (${connFiles.length})</option>` +
+    Object.keys(byDay).sort().reverse().map((d) => `<option value="${d}">${esc(dayLabel(d))} (${byDay[d]})</option>`).join("");
+  $("fDate").value = files.day === null ? "*" : files.day;
+  // Type counts are for the chosen connection and day.
   const counts = {};
-  const inConn = files.list.filter((f) => files.conn === null || f.conn === files.conn);
+  const inConn = connFiles.filter((f) => files.day === null || fileDay(f) === files.day);
   inConn.forEach((f) => (counts[f.kind] = (counts[f.kind] || 0) + 1));
   $("fTypes").innerHTML = [["", "All", inConn.length], ...Object.keys(fileTypeNames).filter((t) => counts[t]).map((t) => [t, fileTypeNames[t], counts[t]])]
     .map(([t, label, n]) => {
@@ -3535,6 +3571,10 @@ $("fConn").addEventListener("change", () => {
   files.conn = $("fConn").value === "*" ? null : $("fConn").value;
   saveFileFilters(); renderFiles();
 });
+$("fDate").addEventListener("change", () => {
+  files.day = $("fDate").value === "*" ? null : $("fDate").value;
+  saveFileFilters(); renderFiles();
+});
 $("fFilter").addEventListener("input", () => { files.q = $("fFilter").value; saveFileFilters(); renderFiles(); });
 $("fFilter").addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && $("fFilter").value) { ev.preventDefault(); $("fFilter").value = ""; files.q = ""; saveFileFilters(); renderFiles(); }
@@ -3542,7 +3582,7 @@ $("fFilter").addEventListener("keydown", (ev) => {
 $("fRefresh").addEventListener("click", loadFiles);
 $("fTable").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-fclear]")) {
-    files.types.clear(); files.q = ""; files.conn = null; saveFileFilters(); renderFiles(); return;
+    files.types.clear(); files.q = ""; files.conn = null; files.day = null; saveFileFilters(); renderFiles(); return;
   }
   const th = ev.target.closest("th[data-fsort]");
   if (th) {
@@ -3642,6 +3682,42 @@ function tableHTML(cols, rows) {
       return v === null || v === undefined ? `<td class="null">NULL</td>` : `<td>${esc(typeof v === "object" ? JSON.stringify(v) : v)}</td>`;
     }).join("")}</tr>`).join("") + "</tbody></table>";
 }
+// hl colours text: the matches of re as cls gives them, the rest escaped.
+function hl(text, re, cls) {
+  let out = "", i = 0;
+  for (const m of text.matchAll(re)) { out += esc(text.slice(i, m.index)) + cls(m); i = m.index + m[0].length; }
+  return out + esc(text.slice(i));
+}
+const hlSpan = (c, t) => `<span class="${c}">${esc(t)}</span>`;
+// jsonLayout puts JSON written on one line on lines of its own, indented,
+// keeping every value exactly as written (a parse would round big numbers).
+function jsonLayout(t) {
+  let out = "", depth = 0;
+  const nl = () => "\n" + "  ".repeat(depth);
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < t.length && t[j] !== '"') j += t[j] === "\\" ? 2 : 1;
+      out += t.slice(i, j + 1); i = j;
+    } else if (c === "{" || c === "[") {
+      let j = i + 1;
+      while (/\s/.test(t[j] || "")) j++;
+      if (t[j] === (c === "{" ? "}" : "]")) { out += c + t[j]; i = j; } else { depth++; out += c + nl(); }
+    } else if (c === "}" || c === "]") { depth = Math.max(0, depth - 1); out += nl() + c; }
+    else if (c === ",") out += c + nl();
+    else if (c === ":") out += ": ";
+    else if (!/\s/.test(c)) out += c;
+  }
+  return out;
+}
+// JSON: keys, strings, numbers and true/false/null.
+const hlJSON = (t) => hl(t, /("(?:\\.|[^"\\\n])*")(\s*:)?|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g,
+  (m) => m[1] ? hlSpan(m[2] ? "jk" : "js", m[1]) + (m[2] || "") : hlSpan(/^[tfn]/.test(m[0]) ? "jl" : "jn", m[0]));
+// XML: tags with their attributes, and comments and declarations.
+const hlXML = (t) => hl(t, /<(\/?)([\w:.-]+)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)(\s*\/?)>|<\?[\s\S]*?\?>|<!--[\s\S]*?-->/g,
+  (m) => !m[2] ? hlSpan("xc", m[0]) : esc("<" + m[1]) + hlSpan("xt", m[2]) +
+    hl(m[3], /([\w:.-]+)(\s*=\s*)("[^"]*"|'[^']*')/g, (a) => hlSpan("xa", a[1]) + esc(a[2]) + hlSpan("xv", a[3])) + esc(m[4] + ">"));
 async function previewFile(f) {
   fPrevKey = fileKey(f);
   $("fpTitle").textContent = f.name;
@@ -3660,13 +3736,6 @@ async function previewFile(f) {
         foot = `${p.rows.length.toLocaleString()} row${p.rows.length === 1 ? "" : "s"}` + (p.truncated ? ` shown: the first ${p.limit} of more` : "") +
           (p.sheet ? ` · sheet "${p.sheet}"${p.sheets > 1 ? ` (1 of ${p.sheets})` : ""}` : "");
         break;
-      case "json": {
-        const cols = [];
-        p.items.forEach((o) => Object.keys(o).forEach((k) => { if (!cols.includes(k)) cols.push(k); }));
-        $("fpBody").innerHTML = p.items.length ? tableHTML(cols, p.items.map((o) => cols.map((c) => o[c]))) : `<p class="emptymsg">The array is empty.</p>`;
-        foot = `${p.items.length.toLocaleString()} object${p.items.length === 1 ? "" : "s"}` + (p.truncated ? ` shown: the first ${p.limit} of more` : "");
-        break;
-      }
       case "zip":
         $("fpBody").innerHTML = `<div class="fpzip"><b>Files in this archive</b>${tableHTML(["File", "Size", "Compressed"],
           p.entries.map((e) => [e.name, fmtSize(e.size), fmtSize(e.compressed)]))}</div>` +
@@ -3674,10 +3743,13 @@ async function previewFile(f) {
         foot = p.textOf ? `Showing the start of ${p.textOf}` + (p.truncated ? " (first 256 KB)" : "") : "";
         break;
       case "text": {
+        // JSON and XML as written, in their own format; JSON written on one
+        // line is laid out first.
         let text = p.text;
-        if ((f.kind === "json" || /\.json$/.test(f.name)) && !p.truncated) { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* show as is */ } }
-        $("fpBody").innerHTML = `<pre>${esc(text)}</pre>`;
-        foot = p.truncated ? "Showing the first 256 KB" : "";
+        const fmt = /\.json$/i.test(f.name) ? "json" : /\.xml$/i.test(f.name) ? "xml" : "";
+        if (fmt === "json" && text.trim().indexOf("\n") < 0) text = jsonLayout(text);
+        $("fpBody").innerHTML = `<pre class="${fmt}">${fmt === "json" ? hlJSON(text) : fmt === "xml" ? hlXML(text) : esc(text)}</pre>`;
+        foot = (fmt ? fmt.toUpperCase() + (p.truncated ? " · " : "") : "") + (p.truncated ? "Showing the first 256 KB" : "");
         break;
       }
       default:
@@ -4599,8 +4671,11 @@ async function presenceCheck() {
   renderUsers();
   msgRender();
 }
-// Every 5 seconds; every 2 while the messages are open, so a reply shows soon.
+// Every 5 seconds; every 2 while the messages are open, so a reply shows soon;
+// and straight away when the tab is shown again (a browser checks in seldom
+// from a tab in the background).
 setInterval(() => { if (msgOpen() || Date.now() - (presence.last || 0) >= 4500) presenceCheck(); }, 2000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) presenceCheck(); });
 setTimeout(presenceCheck, 0); // once the rest of the page's code has run
 // Closed or reloaded: gone from the others' list straight away.
 addEventListener("pagehide", () => navigator.sendBeacon?.("/api/presence/leave", new Blob([JSON.stringify({ client: presence.id })], { type: "application/json" })));
@@ -4617,18 +4692,19 @@ const noticeText = (n) => n.ip ? n.text : n.text.charAt(0).toUpperCase() + n.tex
 const NOTICE_ICON = { connections: "bi-plug", queries: "bi-journal-code", containers: "bi-box-seam", upgrade: "bi-cloud-arrow-down" };
 const noticeToast = (n) => stackToast(NOTICE_ICON[n.kind] || "bi-people", n.ip || "cactusdb", n.at, noticeText(n));
 // A toast of its own, so several stack up instead of replacing each other;
-// with an action, a button that does it and closes the toast.
-function stackToast(icon, title, at, text, action) {
-  const box = $("toastBox"), d = document.querySelector("dialog[open]");
-  if (box.parentElement !== (d || document.body)) (d || document.body).appendChild(box);
+// with an action, a button that does it and closes the toast. A sticky one
+// (a message) stays until it is closed, and onClose runs when it is.
+function stackToast(icon, title, at, text, action, { sticky = false, onClose } = {}) {
+  const box = $("toastBox");
+  placeToasts();
   const t = document.createElement("div");
-  t.className = "toast notice";
+  t.className = "toast notice" + (sticky ? " sticky" : "");
   t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite"); t.setAttribute("aria-atomic", "true");
   t.innerHTML = `<div class="toast-header"><i class="bi ${icon}" aria-hidden="true"></i>` +
     `<strong class="me-auto">${esc(title)}</strong><small>${esc(new Date(at).toLocaleTimeString())}</small>` +
     `<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body"><div class="text"></div></div>`;
   t.querySelector(".text").textContent = text;
-  const bt = new bootstrap.Toast(t, { delay: action ? 20000 : 12000 });
+  const bt = new bootstrap.Toast(t, sticky ? { autohide: false } : { delay: action ? 20000 : 12000 });
   if (action) {
     const row = document.createElement("div"); row.className = "toast-actions";
     row.innerHTML = `<button type="button" class="btn btn-sm btn-primary"><i class="bi ${action.icon}" aria-hidden="true"></i> ${esc(action.label)}</button>`;
@@ -4636,14 +4712,15 @@ function stackToast(icon, title, at, text, action) {
     t.querySelector(".toast-body").appendChild(row);
   }
   box.appendChild(t);
-  t.addEventListener("hidden.bs.toast", () => t.remove());
+  t.addEventListener("hidden.bs.toast", () => { t.remove(); onClose?.(); });
   bt.show();
+  return bt;
 }
 
 // ---- direct messages (presence.go) -------------------------------------------
 // To one page picked from the people using cactusdb. Only that page and this
 // one are given the message, and the server forgets it once both are closed.
-const msg = { threads: new Map(), unread: new Map(), who: new Map(), to: "", name: "" };
+const msg = { threads: new Map(), unread: new Map(), toasts: new Map(), who: new Map(), to: "", name: "" };
 try { msg.name = localStorage.getItem("cactusdb.msgName") || ""; } catch (e) { /* no storage */ }
 $("msgName").value = msg.name;
 const msgOpen = () => $("msgPanel").classList.contains("show");
@@ -4663,12 +4740,18 @@ function msgAdd(m) {
   msg.who.set(other, { ...msg.who.get(other), ip: m.fromIp, name: m.fromName });
   if (msgOpen() && msg.to === other && !document.hidden) return;
   msg.unread.set(other, (msg.unread.get(other) || 0) + 1);
-  stackToast("bi-chat-dots", m.fromName ? `${m.fromName} (${m.fromIp})` : m.fromIp, m.at, m.text,
-    { icon: "bi-reply", label: "Reply", run: () => msgShow(other) });
+  // A message pops up on whatever is on screen (a dialog included) and stays
+  // until it is read: Reply opens the conversation, × marks it read.
+  const bt = stackToast("bi-chat-dots", m.fromName ? `${m.fromName} (${m.fromIp})` : m.fromIp, m.at, m.text,
+    { icon: "bi-reply", label: "Reply", run: () => msgShow(other) },
+    { sticky: true, onClose: () => { msg.toasts.get(other)?.delete(bt); if (!msg.toasts.get(other)?.size) { msg.unread.delete(other); msgRender(); } } });
+  if (!msg.toasts.has(other)) msg.toasts.set(other, new Set());
+  msg.toasts.get(other).add(bt);
 }
 function msgShow(handle) {
   if (handle) msg.to = handle;
   bootstrap.Dropdown.getInstance($("usersBtn"))?.hide();
+  placeToasts();
   bootstrap.Offcanvas.getOrCreateInstance($("msgPanel")).show();
   msgRender();
   setTimeout(() => $("msgText").focus(), 300);
@@ -4677,8 +4760,15 @@ function msgRender() {
   const others = presence.clients.filter((c) => !c.you).map((c) => c.handle);
   const handles = [...new Set([...others, ...msg.threads.keys()])];
   if (!handles.includes(msg.to)) msg.to = handles[0] || "";
-  if (msgOpen() && !document.hidden) msg.unread.delete(msg.to);
+  if (msgOpen() && !document.hidden && msg.unread.has(msg.to)) {
+    msg.unread.delete(msg.to);
+    // Read here: its popups go.
+    for (const bt of msg.toasts.get(msg.to) || []) bt.hide();
+    msg.toasts.delete(msg.to);
+  }
   const unread = [...msg.unread.values()].reduce((a, b) => a + b, 0);
+  // In another tab or window, the tab's title says a message came.
+  document.title = unread ? `(${unread}) New message · cactusdb` : "cactusdb";
   $("msgBtn").hidden = !handles.length;
   $("msgUnread").hidden = !unread; $("msgUnread").textContent = unread;
   $("msgBtn").title = unread ? `Messages: ${unread} new` : "Messages: send a direct message to someone using cactusdb";

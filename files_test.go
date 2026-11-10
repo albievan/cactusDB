@@ -133,6 +133,7 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
   {"id": 1, "name": "Ann", "z": null},
   {"id": 2, "name": "Bob"}
 ]`))
+	put("xml", "rows.xml", []byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<table name=\"t\">\n  <row>\n    <column name=\"id\">1</column>\n  </row>\n</table>\n"))
 	put("sql", "ddl.sql", []byte("CREATE TABLE t (a int);\n"))
 	// An Excel file and a backup .zip, made the way cactusdb makes them.
 	xf := excelize.NewFile()
@@ -163,8 +164,11 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
 	if _, p := preview("xlsx", "t.xlsx"); p["mode"] != "table" || len(p["rows"].([]any)) != 1 || p["truncated"] != false {
 		t.Errorf("xlsx: %v", p)
 	}
-	if _, p := preview("json", "rows.json"); p["mode"] != "json" || len(p["items"].([]any)) != 2 || p["truncated"] != false {
+	if _, p := preview("json", "rows.json"); p["mode"] != "text" || !strings.HasPrefix(p["text"].(string), "[\n  {\"id\": 1,") || p["truncated"] != false {
 		t.Errorf("json: %v", p)
+	}
+	if _, p := preview("xml", "rows.xml"); p["mode"] != "text" || !strings.Contains(p["text"].(string), `<column name="id">1</column>`) {
+		t.Errorf("xml: %v", p)
 	}
 	if _, p := preview("sql", "ddl.sql"); p["mode"] != "text" || p["text"] != "CREATE TABLE t (a int);\n" {
 		t.Errorf("sql: %v", p)
@@ -204,7 +208,7 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
 	if _, err := os.Stat(outside); err != nil {
 		t.Error("a file outside the export folder was deleted")
 	}
-	if len(s.listExportedFiles()) != 3 {
+	if len(s.listExportedFiles()) != 4 {
 		t.Errorf("left: %v", s.listExportedFiles())
 	}
 }
