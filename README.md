@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.46.1
+cactusdb 1.46.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -1156,8 +1156,8 @@ you where to open it. If it can't start (the port is in use, the connection file
 opened…), you get the error straight away. The process id is also written to
 `cactusdb.pid` next to the log file, so you can stop it later:
 
-- **From the browser:** a background cactusdb shows a **⏻ Shutdown** button at the top
-  right, next to *Disconnect*. Click it and confirm. cactusdb cancels running exports,
+- **From the browser:** a background cactusdb has **⏻ Shutdown** at the bottom of the
+  ☰ menu (bottom left, under *Check for update*). Click it and confirm. cactusdb cancels running exports,
   closes every database connection and the connection file, removes `cactusdb.pid`,
   logs `stopped` and exits. The page then says it has shut down, with the command to
   start it again. (The button only appears in background mode; in a terminal, press

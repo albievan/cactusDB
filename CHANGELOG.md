@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.46.2 — 2026-11-10
+
+- **⏻ Shutdown moved to the ☰ menu**: it is the last item of the menu at the bottom left,
+  under *Check for update*, instead of a button in the top bar. It still asks first, and is
+  only there for a cactusdb started with `--runas background`.
+
 ## 1.46.1 — 2026-11-10
 
 - **Fixed: cactusdb on a server stopped answering for about five minutes after Check syntax

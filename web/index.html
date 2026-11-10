@@ -852,7 +852,6 @@
   <button id="reconnectBtn" class="btn btn-sm btn-outline-secondary" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
   <button id="dashBtn" class="btn btn-sm btn-outline-secondary" hidden title="The database's statistics: version, uptime, size, connections, activity, caches, its largest tables…"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</button>
   <button id="disconnectBtn" class="btn btn-sm btn-outline-secondary" hidden>Disconnect</button>
-  <button id="shutdownBtn" class="btn btn-sm btn-outline-danger" hidden title="Stop this background cactusdb"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
 </header>
 
 <div class="layout">
@@ -893,6 +892,7 @@
       <button class="btn btn-outline-secondary text-start" data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Compare databases</button>
       <button class="btn btn-outline-secondary text-start" data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate database</button>
       <button class="btn btn-outline-secondary text-start" data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i> Check for update<span class="updot" id="updateDot" hidden></span></button>
+      <button class="btn btn-outline-danger text-start" id="shutdownBtn" hidden title="Stop this background cactusdb (asks first)"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
     </nav>
     <!-- The quick-connect form is kept for the code that fills it, but never
          shown: connections are added and edited in the connection dialog. -->
@@ -4753,7 +4753,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) watc
 $("verReload").addEventListener("click", () => location.reload());
 $("verLater").addEventListener("click", () => { $("verBanner").hidden = true; state.serverVersion = ""; });
 
-$("shutdownBtn").addEventListener("click", () => $("shutdownDialog").showModal());
+$("shutdownBtn").addEventListener("click", () => { setNavMenu(false); $("shutdownDialog").showModal(); });
 $("sdCancel").addEventListener("click", () => $("shutdownDialog").close());
 $("sdConfirm").addEventListener("click", async () => {
   const b = $("sdConfirm");
