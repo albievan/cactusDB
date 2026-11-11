@@ -33,6 +33,8 @@ type Store struct {
 	moveMu  sync.Mutex // one move at a time; guards path and keyFile
 	path    string     // the database file
 	keyFile string     // the key file; "" when the key comes from the passphrase
+
+	usersMu sync.Mutex // one change of a --remotelogin user at a time
 }
 
 // DB is the open database.
@@ -87,9 +89,6 @@ func (s *Store) init(path, keyFile string) error {
 	if err := s.migrateSuperuser(); err != nil {
 		return err
 	}
-	if err := s.migrateUsers(); err != nil {
-		return err
-	}
 
 	// Per-store random salt for passphrase-derived keys.
 	saltB64, err := s.meta("salt")
@@ -131,6 +130,12 @@ func (s *Store) init(path, keyFile string) error {
 		return fmt.Errorf("cannot decrypt the saved connections in %s with %s.\n"+
 			"  Restore the original %s, or set the %s that was used before,\n"+
 			"  or start with an empty file using --conn-db <new file>", path, src.desc, keyFileName, passphraseEnv)
+	}
+	if err := s.migrateUsers(); err != nil {
+		return err
+	}
+	if err := s.migrateEvents(); err != nil {
+		return err
 	}
 	return s.encryptPlaintextRows()
 }

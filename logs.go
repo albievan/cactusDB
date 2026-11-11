@@ -257,4 +257,5 @@ func (s *server) handleLogsZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "downloaded the logs (%d file(s)) as %s", len(files), name)
+	s.event(r, "export", false, "downloaded the logs (%d file(s)) as %s", len(files), name)
 }

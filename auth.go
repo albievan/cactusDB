@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -8,11 +9,13 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,7 +39,10 @@ import (
 //
 // Passwords are kept as Argon2id hashes. Links, codes and sign-ins are random
 // tokens of which only a SHA-256 is stored, so the database never holds one
-// that works. A signed-in browser holds its token in an HttpOnly cookie.
+// that works. Of a user only the user name (the e-mail address) is stored in
+// plain text: the name, password hash, status, reason, who added them and
+// dates are one record encrypted with the key of the saved connections, as
+// are the IP addresses of sign-ins. A signed-in browser holds its token in an HttpOnly cookie.
 // Answers to the page use status 200 with the status in a header (see
 // statusInHeader): a firewall on the way may block a client after a 401 or 403.
 
@@ -57,19 +63,22 @@ var errNotSignedIn = errors.New("sign in first")
 
 // ---- store -------------------------------------------------------------------
 
-// migrateUsers creates the tables of --remotelogin (since 1.48.0).
+// migrateUsers creates the tables of --remotelogin (since 1.48.0). Since
+// 1.49.0 a user's row holds only the user name (the e-mail address) in plain
+// text: everything else is one encrypted record in data. It runs once the
+// key is loaded, and moves the users of 1.48 into the encrypted form.
 func (s *Store) migrateUsers() error {
+	var cols int
+	s.DB().QueryRow(`SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'status'`).Scan(&cols)
+	if cols > 0 {
+		if err := s.encryptOldUsers(); err != nil {
+			return fmt.Errorf("encrypting the users: %w", err)
+		}
+	}
 	_, err := s.DB().Exec(`CREATE TABLE IF NOT EXISTS users (
-		id          INTEGER PRIMARY KEY AUTOINCREMENT,
-		username    TEXT NOT NULL UNIQUE COLLATE NOCASE, -- an e-mail address, or the first user
-		name        TEXT NOT NULL DEFAULT '',
-		pw          TEXT NOT NULL DEFAULT '',            -- Argon2id hash; '' = none set yet
-		status      TEXT NOT NULL,                       -- active | invited | requested
-		must_change INTEGER NOT NULL DEFAULT 0,
-		reason      TEXT NOT NULL DEFAULT '',            -- why access was requested
-		added_by    TEXT NOT NULL DEFAULT '',
-		created_at  TEXT NOT NULL,
-		last_login  TEXT NOT NULL DEFAULT ''
+		id       INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL UNIQUE COLLATE NOCASE, -- an e-mail address, or the first user
+		data     TEXT NOT NULL                        -- the rest of the user, encrypted (userData)
 	);
 	-- Sign-ins, pending sign-ins and e-mailed links, by the SHA-256 of their token.
 	CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -80,9 +89,73 @@ func (s *Store) migrateUsers() error {
 		tries      INTEGER NOT NULL DEFAULT 0,
 		sent_at    TEXT NOT NULL DEFAULT '',
 		expires_at TEXT NOT NULL,
-		ip         TEXT NOT NULL DEFAULT ''
+		ip         TEXT NOT NULL DEFAULT ''  -- encrypted
 	);
 	CREATE INDEX IF NOT EXISTS auth_tokens_user ON auth_tokens(user_id)`)
+	return err
+}
+
+// encryptOldUsers rewrites the plain-text users table of 1.48 as the
+// encrypted one, keeping the ids, and encrypts the tokens' IP addresses.
+func (s *Store) encryptOldUsers() error {
+	rows, err := s.DB().Query(`SELECT id, username, name, pw, status, must_change, reason, added_by, created_at, last_login FROM users`)
+	if err != nil {
+		return err
+	}
+	var old []appUser
+	for rows.Next() {
+		var u appUser
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.pw, &u.Status, &u.MustChange, &u.Reason, &u.AddedBy, &u.Created, &u.LastLogin); err != nil {
+			rows.Close()
+			return err
+		}
+		old = append(old, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	tx, err := s.DB().Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DROP TABLE users`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`CREATE TABLE users (
+		id       INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		data     TEXT NOT NULL
+	)`); err != nil {
+		return err
+	}
+	for _, u := range old {
+		if _, err := tx.Exec(`INSERT INTO users (id, username, data) VALUES (?, ?, ?)`, u.ID, u.Username, s.sealUser(u)); err != nil {
+			return err
+		}
+	}
+	ips, err := tx.Query(`SELECT hash, ip FROM auth_tokens WHERE ip != '' AND ip NOT LIKE 'enc:v1:%'`)
+	if err == nil { // no auth_tokens table: nothing to encrypt
+		type tokIP struct{ hash, ip string }
+		var plain []tokIP
+		for ips.Next() {
+			var t tokIP
+			if ips.Scan(&t.hash, &t.ip) == nil {
+				plain = append(plain, t)
+			}
+		}
+		ips.Close()
+		for _, t := range plain {
+			if _, err := tx.Exec(`UPDATE auth_tokens SET ip = ? WHERE hash = ?`, s.box.seal("token.ip", t.ip), t.hash); err != nil {
+				return err
+			}
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	_, err = s.DB().Exec(`VACUUM`) // no plain-text copy left in free pages
 	return err
 }
 
@@ -99,40 +172,117 @@ type appUser struct {
 	pw         string
 }
 
+// userData is what users.data holds, encrypted.
+type userData struct {
+	Name       string `json:"name,omitempty"`
+	Pw         string `json:"pw,omitempty"` // Argon2id hash; "" = none set yet
+	Status     string `json:"status"`       // active | invited | requested
+	MustChange bool   `json:"mustChange,omitempty"`
+	Reason     string `json:"reason,omitempty"` // why access was requested
+	AddedBy    string `json:"addedBy,omitempty"`
+	Created    string `json:"created"`
+	LastLogin  string `json:"lastLogin,omitempty"`
+}
+
+func (s *Store) sealUser(u appUser) string {
+	b, _ := json.Marshal(userData{u.Name, u.pw, u.Status, u.MustChange, u.Reason, u.AddedBy, u.Created, u.LastLogin})
+	return s.box.seal("user", string(b))
+}
+
 // email reports whether u signs in with an e-mail address (and a code).
 func (u appUser) email() bool { return !strings.EqualFold(u.Username, adminUser) }
 
-const userCols = `id, username, name, pw, status, must_change, reason, added_by, created_at, last_login`
-
-func scanUser(sc interface{ Scan(...any) error }) (appUser, error) {
+func (s *Store) scanUser(sc interface{ Scan(...any) error }) (appUser, error) {
 	var u appUser
-	err := sc.Scan(&u.ID, &u.Username, &u.Name, &u.pw, &u.Status, &u.MustChange, &u.Reason, &u.AddedBy, &u.Created, &u.LastLogin)
-	return u, err
+	var sealed string
+	if err := sc.Scan(&u.ID, &u.Username, &sealed); err != nil {
+		return u, err
+	}
+	plain, err := s.box.open("user", sealed)
+	if err != nil {
+		return u, fmt.Errorf("user %s: %w", u.Username, err)
+	}
+	var d userData
+	if err := json.Unmarshal([]byte(plain), &d); err != nil {
+		return u, fmt.Errorf("user %s: %w", u.Username, err)
+	}
+	u.Name, u.pw, u.Status, u.MustChange, u.Reason, u.AddedBy, u.Created, u.LastLogin =
+		d.Name, d.Pw, d.Status, d.MustChange, d.Reason, d.AddedBy, d.Created, d.LastLogin
+	return u, nil
 }
 
 func (s *Store) userByName(name string) (appUser, error) {
-	return scanUser(s.DB().QueryRow(`SELECT `+userCols+` FROM users WHERE username = ?`, strings.TrimSpace(name)))
+	return s.scanUser(s.DB().QueryRow(`SELECT id, username, data FROM users WHERE username = ?`, strings.TrimSpace(name)))
 }
 
 func (s *Store) userByID(id int64) (appUser, error) {
-	return scanUser(s.DB().QueryRow(`SELECT `+userCols+` FROM users WHERE id = ?`, id))
+	return s.scanUser(s.DB().QueryRow(`SELECT id, username, data FROM users WHERE id = ?`, id))
 }
 
+// listUsers: requests first, then invitations, then the active users, each
+// by name.
 func (s *Store) listUsers() ([]appUser, error) {
-	rows, err := s.DB().Query(`SELECT ` + userCols + ` FROM users ORDER BY status = 'active', username COLLATE NOCASE`)
+	rows, err := s.DB().Query(`SELECT id, username, data FROM users ORDER BY username COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []appUser{}
 	for rows.Next() {
-		u, err := scanUser(rows)
+		u, err := s.scanUser(rows)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, u)
 	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Status != "active" && out[j].Status == "active" })
 	return out, rows.Err()
+}
+
+// countUsers counts the users of a status, leaving out one id (0: none).
+func (s *Store) countUsers(status string, except int64) int {
+	list, _ := s.listUsers()
+	n := 0
+	for _, u := range list {
+		if u.Status == status && u.ID != except {
+			n++
+		}
+	}
+	return n
+}
+
+// addUser stores a new user; added is false when the user name is taken.
+func (s *Store) addUser(u appUser) (appUser, bool, error) {
+	if u.Created == "" {
+		u.Created = nowText()
+	}
+	res, err := s.DB().Exec(`INSERT INTO users (username, data) VALUES (?, ?) ON CONFLICT(username) DO NOTHING`, u.Username, s.sealUser(u))
+	if err != nil {
+		return u, false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return u, false, nil
+	}
+	u.ID, _ = res.LastInsertId()
+	return u, true, nil
+}
+
+// updateUser changes the stored user id with change, one change at a time.
+func (s *Store) updateUser(id int64, change func(*appUser)) error {
+	s.usersMu.Lock()
+	defer s.usersMu.Unlock()
+	u, err := s.userByID(id)
+	if err != nil {
+		return err
+	}
+	change(&u)
+	_, err = s.DB().Exec(`UPDATE users SET data = ? WHERE id = ?`, s.sealUser(u), id)
+	return err
+}
+
+func (s *Store) deleteUser(id int64) {
+	s.DB().Exec(`DELETE FROM users WHERE id = ?`, id)
+	s.dropTokens(id)
 }
 
 // ensureAdmin adds admin/admin to an empty users table.
@@ -141,25 +291,28 @@ func (s *Store) ensureAdmin() (bool, error) {
 	if err := s.DB().QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n); err != nil || n > 0 {
 		return false, err
 	}
-	_, err := s.DB().Exec(`INSERT INTO users (username, pw, status, must_change, created_at) VALUES (?, ?, 'active', 1, ?)`,
-		adminUser, hashPassword(adminUser), nowText())
-	return err == nil, err
+	_, added, err := s.addUser(appUser{Username: adminUser, pw: hashPassword(adminUser), Status: "active", MustChange: true})
+	return added, err
 }
 
 // resetAdmin sets admin's password back to admin (to be changed at the next
 // sign-in), adding admin if it is missing: cactusdb --resetadmin.
 func (s *Store) resetAdmin() error {
-	res, err := s.DB().Exec(`UPDATE users SET pw = ?, status = 'active', must_change = 1 WHERE username = ?`, hashPassword(adminUser), adminUser)
+	u, err := s.userByName(adminUser)
+	if errors.Is(err, sql.ErrNoRows) {
+		_, _, err = s.addUser(appUser{Username: adminUser, pw: hashPassword(adminUser), Status: "active", MustChange: true})
+		return err
+	}
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		_, err = s.DB().Exec(`INSERT INTO users (username, pw, status, must_change, created_at) VALUES (?, ?, 'active', 1, ?)`,
-			adminUser, hashPassword(adminUser), nowText())
+	if err := s.updateUser(u.ID, func(u *appUser) {
+		u.pw, u.Status, u.MustChange = hashPassword(adminUser), "active", true
+	}); err != nil {
 		return err
 	}
-	_, err = s.DB().Exec(`DELETE FROM auth_tokens WHERE user_id = (SELECT id FROM users WHERE username = ?)`, adminUser)
-	return err
+	s.dropTokens(u.ID)
+	return nil
 }
 
 func nowText() string { return time.Now().UTC().Format(time.RFC3339) }
@@ -236,7 +389,7 @@ type authToken struct {
 func (s *Store) addToken(userID int64, purpose string, life time.Duration, ip string) (string, error) {
 	t := newToken()
 	_, err := s.DB().Exec(`INSERT INTO auth_tokens (hash, user_id, purpose, expires_at, ip) VALUES (?, ?, ?, ?, ?)`,
-		tokenHash(t), userID, purpose, time.Now().Add(life).UTC().Format(time.RFC3339), ip)
+		tokenHash(t), userID, purpose, time.Now().Add(life).UTC().Format(time.RFC3339), s.box.seal("token.ip", ip))
 	return t, err
 }
 
@@ -410,10 +563,11 @@ func (s *server) signIn(w http.ResponseWriter, r *http.Request, u appUser) error
 	if err != nil {
 		return err
 	}
-	s.store.DB().Exec(`UPDATE users SET last_login = ? WHERE id = ?`, nowText(), u.ID)
+	s.store.updateUser(u.ID, func(u *appUser) { u.LastLogin = nowText() })
 	setCookie(w, r, authCookie, t, 0) // until the browser closes, or sessionIdle unused
 	setCookie(w, r, pendingCookie, "", -1)
 	log.Printf("%s %s signed in", clientIP(r), u.Username)
+	s.eventAs(r, u.Username, "signin", false, "signed in")
 	return nil
 }
 
@@ -453,7 +607,7 @@ func (s *server) mailSetPassword(r *http.Request, u appUser, purpose, by string)
 		body = fmt.Sprintf("Hello%s,\n\nSomeone (hopefully you) asked to reset your cactusdb password. Set a new one here:\n\n%s\n\n"+
 			"The link works for one hour. If you didn't ask for it, ignore this e-mail: your password stays as it is.\n", greetName(u.Name), link)
 	}
-	if err := s.sendMail(r.Context(), u.Username, subject, body); err != nil {
+	if err := s.sendMail(r, u.Username, subject, body); err != nil {
 		s.store.dropToken(t)
 		return err
 	}
@@ -474,7 +628,7 @@ func (s *server) sendCode(r *http.Request, t string, u appUser) error {
 		tokenHash(code), nowText(), time.Now().Add(codeLife).UTC().Format(time.RFC3339), tokenHash(t)); err != nil {
 		return err
 	}
-	return s.sendMail(r.Context(), u.Username, "Your cactusdb sign-in code: "+code,
+	return s.sendMail(r, u.Username, "Your cactusdb sign-in code: "+code,
 		fmt.Sprintf("Your cactusdb sign-in code is\n\n    %s\n\nIt works for %d minutes, once. Someone signed in with your password from %s;\n"+
 			"if it wasn't you, change your password.\n", code, int(codeLife/time.Minute), clientIP(r)))
 }
@@ -485,9 +639,7 @@ func (s *server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"remoteLogin": s.remoteLogin, "version": version}
 	if u, ok := s.sessionUser(w, r); ok && s.remoteLogin {
 		out["user"] = map[string]any{"username": u.Username, "name": u.Name, "email": u.email()}
-		var n int
-		s.store.DB().QueryRow(`SELECT COUNT(*) FROM users WHERE status = 'requested'`).Scan(&n)
-		out["requests"] = n
+		out["requests"] = s.store.countUsers("requested", 0)
 	}
 	writeJSON(w, 200, out)
 }
@@ -514,6 +666,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	name, ip := strings.TrimSpace(req.Username), clientIP(r)
 	keys := []string{"u:" + strings.ToLower(name), "ip:" + ip}
 	if d := s.authThrottle.wait(keys...); d > 0 {
+		s.eventAs(r, name, "signin-failed", true, "sign-in refused: too many wrong passwords, try again in %s", d.Round(time.Second))
 		writeErr(w, 429, fmt.Errorf("too many wrong passwords: try again in %s", d.Round(time.Second)))
 		return
 	}
@@ -525,11 +678,13 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !checkPassword(hash, req.Password) || err != nil || u.pw == "" {
 		s.authThrottle.failed(keys...)
 		log.Printf("%s sign-in as %q failed: wrong user name or password", ip, name)
+		s.eventAs(r, name, "signin-failed", true, "sign-in failed: wrong user name or password")
 		writeErr(w, 400, errors.New("wrong user name or password"))
 		return
 	}
 	s.authThrottle.ok(keys...)
 	if u.Status == "requested" {
+		s.eventAs(r, u.Username, "signin-failed", true, "sign-in refused: the request for access isn't approved yet")
 		writeErr(w, 400, errors.New("your request for access hasn't been approved yet: you'll get an e-mail when it is"))
 		return
 	}
@@ -605,12 +760,13 @@ func (s *server) handleLoginPassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	if _, err := s.store.DB().Exec(`UPDATE users SET pw = ?, must_change = 0 WHERE id = ?`, hashPassword(req.Password), u.ID); err != nil {
+	if err := s.store.updateUser(u.ID, func(u *appUser) { u.pw, u.MustChange = hashPassword(req.Password), false }); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
 	s.store.dropTokens(u.ID, "session", "reset", "invite")
 	log.Printf("%s %s changed the password at sign-in", clientIP(r), u.Username)
+	s.eventAs(r, u.Username, "password", false, "chose a new password at sign-in")
 	if u.email() {
 		if err := s.sendCode(r, t, u); err != nil {
 			writeErr(w, 400, fmt.Errorf("the password is changed, but cactusdb couldn't e-mail your sign-in code: %v", err))
@@ -653,6 +809,7 @@ func (s *server) handleLoginCode(w http.ResponseWriter, r *http.Request) {
 		if a.tries >= maxCodeTries {
 			s.store.dropToken(t)
 			log.Printf("%s %s: %d wrong sign-in codes, sign-in cancelled", clientIP(r), u.Username, a.tries)
+			s.eventAs(r, u.Username, "signin-failed", true, "%d wrong sign-in codes: the sign-in was cancelled", a.tries)
 			writeOpaqueErr(w, 400, map[string]string{"restart": "true"}, "too many wrong codes: sign in again")
 			return
 		}
@@ -661,6 +818,7 @@ func (s *server) handleLoginCode(w http.ResponseWriter, r *http.Request) {
 		if time.Since(a.sentAt) > codeLife {
 			msg = "the code has expired: send a new one"
 		}
+		s.eventAs(r, u.Username, "signin-failed", true, "wrong sign-in code (%d tries left)", maxCodeTries-a.tries)
 		writeErr(w, 400, fmt.Errorf("%s (%d tries left)", msg, maxCodeTries-a.tries))
 		return
 	}
@@ -700,6 +858,7 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		if a, err := s.store.token(c.Value, "session"); err == nil {
 			if u, err := s.store.userByID(a.userID); err == nil {
 				log.Printf("%s %s signed out", clientIP(r), u.Username)
+				s.eventAs(r, u.Username, "signout", false, "signed out")
 			}
 		}
 		s.store.dropToken(c.Value)
@@ -741,9 +900,11 @@ func (s *server) handleForgot(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			log.Printf("%s asked for a password reset for %s: link e-mailed", clientIP(r), u.Username)
+			s.eventAs(r, u.Username, "password", false, "asked for a password reset: link e-mailed")
 		}
 	} else {
 		log.Printf("%s asked for a password reset for %q: no such active user, nothing sent", clientIP(r), name)
+		s.eventAs(r, name, "password", true, "asked for a password reset: no such active user, nothing sent")
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
@@ -792,13 +953,14 @@ func (s *server) handleSetPassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	if _, err := s.store.DB().Exec(`UPDATE users SET pw = ?, status = 'active', must_change = 0 WHERE id = ?`, hashPassword(req.Password), u.ID); err != nil {
+	if err := s.store.updateUser(u.ID, func(u *appUser) { u.pw, u.Status, u.MustChange = hashPassword(req.Password), "active", false }); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
 	// Every sign-in and link of the user ends: a reset locks out whoever had the old password.
 	s.store.dropTokens(u.ID)
 	log.Printf("%s %s set a password (%s link)", clientIP(r), u.Username, a.purpose)
+	s.eventAs(r, u.Username, "password", false, "set a password with the e-mailed %s link", map[string]string{"invite": "invitation", "reset": "password reset"}[a.purpose])
 	writeJSON(w, 200, map[string]any{"ok": true, "username": u.Username})
 }
 
@@ -832,17 +994,18 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.authThrottle.failed(key)
-	res, err := s.store.DB().Exec(`INSERT INTO users (username, name, pw, status, reason, created_at) VALUES (?, ?, ?, 'requested', ?, ?) ON CONFLICT(username) DO NOTHING`,
-		email, name, hashPassword(req.Password), reason, nowText())
+	_, added, err := s.store.addUser(appUser{Username: email, Name: name, pw: hashPassword(req.Password), Status: "requested", Reason: reason})
 	if err != nil {
 		writeErr(w, 500, err)
 		return
 	}
-	if n, _ := res.RowsAffected(); n > 0 {
+	if added {
 		log.Printf("%s %s requested access", clientIP(r), email)
+		s.eventAs(r, email, "register", false, "requested access%s", map[bool]string{true: ": " + reason}[reason != ""])
 		s.notify(nil, "users", 0, "a request for access from %s: approve it under ☰ → Users", email)
 	} else {
 		log.Printf("%s a request for access as %s was ignored: the address has an account or a request already", clientIP(r), email)
+		s.eventAs(r, email, "register", true, "request for access ignored: the address has an account or a request already")
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
@@ -882,20 +1045,18 @@ func (s *server) handleAddUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, fmt.Errorf("%s is a user already", email))
 		return
 	}
-	res, err := s.store.DB().Exec(`INSERT INTO users (username, name, status, added_by, created_at) VALUES (?, ?, 'invited', ?, ?)`,
-		email, cleanName(req.Name), me.Username, nowText())
-	if err != nil {
-		writeErr(w, 500, err)
+	u, added, err := s.store.addUser(appUser{Username: email, Name: cleanName(req.Name), Status: "invited", AddedBy: me.Username})
+	if err != nil || !added {
+		writeErr(w, 500, cmp.Or(err, fmt.Errorf("%s is a user already", email)))
 		return
 	}
-	id, _ := res.LastInsertId()
-	u, _ := s.store.userByID(id)
 	if err := s.mailSetPassword(r, u, "invite", me.Username); err != nil {
-		s.store.DB().Exec(`DELETE FROM users WHERE id = ?`, id)
+		s.store.deleteUser(u.ID)
 		writeErr(w, 400, fmt.Errorf("%s wasn't added: the invitation couldn't be e-mailed: %v", email, err))
 		return
 	}
 	logAction(r, "added the user %s and e-mailed the invitation", email)
+	s.event(r, "user", false, "added the user %s and e-mailed the invitation", email)
 	s.notify(r, "users", 0, "added the user %s", email)
 	writeJSON(w, 200, u)
 }
@@ -929,22 +1090,24 @@ func (s *server) handleUserAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		link = strings.TrimSuffix(link, "#")
-		if err := s.sendMail(r.Context(), u.Username, "Your access to cactusdb was approved",
+		if err := s.sendMail(r, u.Username, "Your access to cactusdb was approved",
 			fmt.Sprintf("Hello%s,\n\n%s approved your request for access to cactusdb. Sign in here with this e-mail address\n"+
 				"and the password you chose:\n\n%s\n\ncactusdb e-mails you a code each time you sign in.\n", greetName(u.Name), me.Username, link)); err != nil {
 			writeErr(w, 400, fmt.Errorf("not approved: the e-mail to %s couldn't be sent: %v", u.Username, err))
 			return
 		}
-		s.store.DB().Exec(`UPDATE users SET status = 'active', added_by = ? WHERE id = ?`, me.Username, u.ID)
+		s.store.updateUser(u.ID, func(u *appUser) { u.Status, u.AddedBy = "active", me.Username })
 		logAction(r, "approved the request for access of %s (e-mailed)", u.Username)
+		s.event(r, "user", false, "approved the request for access of %s", u.Username)
 		s.notify(r, "users", 0, "approved the request for access of %s", u.Username)
 	case "reject":
 		if u.Status != "requested" {
 			writeErr(w, 400, fmt.Errorf("%s isn't waiting for approval", u.Username))
 			return
 		}
-		s.store.DB().Exec(`DELETE FROM users WHERE id = ?`, u.ID)
+		s.store.deleteUser(u.ID)
 		logAction(r, "rejected the request for access of %s", u.Username)
+		s.event(r, "user", false, "rejected the request for access of %s", u.Username)
 		s.notify(r, "users", 0, "rejected the request for access of %s", u.Username)
 	case "resend":
 		if !u.email() || u.Status == "requested" {
@@ -961,20 +1124,19 @@ func (s *server) handleUserAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logAction(r, "e-mailed %s a new %s link", u.Username, map[string]string{"invite": "invitation", "reset": "password reset"}[purpose])
+		s.event(r, "user", false, "sent %s a new %s link", u.Username, map[string]string{"invite": "invitation", "reset": "password reset"}[purpose])
 	case "delete":
 		if u.ID == me.ID {
 			writeErr(w, 400, errors.New("you can't delete yourself"))
 			return
 		}
-		var active int
-		s.store.DB().QueryRow(`SELECT COUNT(*) FROM users WHERE status = 'active' AND id != ?`, u.ID).Scan(&active)
-		if active == 0 {
+		if s.store.countUsers("active", u.ID) == 0 {
 			writeErr(w, 400, errors.New("that is the last user who can sign in"))
 			return
 		}
-		s.store.DB().Exec(`DELETE FROM users WHERE id = ?`, u.ID)
-		s.store.dropTokens(u.ID)
+		s.store.deleteUser(u.ID)
 		logAction(r, "deleted the user %s", u.Username)
+		s.event(r, "user", false, "deleted the user %s", u.Username)
 		s.notify(r, "users", 0, "deleted the user %s", u.Username)
 	default:
 		writeErr(w, 404, fmt.Errorf("unknown action %q", act))
@@ -1001,6 +1163,7 @@ func (s *server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if !checkPassword(me.pw, req.Current) {
 		s.authThrottle.failed(key)
+		s.event(r, "password", true, "changing the password failed: the current password is wrong")
 		writeErr(w, 400, errors.New("the current password is wrong"))
 		return
 	}
@@ -1008,7 +1171,7 @@ func (s *server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	if _, err := s.store.DB().Exec(`UPDATE users SET pw = ?, must_change = 0 WHERE id = ?`, hashPassword(req.Password), me.ID); err != nil {
+	if err := s.store.updateUser(me.ID, func(u *appUser) { u.pw, u.MustChange = hashPassword(req.Password), false }); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
@@ -1017,5 +1180,6 @@ func (s *server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		s.store.DB().Exec(`DELETE FROM auth_tokens WHERE user_id = ? AND hash != ?`, me.ID, tokenHash(c.Value))
 	}
 	logAction(r, "changed their password")
+	s.event(r, "password", false, "changed their password")
 	writeJSON(w, 200, map[string]any{"ok": true})
 }

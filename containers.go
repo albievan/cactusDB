@@ -1104,6 +1104,7 @@ func (s *server) superuserOK(w http.ResponseWriter, r *http.Request, pw, what st
 	case errors.Is(err, errLockWrong):
 		s.throttle.failed(superThrottleID)
 		logAction(r, "%s FAILED: wrong superuser password", what)
+		s.event(r, "signin-failed", true, "%s FAILED: wrong superuser password", what)
 		writeJSON(w, 403, map[string]any{"error": "wrong superuser password", "locked": true})
 		return false
 	case err != nil:
@@ -1166,6 +1167,7 @@ func (s *server) handleContainerDeploy(w http.ResponseWriter, r *http.Request) {
 		data = d.DataDir
 	}
 	logAction(r, "deploying %s as %s on %s, port %d, data in %s", sp.Name, d.Name, where, d.Port, data)
+	s.event(r, "container", false, "deploying %s as %s on %s, port %d, data in %s", sp.Name, d.Name, where, d.Port, data)
 	s.notify(r, "containers", 0, "started deploying %s as the container %s on %s", sp.Name, d.Name, rt.Name)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
@@ -1186,10 +1188,12 @@ func (s *server) handleContainerDeploy(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			j.log("✘ %s", err)
 			logAction(r, "deploying %s FAILED: %s", d.Name, firstLine(err.Error()))
+			s.event(r, "container", true, "deploying %s FAILED: %s", d.Name, firstLine(err.Error()))
 			s.notify(r, "containers", 0, "couldn't deploy the container %s: %s", d.Name, firstLine(err.Error()))
 		} else {
 			j.log("✔ %s is ready", sp.Name)
 			logAction(r, "deployed %s (%s) on %s", d.Name, sp.Name, where)
+			s.event(r, "container", false, "deployed %s (%s) on %s", d.Name, sp.Name, where)
 			s.notify(r, "containers", 0, "deployed the container %s (%s) on %s: it is ready", d.Name, sp.Name, rt.Name)
 		}
 	}()
@@ -1353,9 +1357,11 @@ func (s *server) handleContainerRemove(w http.ResponseWriter, r *http.Request) {
 	err := deleteCtr(ctx, rt, t)
 	if err != nil {
 		logAction(r, "removing container %s FAILED: %v", t.Name, err)
+		s.event(r, "container", true, "removing container %s FAILED: %v", t.Name, err)
 		writeErr(w, 502, err)
 		return
 	}
 	logAction(r, "removed container %s (%s); its data was kept", t.Name, rt.Name)
+	s.event(r, "container", false, "removed container %s (%s); its data was kept", t.Name, rt.Name)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

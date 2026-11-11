@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"mime/quotedprintable"
@@ -9,7 +10,10 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -144,6 +148,7 @@ func newAuthHarness(t *testing.T) *authHarness {
 	mux.HandleFunc("POST /api/auth/setpassword", s.handleSetPassword)
 	mux.HandleFunc("POST /api/auth/register", s.handleRegister)
 	mux.HandleFunc("GET /api/users", s.handleListUsers)
+	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("POST /api/users", s.handleAddUser)
 	mux.HandleFunc("POST /api/users/{id}/{action}", s.handleUserAction)
 	mux.HandleFunc("POST /api/account/password", s.handleChangePassword)
@@ -395,6 +400,140 @@ func TestPasswordHashAndThrottle(t *testing.T) {
 	for in, want := range map[string]bool{"a@b.co": true, "ann.smith@example.com": true, "admin": false, "a@b": false, "Ann <a@b.co>": false, "a@b.co ": false} {
 		if validEmail(in) != want {
 			t.Errorf("validEmail(%q) = %v", in, !want)
+		}
+	}
+}
+
+// The users of 1.48 (in plain text) are encrypted at startup, and nothing of
+// a user but the e-mail address can be read in the file.
+func TestUsersEncrypted(t *testing.T) {
+	dir := t.TempDir()
+	path, key := filepath.Join(dir, "c.db"), filepath.Join(dir, "c.key")
+	st, err := openStore(path, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Put the 1.48 tables back, as an old file has them.
+	if _, err := st.DB().Exec(`DROP TABLE users; CREATE TABLE users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL DEFAULT '',
+		pw TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, must_change INTEGER NOT NULL DEFAULT 0, reason TEXT NOT NULL DEFAULT '',
+		added_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, last_login TEXT NOT NULL DEFAULT '');
+		INSERT INTO users (id, username, name, pw, status, reason, added_by, created_at, last_login)
+		VALUES (7, 'bob@example.com', 'Bobby Tables', ?, 'requested', 'quarterly figures', 'carol@example.com', '2026-11-01T08:00:00Z', '2026-11-02T09:00:00Z');
+		INSERT INTO auth_tokens (hash, user_id, purpose, expires_at, ip) VALUES ('h1', 7, 'session', '2999-01-01T00:00:00Z', '192.0.2.77')`,
+		hashPassword("bobs-password")); err != nil {
+		t.Fatal(err)
+	}
+	st.DB().Close()
+
+	st, err = openStore(path, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := st.userByName("BOB@example.com")
+	if err != nil || u.ID != 7 || u.Name != "Bobby Tables" || u.Status != "requested" || u.Reason != "quarterly figures" ||
+		u.AddedBy != "carol@example.com" || u.LastLogin != "2026-11-02T09:00:00Z" || !checkPassword(u.pw, "bobs-password") {
+		t.Fatalf("the moved user: %+v %v", u, err)
+	}
+	if added, err := st.ensureAdmin(); err != nil || added {
+		t.Fatalf("ensureAdmin with users: %v %v", added, err)
+	}
+	nu, added, err := st.addUser(appUser{Username: "dave@example.com", Name: "Dave Secretname", Status: "invited", AddedBy: "bob@example.com"})
+	if err != nil || !added {
+		t.Fatal(added, err)
+	}
+	if _, added, _ := st.addUser(appUser{Username: "DAVE@example.com", Status: "requested"}); added {
+		t.Fatal("the same address added twice")
+	}
+	st.updateUser(nu.ID, func(u *appUser) { u.Status = "active" })
+	if n := st.countUsers("active", 0); n != 1 {
+		t.Fatalf("active users: %d", n)
+	}
+	if list, _ := st.listUsers(); len(list) != 2 || list[0].Username != "bob@example.com" {
+		t.Fatalf("list: %+v", list)
+	}
+	if _, err := st.addToken(nu.ID, "session", time.Hour, "198.51.100.23"); err != nil {
+		t.Fatal(err)
+	}
+	st.DB().Close()
+
+	raw, _ := os.ReadFile(path)
+	for _, wal := range []string{"-wal", "-journal"} {
+		b, _ := os.ReadFile(path + wal)
+		raw = append(raw, b...)
+	}
+	for _, secret := range []string{"Bobby Tables", "quarterly figures", "requested", "2026-11-02", "192.0.2.77", "Dave Secretname", "198.51.100.23", "argon2id", "carol@example.com"} {
+		if bytes.Contains(raw, []byte(secret)) {
+			t.Errorf("c.db holds %q in plain text", secret)
+		}
+	}
+	if !bytes.Contains(raw, []byte("bob@example.com")) {
+		t.Error("the user name isn't in the file (it is meant to be plain text)")
+	}
+}
+
+// Sign-ins, failed ones and password changes are events; only signed-in users
+// see them, and what they say isn't readable in the file.
+func TestEvents(t *testing.T) {
+	h := newAuthHarness(t)
+	admin := h.browser()
+	h.call(admin, "POST", "/api/auth/login", map[string]string{"username": "admin", "password": "not-it"})
+	if code, out := h.call(admin, "GET", "/api/events", nil); code != 401 || out["signin"] != true {
+		t.Fatalf("events signed out: %d %v", code, out)
+	}
+	h.mustOK(admin, "/api/auth/login", map[string]string{"username": "admin", "password": "admin"})
+	h.mustOK(admin, "/api/auth/login/password", map[string]string{"password": "a-new-admin-pw"})
+
+	events := func(query string) []map[string]any {
+		t.Helper()
+		code, out := h.call(admin, "GET", "/api/events"+query, nil)
+		if code != 200 {
+			t.Fatalf("events%s: %d %v", query, code, out)
+		}
+		var list []map[string]any
+		for _, e := range out["events"].([]any) {
+			list = append(list, e.(map[string]any))
+		}
+		return list
+	}
+	all := events("")
+	var kinds []string
+	for _, e := range all {
+		kinds = append(kinds, e["kind"].(string))
+	}
+	if got := strings.Join(kinds, ","); got != "signin,password,signin-failed" {
+		t.Fatalf("events newest first: %s", got)
+	}
+	if f := all[2]; f["user"] != "admin" || f["failed"] != true || f["ip"] != "127.0.0.1" || !strings.Contains(f["text"].(string), "wrong user name or password") {
+		t.Fatalf("the failed sign-in: %v", f)
+	}
+	if l := events("?kind=signin-failed"); len(l) != 1 {
+		t.Fatalf("kind filter: %v", l)
+	}
+	if l := events("?failed=1"); len(l) != 1 {
+		t.Fatalf("failed filter: %v", l)
+	}
+	if l := events("?q=NEW+PASSWORD"); len(l) != 1 || l[0]["kind"] != "password" {
+		t.Fatalf("search: %v", l)
+	}
+	if l := events("?before=" + strconv.Itoa(int(all[1]["id"].(float64)))); len(l) != 1 {
+		t.Fatalf("older: %v", l)
+	}
+	today := time.Now().Format("2006-01-02")
+	_, offset := time.Now().Zone()
+	if l := events("?day=" + today + "&tz=" + strconv.Itoa(-offset/60)); len(l) != 3 {
+		t.Fatalf("today: %v", l)
+	}
+	if l := events("?day=2001-01-01&tz=0"); len(l) != 0 {
+		t.Fatalf("another day: %v", l)
+	}
+
+	raw, _ := os.ReadFile(h.s.store.path)
+	b, _ := os.ReadFile(h.s.store.path + "-wal")
+	raw = append(raw, b...)
+	for _, secret := range []string{"wrong user name", "127.0.0.1", "new password at sign-in"} {
+		if bytes.Contains(raw, []byte(secret)) {
+			t.Errorf("c.db holds %q in plain text", secret)
 		}
 	}
 }

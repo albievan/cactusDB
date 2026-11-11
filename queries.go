@@ -113,6 +113,7 @@ func (s *server) handleSaveQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "[%s] saved query %q (version %d)", ss.label, q.Name, version)
+	s.event(r, "query", false, "[%s] saved query %q (version %d)", ss.label, q.Name, version)
 	// Not the query's name: it is kept encrypted with the connection password.
 	if req.ID == 0 {
 		s.notify(r, "queries", ss.savedID, "added a saved query to “%s”", ss.label)
@@ -163,6 +164,7 @@ func (s *server) handleDeleteQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "[%s] deleted saved query %d", ss.label, id)
+	s.event(r, "query", false, "[%s] deleted saved query %d", ss.label, id)
 	s.notify(r, "queries", ss.savedID, "deleted a saved query of “%s”", ss.label)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

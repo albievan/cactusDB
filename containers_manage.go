@@ -1010,6 +1010,7 @@ func (s *server) handleContainerAction(w http.ResponseWriter, r *http.Request) {
 	ctrSizes.Unlock()
 	if err != nil {
 		logAction(r, "%s container %s FAILED: %s", t.Action, t.Name, firstLine(err.Error()))
+		s.event(r, "container", true, "%s container %s FAILED: %s", t.Action, t.Name, firstLine(err.Error()))
 		if len(done) > 0 { // a purge that got part of the way
 			writeJSON(w, 502, map[string]any{"error": err.Error(), "done": done})
 			return
@@ -1020,10 +1021,13 @@ func (s *server) handleContainerAction(w http.ResponseWriter, r *http.Request) {
 	switch t.Action {
 	case "delete":
 		logAction(r, "removed container %s (%s); its data was kept", t.Name, rt.Name)
+		s.event(r, "container", false, "removed container %s (%s); its data was kept", t.Name, rt.Name)
 	case "purge":
 		logAction(r, "purged container %s (%s): %s", t.Name, rt.Name, strings.Join(done, "; "))
+		s.event(r, "container", false, "purged container %s (%s): %s", t.Name, rt.Name, strings.Join(done, "; "))
 	default:
 		logAction(r, "%s container %s (%s)", t.Action, t.Name, rt.Name)
+		s.event(r, "container", false, "%s container %s (%s)", t.Action, t.Name, rt.Name)
 	}
 	writeJSON(w, 200, map[string]any{"ok": true, "done": done})
 }

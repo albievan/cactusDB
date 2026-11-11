@@ -299,6 +299,7 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		os.Remove(tmp.Name())
 		logAction(r, "compress %d file(s) FAILED: %v", len(chosen), err)
+		s.event(r, "export", true, "compress %d file(s) FAILED: %v", len(chosen), err)
 		writeErr(w, 500, fmt.Errorf("compressing failed: %w", err))
 		return
 	}
@@ -322,6 +323,7 @@ func (s *server) handlePrepareZip(w http.ResponseWriter, r *http.Request) {
 		logAction(r, "compress: %d file(s) skipped, no longer there: %s", len(missing), strings.Join(missing, ", "))
 	}
 	logAction(r, "compressed %d file(s), %s to %s, for download as %s", len(chosen)-len(missing), humanSize(total), humanSize(fi.Size()), name)
+	s.event(r, "export", false, "compressed %d file(s), %s to %s, for download as %s", len(chosen)-len(missing), humanSize(total), humanSize(fi.Size()), name)
 	writeJSON(w, 200, map[string]any{
 		"name":     name,
 		"files":    len(chosen) - len(missing),
@@ -398,6 +400,7 @@ func (s *server) handleDownloadZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "download %s", pz.name)
+	s.event(r, "export", false, "download %s", pz.name)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(pz.name, `"`, "_")+`"`)
 	http.ServeFile(w, r, pz.path)
@@ -669,9 +672,11 @@ func (s *server) handleDeleteFiles(w http.ResponseWriter, r *http.Request) {
 		if err := os.Remove(f.path); err != nil {
 			failed = append(failed, f.Name+": "+err.Error())
 			logAction(r, "delete %s FAILED: %v", f.path, err)
+			s.event(r, "files", true, "delete %s FAILED: %v", f.path, err)
 			continue
 		}
 		logAction(r, "deleted %s", f.path)
+		s.event(r, "files", false, "deleted %s", f.path)
 		deleted++
 		freed += f.Size
 	}

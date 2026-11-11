@@ -474,6 +474,7 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request) {
 	}
 	j.set(func(j *upgradeJob) { j.Command = opts.Command })
 	logAction(r, "upgrade to cactusdb %s started: downloading %s", latest, distURL+binaryName())
+	s.event(r, "server", false, "upgrade to cactusdb %s started: downloading %s", latest, distURL+binaryName())
 	s.notify(r, "upgrade", 0, "started updating cactusdb from %s to %s: it restarts once installed, and this page reloads", version, latest)
 	go s.runUpgrade(j, exe, opts, latest, nil)
 	writeJSON(w, 200, j.snapshot())
@@ -510,6 +511,7 @@ func (s *server) handleUpgradeUpload(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, errLockWrong):
 		s.throttle.failed(superThrottleID)
 		logAction(r, "upgrade from an uploaded file REFUSED: wrong superuser password")
+		s.event(r, "signin-failed", true, "upgrade from an uploaded file REFUSED: wrong superuser password")
 		refuse(403, errors.New("wrong superuser password"))
 		return
 	case err != nil:
@@ -558,6 +560,7 @@ func (s *server) handleUpgradeUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	logAction(r, "upgrade from a file sent by the browser (%d bytes), superuser password given", n)
+	s.event(r, "server", false, "upgrade from a file sent by the browser (%d bytes), superuser password given", n)
 	s.notify(r, "upgrade", 0, "started updating cactusdb %s from a file: it restarts once installed, and this page reloads", version)
 	s.runUpgrade(j, exe, opts, "", func(context.Context, func(int64, int64)) (string, error) { return tmp, nil })
 	snap := j.snapshot()

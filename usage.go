@@ -341,6 +341,7 @@ func (s *server) handleUsageDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	n, _ := res.RowsAffected()
 	logAction(r, "usage log: deleted %d event(s) from %s to %s (UTC)", n, orOpen(from), orOpen(to))
+	s.event(r, "settings", false, "usage log: deleted %d event(s) from %s to %s (UTC)", n, orOpen(from), orOpen(to))
 	sum, err := s.usageSummary()
 	if err != nil {
 		writeErr(w, 500, err)

@@ -200,6 +200,7 @@ func (s *server) handleMigrate(w http.ResponseWriter, r *http.Request) {
 		what = "migration script of"
 	}
 	logAction(r, "%s %q (%s) to a new %s database %q", what, src.label, engineName(src.engine), engineName(te), req.NewDatabase)
+	s.event(r, "export", false, "%s %q (%s) to a new %s database %q", what, src.label, engineName(src.engine), engineName(te), req.NewDatabase)
 	m := &migrator{s: s, job: job, req: req, src: src, srcEngine: src.engine, tp: tp}
 	go func() {
 		defer cancel()

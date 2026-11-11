@@ -137,6 +137,8 @@
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
             mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
   header .flow svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  /* A phone: the buttons first, the animation goes. */
+  @media (max-width: 640px) { header { gap: 8px; } header .flow { display: none; } header .status { flex: 1 1 auto; } }
   .flow .wave { fill: none; stroke: url(#flowGrad); vector-effect: non-scaling-stroke; }
   .flow .wave.a { stroke-width: 1.5; opacity: .75; animation: flowA 6s linear infinite; }
   .flow .wave.b { stroke-width: 1.1; opacity: .5; animation: flowA 4.2s linear infinite; }
@@ -834,6 +836,35 @@
   .ustable .uacts { text-align: right; }
   .ustable .uacts .btn { margin-left: 4px; }
   .ustable tr.req { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  /* Events (events.go). */
+  #eventsBtn { flex: none; }
+  #eventsDialog { width: min(1000px, calc(100vw - 32px)); }
+  .evfilters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .evfilters select { width: auto; min-width: 170px; }
+  .evfilters input[type=date] { width: auto; }
+  .evfilters input[type=search] { flex: 1 1 200px; width: auto; }
+  .evfilters .form-check { margin: 0; white-space: nowrap; }
+  .evtable { max-height: 58vh; }
+  .evtable td.evwhen { font-variant-numeric: tabular-nums; }
+  .evtable td.evtext { white-space: normal; overflow-wrap: anywhere; min-width: 260px; }
+  .evtable td.evwho { white-space: normal; overflow-wrap: anywhere; max-width: 240px; }
+  .evtable .evkind i { margin-right: 4px; }
+  .evtable tr.evbad td { background: color-mix(in srgb, var(--bs-danger) 9%, transparent); }
+  .evtable tr.evbad .evkind { color: var(--bs-danger-text-emphasis); }
+  .evtable tr.evday td { background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 600; padding-top: 6px; }
+  .evcount { color: var(--muted); font-size: 12px; }
+  /* A phone: each event is a card (time and kind, who and where, what happened). */
+  @media (max-width: 640px) {
+    .evtable thead { display: none; }
+    .evtable table, .evtable tbody { display: block; }
+    .evtable tr { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+    .evtable td { display: block; border: 0; padding: 0; white-space: normal; min-width: 0 !important; max-width: none !important; background: transparent !important; }
+    .evtable td:nth-child(3), .evtable td:nth-child(4) { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+    .evtable td.evtext { grid-column: 1 / -1; }
+    .evtable tr.evday { background: var(--panel-2); }
+    .evtable tr.evday td { grid-column: 1 / -1; }
+    .evtable tr.evbad { background: color-mix(in srgb, var(--bs-danger) 9%, transparent); }
+  }
   #signOutBtn { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; min-width: 0; }
   .signedas { color: var(--muted); font-size: 11px; margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .edsub { margin: 22px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
@@ -888,6 +919,7 @@
     <div class="dropdown-menu dropdown-menu-end shadow users" id="usersMenu"></div>
   </div>
   <button id="msgBtn" class="btn btn-sm btn-outline-secondary position-relative" type="button" hidden title="Messages: send a direct message to someone using cactusdb" aria-controls="msgPanel"><i class="bi bi-chat-dots" aria-hidden="true"></i><span class="visually-hidden">Messages</span><span class="badge rounded-pill text-bg-danger msgunread" id="msgUnread" hidden></span></button>
+  <button id="eventsBtn" class="btn btn-sm btn-outline-secondary" type="button" title="Events: messages and e-mails sent, sign-ins and failed sign-ins, requests for access, exports, deleted files, connections changed…"><i class="bi bi-journal-text" aria-hidden="true"></i><span class="visually-hidden">Events</span></button>
   <button id="reconnectBtn" class="btn btn-sm btn-outline-secondary" hidden title="Refresh the database connection and reload every table, view, procedure, trigger… and what is open"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
   <button id="dashBtn" class="btn btn-sm btn-outline-secondary" hidden title="The database's statistics: version, uptime, size, connections, activity, caches, its largest tables…"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</button>
   <button id="disconnectBtn" class="btn btn-sm btn-outline-secondary" hidden>Disconnect</button>
@@ -1567,6 +1599,26 @@
   <div class="dactions"><span class="spacer"></span><button class="btn btn-primary" type="button" id="usClose">Close</button></div>
 </dialog>
 
+<dialog id="eventsDialog" class="dlg" aria-labelledby="evTitle">
+  <h3 id="evTitle">Events</h3>
+  <p class="hint mt-0">What happened in cactusdb, newest first: messages and e-mails sent, sign-ins and failed sign-ins,
+    requests for access, users, exports, deleted files, saved connections and queries, settings and more. Kept for
+    <span id="evKeep">90</span> days; who did it, from where and what it says are stored encrypted.</p>
+  <div class="evfilters">
+    <label class="visually-hidden" for="evKind">Kind of event</label>
+    <select class="form-select form-select-sm" id="evKind"></select>
+    <label class="visually-hidden" for="evDay">Day</label>
+    <input class="form-control form-control-sm" type="date" id="evDay" title="Only this day">
+    <label class="visually-hidden" for="evQ">Search</label>
+    <input class="form-control form-control-sm" type="search" id="evQ" placeholder="Search who, IP address or text" autocomplete="off">
+    <div class="form-check"><input class="form-check-input" type="checkbox" id="evFailed"><label class="form-check-label" for="evFailed">Only failed</label></div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="evRefresh" title="Load the newest events"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
+  </div>
+  <div class="ustable evtable" id="evTable"></div>
+  <div class="dactions"><button class="btn btn-outline-secondary" type="button" id="evMore" hidden>Show older events</button>
+    <span class="evcount" id="evCount"></span><span class="spacer"></span><button class="btn btn-primary" type="button" id="evClose">Close</button></div>
+</dialog>
+
 <div id="verBanner" class="gabanner card shadow" role="status" hidden>
   <span id="verBannerText"></span>
   <button type="button" class="btn btn-primary" id="verReload">Reload</button>
@@ -2135,6 +2187,81 @@ $("usPwForm").addEventListener("submit", async (ev) => {
   } catch (e) { usShow("usPwResult", "bad", e.message); }
 });
 $("usClose").addEventListener("click", () => $("usersDialog").close());
+
+// ---- Events (events.go): the button next to Messages ------------------------------
+const EV_KINDS = {
+  message: ["Message sent", "chat-dots"], email: ["E-mail sent", "envelope"], signin: ["Signed in", "box-arrow-in-right"],
+  "signin-failed": ["Failed sign-in", "shield-exclamation"], signout: ["Signed out", "box-arrow-right"], password: ["Password", "key"],
+  register: ["Request for access", "person-plus"], user: ["Users", "people"], export: ["Data exported", "download"],
+  files: ["Files deleted", "trash"], connection: ["Connection", "plug"], query: ["Saved query", "bookmark"],
+  settings: ["Settings", "gear"], container: ["Container", "box-seam"], server: ["cactusdb", "power"],
+};
+const evState = { list: [], next: 0, timer: 0, seq: 0 };
+function evParams(before) {
+  const q = new URLSearchParams();
+  if ($("evKind").value) q.set("kind", $("evKind").value);
+  if ($("evDay").value) { q.set("day", $("evDay").value); q.set("tz", new Date($("evDay").value + "T00:00").getTimezoneOffset()); }
+  if ($("evQ").value.trim()) q.set("q", $("evQ").value.trim());
+  if ($("evFailed").checked) q.set("failed", "1");
+  if (before) q.set("before", before);
+  return q;
+}
+async function evLoad(older = false) {
+  const seq = ++evState.seq;
+  if (!older && !evState.list.length) $("evTable").innerHTML = `<p class="emptymsg p-3"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>  Loading…</p>`;
+  try {
+    const res = await api("GET", "/api/events?" + evParams(older ? evState.next : 0));
+    if (seq !== evState.seq) return; // filters changed meanwhile
+    $("evKeep").textContent = res.keepDays;
+    evState.list = older ? evState.list.concat(res.events) : res.events;
+    evState.next = res.next;
+    evRender();
+  } catch (e) { if (seq === evState.seq) $("evTable").innerHTML = `<p class="emptymsg p-3">${esc(e.message)}</p>`; }
+}
+function evRender() {
+  const list = evState.list;
+  $("evMore").hidden = !evState.next;
+  $("evCount").textContent = list.length ? `${list.length} event${list.length === 1 ? "" : "s"}${evState.next ? " so far" : ""}` : "";
+  if (!list.length) {
+    const filtered = $("evKind").value || $("evDay").value || $("evQ").value.trim() || $("evFailed").checked;
+    $("evTable").innerHTML = `<p class="emptymsg p-3">${filtered ? "No events match: change or clear the filters." : "No events yet."}</p>`;
+    return;
+  }
+  let day = "";
+  const rows = list.map((e) => {
+    const at = new Date(e.at), d = at.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const head = d !== day ? `<tr class="evday"><td colspan="5">${esc(d)}</td></tr>` : "";
+    day = d;
+    const [label, icon] = EV_KINDS[e.kind] || [e.kind, "dot"];
+    return head + `<tr class="${e.failed ? "evbad" : ""}"><td class="evwhen" title="${esc(at.toLocaleString())}">${esc(at.toLocaleTimeString())}</td>` +
+      `<td class="evkind"><i class="bi bi-${icon}" aria-hidden="true"></i>${esc(label)}${e.failed ? ` <span class="badge text-bg-danger">failed</span>` : ""}</td>` +
+      `<td class="evwho">${e.user ? esc(e.user) : `<span class="text-body-secondary">–</span>`}</td>` +
+      `<td class="evip">${esc(e.ip || "")}</td><td class="evtext">${esc(e.text)}</td></tr>`;
+  }).join("");
+  $("evTable").innerHTML = `<table class="table table-sm"><thead><tr><th>Time</th><th>Event</th><th>Who</th><th>IP address</th><th>What happened</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function openEvents() {
+  if (!$("evKind").options.length) {
+    $("evKind").innerHTML = `<option value="">All events</option>` +
+      Object.entries(EV_KINDS).map(([k, [label]]) => `<option value="${k}">${esc(label)}</option>`).join("");
+  }
+  $("eventsDialog").showModal();
+  evLoad();
+  // While it is open the newest events come in by themselves (unless older ones are shown).
+  clearInterval(evState.timer);
+  evState.timer = setInterval(() => {
+    if (!$("eventsDialog").open) return clearInterval(evState.timer);
+    if (!document.hidden && evState.list.length <= 200 && $("evTable").scrollTop < 40) evLoad();
+  }, 15000);
+}
+$("eventsBtn").addEventListener("click", openEvents);
+$("evRefresh").addEventListener("click", () => evLoad());
+$("evMore").addEventListener("click", () => evLoad(true));
+$("evClose").addEventListener("click", () => $("eventsDialog").close());
+$("eventsDialog").addEventListener("close", () => clearInterval(evState.timer));
+for (const id of ["evKind", "evDay", "evFailed"]) $(id).addEventListener("change", () => { evState.list = []; evLoad(); });
+let evQTimer = 0;
+$("evQ").addEventListener("input", () => { clearTimeout(evQTimer); evQTimer = setTimeout(() => { evState.list = []; evLoad(); }, 300); });
 
 // ---- ☰ → E-mail server (mail.go): as cactusInv's Settings → E-mail server -------------
 const EM_PRESETS = {

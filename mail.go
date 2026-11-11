@@ -220,6 +220,7 @@ func (s *server) handleSaveSMTP(w http.ResponseWriter, r *http.Request) {
 		changed = ", password changed"
 	}
 	logAction(r, "saved the e-mail server: %s:%d (%s) as %q, %s%s", st.Host, st.Port, st.TLS, st.Username, state, changed)
+	s.event(r, "settings", false, "saved the e-mail server: %s:%d (%s) as %q, %s%s", st.Host, st.Port, st.TLS, st.Username, state, changed)
 	v, _ := s.smtpView()
 	writeJSON(w, 200, v)
 }
@@ -239,7 +240,7 @@ func (s *server) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, _, _ := s.store.loadSMTP()
-	if err := s.sendMail(r.Context(), to, "cactusdb test e-mail",
+	if err := s.sendMail(r, to, "cactusdb test e-mail",
 		"This is a test e-mail from cactusdb. Your e-mail server settings work.\n\n"+linkLine(st.LinkBase)); err != nil {
 		logAction(r, "test e-mail to %s failed: %v", to, err)
 		writeErr(w, 400, err)
@@ -259,7 +260,16 @@ func linkLine(base string) string {
 var errNoMailServer = errors.New("no e-mail server is set up: set one up under ☰ → E-mail server")
 
 // sendMail sends a plain-text e-mail through the saved mail server.
-func (s *server) sendMail(ctx context.Context, to, subject, body string) error {
+func (s *server) sendMail(r *http.Request, to, subject, body string) (err error) {
+	// The event says what was sent, never a sign-in code.
+	about, _, _ := strings.Cut(subject, ": ")
+	defer func() {
+		if err != nil {
+			s.event(r, "email", true, "e-mail to %s failed (%s): %v", to, about, err)
+		} else {
+			s.event(r, "email", false, "e-mailed %s: %s", to, about)
+		}
+	}()
 	st, ok, err := s.store.loadSMTP()
 	if err != nil {
 		return err
@@ -277,7 +287,7 @@ func (s *server) sendMail(ctx context.Context, to, subject, body string) error {
 	if err != nil {
 		return fmt.Errorf("Send as: %w", err)
 	}
-	if err := smtpSend(ctx, st.smtpSettings, pw, from, to, subject, body, nil); err != nil {
+	if err := smtpSend(r.Context(), st.smtpSettings, pw, from, to, subject, body, nil); err != nil {
 		return fmt.Errorf("the e-mail server refused: %w", err)
 	}
 	return nil

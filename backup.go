@@ -529,10 +529,12 @@ func (s *server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	res, err := backupToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, ss.label, ss.dbName, groups, nil)
 	if err != nil {
 		logAction(r, "[%s] backup FAILED: %v", ss.label, err)
+		s.event(r, "export", true, "[%s] backup FAILED: %v", ss.label, err)
 		writeErr(w, 400, err)
 		return
 	}
 	logAction(r, "[%s] backup: %d table(s), %d row(s), %s to %s", ss.label, res.Tables, res.Rows, humanSize(res.Size), res.Path)
+	s.event(r, "export", false, "[%s] backup: %d table(s), %d row(s), %s to %s", ss.label, res.Tables, res.Rows, humanSize(res.Size), res.Path)
 	writeJSON(w, 200, map[string]any{
 		"path":     res.Path,
 		"file":     filepath.Base(res.Path),

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.49.0 — 2026-11-11
+
+- **Events**: a new button in the top bar, next to 💬 Messages, lists what happened in
+  cactusdb, newest first and by day: messages sent (to whom, never what), e-mails sent
+  (never a sign-in code), sign-ins, sign-outs and **failed sign-ins** (wrong password,
+  wrong code, too many tries, not yet approved, wrong superuser password), passwords set
+  and reset, requests for access, users added, approved, rejected and deleted, **data
+  exported** (tables, queries, all tables, DDL, backups, downloads), **files deleted**,
+  saved connections **added, changed or deleted** (and connecting), saved queries,
+  settings, containers, and cactusdb starting, updating and shutting down. Each shows the
+  time, who (the signed-in user, or the page's name), the IP address and what happened;
+  failed ones are red. Filter by kind, day, *Only failed* or a search; new events come in
+  while it is open. Kept for 90 days, stored encrypted (only the time and kind are
+  readable in the file); with `--remotelogin` only signed-in users see them. One card per
+  event on a phone.
+- **`--remotelogin` users are stored encrypted**: of a user only the e-mail address is
+  readable in `cactus.conn.db`. Their name, password hash, status, reason, who added them
+  and dates are one record encrypted with cactusdb's key (AES-256-GCM), and so are the IP
+  addresses of sign-ins. The users of 1.48 are encrypted at the first start, and the file
+  is vacuumed so no plain copy remains.
+- On a phone the top bar leaves out its animation, so its buttons fit.
+
 ## 1.48.1 — 2026-11-10
 
 - **The `--remotelogin` sign-in page looks like cactusInv's**: a green side with what cactusdb

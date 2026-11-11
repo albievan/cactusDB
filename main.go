@@ -36,7 +36,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.48.1"
+var version = "1.49.0"
 
 //go:embed web
 var webFS embed.FS
@@ -427,6 +427,7 @@ func main() {
 		}
 	}
 	s.setExportFolder(exportDir)
+	s.eventAs(nil, "", "server", false, "cactusdb %s started on port %d%s", version, *port, map[bool]string{true: ", sign-in required (--remotelogin)"}[*remoteLogin])
 
 	static, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
@@ -455,6 +456,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/setpassword/info", s.handleSetPasswordInfo)
 	mux.HandleFunc("POST /api/auth/setpassword", s.handleSetPassword)
 	mux.HandleFunc("POST /api/auth/register", s.handleRegister)
+	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/users", s.handleListUsers)
 	mux.HandleFunc("POST /api/users", s.handleAddUser)
 	mux.HandleFunc("POST /api/users/{id}/{action}", s.handleUserAction)
@@ -720,6 +722,7 @@ func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "shutdown requested")
+	s.event(r, "server", false, "shutdown requested")
 	writeJSON(w, 200, map[string]bool{"ok": true})
 	s.stopOnce.Do(func() { close(s.shutdown) })
 }
@@ -1130,6 +1133,7 @@ func (s *server) unlockConnAs(w http.ResponseWriter, r *http.Request, id int64, 
 		if errors.Is(err, errLockWrong) {
 			s.throttle.failed(superThrottleID)
 			logAction(r, "superuser unlock FAILED: wrong superuser password")
+			s.event(r, "signin-failed", true, "superuser unlock FAILED: wrong superuser password")
 			writeJSON(w, 403, map[string]any{"error": "wrong superuser password", "locked": true})
 			return c, nil, false
 		}
@@ -1144,6 +1148,7 @@ func (s *server) unlockConnAs(w http.ResponseWriter, r *http.Request, id int64, 
 		if err == nil {
 			s.throttle.ok(superThrottleID)
 			logAction(r, "superuser opened connection %q", c.Name)
+			s.event(r, "connection", false, "superuser opened connection %q", c.Name)
 		}
 	} else {
 		c, box, err = s.store.Unlock(id, password)
@@ -1156,6 +1161,7 @@ func (s *server) unlockConnAs(w http.ResponseWriter, r *http.Request, id int64, 
 	case errors.Is(err, errLockWrong):
 		s.throttle.failed(id)
 		logAction(r, "unlock %q FAILED: wrong connection password", c.Name)
+		s.event(r, "connection", true, "unlock %q FAILED: wrong connection password", c.Name)
 		writeJSON(w, 403, map[string]any{"error": err.Error(), "locked": true})
 	case err != nil:
 		writeErr(w, 500, err)
@@ -1204,6 +1210,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	db, err := openDB(r.Context(), p)
 	if err != nil {
 		logAction(r, "connect FAILED %s after %s: %v", defaultConnName(p), time.Since(start).Round(time.Millisecond), err)
+		s.event(r, "connection", true, "connect FAILED %s after %s: %v", defaultConnName(p), time.Since(start).Round(time.Millisecond), err)
 		writeErr(w, 400, fmt.Errorf("connection failed: %w", explainConnErr(p, err)))
 		return
 	}
@@ -1224,6 +1231,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			resp["saveError"] = err.Error()
 		} else {
 			logAction(r, "save connection %q (password-protected)", req.Name)
+			s.event(r, "connection", false, "added the saved connection %q (%s)", strings.TrimSpace(req.Name), defaultConnName(p))
 			s.notify(r, "connections", 0, "added the saved connection “%s”", strings.TrimSpace(req.Name))
 			resp["savedId"] = id
 			label, savedID, connBox = strings.TrimSpace(req.Name), id, box
@@ -1243,6 +1251,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	noteSession(r, id)
 	logAction(r, "connect %s as %q in %s", defaultConnName(p), label, time.Since(start).Round(time.Millisecond))
+	s.event(r, "connection", false, "connect %s as %q in %s", defaultConnName(p), label, time.Since(start).Round(time.Millisecond))
 	resp["session"] = id
 	resp["engine"] = p.Engine
 	resp["dashboard"] = hasDashboard(dialect(p.Engine))
@@ -1582,10 +1591,12 @@ func (s *server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		logAction(r, "[%s] export %s FAILED: %v (sql: %s)", ss.label, req.Format, err, oneLine(q))
+		s.event(r, "export", true, "[%s] export %s FAILED: %v (sql: %s)", ss.label, req.Format, err, oneLine(q))
 		writeErr(w, 400, err)
 		return
 	}
 	logAction(r, "[%s] export %s: %d row(s) to %s (sql: %s)", ss.label, req.Format, rows, path, oneLine(q))
+	s.event(r, "export", false, "[%s] export %s: %d row(s) to %s (sql: %s)", ss.label, req.Format, rows, path, oneLine(q))
 	writeJSON(w, 200, map[string]any{
 		"path":     path,
 		"file":     filepath.Base(path),
@@ -1618,10 +1629,12 @@ func (s *server) handleExportDDL(w http.ResponseWriter, r *http.Request) {
 	path, n, err := exportDDLToDir(r.Context(), ss.exportDir(s.exportFolder()), ss.engine, ss.db, ss.label, ss.dbName, ddlTargets(groups), nil)
 	if err != nil {
 		logAction(r, "[%s] DDL export FAILED: %v", ss.label, err)
+		s.event(r, "export", true, "[%s] DDL export FAILED: %v", ss.label, err)
 		writeErr(w, 400, err)
 		return
 	}
 	logAction(r, "[%s] DDL export: %d object(s) to %s", ss.label, n, path)
+	s.event(r, "export", false, "[%s] DDL export: %d object(s) to %s", ss.label, n, path)
 	writeJSON(w, 200, map[string]any{
 		"path":     path,
 		"file":     filepath.Base(path),
@@ -1695,6 +1708,7 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAction(r, "download %s", path)
+	s.event(r, "export", false, "download %s", path)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+file+`"`)
 	http.ServeFile(w, r, path)
 }
@@ -1826,10 +1840,13 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case c.ID == 0:
 		s.notify(r, "connections", 0, "added the saved connection “%s”", c.Name)
+		s.event(r, "connection", false, "added the saved connection %q (%s)", c.Name, defaultConnName(c.ConnParams))
 	case oldName != c.Name:
 		s.notify(r, "connections", 0, "changed the saved connection “%s” and renamed it “%s”", oldName, c.Name)
+		s.event(r, "connection", false, "changed the saved connection %q and renamed it %q (%s)", oldName, c.Name, defaultConnName(c.ConnParams))
 	default:
 		s.notify(r, "connections", 0, "changed the saved connection “%s”", c.Name)
+		s.event(r, "connection", false, "changed the saved connection %q (%s)", c.Name, defaultConnName(c.ConnParams))
 	}
 	writeJSON(w, 200, map[string]any{"id": id})
 }
@@ -1870,6 +1887,7 @@ func (s *server) handleDeleteConn(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	logAction(r, "delete saved connection %q and its saved queries", c.Name)
+	s.event(r, "connection", false, "deleted the saved connection %q and its saved queries", c.Name)
 	s.notify(r, "connections", 0, "deleted the saved connection “%s” and its saved queries", c.Name)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -279,6 +280,12 @@ func (s *server) handleMessage(w http.ResponseWriter, r *http.Request) {
 		p.messages = p.messages[len(p.messages)-maxMessages:]
 	}
 	log.Printf("%s sent a message to %s", from.ip, to.ip) // not what it says
+	// p.mu is held, so not s.event: it would wait for it.
+	who := from.name
+	if u, ok := currentUser(r); ok {
+		who = u.Username
+	}
+	s.eventAs(r, who, "message", false, "sent a message to %s", cmp.Or(to.name, to.ip))
 	writeJSON(w, 200, m)
 }
 

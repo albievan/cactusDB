@@ -134,6 +134,7 @@ func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logAction(r, "idle time set to %d minute(s)", n)
+		s.event(r, "settings", false, "idle time set to %d minute(s)", n)
 	}
 	if req.ExportDir != nil {
 		dir, saved, err := checkExportDir(*req.ExportDir, s.defaultExportDir)
@@ -147,6 +148,7 @@ func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		s.setExportFolder(dir)
 		logAction(r, "export folder set to %s", dir)
+		s.event(r, "settings", false, "export folder set to %s", dir)
 	}
 	if req.GAID != nil || req.GASecret != nil || req.GAClearSecret != nil || req.GACLI != nil {
 		if err := saveGASettings(s.store, req.GAID, req.GASecret, req.GAClearSecret, req.GACLI); err != nil {
@@ -155,6 +157,7 @@ func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		c := loadGAConfig(s.store)
 		logAction(r, "Google Analytics: measurement id %q, API secret set: %v, command-line runs: %v", c.ID, c.Secret != "", c.CLI)
+		s.event(r, "settings", false, "Google Analytics: measurement id %q, API secret set: %v, command-line runs: %v", c.ID, c.Secret != "", c.CLI)
 	}
 	var moved *moveResult
 	if req.DBPath != nil {
@@ -168,6 +171,7 @@ func (s *server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logAction(r, "connection database moved from %s to %s%s", moved.From, moved.To, keyMoveNote(moved))
+		s.event(r, "settings", false, "connection database moved from %s to %s%s", moved.From, moved.To, keyMoveNote(moved))
 		for _, w := range moved.Warnings {
 			log.Printf("warning: %s", w)
 		}

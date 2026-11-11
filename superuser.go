@@ -272,6 +272,7 @@ func (s *server) handleSuperuserReveal(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, errLockWrong):
 		s.throttle.failed(superThrottleID)
 		logAction(r, "superuser sign-in FAILED: wrong superuser password")
+		s.event(r, "signin-failed", true, "superuser sign-in FAILED: wrong superuser password")
 		writeJSON(w, 403, map[string]any{"error": "wrong superuser password", "locked": true})
 		return
 	case errors.Is(err, errNoSuperuser):
@@ -304,6 +305,7 @@ func (s *server) handleSuperuserReveal(w http.ResponseWriter, r *http.Request) {
 		out = append(out, i)
 	}
 	logAction(r, "superuser signed in")
+	s.event(r, "signin", false, "superuser signed in")
 	writeJSON(w, 200, out)
 }
 

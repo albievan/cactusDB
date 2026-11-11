@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.48.1
+cactusdb 1.49.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -673,9 +673,39 @@ in the background its title says so, for example *(1) New message · cactusdb*; 
 there when they come back to the tab. Messages are **private**: only the page you picked, and yours, are given
 a message. Other pages, from the same computer or another, never see it. Pages are addressed by
 a handle that isn't the secret id a page checks in with, so no page can read another's
-messages. Messages are kept in memory only, are never logged or written to disk, and are
-forgotten once both pages are closed. Reloading a page starts a new conversation. Under
+messages. Messages are kept in memory only, and what they say is never logged or written to
+disk ([Events](#events) only notes that one was sent, and to whom); they are forgotten once
+both pages are closed. Reloading a page starts a new conversation. Under
 **Your name** you can give a name the others see next to your IP (kept in this browser).
+
+<a id="events"></a>
+**Events.** The 📓 **Events** button in the top bar, next to 💬 Messages, lists what happened
+in cactusdb, newest first, by day: the time, the kind of event, who (the signed-in user, or
+the name a page gave under *Your name*), their IP address and what happened. It records:
+
+| Event | When |
+|---|---|
+| Message sent | A direct message was sent (to whom, never what it says) |
+| E-mail sent | cactusdb e-mailed someone: a sign-in code, an invitation, a password reset link, an approval, a test e-mail (never the code itself); one that failed is marked |
+| Signed in, Signed out | A `--remotelogin` user signed in or out, or someone signed in as the superuser |
+| Failed sign-in | A wrong user name or password, a wrong sign-in code, too many tries, a request for access not yet approved, a wrong superuser password |
+| Password | A new password chosen at sign-in, set with an e-mailed link or changed under ☰ → Users; a reset asked for |
+| Request for access | Someone asked for access on the sign-in page (with their reason) |
+| Users | A user added, deleted or sent a new link; a request approved or rejected |
+| Data exported | A table or query exported, all tables exported, a DDL script, a backup, a migration started, a file or the logs downloaded |
+| Files deleted | Exported files deleted under *Exported files* |
+| Connection | A saved connection added, changed (or renamed) or deleted; connecting, and failing to; a connection password that was wrong |
+| Saved query | A saved query added, changed or deleted |
+| Settings | The e-mail server, idle time, export folder, Google Analytics or the connection file's folder changed; usage log events deleted |
+| Container | A database container deployed, started, stopped, removed or purged |
+| cactusdb | cactusdb started, an update was installed, a shutdown from the browser |
+
+Pick a kind of event, a day, type something to search who, the IP address or the text, or
+tick **Only failed**. While the window is open new events come in by themselves; **Show
+older events** loads more. Events are kept for 90 days. Who did it, from which IP address
+and what happened are stored **encrypted** in `cactus.conn.db`, like the saved passwords;
+only the time and the kind of event are readable in the file. With `--remotelogin` only
+signed-in users can see the events.
 
 <a id="remote-login"></a>
 ### Signing in first: `--remotelogin`
@@ -720,7 +750,14 @@ Wrong passwords are slowed down: after 5 for a user name or from one computer, e
 try waits 2 seconds, doubling up to 5 minutes. Passwords are stored as Argon2id hashes;
 codes, links and sign-ins as SHA-256 hashes of random tokens, so the connection file never
 holds one that works. The browser holds its sign-in in an HttpOnly cookie. The log notes
-every sign-in, failed sign-in and user change with the client IP, never a password or code.
+every sign-in, failed sign-in and user change with the client IP, never a password or code,
+and so does the [Events](#events) list.
+
+**Users are stored encrypted.** In `cactus.conn.db` only a user's e-mail address (their user
+name) is readable. Their name, password hash, status, reason for requesting access, who
+added them and the dates are one record encrypted with cactusdb's key (AES-256-GCM, as the
+saved passwords), and so are the IP addresses of sign-ins. The users of 1.48 are encrypted
+the first time 1.49 starts.
 
 <a id="email-server"></a>
 ### E-mail server
@@ -1409,7 +1446,8 @@ cactusdb/
 ├── cactusdb(.exe)       the program
 ├── cactusdb.old(.exe)   the previous version, after an update installed from the web UI
 ├── cactus.conn.db       your saved connections, the chosen export folder, the usage log and
-│                        the startup options (for installing an update from the web UI)
+│                        the startup options (for installing an update from the web UI),
+│                        the events and the --remotelogin users (encrypted)
 │                        (an SQLite database; can be moved: ☰ → Folder setup)
 ├── cactus.conn.db.location  where it was moved to, if it was
 ├── cactus.key           the key that encrypts saved usernames and passwords
@@ -1598,6 +1636,9 @@ is sent and how to set it up. In short:
   lists, manages and reads the logs of containers it deployed itself (labelled `com.cactusdb.managed`, or `app.kubernetes.io/managed-by=cactusdb`).
   Database passwords reach Docker through the environment and Kubernetes through a Secret,
   never a command line, and are not kept by cactusdb.
+- **Users and events are encrypted** in `cactus.conn.db` with the same key: of a
+  `--remotelogin` user only the e-mail address is readable, of an event only its time and
+  kind (see [Signing in first](#remote-login) and [Events](#events)).
 - **The usage log** in `cactus.conn.db` (see *The usage log*) holds the SQL that was run
   (shortened), table and connection names and IP addresses, but never passwords or a whole
   session id. It isn't encrypted, so give `cactus.conn.db` to someone else only if they
@@ -1739,6 +1780,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `settings.go` | Changing the export folder from the web UI |
 | `lock.go` | Connection passwords (Argon2id keys), saved queries in the store, the wrong-password throttle |
 | `auth.go` | `--remotelogin`: users, signing in with the e-mailed code, invitations, password resets, requests for access, the sign-in gate in front of everything (`/api/auth/…`, `/api/users`); the sign-in page is `web/login.html` |
+| `events.go` | The Events button: the `events` table (encrypted), recording an event, `/api/events` |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |
