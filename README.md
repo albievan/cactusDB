@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.54.2
+cactusdb 1.54.3
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -392,7 +392,9 @@ closing the dialog: edit, execute, look, and save when it's right. The rows are 
 once the query is changed, until it is executed again. **Hide rows** / **Show rows** above
 them collapses and expands them (hidden, the query fills the dialog again). While they
 show, drag the query's bottom edge to give it more or less room; it keeps that height
-when you execute again or show the rows again.
+when you execute again or show the rows again. The query in the dialog gets the same
+**suggestions** as the Data tab's editor (columns after `t3.`, tables after FROM or JOIN,
+↑ ↓ Enter / Tab, Esc closes the list but not the dialog, Ctrl+Space asks).
 
 **Closing with changes.** **Cancel** or Esc after changing anything in the dialog asks
 whether to **Save** the changes, **Discard** them or **Keep editing**.

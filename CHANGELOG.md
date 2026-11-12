@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.54.3 — 2026-11-12
+
+- The query of the Save / Edit saved query dialog gets the same suggestions as the Data
+  tab's editor: the columns after `t3.`, the tables after FROM or JOIN, aliases and
+  keywords (↑ ↓, Enter or Tab, Esc closes the list but not the dialog, Ctrl+Space).
+
 ## 1.54.2 — 2026-11-12
 
 - Saved query dialog: **Hide rows** / **Show rows** collapses and expands the rows of

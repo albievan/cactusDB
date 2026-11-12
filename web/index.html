@@ -697,6 +697,8 @@
   .sqrowsbar .hint { margin: 0; font-size: 11.5px; }
   /* With rows under it the query keeps the height it is given (drag its bottom edge). */
   #sqDialog.rows #sqSql { flex: none; resize: vertical; min-height: 60px; max-height: 70vh; }
+  .sqqawrap { display: flex; flex-direction: column; flex: 1 1 0; min-height: 120px; }
+  #sqDialog.rows .sqqawrap { flex: none; min-height: 0; }
   .sqrows.stale { opacity: .55; }
   .sqrows table { margin: 0; }
   .sqrows th { position: sticky; top: 0; z-index: 1; background: var(--panel-2); }
@@ -2016,7 +2018,10 @@
     <label class="form-label" for="sqDesc">Description</label>
     <textarea class="form-control form-control-sm" id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
     <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
-    <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono grow"></textarea>
+    <div class="sqlwrap sqqawrap">
+      <textarea id="sqSql" rows="8" spellcheck="false" autocomplete="off" aria-autocomplete="list" aria-controls="sqQaList" class="form-control form-control-sm mono grow"></textarea>
+      <div class="qalist" id="sqQaList" role="listbox" aria-label="Suggestions" hidden></div>
+    </div>
     <div id="sqResult" class="dresult alert alert-danger" hidden></div>
     <div class="sqrowsbar" id="sqRowsBar" hidden>
       <button type="button" class="btn btn-sm btn-link" id="sqRowsToggle" aria-expanded="true" aria-controls="sqRows"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span>Hide rows</span></button>
@@ -5956,7 +5961,7 @@ $("limit").addEventListener("change", () => { if (state.result) run(); });
 // are read once a connection from the catalog (/api/columns). Beside the
 // query its tables are drawn with the conditions that join them (a.x = b.y),
 // 1 or N at each end from the keys, and a table joined by nothing marked.
-const qa = { cols: null, loading: null, seq: 0, req: 0, items: [], at: 0, from: 0, to: 0, open: false, skip: false };
+const qa = { cols: null, loading: null, seq: 0, req: 0, items: [], at: 0, from: 0, to: 0, open: false, skip: false, ta: $("sql"), list: $("qaList") };
 const QA_KW = ["SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "ON", "AND", "OR", "NOT",
   "IN", "EXISTS", "BETWEEN", "LIKE", "IS NULL", "IS NOT NULL", "AS", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "OFFSET", "DISTINCT", "UNION",
   "UNION ALL", "WITH", "CASE", "WHEN", "THEN", "ELSE", "END", "COUNT(*)", "SUM(", "MIN(", "MAX(", "AVG(", "COALESCE(", "ASC", "DESC"];
@@ -6162,25 +6167,25 @@ function qaCaretXY(ta, pos) {
   div.remove();
   return r;
 }
-async function qaUpdate(force) {
-  const ta = $("sql");
+async function qaUpdate(force, ta = qa.ta) {
+  qa.ta = ta; qa.list = ta === $("sqSql") ? $("sqQaList") : $("qaList");
   if (!$("qaOn").checked || !qaIsSQL() || ta.selectionStart !== ta.selectionEnd) return qaClose();
   const req = ++qa.req;
   await qaColumns();
   if (req !== qa.req || document.activeElement !== ta) return;
   const r = qaSuggest(ta.value, ta.selectionStart, force);
   if (!r || !r.items.length) {
-    if (force) { qaShow([], ta); $("qaList").innerHTML = `<div class="qahint">${qa.cols && qa.cols.size ? "Nothing to suggest here" : "No columns could be read for this database"}</div>`; return; }
+    if (force) { qaShow([], ta); qa.list.innerHTML = `<div class="qahint">${qa.cols && qa.cols.size ? "Nothing to suggest here" : "No columns could be read for this database"}</div>`; return; }
     return qaClose();
   }
   qa.items = r.items; qa.from = r.from; qa.to = ta.selectionStart; qa.at = 0;
   qaShow(r.items, ta, ta.value.slice(r.from, qa.to));
 }
 function qaShow(items, ta, part = "") {
-  const list = $("qaList"), pl = part.toLowerCase();
+  const list = qa.list, pl = part.toLowerCase(), id = list.id + "-";
   const icon = (it) => it.kind === "col" ? (it.key === "PRI" ? "key-fill" : it.key === "UNI" ? "key" : "dot") : it.kind === "alias" ? "link-45deg" : it.kind === "kw" ? "code" : ICONS[it.kind] || "table";
   const mark = (s) => { const i = pl ? s.toLowerCase().indexOf(pl) : -1; return i < 0 ? esc(s) : esc(s.slice(0, i)) + "<b>" + esc(s.slice(i, i + pl.length)) + "</b>" + esc(s.slice(i + pl.length)); };
-  list.innerHTML = items.map((it, i) => `<div class="qa${i === qa.at ? " on" : ""}" role="option" id="qa${i}" data-i="${i}" aria-selected="${i === qa.at}">` +
+  list.innerHTML = items.map((it, i) => `<div class="qa${i === qa.at ? " on" : ""}" role="option" id="${id}${i}" data-i="${i}" aria-selected="${i === qa.at}">` +
     `<i class="bi bi-${icon(it)}" aria-hidden="true"></i><span class="n">${mark(it.label)}</span><span class="d">${esc(it.detail || "")}</span></div>`).join("") +
     (items.length ? `<div class="qahint">↑ ↓ choose · Enter or Tab takes · Esc closes</div>` : "");
   const xy = qaCaretXY(ta, ta.selectionStart);
@@ -6188,23 +6193,24 @@ function qaShow(items, ta, part = "") {
   list.style.left = Math.max(0, Math.min(ta.offsetLeft + xy.x, ta.offsetLeft + ta.clientWidth - Math.min(list.offsetWidth, ta.clientWidth))) + "px";
   list.style.top = (ta.offsetTop + Math.min(Math.max(xy.y, 0), ta.clientHeight - xy.h) + xy.h + 2) + "px";
   ta.setAttribute("aria-expanded", "true");
-  if (qa.open) ta.setAttribute("aria-activedescendant", "qa" + qa.at);
+  if (qa.open) ta.setAttribute("aria-activedescendant", id + qa.at);
 }
 function qaClose() {
   qa.open = false; qa.req++;
-  const list = $("qaList");
-  if (list) { list.hidden = true; list.innerHTML = ""; }
-  $("sql").setAttribute("aria-expanded", "false"); $("sql").removeAttribute("aria-activedescendant");
+  for (const [ta, list] of [[$("sql"), $("qaList")], [$("sqSql"), $("sqQaList")]]) {
+    if (list) { list.hidden = true; list.innerHTML = ""; }
+    if (ta) { ta.setAttribute("aria-expanded", "false"); ta.removeAttribute("aria-activedescendant"); }
+  }
 }
 function qaMove(d) {
   if (!qa.items.length) return;
   qa.at = (qa.at + d + qa.items.length) % qa.items.length;
-  $("qaList").querySelectorAll(".qa").forEach((el, i) => { el.classList.toggle("on", i === qa.at); el.setAttribute("aria-selected", i === qa.at); });
-  $("qaList").querySelector(".qa.on")?.scrollIntoView({ block: "nearest" });
-  $("sql").setAttribute("aria-activedescendant", "qa" + qa.at);
+  qa.list.querySelectorAll(".qa").forEach((el, i) => { el.classList.toggle("on", i === qa.at); el.setAttribute("aria-selected", i === qa.at); });
+  qa.list.querySelector(".qa.on")?.scrollIntoView({ block: "nearest" });
+  qa.ta.setAttribute("aria-activedescendant", qa.list.id + "-" + qa.at);
 }
 function qaAccept(i) {
-  const it = qa.items[i], ta = $("sql");
+  const it = qa.items[i], ta = qa.ta;
   if (!it) return;
   ta.focus();
   ta.setSelectionRange(qa.from, qa.to);
@@ -6212,22 +6218,26 @@ function qaAccept(i) {
   // As typed (it can be undone), where the browser allows.
   if (!document.execCommand("insertText", false, it.insert)) { ta.setRangeText(it.insert, qa.from, qa.to, "end"); ta.dispatchEvent(new Event("input")); }
   qa.skip = false;
-  qaClose(); qdSoon();
+  qaClose();
+  if (ta === $("sql")) qdSoon();
 }
-$("sql").addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.code === "Space") { e.preventDefault(); qaUpdate(true); return; }
-  if (!qa.open) return;
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); qaMove(e.key === "ArrowDown" ? 1 : -1); }
-  else if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); qaAccept(qa.at); }
-  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); qaClose(); }
-  else if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key)) qaClose();
-});
-$("sql").addEventListener("input", () => { if (!qa.skip) qaUpdate(false); qdSoon(); });
-$("sql").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("sql")) qaClose(); }, 120));
-$("sql").addEventListener("click", qaClose);
-$("sql").addEventListener("scroll", qaClose);
-$("qaList").addEventListener("mousedown", (e) => e.preventDefault()); // the editor keeps the focus
-$("qaList").addEventListener("click", (e) => { const el = e.target.closest("[data-i]"); if (el) qaAccept(+el.dataset.i); });
+// The suggestions work in the Data tab's editor and in the saved query's.
+for (const [ta, list] of [[$("sql"), $("qaList")], [$("sqSql"), $("sqQaList")]]) {
+  ta.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.code === "Space") { e.preventDefault(); qaUpdate(true, ta); return; }
+    if (!qa.open || qa.ta !== ta) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); qaMove(e.key === "ArrowDown" ? 1 : -1); }
+    else if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); qaAccept(qa.at); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); qaClose(); } // not the dialog's Esc
+    else if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key)) qaClose();
+  });
+  ta.addEventListener("input", () => { if (!qa.skip) qaUpdate(false, ta); if (ta === $("sql")) qdSoon(); });
+  ta.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== ta) qaClose(); }, 120));
+  ta.addEventListener("click", qaClose);
+  ta.addEventListener("scroll", qaClose);
+  list.addEventListener("mousedown", (e) => e.preventDefault()); // the editor keeps the focus
+  list.addEventListener("click", (e) => { const el = e.target.closest("[data-i]"); if (el) qaAccept(+el.dataset.i); });
+}
 for (const id of ["qaOn", "qdOn"]) {
   try { const v = localStorage.getItem("cactusdb." + id); if (v) $(id).checked = v === "1"; } catch (e) { /* default */ }
   $(id).addEventListener("change", () => {
