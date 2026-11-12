@@ -1884,7 +1884,7 @@
   </form>
 </dialog>
 
-<!-- ☰ → E-mail server (mail.go): set up as in cactusInv. -->
+<!-- ☰ → E-mail server (mail.go): a provider preset, then the server's details. -->
 <dialog id="emailDialog" class="dlg wide" aria-labelledby="emTitle">
   <form id="emForm">
     <div class="emhead">
@@ -2601,7 +2601,7 @@ for (const id of ["evKind", "evDay", "evFailed"]) $(id).addEventListener("change
 let evQTimer = 0;
 $("evQ").addEventListener("input", () => { clearTimeout(evQTimer); evQTimer = setTimeout(() => { evState.list = []; evLoad(); }, 300); });
 
-// ---- ☰ → E-mail server (mail.go): as cactusInv's Settings → E-mail server -------------
+// ---- ☰ → E-mail server (mail.go): a provider preset, then the server's details --------
 const EM_PRESETS = {
   "Gmail": { host: "smtp.gmail.com", port: 587, tls: "starttls", hint: "Use your Gmail address as user name and a Google App password (Google Account → Security → 2-Step Verification → App passwords), not your normal password." },
   "Outlook / Microsoft 365": { host: "smtp.office365.com", port: 587, tls: "starttls", hint: "Use your Microsoft 365 address and password (SMTP AUTH must be enabled for the mailbox)." },

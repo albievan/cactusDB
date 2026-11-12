@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.57.0
+cactusdb 1.57.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -747,7 +747,7 @@ signed-in users can see the events.
 
 Start cactusdb with **`--remotelogin`** and nothing of it can be seen or used before signing
 in: opening it shows the sign-in page, and every request without a sign-in is refused. The
-sign-in page looks like cactusInv's: on the left, in green, what cactusdb does and its
+sign-in page shows, on the left in green, what cactusdb does and its
 source on GitHub; on the right the form, and the version. Each password box has a small eye button in it
 that shows what is typed there, and hides it again.
 
@@ -800,7 +800,7 @@ the first time 1.49 starts.
 
 ☰ → **E-mail server** sets up the mail server cactusdb sends e-mail through: the sign-in
 codes, invitations, password reset links and approvals of `--remotelogin`. It works like
-cactusInv's *Settings → E-mail server*:
+a mail client's account setup:
 
 - **Gmail**, **Outlook / Microsoft 365** or **Custom** fills in the host, port and security,
   with a hint for that provider. **Setup guide** explains step by step what to do at the

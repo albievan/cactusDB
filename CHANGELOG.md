@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.57.1 — 2026-11-12
+
+- Code comments and documentation describe cactusdb on its own; nothing else changed.
+
 ## 1.57.0 — 2026-11-12
 
 - New **Full DDL** tab: the DDL (`CREATE` statements) of every object of the connected
@@ -147,7 +151,7 @@
 
 ## 1.48.1 — 2026-11-10
 
-- **The `--remotelogin` sign-in page looks like cactusInv's**: a green side with what cactusdb
+- **The `--remotelogin` sign-in page is redesigned**: a green side with what cactusdb
   does (24 database engines, read-only, exports, saved queries, compare and migrate,
   backups) and its source, github.com/albievan/cactusDB, with the wave lines; the form on
   paper with cactusdb's logo, *Show what I type*, the version and *Source on GitHub*. Also
@@ -170,7 +174,7 @@
   - ☰ → **Sign out**. Passwords are stored as Argon2id hashes, codes and links as hashes of
     random tokens; wrong passwords are slowed down. Errors reach the page as 200 with the
     status in a header, as everywhere in cactusdb.
-- **☰ → E-mail server**, set up as in cactusInv: Gmail, Outlook / Microsoft 365 or Custom
+- **☰ → E-mail server**, set up like a mail client: Gmail, Outlook / Microsoft 365 or Custom
   presets with a hint, host, port, security, user name, password (stored encrypted),
   Send as (with Gmail's and Microsoft 365's warnings), *Use this server for all e-mail*, a
   setup guide per provider, and a test e-mail. Plus the address cactusdb's e-mailed links

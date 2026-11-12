@@ -36,7 +36,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.57.0"
+var version = "1.57.1"
 
 //go:embed web
 var webFS embed.FS

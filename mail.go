@@ -21,7 +21,7 @@ import (
 
 // ☰ → E-mail server: the mail server cactusdb sends e-mail through (the
 // links and sign-in codes of --remotelogin, see auth.go). Set up the same
-// way as cactusInv's Settings → E-mail server: a provider preset (Gmail,
+// way as a mail client: a provider preset (Gmail,
 // Outlook / Microsoft 365, Custom), host, port, security, user name,
 // password, Send as, and "Use this server for all e-mail". The settings are
 // kept in the meta table; the password sealed with cactusdb's key
