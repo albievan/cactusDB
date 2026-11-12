@@ -212,3 +212,27 @@ func TestAPIColumns(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIFullDDL(t *testing.T) {
+	s := newTestServer(t)
+	db, err := openDB(context.Background(), ConnParams{Engine: EngineSQLite, Database: newShopDB(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s.sessions["s1"] = &session{engine: EngineSQLite, label: "shop", dbName: "shop", db: db}
+	rec := httptest.NewRecorder()
+	s.handleFullDDL(rec, httptest.NewRequest("GET", "/api/fullddl?session=s1", nil))
+	var res struct {
+		DDL       string `json:"ddl"`
+		Objects   int    `json:"objects"`
+		Truncated bool   `json:"truncated"`
+		File      string `json:"file"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != 200 {
+		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
+	}
+	if res.Objects == 0 || !strings.Contains(res.DDL, "CREATE TABLE") || res.Truncated || !strings.HasPrefix(res.File, "shop_ddl_") {
+		t.Fatalf("%+v", res)
+	}
+}

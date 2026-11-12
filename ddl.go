@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -181,4 +183,37 @@ func exportDDLToDir(ctx context.Context, dir, engine string, db *sql.DB, label, 
 	return writeExportFile(dir, name+"_ddl", "sql", func(w io.Writer) (int, error) {
 		return writeDDL(ctx, w, engine, db, label, targets, progress)
 	})
+}
+
+// fullDDLMax is the most DDL the Full DDL tab is sent; a bigger script is
+// cut there with a note, and the DDL button still exports all of it.
+const fullDDLMax = 32 << 20
+
+// handleFullDDL returns the DDL (CREATE statements) of every object as text,
+// for the Full DDL tab. It only reads.
+func (s *server) handleFullDDL(w http.ResponseWriter, r *http.Request) {
+	ss, err := s.session(r, "")
+	if err != nil {
+		writeErr(w, 401, err)
+		return
+	}
+	groups, err := listObjects(r.Context(), ss.engine, ss.db)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	var b bytes.Buffer
+	n, err := writeDDL(r.Context(), &b, ss.engine, ss.db, ss.label, ddlTargets(groups), nil)
+	if err != nil {
+		logAction(r, "[%s] full DDL FAILED: %v", ss.label, err)
+		writeErr(w, 400, err)
+		return
+	}
+	src, cut := b.String(), false
+	if len(src) > fullDDLMax {
+		src, cut = strings.ToValidUTF8(src[:fullDDLMax], ""), true
+	}
+	logAction(r, "[%s] full DDL: %d object(s), %d byte(s)", ss.label, n, b.Len())
+	file := unsafeFileChars.ReplaceAllString(ss.dbName, "_") + "_ddl_" + time.Now().Format("20060102-150405") + ".sql"
+	writeJSON(w, 200, map[string]any{"ddl": src, "objects": n, "bytes": b.Len(), "truncated": cut, "file": file})
 }

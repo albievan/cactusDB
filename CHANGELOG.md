@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.57.0 — 2026-11-12
+
+- New **Full DDL** tab: the DDL (`CREATE` statements) of every object of the connected
+  database as one script, shown in the main area (not a pop-up), with syntax colouring,
+  **Reload**, **Copy** and **Download .sql**.
+- **Sign-in page**: *Show what I type* is now a small eye button inside each password box,
+  showing or hiding that box only.
+
 ## 1.56.0 — 2026-11-12
 
 - **After an upgrade every open page reloads into the new version by itself**, also with a

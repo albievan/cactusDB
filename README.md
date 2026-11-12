@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.56.0
+cactusdb 1.57.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -748,7 +748,8 @@ signed-in users can see the events.
 Start cactusdb with **`--remotelogin`** and nothing of it can be seen or used before signing
 in: opening it shows the sign-in page, and every request without a sign-in is refused. The
 sign-in page looks like cactusInv's: on the left, in green, what cactusdb does and its
-source on GitHub; on the right the form (with *Show what I type*), and the version.
+source on GitHub; on the right the form, and the version. Each password box has a small eye button in it
+that shows what is typed there, and hides it again.
 
 ```sh
 cactusdb --port 8087 --remotelogin --runas background
@@ -1012,6 +1013,13 @@ those objects.
 - **Procedures, functions, triggers, generators and all other objects** open in the
   **Definition** tab, which shows their full source code with syntax colouring. Use
   **Copy** to copy it to the clipboard.
+- The **Full DDL** tab (next to Definition, once connected) shows the DDL of the whole
+  database in the main area: the `CREATE` statements of every object in one script, in the
+  order the DDL button exports them, with syntax colouring. Above it: how many objects and
+  how big, **Reload** (read it again), **Copy** and **Download .sql** (saved from the
+  browser, nothing is written on the server). It is read when the tab is first opened and
+  kept until you reconnect or Reload; a script over 32 MB is cut short with a note (the
+  **DDL** button still exports all of it).
 - **Generators / sequences** also show their **current value**. Reading it never
   advances the generator. Queries that would advance one (`nextval()`, `GEN_ID()`,
   `NEXT VALUE FOR`) are refused, because a sequence change can't be undone.

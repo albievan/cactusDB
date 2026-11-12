@@ -372,7 +372,7 @@
   .tabs .title:empty { display: none; }
   .pane { min-height: 0; min-width: 0; }
   #dataPane { display: grid; grid-template-rows: auto auto auto 1fr; }
-  #dataPane[hidden], #defPane[hidden], #filesPane[hidden], #logsPane[hidden] { display: none; }
+  #dataPane[hidden], #defPane[hidden], #fddlPane[hidden], #filesPane[hidden], #logsPane[hidden] { display: none; }
   #logsPane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
   #logsPane .filesbar input[type=search] { flex: 1; min-width: 220px; }
   #logsPane .filesbar .form-select { width: auto; }
@@ -558,6 +558,10 @@
   .defbar .spacer { flex: 1; }
   pre#defSrc { margin: 0; padding: 14px 16px; overflow: auto; font: 13px/1.5 var(--mono); white-space: pre; tab-size: 4; }
   pre#defSrc.error { color: var(--danger); white-space: pre-wrap; }
+  #fddlPane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); min-height: 0; }
+  #fddlInfo { font-size: 12px; color: var(--muted); }
+  pre#fddlSrc { margin: 0; padding: 14px 16px; overflow: auto; font: 13px/1.5 var(--mono); white-space: pre; tab-size: 4; }
+  pre#fddlSrc.error { color: var(--danger); white-space: pre-wrap; }
   .hl-k { color: var(--accent); font-weight: 600; }
   .hl-s { color: #b5651d; }
   .hl-c { color: var(--muted); font-style: italic; }
@@ -1233,6 +1237,7 @@
     <div class="tabs nav nav-tabs">
       <button class="nav-link active" data-tab="data">Data</button>
       <button class="nav-link" data-tab="def">Definition</button>
+      <button class="nav-link" data-tab="fullddl" id="fddlTab" hidden title="The DDL (CREATE statements) of every object in the connected database, in one script">Full DDL</button>
       <button class="nav-link" data-tab="queries" id="queriesTab" hidden title="Queries saved for this connection">Saved queries</button>
       <button class="nav-link" data-tab="files" title="Download exported files, compressed">Exported files</button>
       <button class="nav-link" data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
@@ -1427,6 +1432,16 @@
         <button class="btn btn-sm btn-outline-secondary" id="copyDefBtn" disabled>Copy</button>
       </div>
       <pre id="defSrc">Select an object on the left to see its definition.</pre>
+    </div>
+    <div class="pane" id="fddlPane" hidden>
+      <div class="defbar">
+        <b>Full DDL</b><span id="fddlInfo"></span>
+        <span class="spacer"></span>
+        <button class="btn btn-sm btn-outline-secondary" id="fddlReload" title="Read the DDL again from the database" disabled>Reload</button>
+        <button class="btn btn-sm btn-outline-secondary" id="fddlCopy" title="Copy the whole DDL to the clipboard" disabled>Copy</button>
+        <button class="btn btn-sm btn-outline-secondary" id="fddlSave" title="Save the DDL as a .sql file from this browser" disabled>Download .sql</button>
+      </div>
+      <pre id="fddlSrc">Open the Full DDL tab to read the DDL of every object.</pre>
     </div>
     <div class="pane" id="migratePane" hidden>
       <div class="mgpage">
@@ -4796,7 +4811,7 @@ async function connect(extra = {}) {
     $("engineBadge").hidden = false;
     // The dashboard, for the databases whose statistics cactusdb can read.
     dashReset(!!res.dashboard);
-    relReset(); qaReset();
+    relReset(); qaReset(); fddlReset();
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
     $("backupBtn").disabled = !!eng.noBackup;
     $("backupBtn").title = eng.noBackup ? `A backup as an SQL script isn't available for ${eng.name}: use Export all and DDL` : backupTitle;
@@ -4844,7 +4859,7 @@ async function disconnect(reason = "") {
   $("status").textContent = "Not connected";
   $("engineBadge").hidden = true;
   dashReset(false);
-  relReset(); qaReset();
+  relReset(); qaReset(); fddlReset();
   $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
@@ -4985,7 +5000,7 @@ function gaFromTrack(fn) {
 // Requests to the server: what they did, by engine and format only.
 const GA_API = {
   "POST /api/connect": "connect", "POST /api/testconn": "test_connection", "POST /api/disconnect": "disconnect",
-  "GET /api/select": "open_table", "GET /api/definition": "show_definition", "POST /api/query": "run_query",
+  "GET /api/select": "open_table", "GET /api/definition": "show_definition", "GET /api/fullddl": "full_ddl", "POST /api/query": "run_query",
   "GET /api/tablestats": "table_stats", "GET /api/relationships": "relationships", "POST /api/relationships/unique": "relationship_cardinality", "POST /api/export": "export", "POST /api/exportall": "export_all",
   "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare", "POST /api/migrate": "migrate",
   "POST /api/connections": "save_connection", "POST /api/queries": "save_query", "POST /api/relviews": "save_relationships_view",
@@ -5449,7 +5464,7 @@ async function refreshAll() {
     const res = await api("POST", "/api/refresh", { session });
     if (session !== state.session) return;
     state.objects = res.objects; resetTableStats(); state.defFor = null;
-    relReset(); qaReset();
+    relReset(); qaReset(); fddlReset();
     const sel = state.sel;
     if (sel && !state.objects.some((g) => g.type === sel.type && g.items.includes(sel.name))) {
       state.sel = null; state.table = null; $("tabTitle").textContent = "";
@@ -5887,6 +5902,8 @@ function showTab(tab) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   $("dataPane").hidden = tab !== "data";
   $("defPane").hidden = tab !== "def";
+  $("fddlPane").hidden = tab !== "fullddl";
+  if (tab === "fullddl") fddlLoad();
   $("filesPane").hidden = tab !== "files";
   $("logsPane").hidden = tab !== "logs";
   $("comparePane").hidden = tab !== "compare";
@@ -5948,6 +5965,54 @@ async function copyText(text) {
   ta.remove();
   return ok;
 }
+
+// ---- full DDL ----------------------------------------------------------------
+// The Full DDL tab: the CREATE statements of every object as one script,
+// read once per connection (Reload reads it again).
+const fddl = { seq: 0, raw: "", file: "", loaded: false };
+function fddlReset() {
+  fddl.seq++; fddl.raw = ""; fddl.loaded = false;
+  $("fddlTab").hidden = !state.session;
+  $("fddlInfo").textContent = ""; $("fddlSrc").className = "";
+  $("fddlSrc").textContent = "Open the Full DDL tab to read the DDL of every object.";
+  $("fddlReload").disabled = !state.session; $("fddlCopy").disabled = true; $("fddlSave").disabled = true;
+  if (state.tab === "fullddl") { if (state.session) fddlLoad(); else showTab("data"); }
+}
+async function fddlLoad(again) {
+  if (!state.session || (fddl.loaded && !again)) return;
+  const seq = ++fddl.seq; fddl.loaded = true;
+  $("fddlSrc").className = ""; $("fddlSrc").textContent = "Reading the DDL of every object…"; $("fddlInfo").textContent = "";
+  $("fddlReload").disabled = true; $("fddlCopy").disabled = true; $("fddlSave").disabled = true;
+  try {
+    const res = await api("GET", "/api/fullddl?" + new URLSearchParams({ session: state.session }));
+    if (seq !== fddl.seq) return;
+    fddl.raw = res.ddl || ""; fddl.file = res.file || "";
+    // Colouring a very big script would hold the page up; it's shown plain.
+    if (fddl.raw.length <= 2000000) $("fddlSrc").innerHTML = highlightSQL(fddl.raw || "(no objects)");
+    else $("fddlSrc").textContent = fddl.raw;
+    $("fddlSrc").scrollTop = 0;
+    const kb = res.bytes < 1024 ? `${res.bytes} bytes` : res.bytes < 1048576 ? `${(res.bytes / 1024).toFixed(0)} KB` : `${(res.bytes / 1048576).toFixed(1)} MB`;
+    $("fddlInfo").textContent = ` · ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} · ${kb}` +
+      (res.truncated ? " · cut short here: use DDL (left) to export all of it" : "");
+    $("fddlCopy").disabled = !fddl.raw; $("fddlSave").disabled = !fddl.raw;
+  } catch (e) {
+    if (seq !== fddl.seq) return;
+    fddl.loaded = false;
+    $("fddlSrc").className = "error"; $("fddlSrc").textContent = e.message;
+  } finally { if (seq === fddl.seq) $("fddlReload").disabled = !state.session; }
+}
+$("fddlReload").addEventListener("click", () => fddlLoad(true));
+$("fddlCopy").addEventListener("click", async () => {
+  if (await copyText(fddl.raw)) toast("DDL copied");
+  else toast("Copy failed – select the text and copy it manually", true);
+});
+$("fddlSave").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([fddl.raw], { type: "application/sql" }));
+  a.download = fddl.file || "ddl.sql";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
 
 $("copyDefBtn").addEventListener("click", async () => {
   if (await copyText($("defSrc").dataset.raw || "")) toast("Definition copied");

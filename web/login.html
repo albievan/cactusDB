@@ -56,6 +56,13 @@
   .hero .waves { position: absolute; left: 0; bottom: 0; width: 100%; height: 33.333%; pointer-events: none; }
   .hero .mobilemark { display: none; margin-bottom: 2.5rem; }
   /* The form side. */
+  /* The eye button inside a password box. */
+  .pwbox { position: relative; }
+  .pwbox > .form-control { padding-right: 40px; }
+  .pwbox .eye { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 32px; height: 32px; padding: 0;
+    display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+  .pwbox .eye:hover { color: var(--text); background: rgba(127, 127, 127, .12); }
+  .pwbox .eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .side { width: min(460px, 100%); flex: none; display: flex; flex-direction: column; padding: 48px 40px 32px; background: var(--paper); color: var(--text); }
   .wordmark { display: flex; align-items: center; gap: 10px; }
   .wordmark .name { font-size: 24px; font-weight: 700; line-height: 1; color: var(--brand-ink); }
@@ -125,7 +132,6 @@
         <input class="form-control mb-3" id="siUser" autocomplete="username" autocapitalize="none" required autofocus>
         <label class="form-label" for="siPass">Password</label>
         <input class="form-control mb-3" id="siPass" type="password" autocomplete="current-password" required>
-        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
         <button class="btn btn-primary btn-big w-100" type="submit">Sign in</button>
         <div class="links">
           <button type="button" class="btn btn-link" data-go="vForgot">Forgot your password?</button>
@@ -141,8 +147,7 @@
         <input class="form-control" id="chPass" type="password" autocomplete="new-password" minlength="8" required>
         <div class="hint mb-3">At least 8 characters, not the user name.</div>
         <label class="form-label" for="chPass2">New password again</label>
-        <input class="form-control mb-2" id="chPass2" type="password" autocomplete="new-password" required>
-        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <input class="form-control mb-3" id="chPass2" type="password" autocomplete="new-password" required>
         <button class="btn btn-primary btn-big w-100" type="submit">Save and sign in</button>
         <div class="links"><button type="button" class="btn btn-link" data-go="vSignin">Back to sign in</button></div>
       </form>
@@ -182,8 +187,7 @@
         <input class="form-control" id="rgPass" type="password" autocomplete="new-password" minlength="8" required>
         <div class="hint mb-3">At least 8 characters. You'll sign in with it once approved.</div>
         <label class="form-label" for="rgPass2">Password again</label>
-        <input class="form-control mb-2" id="rgPass2" type="password" autocomplete="new-password" required>
-        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <input class="form-control mb-3" id="rgPass2" type="password" autocomplete="new-password" required>
         <label class="form-label" for="rgReason">Why you need access <span class="text-body-secondary fw-normal">(optional)</span></label>
         <textarea class="form-control mb-3" id="rgReason" rows="2" maxlength="500"></textarea>
         <button class="btn btn-primary btn-big w-100" type="submit">Send the request</button>
@@ -198,8 +202,7 @@
         <input class="form-control" id="stPass" type="password" autocomplete="new-password" minlength="8" required>
         <div class="hint mb-3">At least 8 characters, not your e-mail address.</div>
         <label class="form-label" for="stPass2">New password again</label>
-        <input class="form-control mb-2" id="stPass2" type="password" autocomplete="new-password" required>
-        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" data-show> Show what I type</label>
+        <input class="form-control mb-3" id="stPass2" type="password" autocomplete="new-password" required>
         <button class="btn btn-primary btn-big w-100" type="submit">Set the password</button>
       </form>
 
@@ -233,18 +236,28 @@ function say(text, ok) {
   m.hidden = !text; m.textContent = text || "";
   m.className = "notice" + (ok ? "" : " error");
 }
-// "Show what I type": the passwords of that form as plain text.
-document.addEventListener("change", (ev) => {
-  if (!ev.target.matches("[data-show]")) return;
-  ev.target.closest("form").querySelectorAll("input[type=password], input[data-pw]").forEach((i) => {
-    i.dataset.pw = "1"; i.type = ev.target.checked ? "text" : "password";
-  });
+// Every password box has a small eye button in it that shows what is typed
+// there, and hides it again.
+function eyeSet(b, on) {
+  b.previousElementSibling.type = on ? "text" : "password";
+  b.setAttribute("aria-pressed", on); b.title = on ? "Hide password" : "Show password"; b.setAttribute("aria-label", b.title);
+  b.firstElementChild.className = on ? "bi bi-eye-slash" : "bi bi-eye";
+}
+document.querySelectorAll("input[type=password]").forEach((i) => {
+  const box = document.createElement("div"), b = document.createElement("button");
+  box.className = "pwbox " + [...i.classList].filter((c) => /^m[bt]-/.test(c)).join(" ");
+  i.classList.remove(...[...i.classList].filter((c) => /^m[bt]-/.test(c)));
+  b.type = "button"; b.className = "eye"; b.innerHTML = '<i aria-hidden="true"></i>';
+  i.replaceWith(box); box.append(i, b); eyeSet(b, false);
+  b.addEventListener("click", () => { eyeSet(b, i.type === "password"); i.focus(); });
 });
+const eyesOff = () => document.querySelectorAll(".pwbox .eye").forEach((b) => eyeSet(b, false));
 // The wavy lines at the bottom of the green side.
 $("waves").innerHTML = Array.from({ length: 14 }, (_, i) =>
   `<path d="M0 ${120 + i * 12} C 300 ${40 + i * 14}, 600 ${220 + i * 6}, 900 ${110 + i * 10} S 1200 ${150 + i * 9}, 1200 ${150 + i * 9}" fill="none" stroke="#d9c89f" stroke-opacity="${(0.08 + i * 0.012).toFixed(3)}" stroke-width="1"/>`).join("");
 function show(view, keepMsg) {
   document.querySelectorAll("[data-view]").forEach((v) => (v.hidden = v.id !== view));
+  eyesOff();
   if (!keepMsg) say("");
   const first = $(view).querySelector("input:not([type=hidden])");
   if (first) setTimeout(() => first.focus(), 0);
