@@ -37,6 +37,16 @@ type relEdge struct {
 	Kind  string `json:"kind"` // fk, trigger, uses or assumed (from column names)
 	Label string `json:"label,omitempty"`
 	Guess bool   `json:"guess,omitempty"` // found by its name in the source
+	// The columns joined (foreign keys and assumed): From's, then To's, in order.
+	FromCols []string `json:"fromCols,omitempty"`
+	ToCols   []string `json:"toCols,omitempty"`
+	Via      []string `json:"via,omitempty"` // assumed: the views, procedures… whose joins show it
+}
+
+// relColumn is a column of a table, for expanding it in the picture.
+type relColumn struct {
+	Name string `json:"n"`
+	Key  string `json:"k,omitempty"` // PRI or UNI: a single-column key
 }
 
 // relObj is an object as the catalog queries name it: its sidebar name and
@@ -61,15 +71,19 @@ type relGraph struct {
 	edges   map[string]*relEdge
 	order   []string
 	notes   []string
-	labels  map[string]string // type → the sidebar's label, e.g. Generators
-	schemas map[string]bool   // lower-case schemas (and MySQL's database) that qualify names
+	labels  map[string]string      // type → the sidebar's label, e.g. Generators
+	columns map[string][]relColumn // table id → its columns
+	joined  map[string]bool        // tables (two ids) joined by a foreign key, either way
+	assumed map[string]*relEdge    // tables (two ids) with an assumed relationship
+	schemas map[string]bool        // lower-case schemas (and MySQL's database) that qualify names
 }
 
 // relTypes are the objects drawn: all but indexes.
 func relDrawn(typ string) bool { return typ != ObjIndex }
 
 func newRelGraph(groups []ObjectGroup) *relGraph {
-	g := &relGraph{byKey: map[string]string{}, byName: map[string][]string{}, edges: map[string]*relEdge{}, labels: map[string]string{}, schemas: map[string]bool{}}
+	g := &relGraph{byKey: map[string]string{}, byName: map[string][]string{}, edges: map[string]*relEdge{}, labels: map[string]string{}, schemas: map[string]bool{},
+		columns: map[string][]relColumn{}, joined: map[string]bool{}, assumed: map[string]*relEdge{}}
 	for _, gr := range groups {
 		if !relDrawn(gr.Type) {
 			continue
@@ -120,6 +134,28 @@ func (g *relGraph) find(o relObj) string {
 func (g *relGraph) add(from, to relObj, kind, label string) {
 	f, t := g.find(from), g.find(to)
 	g.link(f, t, kind, label, false)
+}
+
+// relPair is the key of two tables, whichever way.
+func relPair(a, b string) string { return min(a, b) + "\x00" + max(a, b) }
+
+// linkCols links two tables by their columns: each foreign key (or assumed
+// pair of columns) is its own line.
+func (g *relGraph) linkCols(from, to, kind, label string, fcols, tcols []string) *relEdge {
+	if from == "" || to == "" {
+		return nil
+	}
+	key := from + "\x00" + to + "\x00" + kind + "\x00" + strings.Join(fcols, ",")
+	if e := g.edges[key]; e != nil {
+		return e
+	}
+	if kind == "fk" {
+		g.joined[relPair(from, to)] = true
+	}
+	e := &relEdge{From: from, To: to, Kind: kind, Label: label, FromCols: fcols, ToCols: tcols}
+	g.edges[key] = e
+	g.order = append(g.order, key)
+	return e
 }
 
 func (g *relGraph) link(from, to, kind, label string, guess bool) {
@@ -310,10 +346,17 @@ func (g *relGraph) foreignKeys(ctx context.Context, db *sql.DB, q string, args .
 	for _, k := range order {
 		f := fks[k]
 		label := strings.Join(f.fcols, ", ")
-		if t := strings.Join(slices.DeleteFunc(f.tcols, func(s string) bool { return s == "" }), ", "); t != "" {
+		if slices.Contains(f.tcols, "") {
+			f.tcols = nil
+		}
+		if t := strings.Join(f.tcols, ", "); t != "" {
 			label += " → " + t
 		}
-		g.add(relOf(f.from, ObjTable), relOf(f.to, ObjTable), "fk", label)
+		tcols := f.tcols
+		if len(tcols) == 0 {
+			tcols = nil // SQLite: the parent's primary key, filled in from the columns
+		}
+		g.linkCols(g.find(relOf(f.from, ObjTable)), g.find(relOf(f.to, ObjTable)), "fk", label, f.fcols, tcols)
 	}
 }
 
@@ -556,7 +599,68 @@ func (s *server) handleRelationships(w http.ResponseWriter, r *http.Request) {
 		g.nodes = []relNode{}
 	}
 	writeJSON(w, 200, map[string]any{"label": ss.label, "engine": ss.kind(), "nodes": g.nodes,
-		"edges": edges, "labels": g.labels, "notes": g.notes, "ms": time.Since(start).Milliseconds()})
+		"edges": edges, "labels": g.labels, "columns": g.columns, "notes": g.notes, "ms": time.Since(start).Milliseconds()})
+}
+
+// handleRelUnique answers, for each table and columns asked, whether no two
+// rows have the same values in them (NULLs left out): the ends of a
+// relationship are then 1, else N. Only a read: GROUP BY … HAVING COUNT(*) > 1,
+// stopped at the first duplicate. The page asks only for columns that aren't
+// a key already.
+func (s *server) handleRelUnique(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Session string `json:"session"`
+		Sides   []struct {
+			Table string   `json:"table"`
+			Cols  []string `json:"cols"`
+		} `json:"sides"`
+	}
+	readJSON(r, &req)
+	ss, err := s.session(r, req.Session)
+	if err != nil {
+		writeErr(w, 401, err)
+		return
+	}
+	if backendOf(ss.db) != nil {
+		writeErr(w, 400, fmt.Errorf("%s has no columns to compare", engineName(ss.kind())))
+		return
+	}
+	type result struct {
+		Unique *bool  `json:"unique"` // nil: not known (an error or too slow)
+		Error  string `json:"error,omitempty"`
+	}
+	out := make([]result, len(req.Sides))
+	for i, side := range req.Sides {
+		if len(side.Cols) == 0 {
+			continue
+		}
+		var cols, notNull []string
+		for _, c := range side.Cols {
+			q := quoteIdent(ss.engine, c)
+			cols, notNull = append(cols, q), append(notNull, q+" IS NOT NULL")
+		}
+		q := "SELECT " + strings.Join(cols, ", ") + " FROM " + quoteObject(ss.engine, side.Table) +
+			" WHERE " + strings.Join(notNull, " AND ") + " GROUP BY " + strings.Join(cols, ", ") + " HAVING COUNT(*) > 1"
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		rows, err := ss.db.QueryContext(ctx, q)
+		if err == nil {
+			dup := rows.Next()
+			err = rows.Err()
+			rows.Close()
+			if err == nil {
+				unique := !dup
+				out[i].Unique = &unique
+			}
+		}
+		cancel()
+		if err != nil {
+			out[i].Error = firstLine(err.Error())
+		}
+		if r.Context().Err() != nil {
+			break
+		}
+	}
+	writeJSON(w, 200, map[string]any{"results": out})
 }
 
 // ---- relationships assumed from column names ----
@@ -700,17 +804,12 @@ func (g *relGraph) assume(cols []relCol) int {
 	}
 	slices.Sort(names)
 	added := 0
-	link := func(from, to, label string) {
+	link := func(from, to, fcol, tcol, label string) {
 		f, t := g.find(relOf(from, ObjTable)), g.find(relOf(to, ObjTable))
-		if f == "" || t == "" || f == t {
+		if f == "" || t == "" || f == t || g.joined[relPair(f, t)] || g.assumed[relPair(f, t)] != nil {
 			return
 		}
-		for _, k := range []string{f + "\x00" + t + "\x00fk", t + "\x00" + f + "\x00fk", f + "\x00" + t + "\x00assumed", t + "\x00" + f + "\x00assumed"} {
-			if g.edges[k] != nil {
-				return
-			}
-		}
-		g.link(f, t, "assumed", label, false)
+		g.assumed[relPair(f, t)] = g.linkCols(f, t, "assumed", label, []string{fcol}, []string{tcol})
 		added++
 	}
 	// 1. The same column in several tables: they refer to the table it defines.
@@ -726,10 +825,19 @@ func (g *relGraph) assume(cols []relCol) int {
 			continue
 		}
 		slices.Sort(hs)
+		// The table named after the column (CLIENT for CLIENT_NO) first, then
+		// the tables it is the key of.
 		var defs []string
 		for _, h := range hs {
-			if tables[h].key == lc {
+			if slices.Contains(tables[h].words, relStem(lc)) {
 				defs = append(defs, h)
+			}
+		}
+		if len(defs) == 0 {
+			for _, h := range hs {
+				if tables[h].key == lc {
+					defs = append(defs, h)
+				}
 			}
 		}
 		if len(defs) == 0 {
@@ -758,7 +866,7 @@ func (g *relGraph) assume(cols []relCol) int {
 			}
 			for _, d := range defs {
 				name := tables[h].cols[lc]
-				link(h, d, name+" = "+tables[d].cols[lc])
+				link(h, d, name, tables[d].cols[lc], name+" = "+tables[d].cols[lc])
 			}
 		}
 	}
@@ -777,7 +885,7 @@ func (g *relGraph) assume(cols []relCol) int {
 					}
 					for _, w := range t.words {
 						if lc == w+"_"+k || lc == w+k {
-							link(n, tn, name+" → "+t.cols[k])
+							link(n, tn, name, t.cols[k], name+" → "+t.cols[k])
 						}
 					}
 				}
@@ -787,35 +895,36 @@ func (g *relGraph) assume(cols []relCol) int {
 	return added
 }
 
-// relColumnsQuery reads every table's columns: table (as the sidebar names
-// it), column, position and PRI / UNI for a single-column key.
+// relColumnsQuery reads every table's and view's columns: table (as the
+// sidebar names it), column, position and PRI / UNI for a single-column key.
 func relColumnsQuery(engine string) string {
 	switch engine {
 	case EngineSQLite:
 		return `SELECT m.name, p.name, p.cid + 1, CASE WHEN p.pk = 1 AND (SELECT COUNT(*) FROM pragma_table_info(m.name) x WHERE x.pk > 0) = 1 THEN 'PRI'
 			WHEN EXISTS (SELECT 1 FROM pragma_index_list(m.name) il JOIN pragma_index_info(il.name) ii WHERE il."unique" = 1
 				AND ii.name = p.name AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1) THEN 'UNI' ELSE '' END
-			FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'`
+			FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type IN ('table', 'view') AND m.name NOT LIKE 'sqlite_%'`
 	case EngineMySQL, EngineMariaDB:
 		return `SELECT c.table_name, c.column_name, c.ordinal_position, CASE WHEN c.column_key IN ('PRI', 'UNI') AND (SELECT COUNT(*)
 				FROM information_schema.statistics s WHERE s.table_schema = c.table_schema AND s.table_name = c.table_name
 				AND s.index_name = (SELECT MIN(s2.index_name) FROM information_schema.statistics s2 WHERE s2.table_schema = c.table_schema
 					AND s2.table_name = c.table_name AND s2.column_name = c.column_name AND s2.non_unique = 0)) = 1 THEN c.column_key ELSE '' END
 			FROM information_schema.columns c JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
-			WHERE c.table_schema = DATABASE() AND t.table_type IN ('BASE TABLE', 'SYSTEM VERSIONED')`
+			WHERE c.table_schema = DATABASE() AND t.table_type IN ('BASE TABLE', 'SYSTEM VERSIONED', 'VIEW')`
 	case EnginePostgres:
 		return `SELECT n.nspname || '.' || c.relname, a.attname, a.attnum, COALESCE((SELECT CASE WHEN i.indisprimary THEN 'PRI' ELSE 'UNI' END
 				FROM pg_index i WHERE i.indrelid = c.oid AND (i.indisprimary OR i.indisunique) AND i.indnatts = 1 AND i.indkey[0] = a.attnum
 				ORDER BY i.indisprimary DESC LIMIT 1), '')
 			FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
-			WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\_%'`
+			WHERE c.relkind IN ('r', 'p', 'v', 'm') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\_%'`
 	case EngineMSSQL:
 		return `SELECT s.name + '.' + t.name, c.name, c.column_id, COALESCE((SELECT TOP 1 CASE WHEN i.is_primary_key = 1 THEN 'PRI' ELSE 'UNI' END
 				FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
 				WHERE i.object_id = t.object_id AND (i.is_primary_key = 1 OR i.is_unique = 1) AND ic.column_id = c.column_id
 				AND (SELECT COUNT(*) FROM sys.index_columns x WHERE x.object_id = i.object_id AND x.index_id = i.index_id AND x.is_included_column = 0) = 1
 				ORDER BY i.is_primary_key DESC), '')
-			FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.columns c ON c.object_id = t.object_id WHERE t.is_ms_shipped = 0`
+			FROM sys.objects t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.columns c ON c.object_id = t.object_id
+			WHERE t.type IN ('U', 'V') AND t.is_ms_shipped = 0`
 	case EngineFirebird:
 		return `SELECT TRIM(f.RDB$RELATION_NAME), TRIM(f.RDB$FIELD_NAME), f.RDB$FIELD_POSITION + 1, COALESCE((SELECT FIRST 1
 				IIF(EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS rc WHERE rc.RDB$INDEX_NAME = i.RDB$INDEX_NAME AND rc.RDB$CONSTRAINT_TYPE = 'PRIMARY KEY'), 'PRI', 'UNI')
@@ -823,13 +932,13 @@ func relColumnsQuery(engine string) string {
 				WHERE i.RDB$RELATION_NAME = f.RDB$RELATION_NAME AND i.RDB$UNIQUE_FLAG = 1 AND i.RDB$SEGMENT_COUNT = 1 AND s.RDB$FIELD_NAME = f.RDB$FIELD_NAME
 				ORDER BY 1), '')
 			FROM RDB$RELATION_FIELDS f JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = f.RDB$RELATION_NAME
-			WHERE r.RDB$VIEW_BLR IS NULL AND COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0`
+			WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0`
 	case EngineOracle:
 		return `SELECT c.owner || '.' || c.table_name, c.column_name, c.column_id, (SELECT MIN(DECODE(k.constraint_type, 'P', 'PRI', 'UNI'))
 				FROM all_constraints k JOIN all_cons_columns kc ON kc.owner = k.owner AND kc.constraint_name = k.constraint_name
 				WHERE k.owner = c.owner AND k.table_name = c.table_name AND k.constraint_type IN ('P', 'U') AND kc.column_name = c.column_name
 				AND (SELECT COUNT(*) FROM all_cons_columns x WHERE x.owner = k.owner AND x.constraint_name = k.constraint_name) = 1)
-			FROM all_tab_columns c JOIN all_tables t ON t.owner = c.owner AND t.table_name = c.table_name WHERE c.owner = :1`
+			FROM all_tab_columns c WHERE c.owner = :1 AND c.table_name NOT LIKE 'BIN$%'`
 	}
 	return ""
 }
@@ -853,5 +962,321 @@ func (g *relGraph) assumeFromColumns(ctx context.Context, ss *session) {
 		pos, _ := strconv.Atoi(c[2].String)
 		cols = append(cols, relCol{table: c[0].String, name: c[1].String, pos: pos, key: c[3].String})
 	}, args...)
-	g.assume(cols)
+	slices.SortStableFunc(cols, func(a, b relCol) int { return cmp.Compare(a.pos, b.pos) })
+	keys := map[string]string{} // table id → its primary key column
+	var tableCols []relCol
+	for _, c := range cols {
+		if id := g.find(relOf(c.table, ObjTable, ObjView, ObjMatView)); id != "" {
+			g.columns[id] = append(g.columns[id], relColumn{Name: c.name, Key: c.key})
+			if c.key == "PRI" {
+				keys[id] = c.name
+			}
+			if strings.HasPrefix(id, ObjTable+":") {
+				tableCols = append(tableCols, c)
+			}
+		}
+	}
+	// A foreign key to the parent's primary key without naming it (SQLite).
+	for _, e := range g.edges {
+		if e.Kind == "fk" && len(e.ToCols) == 0 && len(e.FromCols) == 1 && keys[e.To] != "" {
+			e.ToCols = []string{keys[e.To]}
+			e.Label += " → " + keys[e.To]
+		}
+	}
+	g.assumeJoins(ctx, ss)
+	g.assume(tableCols)
+}
+
+// ---- relationships assumed from the joins in views, procedures… ----
+//
+// A view, procedure, function or trigger that joins two tables or views
+// (FROM orders o JOIN customer c ON c.id = o.customer_id, or the same in a
+// WHERE) shows how they are related, keys or not. Each such pair of columns
+// becomes an assumed relationship, noting where it was found; it goes before
+// the ones assumed from names alone.
+
+// relJoinSources are the queries of the sources: their type, name (as the
+// sidebar names it) and text; Oracle's come a line per row.
+func relJoinSources(engine string) []string {
+	switch engine {
+	case EngineSQLite:
+		return []string{`SELECT type, name, sql FROM sqlite_master WHERE type IN ('view', 'trigger')`}
+	case EngineMySQL, EngineMariaDB:
+		return []string{
+			`SELECT 'view', table_name, view_definition FROM information_schema.views WHERE table_schema = DATABASE()`,
+			`SELECT LOWER(routine_type), routine_name, routine_definition FROM information_schema.routines WHERE routine_schema = DATABASE()`,
+			`SELECT 'trigger', trigger_name, action_statement FROM information_schema.triggers WHERE trigger_schema = DATABASE()`,
+			`SELECT 'event', event_name, event_definition FROM information_schema.events WHERE event_schema = DATABASE()`}
+	case EnginePostgres:
+		const userNS = `n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\_%'`
+		return []string{
+			`SELECT CASE c.relkind WHEN 'm' THEN 'matview' ELSE 'view' END, n.nspname || '.' || c.relname, pg_get_viewdef(c.oid)
+				FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('v', 'm') AND ` + userNS,
+			`SELECT CASE p.prokind WHEN 'p' THEN 'procedure' ELSE 'function' END,
+				n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', p.prosrc
+				FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE p.prokind IN ('f', 'p') AND ` + userNS}
+	case EngineMSSQL:
+		return []string{`SELECT CASE o.type WHEN 'V' THEN 'view' WHEN 'P' THEN 'procedure' WHEN 'TR' THEN 'trigger' ELSE 'function' END,
+			COALESCE(OBJECT_SCHEMA_NAME(o.object_id) + '.', '') + o.name, m.definition
+			FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id WHERE o.is_ms_shipped = 0`}
+	case EngineFirebird:
+		const user = `COALESCE(RDB$SYSTEM_FLAG, 0) = 0`
+		return []string{
+			`SELECT 'view', TRIM(RDB$RELATION_NAME), RDB$VIEW_SOURCE FROM RDB$RELATIONS WHERE RDB$VIEW_BLR IS NOT NULL AND ` + user,
+			`SELECT 'procedure', TRIM(RDB$PROCEDURE_NAME), RDB$PROCEDURE_SOURCE FROM RDB$PROCEDURES WHERE ` + user,
+			`SELECT 'trigger', TRIM(RDB$TRIGGER_NAME), RDB$TRIGGER_SOURCE FROM RDB$TRIGGERS WHERE ` + user}
+	case EngineOracle:
+		return []string{
+			`SELECT 'view', owner || '.' || view_name, text FROM all_views WHERE owner = :1`,
+			`SELECT LOWER(type), owner || '.' || name, text FROM all_source WHERE owner = :1
+				AND type IN ('PROCEDURE', 'FUNCTION', 'TRIGGER', 'PACKAGE BODY') ORDER BY name, type, line`}
+	}
+	return nil
+}
+
+var relSourceTypes = map[string][]string{"view": {ObjView}, "matview": {ObjMatView}, "procedure": {ObjProcedure}, "function": {ObjFunction},
+	"trigger": {ObjTrigger}, "event": {ObjEvent}, "package body": {ObjPackage}}
+
+func (g *relGraph) assumeJoins(ctx context.Context, ss *session) {
+	type src struct {
+		obj  string // its id, or its name when it isn't drawn
+		text strings.Builder
+	}
+	var order []string
+	srcs := map[string]*src{}
+	for _, q := range relJoinSources(ss.engine) {
+		var args []any
+		if ss.engine == EngineOracle {
+			owner, err := oracleOwner(ctx, ss.db)
+			if err != nil {
+				return
+			}
+			args = append(args, owner)
+		}
+		g.relRows(ctx, ss.db, "sources of views and routines", q, func(c []sql.NullString) {
+			key := c[0].String + "\x00" + c[1].String
+			s := srcs[key]
+			if s == nil {
+				s = &src{obj: cmp.Or(g.find(relOf(c[1].String, relSourceTypes[strings.ToLower(c[0].String)]...)), c[1].String)}
+				srcs[key] = s
+				order = append(order, key)
+			}
+			s.text.WriteString(c[2].String)
+			s.text.WriteByte('\n')
+		}, args...)
+	}
+	for _, k := range order {
+		for _, j := range g.sqlJoins(srcs[k].text.String()) {
+			g.assumeJoin(j, srcs[k].obj)
+		}
+	}
+}
+
+// relJoin is a comparison of two columns of two objects: a.ac = b.bc.
+type relJoin struct{ a, ac, b, bc string }
+
+var relSQLWords = map[string]bool{}
+
+func init() {
+	for _, w := range strings.Fields(`select from where join inner left right full outer cross natural on using as and or not
+		group order by having union all except intersect minus limit offset fetch set values into update delete insert
+		with when then else end case begin declare return returns do for while if is null in exists like between lateral window`) {
+		relSQLWords[w] = true
+	}
+}
+
+// sqlJoins finds the comparisons of columns of two tables or views in SQL:
+// the aliases of FROM / JOIN (orders o, orders AS o) are resolved, and
+// qualified names (shop.orders.id) are understood.
+func (g *relGraph) sqlJoins(src string) []relJoin {
+	toks := sqlTokens(src)
+	resolve := func(parts []string) string {
+		for _, name := range []string{strings.Join(parts, "."), strings.Join(parts[min(1, len(parts)-1):], ".")} {
+			if len(parts) > 1 && name == strings.Join(parts[1:], ".") && !g.schemas[parts[0]] {
+				continue
+			}
+			for _, id := range g.byName[name] {
+				if t, _, _ := strings.Cut(id, ":"); t == ObjTable || t == ObjView || t == ObjMatView {
+					return id
+				}
+			}
+		}
+		return ""
+	}
+	aliases := map[string]string{}
+	for i, t := range toks {
+		if t.parts == nil || i == 0 {
+			continue
+		}
+		prev := toks[i-1].word
+		// MariaDB writes FROM (`shop`.`ledger` `l` JOIN …).
+		if prev != "from" && prev != "join" && prev != "," && prev != "(" && prev != "update" && prev != "into" {
+			continue
+		}
+		id := resolve(t.parts)
+		if id == "" {
+			continue
+		}
+		aliases[strings.Join(t.parts, ".")] = id
+		aliases[t.parts[len(t.parts)-1]] = id
+		j := i + 1
+		if j < len(toks) && toks[j].word == "as" {
+			j++
+		}
+		if j < len(toks) && len(toks[j].parts) == 1 && !relSQLWords[toks[j].word] {
+			aliases[toks[j].parts[0]] = id
+		}
+	}
+	var out []relJoin
+	col := func(t sqlToken) (string, string) {
+		if len(t.parts) < 2 {
+			return "", ""
+		}
+		q := t.parts[:len(t.parts)-1]
+		id := aliases[strings.Join(q, ".")]
+		if id == "" {
+			id = resolve(q)
+		}
+		return id, t.orig[len(t.orig)-1]
+	}
+	for i := 0; i+2 < len(toks); i++ {
+		if toks[i+1].word != "=" {
+			continue
+		}
+		a, ac := col(toks[i])
+		b, bc := col(toks[i+2])
+		if a != "" && b != "" && a != b {
+			out = append(out, relJoin{a, ac, b, bc})
+		}
+	}
+	return out
+}
+
+// assumeJoin adds the relationship of a join, from the side that refers
+// (whose column isn't the key of its table, or named after the other) to
+// the side referred to.
+func (g *relGraph) assumeJoin(j relJoin, via string) {
+	keyish := func(id, col string) bool {
+		for _, c := range g.columns[id] {
+			if strings.EqualFold(c.Name, col) && c.Key != "" {
+				return true
+			}
+		}
+		_, name, _ := strings.Cut(id, ":")
+		return slices.Contains(relTableWords(name), relStem(strings.ToLower(col))) || strings.EqualFold(col, "id")
+	}
+	first := func(id, col string) bool {
+		cs := g.columns[id]
+		return len(cs) > 0 && strings.EqualFold(cs[0].Name, col)
+	}
+	ka, kb := keyish(j.a, j.ac), keyish(j.b, j.bc)
+	if ka == kb { // neither (or both): a table's first column is most likely its own
+		ka, kb = first(j.a, j.ac), first(j.b, j.bc)
+	}
+	if ka && !kb {
+		j = relJoin{j.b, j.bc, j.a, j.ac}
+	}
+	pair := relPair(j.a, j.b)
+	if g.joined[pair] {
+		return
+	}
+	viaName := via
+	if _, n, ok := strings.Cut(via, ":"); ok {
+		viaName = n
+	}
+	if e := g.assumed[pair]; e != nil {
+		if len(e.Via) > 0 && len(e.Via) < 5 && !slices.Contains(e.Via, viaName) {
+			e.Via = append(e.Via, viaName)
+		}
+		return
+	}
+	e := g.linkCols(j.a, j.b, "assumed", j.ac+" = "+j.bc, []string{j.ac}, []string{j.bc})
+	e.Via = []string{viaName}
+	g.assumed[pair] = e
+}
+
+// sqlToken is a word or symbol of SQL; a name has its parts (lower case,
+// split at dots, unquoted) and orig (as written).
+type sqlToken struct {
+	word        string // lower case; a symbol as is
+	parts, orig []string
+}
+
+func sqlTokens(src string) []sqlToken {
+	var out []sqlToken
+	rs := []rune(src)
+	var parts []string
+	flush := func() {
+		if len(parts) > 0 {
+			lower := make([]string, len(parts))
+			for i, p := range parts {
+				lower[i] = strings.ToLower(p)
+			}
+			out = append(out, sqlToken{word: strings.Join(lower, "."), parts: lower, orig: slices.Clone(parts)})
+		}
+		parts = parts[:0]
+	}
+	ident := func(r rune) bool {
+		return r == '_' || r == '$' || r == '#' || unicode.IsLetter(r) || unicode.IsDigit(r)
+	}
+	for i := 0; i < len(rs); {
+		r := rs[i]
+		switch {
+		case r == '-' && i+1 < len(rs) && rs[i+1] == '-':
+			flush()
+			for i < len(rs) && rs[i] != '\n' {
+				i++
+			}
+		case r == '/' && i+1 < len(rs) && rs[i+1] == '*':
+			flush()
+			for i += 2; i+1 < len(rs) && !(rs[i] == '*' && rs[i+1] == '/'); i++ {
+			}
+			i += 2
+		case r == '\'':
+			flush()
+			for i++; i < len(rs) && rs[i] != '\''; i++ {
+			}
+			i++
+			out = append(out, sqlToken{word: "''"})
+		case r == '"' || r == '`' || r == '[':
+			end := map[rune]rune{'"': '"', '`': '`', '[': ']'}[r]
+			j := i + 1
+			for j < len(rs) && rs[j] != end {
+				j++
+			}
+			parts = append(parts, string(rs[i+1:min(j, len(rs))]))
+			i = j + 1
+			if i >= len(rs) || rs[i] != '.' {
+				flush()
+			}
+		case ident(r) && !unicode.IsDigit(r):
+			j := i
+			for j < len(rs) && ident(rs[j]) {
+				j++
+			}
+			parts = append(parts, string(rs[i:j]))
+			i = j
+			if i >= len(rs) || rs[i] != '.' {
+				flush()
+			}
+		case r == '.' && len(parts) > 0:
+			i++
+		case unicode.IsSpace(r):
+			flush()
+			i++
+		default:
+			flush()
+			if unicode.IsDigit(r) {
+				for i < len(rs) && ident(rs[i]) {
+					i++
+				}
+				out = append(out, sqlToken{word: "0"})
+				continue
+			}
+			out = append(out, sqlToken{word: string(r)})
+			i++
+		}
+	}
+	flush()
+	return out
 }

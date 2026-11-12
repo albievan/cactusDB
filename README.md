@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.51.0
+cactusdb 1.52.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -830,7 +830,22 @@ again.
 | dashed orange → | a **trigger** fires on the table (or view) at the arrow |
 | solid blue → | **uses**: a view, procedure, function, trigger or package reads or calls what is at the arrow, a trigger uses a generator, a table a sequence or domain |
 | dotted blue → | **uses, found in the source**: the database keeps no record of it, so cactusdb found the object's name in the source (switch off *Found in the source* to hide these) |
-| dash-dot purple → | **assumed from column names**: for tables without foreign keys (switch off *Assumed from column names* to hide these). A table's key column found in other tables (`CLIENT_NO` in `CLIENT` and `INVOICE`); without a key, the table whose name the column starts with (`ITEM_CODE` → `ITEM`), or the table that has it as its first column (`INV_NO` → `INVOICE` rather than `INVOICE_LINE`); and a column named after a table and its key or id (`customer_id`, `CustomerID` → `customers.id`). Generic names (`id`, `name`, `code`, `status`, `created`…) never link tables on their own, and tables already joined by a foreign key get no assumed line |
+| dash-dot purple → | **assumed**, where there is no foreign key (switch off *Assumed relationships* to hide these). First from the **joins in the DDL** of the views, procedures, functions and triggers: `FROM ledger l JOIN acct a ON a.acct_key = l.account_ref` (or the same in a WHERE) links `ledger.account_ref → acct.acct_key`, noted *joined in V_LEDGER*; the side referred to is the column that is a key, named after its table, or the table's first column. Then from **column names**: the table named after the column (`CLIENT` for `CLIENT_NO`), or else a table's key column found in other tables found in other tables (`CLIENT_NO` in `CLIENT` and `INVOICE`); without a key, the table whose name the column starts with (`ITEM_CODE` → `ITEM`), or the table that has it as its first column (`INV_NO` → `INVOICE` rather than `INVOICE_LINE`); and a column named after a table and its key or id (`customer_id`, `CustomerID` → `customers.id`). Generic names (`id`, `name`, `code`, `status`, `created`…) never link tables on their own, and tables already joined by a foreign key get no assumed line |
+
+**The columns of each relationship** are written on its line (`CLIENT_NO = CLIENT_NO`,
+`customer_id → id`; switch off *Linked columns* to hide them). **Work out 1:N / N:M** finds,
+only when you click it, whether each foreign key and assumed relationship drawn is one to
+one (**1:1**), many to one (**N:1**), one to many (**1:N**) or many to many (**N:M**): **1** or
+**N** is written at each end of the line and the kind on it. An end is 1 when its columns
+are unique: a primary or unique key (and what a foreign key refers to) is; other columns
+are checked in the database with `SELECT … GROUP BY … HAVING COUNT(*) > 1` (a read, never
+a change; 20 seconds at most each, else **?**).
+
+**Expand a table** (▸ on its box, or **Columns** for all) to list its columns, the key
+marked 🔑 and the joined ones in bold; the lines then join the rows of their columns. Views
+can be expanded too. **Choose tables** draws only the objects you tick (filter to find
+them), with **And what they link to** also the ones a step away; *Choose* at the side adds
+or removes the selected one.
 
 Linked objects are arranged together, each group beside the others. **Drag** an object to
 move it, drag the background to pan, the **wheel** or a pinch zooms; ⤢ shows everything.
@@ -1824,7 +1839,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `lock.go` | Connection passwords (Argon2id keys), saved queries in the store, the wrong-password throttle |
 | `auth.go` | `--remotelogin`: users, signing in with the e-mailed code, invitations, password resets, requests for access, the sign-in gate in front of everything (`/api/auth/…`, `/api/users`); the sign-in page is `web/login.html` |
 | `events.go` | The Events button: the `events` table (encrypted), recording an event, `/api/events` |
-| `relations.go` | The DB Relationships tab: every object and its foreign keys, triggers and dependencies from each database's catalog, or found in the source (`/api/relationships`) |
+| `relations.go` | The DB Relationships tab: every object and its foreign keys, triggers and dependencies from each database's catalog or found in the source, relationships assumed from the joins in views and routines and from column names, every table's columns (`/api/relationships`), and the uniqueness check for 1:N / N:M (`/api/relationships/unique`) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |

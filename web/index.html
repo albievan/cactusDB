@@ -773,11 +773,46 @@
   .relcanvas.panning { cursor: grabbing; }
   .relworld { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
   .relworld svg { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }
+  .relworld svg.rellabels { pointer-events: none; }
   .relnode { --c: var(--muted); position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; max-width: 280px;
     padding: 3px 9px 3px 7px; font-size: 12px; line-height: 18px; white-space: nowrap; color: var(--text); background: var(--panel);
     border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / .08);
     cursor: pointer; user-select: none; transition: opacity .15s; }
   .relnode span { overflow: hidden; text-overflow: ellipsis; }
+  .relnode { flex-direction: column; align-items: stretch; gap: 0; }
+  .relnh { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .relexp { display: inline-grid; place-items: center; width: 16px; height: 16px; margin: 0 -2px 0 -3px; padding: 0; font-size: 10px;
+    color: var(--muted); background: none; border: 0; border-radius: 3px; cursor: pointer; }
+  .relexp:hover { color: var(--text); background: var(--row-hover); }
+  .relnode.open { padding-bottom: 4px; }
+  .relnode.open .relnh { padding-bottom: 3px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .relcols { list-style: none; margin: 2px 0 0; padding: 0; max-height: 320px; overflow-y: auto; font-family: var(--mono); font-size: 11px; line-height: 17px; }
+  .relcols li { display: flex; align-items: center; gap: 5px; padding: 0 2px; color: var(--muted); white-space: nowrap; }
+  .relcols li span { overflow: hidden; text-overflow: ellipsis; }
+  .relcols li i { width: 11px; font-size: 10px; flex: none; }
+  .relcols li .bi-dot { opacity: .5; }
+  .relcols li.on { color: var(--text); font-weight: 600; }
+  .relcols li.on i, .relcols li .bi-key-fill, .relcols li .bi-key { color: var(--c); }
+  .rellbl text { font-size: 10px; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+  .rellbl .relmid { fill: var(--text); text-anchor: middle; }
+  .rellbl .relend { font-size: 11px; font-weight: 700; text-anchor: middle; }
+  .rellbl.k-fk .relend { fill: var(--rel-fk); } .rellbl.k-assumed .relend { fill: var(--rel-assumed); }
+  .relworld.dim .rellbl:not(.near) { opacity: .08; }
+  .relside .relcard { margin-left: 4px; padding: 0 5px; font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; }
+  .relpickwrap { position: relative; }
+  .relpickbox { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; width: 320px; max-width: calc(100vw - 32px); padding: 10px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+  .relpickbox[hidden] { display: none; }
+  .relpickacts { display: flex; align-items: center; gap: 6px; margin: 8px 0; }
+  .relpickacts .hint { margin: 0 0 0 auto; }
+  .relpicklist { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 4px; }
+  .relpicklist label { --c: var(--muted); display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-size: 12.5px; border-radius: 4px; cursor: pointer; }
+  .relpicklist label:hover { background: var(--row-hover); }
+  .relpicklist label .form-check-input { margin: 0; flex: none; }
+  .relpicklist label i { color: var(--c); }
+  .relpicklist label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .relpicklist .hint { margin: 6px 4px; }
+  .relpickfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
   .relnode i { color: var(--c); }
   .relnode.sel { outline: 2px solid var(--c); outline-offset: 2px; font-weight: 600; }
   .relnode.hit { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent); }
@@ -1385,7 +1420,22 @@
         <datalist id="relNames"></datalist>
         <label class="form-check form-switch" title="Also the objects that have no relationships with any other"><input class="form-check-input" type="checkbox" id="relLonely" role="switch"> <span id="relLonelyText">Objects without relationships</span></label>
         <label class="form-check form-switch" title="Also the uses found by an object's name in a view's, procedure's, function's or trigger's source, where the database keeps no record of them"><input class="form-check-input" type="checkbox" id="relGuess" role="switch" checked> Found in the source</label>
-        <label class="form-check form-switch" title="Also the relationships assumed from columns of the same name, for tables without foreign keys: a table's key column in other tables (CUSTOMER_NO), or a column named after a table (customer_id → customers.id)"><input class="form-check-input" type="checkbox" id="relAssumed" role="switch" checked> Assumed from column names</label>
+        <div class="relpickwrap">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="relPick" aria-haspopup="true" aria-expanded="false" title="Choose the tables (and other objects) to draw"><i class="bi bi-ui-checks" aria-hidden="true"></i> Choose tables<span id="relPickCount"></span></button>
+          <div class="relpickbox" id="relPickBox" hidden role="dialog" aria-label="Choose tables">
+            <input type="search" class="form-control form-control-sm" id="relPickQ" placeholder="Filter…" aria-label="Filter the objects" autocomplete="off">
+            <div class="relpickacts"><button type="button" class="btn btn-sm btn-outline-secondary" id="relPickAll" title="Tick every object listed (as filtered)">Tick listed</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="relPickNone" title="Untick all: everything is drawn">Clear</button>
+              <span class="hint" id="relPickSum"></span></div>
+            <div class="relpicklist" id="relPickList"></div>
+            <div class="relpickfoot"><label class="form-check form-switch" title="Also draw what the chosen objects are linked to"><input class="form-check-input" type="checkbox" id="relPickNear" role="switch"> And what they link to</label>
+              <button type="button" class="btn btn-sm btn-primary" id="relPickDone">Done</button></div>
+          </div>
+        </div>
+        <label class="form-check form-switch" title="Write on each foreign key and assumed relationship the columns it joins"><input class="form-check-input" type="checkbox" id="relColsOn" role="switch" checked> Linked columns</label>
+        <label class="form-check form-switch" title="Also the relationships assumed where there is no foreign key: from the joins in the views, procedures, functions and triggers (a.x = b.y), and from columns of the same name (a table's key column in other tables, or customer_id → customers.id)"><input class="form-check-input" type="checkbox" id="relAssumed" role="switch" checked> Assumed relationships</label>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relOpenAll" title="Show or hide the columns of every table drawn (or click ▸ on a table)"><i class="bi bi-arrows-expand" aria-hidden="true"></i> Columns</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relCard" title="Work out for each foreign key and assumed relationship drawn whether it is one to one (1:1), many to one (N:1), one to many (1:N) or many to many (N:M): keys say so, other columns are checked in the database for duplicate values (a read, never a change)"><i class="bi bi-diagram-2" aria-hidden="true"></i> Work out 1:N / N:M</button>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relRelayout" aria-label="Arrange again" title="Arrange the objects again"><i class="bi bi-shuffle" aria-hidden="true"></i></button>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" aria-label="Download the picture" title="Download the picture as it is arranged now (PNG)"><i class="bi bi-image" aria-hidden="true"></i></button>
         <button type="button" class="btn btn-sm btn-primary" id="relRefresh" title="Read the objects and their relationships from the database's catalog now (only then are they read)"><i class="bi bi-diagram-3" aria-hidden="true"></i> Generate Relationships</button>
@@ -1400,6 +1450,7 @@
               <marker id="relArrow-assumed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-assumed" d="M0 0L10 5L0 10z"/></marker>
             </defs><g id="relEdges"></g></svg>
             <div id="relNodes"></div>
+            <svg aria-hidden="true" class="rellabels"><g id="relLabels"></g></svg>
           </div>
           <div class="relmsg" id="relMsg"></div>
           <div class="rellegend">
@@ -1407,7 +1458,8 @@
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-trigger"/></svg>Trigger → its table</span>
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses"/></svg>Uses</span>
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses guess"/></svg>Found in the source</span>
-            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-assumed"/></svg>Assumed from column names</span>
+            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-assumed"/></svg>Assumed (joins in views…, same column names)</span>
+            <span><b>1</b> / <b>N</b> at the ends: one or many rows (Work out 1:N / N:M)</span>
           </div>
           <div class="relzoom">
             <button type="button" class="btn btn-sm btn-outline-secondary" id="relZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
@@ -2652,7 +2704,11 @@ $("dbMove").addEventListener("click", () => moveDb($("dbPath").value));
 // pan, the wheel or a pinch zooms; a click shows an object's relationships,
 // a double click opens it.
 const rel = { data: null, seq: 0, nodes: [], byId: new Map(), edges: [], sel: null, focus: null, hidden: new Set(),
-  view: { x: 0, y: 0, k: 1 }, ptr: new Map(), drag: null };
+  view: { x: 0, y: 0, k: 1 }, ptr: new Map(), drag: null,
+  chosen: new Set(), // the objects picked with Choose tables (none: all)
+  open: new Set(),   // the tables expanded to their columns
+  uniq: new Map(),   // "id|col,col" → whether the columns are unique (Work out 1:N)
+  cardOn: false, cardSeq: 0 };
 const REL_ORDER = ["table", "view", "matview", "trigger", "procedure", "function", "package", "sequence", "domain", "exception", "event", "synonym"];
 const REL_MAX = 2500; // objects drawn at once
 const relLabel = (type) => (rel.data && rel.data.labels[type]) || type;
@@ -2662,6 +2718,8 @@ const relOne = (type) => relLabel(type).replace(/ies$/, "y").replace(/s$/, "");
 // what was drawn goes, and nothing is read until Generate Relationships.
 function relReset() {
   rel.seq++; rel.data = null; rel.sel = null; rel.focus = null; rel.hidden.clear(); rel.drawn = false;
+  rel.chosen.clear(); rel.open.clear(); rel.uniq.clear(); rel.cardOn = false; rel.cardSeq++; relPickClose();
+  relOpenAllText();
   $("relTab").hidden = !state.session;
   $("relNodes").innerHTML = ""; $("relEdges").innerHTML = ""; $("relSide").hidden = true; $("relTypes").innerHTML = ""; $("relSub").textContent = "";
   $("relNames").innerHTML = ""; $("relFind").value = "";
@@ -2681,8 +2739,8 @@ function relOpen() {
 // The controls that work on a picture: only once one is generated.
 function relControls() {
   const none = !rel.data;
-  ["relFind", "relLonely", "relGuess", "relAssumed", "relRelayout", "relPng", "relZoomIn", "relZoomOut", "relFit"].forEach((id) => { $(id).disabled = none; });
-  if (!none) $("relLonely").disabled = !!rel.focus;
+  ["relFind", "relLonely", "relGuess", "relAssumed", "relColsOn", "relCard", "relPick", "relOpenAll", "relRelayout", "relPng", "relZoomIn", "relZoomOut", "relFit"].forEach((id) => { $(id).disabled = none; });
+  if (!none) $("relLonely").disabled = !!rel.focus || rel.chosen.size > 0;
 }
 async function relLoad() {
   if (!state.session) return;
@@ -2695,6 +2753,11 @@ async function relLoad() {
     const d = await api("GET", "/api/relationships?session=" + encodeURIComponent(state.session));
     if (seq !== rel.seq) return;
     rel.data = d; rel.sel = null; rel.focus = null;
+    // What was chosen and expanded stays, where it still exists; uniqueness is worked out again.
+    const ids = new Set(d.nodes.map((n) => n.id));
+    [rel.chosen, rel.open].forEach((set) => [...set].forEach((id) => { if (!ids.has(id)) set.delete(id); }));
+    rel.uniq.clear(); rel.cardOn = false; rel.cardSeq++;
+    d.columns = d.columns || {};
     $("relNames").innerHTML = d.nodes.map((n) => `<option value="${esc(n.name)}">${esc(relOne(n.type))}</option>`).join("");
     rel.drawn = false;
     relControls();
@@ -2723,6 +2786,12 @@ function relShown() {
       frontier = next;
     }
     ids = near;
+  } else if (rel.chosen.size) {
+    // The chosen objects, and what they link to when asked.
+    const pick = new Set([...rel.chosen].filter((id) => ids.has(id)));
+    const chosen = new Set(pick); // one step from the chosen ones, not along a chain
+    if ($("relPickNear").checked) for (const e of edges) { if (chosen.has(e.from)) pick.add(e.to); if (chosen.has(e.to)) pick.add(e.from); }
+    ids = pick;
   } else if (!$("relLonely").checked) ids = new Set([...ids].filter((id) => linked.has(id)));
   edges = edges.filter((e) => ids.has(e.from) && ids.has(e.to));
   return { nodes: d.nodes.filter((n) => ids.has(n.id)), edges, lonely: d.nodes.filter((n) => !rel.hidden.has(n.type) && !linked.has(n.id)).length };
@@ -2736,6 +2805,21 @@ function relChips() {
     `<i class="bi bi-${ICONS[t] || "dot"}" aria-hidden="true"></i>${esc(relLabel(t))} <span class="cnt">${fmtInt(count[t])}</span></button>`).join("");
 }
 
+// relNodeHtml is an object's box: a table can be expanded to its columns
+// (keys and the columns of the lines drawn are marked).
+function relNodeHtml(n, joined) {
+  const cols = rel.data.columns[n.id], open = cols && rel.open.has(n.id);
+  const exp = cols ? `<button type="button" class="relexp" data-exp aria-expanded="${!!open}" title="${open ? "Hide" : "Show"} its ${fmtInt(cols.length)} columns" aria-label="${open ? "Hide" : "Show"} the columns">` +
+    `<i class="bi bi-chevron-${open ? "down" : "right"}" aria-hidden="true"></i></button>` : "";
+  const list = open ? `<ul class="relcols">` + cols.map((c) => {
+    const on = joined && joined.has(c.n);
+    return `<li data-col="${esc(c.n)}" class="${on ? "on" : ""}" title="${esc(c.n)}${c.k === "PRI" ? " (primary key)" : c.k === "UNI" ? " (unique)" : ""}${on ? ", joined by a line" : ""}">` +
+      `<i class="bi bi-${c.k === "PRI" ? "key-fill" : c.k === "UNI" ? "key" : on ? "link-45deg" : "dot"}" aria-hidden="true"></i><span>${esc(c.n)}</span></li>`;
+  }).join("") + `</ul>` : "";
+  return `<div class="relnode t-${n.type}${open ? " open" : ""}" data-id="${esc(n.id)}" title="${esc(relOne(n.type))} ${esc(n.name)}">` +
+    `<div class="relnh">${exp}<i class="bi bi-${ICONS[n.type] || "dot"}" aria-hidden="true"></i><span>${esc(n.name)}</span></div>${list}</div>`;
+}
+
 function relBuild(keepView) {
   const d = rel.data;
   if (!d) return;
@@ -2743,34 +2827,41 @@ function relBuild(keepView) {
   relChips();
   const shown = relShown();
   $("relLonelyText").textContent = `Objects without relationships (${fmtInt(shown.lonely)})`;
-  $("relLonely").disabled = !!rel.focus;
+  $("relLonely").disabled = !!rel.focus || rel.chosen.size > 0;
+  $("relPickCount").textContent = rel.chosen.size ? ` (${fmtInt(rel.chosen.size)})` : "";
   const notes = (d.notes || []).map((n) => " · " + n).join("");
   const assumed = d.edges.filter((e) => e.kind === "assumed").length;
-  $("relSub").textContent = `${fmtInt(d.nodes.length)} objects · ${fmtInt(d.edges.length)} relationships` + (assumed ? ` (${fmtInt(assumed)} assumed from column names)` : "") +
-    (rel.focus ? ` · showing what is around ${rel.byId.get(rel.focus)?.name || d.nodes.find((n) => n.id === rel.focus)?.name}` : "") + notes;
+  $("relSub").textContent = `${fmtInt(d.nodes.length)} objects · ${fmtInt(d.edges.length)} relationships` + (assumed ? ` (${fmtInt(assumed)} assumed from joins and column names)` : "") +
+    (rel.focus ? ` · showing what is around ${rel.byId.get(rel.focus)?.name || d.nodes.find((n) => n.id === rel.focus)?.name}`
+      : rel.chosen.size ? ` · showing the ${fmtInt(rel.chosen.size)} chosen` + ($("relPickNear").checked ? " and what they link to" : "") : "") + notes;
   if (!d.nodes.length) return relMsg("<span>This database has no objects to draw.</span>");
   if (!shown.nodes.length) {
     return relMsg(shown.lonely && !$("relLonely").checked
       ? `<span>None of the objects shown has a relationship with another.<br>Switch on <b>Objects without relationships</b> to see them all.</span>`
-      : `<span>No object is shown: switch on a type above.</span>`);
+      : rel.chosen.size ? `<span>None of the chosen objects is of a type switched on above.</span>` : `<span>No object is shown: switch on a type above.</span>`);
   }
   if (shown.nodes.length > REL_MAX) {
     return relMsg(`<span>${fmtInt(shown.nodes.length)} objects are too many to draw at once.<br>Switch off some types above, or find an object and show only what is around it.</span>`);
   }
   relMsg("");
-  if (shown.nodes.length > 300 && !rel.focus) $("relSub").textContent += " · zoom in, or find an object and show only what is around it";
-  $("relNodes").innerHTML = shown.nodes.map((n) => `<div class="relnode t-${n.type}" data-id="${esc(n.id)}" title="${esc(relOne(n.type))} ${esc(n.name)}">` +
-    `<i class="bi bi-${ICONS[n.type] || "dot"}" aria-hidden="true"></i><span>${esc(n.name)}</span></div>`).join("");
+  if (shown.nodes.length > 300 && !rel.focus && !rel.chosen.size) $("relSub").textContent += " · zoom in, or find an object and show only what is around it";
+  // The columns joined by a drawn line, marked in an expanded table.
+  const joinedCols = new Map();
+  for (const e of shown.edges) for (const [id, cols] of [[e.from, e.fromCols], [e.to, e.toCols]]) {
+    if (!joinedCols.has(id)) joinedCols.set(id, new Set());
+    (cols || []).forEach((c) => joinedCols.get(id).add(c));
+  }
+  $("relNodes").innerHTML = shown.nodes.map((n) => relNodeHtml(n, joinedCols.get(n.id))).join("");
   rel.byId = new Map();
   rel.nodes = [...$("relNodes").children].map((el, i) => {
-    const n = { ...shown.nodes[i], el, w: el.offsetWidth, h: el.offsetHeight, x: 0, y: 0 };
+    const n = { ...shown.nodes[i], el, w: el.offsetWidth, h: el.offsetHeight, x: 0, y: 0, open: rel.open.has(shown.nodes[i].id) };
     rel.byId.set(n.id, n);
     return n;
   });
   rel.edges = shown.edges.map((e) => ({ ...e, s: rel.byId.get(e.from), t: rel.byId.get(e.to) }));
   relLayout();
-  relDrawEdges();
   rel.nodes.forEach(relPlace);
+  relDrawEdges();
   if (rel.sel && !rel.byId.has(rel.sel)) rel.sel = null;
   relSelect(rel.sel, false);
   if (!keepView) relFit();
@@ -2793,12 +2884,17 @@ function relLayout() {
   alone.forEach((n) => (byType[n.type] = byType[n.type] || []).push(n));
   for (const t of Object.keys(byType).sort((a, b) => REL_ORDER.indexOf(a) - REL_ORDER.indexOf(b))) {
     const ns = byType[t].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-    const cols = Math.max(1, Math.round(Math.sqrt(ns.length * 1.6))), colW = Math.max(...ns.map((n) => n.w)) + 16, rowH = 32;
-    ns.forEach((n, i) => { n.x = (i % cols) * colW + n.w / 2; n.y = 30 + Math.floor(i / cols) * rowH + n.h / 2; });
+    const cols = Math.max(1, Math.round(Math.sqrt(ns.length * 1.6))), colW = Math.max(...ns.map((n) => n.w)) + 16;
+    let y = 30; // rows as tall as their tallest (an expanded table)
+    for (let r = 0; r < ns.length; r += cols) {
+      const row = ns.slice(r, r + cols);
+      row.forEach((n, i) => { n.x = i * colW + n.w / 2; n.y = y + n.h / 2; });
+      y += Math.max(...row.map((n) => n.h)) + 8;
+    }
     const label = document.createElement("div");
     label.className = "rellabel"; label.textContent = `${relLabel(t)} without relationships`;
     $("relNodes").appendChild(label);
-    boxes.push({ nodes: ns, label, w: Math.max(Math.min(ns.length, cols) * colW, label.offsetWidth), h: 30 + Math.ceil(ns.length / cols) * rowH, minX: 0, minY: 0 });
+    boxes.push({ nodes: ns, label, w: Math.max(Math.min(ns.length, cols) * colW, label.offsetWidth), h: y, minX: 0, minY: 0 });
   }
   // Shelves: as wide as a square of all of it, a little wider for screens.
   const gap = 90, area = boxes.reduce((a, b) => a + (b.w + gap) * (b.h + gap), 0);
@@ -2819,7 +2915,9 @@ function relLayout() {
 // space squeezed sideways by SX, where they are about square, and stretches
 // the result. It returns the group's bounds.
 function relForce(ns, es) {
-  const SX = 2.4, K = 62, n = ns.length, deg = new Map();
+  // Larger boxes (expanded tables) need longer lines between them.
+  const area = ns.reduce((a, p) => a + p.w * p.h, 0) / ns.length;
+  const SX = 2.4, K = 62 * Math.max(1, Math.sqrt(area / (140 * 26)) * 0.8), n = ns.length, deg = new Map();
   es.forEach((e) => { deg.set(e.s, (deg.get(e.s) || 0) + 1); deg.set(e.t, (deg.get(e.t) || 0) + 1); });
   // A sunflower to start with, the most connected in the middle.
   [...ns].sort((a, b) => (deg.get(b) || 0) - (deg.get(a) || 0)).forEach((p, i) => {
@@ -2854,21 +2952,34 @@ function relForce(ns, es) {
     temp = Math.max(temp * 0.97, 0.5);
   }
   for (const p of ns) p.x *= SX;
-  for (let it = 0; it < 200; it++) {
-    let moved = false;
-    near((p, q) => {
-      const ox = (p.w + q.w) / 2 + 18 - Math.abs(p.x - q.x), oy = (p.h + q.h) / 2 + 14 - Math.abs(p.y - q.y);
-      if (ox <= 0 || oy <= 0) return;
-      moved = true;
-      // Half the overlap each way parts them (the second visit of the pair then finds none).
-      if (ox / (p.w + q.w) < oy / (p.h + q.h)) { const s = (p.x < q.x || (p.x === q.x && p.id < q.id) ? -1 : 1) * ox / 2; p.x += s; q.x -= s; }
-      else { const s = (p.y < q.y || (p.y === q.y && p.id < q.id) ? -1 : 1) * oy / 2; p.y += s; q.y -= s; }
-    }, 300); // wider than the widest object
-    if (!moved) break;
-  }
+  relSeparate(ns);
   const minX = Math.min(...ns.map((p) => p.x - p.w / 2)), maxX = Math.max(...ns.map((p) => p.x + p.w / 2));
   const minY = Math.min(...ns.map((p) => p.y - p.h / 2)), maxY = Math.max(...ns.map((p) => p.y + p.h / 2));
   return { nodes: ns, w: maxX - minX, h: maxY - minY, minX, minY };
+}
+
+// relSeparate moves overlapping objects apart (after the layout, or when a
+// table is expanded): half the overlap each way per pair.
+function relSeparate(ns, gx = 18, gy = 14) {
+  const cell = Math.max(300, ...ns.map((p) => Math.max(p.w, p.h) + 180));
+  for (let it = 0; it < 200; it++) {
+    let moved = false;
+    const grid = new Map();
+    for (const p of ns) { const k = Math.floor(p.x / cell) + "," + Math.floor(p.y / cell); (grid.get(k) || grid.set(k, []).get(k)).push(p); }
+    for (const p of ns) {
+      const cx = Math.floor(p.x / cell), cy = Math.floor(p.y / cell);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) for (const q of grid.get(gx + "," + gy) || []) {
+        if (q === p) continue;
+        // More room around an expanded table, for the lines and what is written on them.
+        const wide = p.open || q.open, ox = (p.w + q.w) / 2 + (wide ? 90 : gx) - Math.abs(p.x - q.x), oy = (p.h + q.h) / 2 + (wide ? 70 : gy) - Math.abs(p.y - q.y);
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        if (ox / (p.w + q.w) < oy / (p.h + q.h)) { const s = (p.x < q.x || (p.x === q.x && p.id < q.id) ? -1 : 1) * ox / 2; p.x += s; q.x -= s; }
+        else { const s = (p.y < q.y || (p.y === q.y && p.id < q.id) ? -1 : 1) * oy / 2; p.y += s; q.y -= s; }
+      }
+    }
+    if (!moved) break;
+  }
 }
 
 // ---- drawing ----
@@ -2886,21 +2997,56 @@ function relPath(e) {
     e.head = [x + 40, y + 20, s.x + s.w / 2 + 4, s.y];
     return `M${x} ${y - 2}C${x + 10} ${y - 34} ${x + 52} ${y - 8} ${s.x + s.w / 2 + 4} ${s.y}`;
   }
-  // Two objects that use each other: the two lines bend apart.
-  const bend = e.both ? 26 : 0, mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2, len = Math.hypot(t.x - s.x, t.y - s.y) || 1;
-  const cx = mx - ((t.y - s.y) / len) * bend, cy = my + ((t.x - s.x) / len) * bend;
-  const [x1, y1] = relEnd(s, cx, cy, 2), [x2, y2] = relEnd(t, cx, cy, 4);
+  // Several lines between the same two objects bend apart (e.bend, set by relDrawEdges).
+  const bend = e.bend || 0, len = Math.hypot(t.x - s.x, t.y - s.y) || 1;
+  const sg = e.from < e.to ? 1 : -1, mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2;
+  const cx = mx - ((t.y - s.y) / len) * bend * sg, cy = my + ((t.x - s.x) / len) * bend * sg;
+  const [x1, y1] = relAnchor(s, e.fromCols, cx, cy, 2), [x2, y2] = relAnchor(t, e.toCols, cx, cy, 4);
   e.head = [bend ? cx : x1, bend ? cy : y1, x2, y2]; // for the arrow of the picture
+  e.p = { x1, y1, x2, y2, cx: bend ? cx : (x1 + x2) / 2, cy: bend ? cy : (y1 + y2) / 2, bend };
   return bend ? `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}` : `M${x1} ${y1}L${x2} ${y2}`;
 }
+// relAnchor is where a line leaves an object: at the row of its first column
+// when the table is expanded (on the side toward the other end), else its box.
+function relAnchor(n, cols, tx, ty, pad) {
+  const li = n.open && cols && cols.length && n.el.querySelector(`li[data-col="${CSS.escape(cols[0])}"]`);
+  if (!li) return relEnd(n, tx, ty, pad);
+  const list = li.parentElement, top = n.y - n.h / 2;
+  const y = Math.min(Math.max(li.offsetTop - list.scrollTop + li.offsetHeight / 2, list.offsetTop + 6), list.offsetTop + list.clientHeight - 6);
+  return [tx < n.x ? n.x - n.w / 2 - pad : n.x + n.w / 2 + pad, top + y];
+}
+// relCard is the cardinality of a foreign key or assumed relationship: each
+// end 1 when its columns are unique, else N (N:M when neither is), or "" when
+// not worked out yet, ? when it couldn't be.
+function relUniqueKnown(id, cols, fkTarget) {
+  if (!cols || !cols.length) return null;
+  if (fkTarget) return true; // a foreign key refers to a primary or unique key
+  const k = id + "|" + cols.join(",");
+  if (rel.uniq.has(k)) return rel.uniq.get(k);
+  if (cols.length === 1 && (rel.data.columns[id] || []).some((c) => c.n === cols[0] && c.k)) return true;
+  return undefined;
+}
+function relCard(e) {
+  if (!rel.cardOn || (e.kind !== "fk" && e.kind !== "assumed")) return null;
+  const a = relUniqueKnown(e.from, e.fromCols, false), b = relUniqueKnown(e.to, e.toCols, e.kind === "fk");
+  if (a === undefined || b === undefined) return null;
+  if (a === null || b === null) return { text: "?", from: "?", to: "?" };
+  const from = a ? "1" : "N", to = b ? "1" : a ? "N" : "M";
+  return { text: from + ":" + to, from, to };
+}
+const REL_CARD_WORDS = { "1:1": "one to one", "N:1": "many to one", "1:N": "one to many", "N:M": "many to many", "?": "not known" };
 function relEdgeTitle(e) {
   const what = { fk: "refers to (foreign key)", trigger: "fires on", uses: e.guess ? "uses (found in its source)" : "uses",
-    assumed: "is assumed to refer to (same column name)" }[e.kind];
-  return `${relOne(e.s.type)} ${e.s.name} ${what} ${relOne(e.t.type).toLowerCase()} ${e.t.name}` + (e.label ? `: ${e.label}` : "");
+    assumed: e.via ? "is assumed to refer to (joined in " + e.via.join(", ") + ")" : "is assumed to refer to (same column name)" }[e.kind];
+  const c = relCard(e);
+  return `${relOne(e.s.type)} ${e.s.name} ${what} ${relOne(e.t.type).toLowerCase()} ${e.t.name}` + (e.label ? `: ${e.label}` : "") +
+    (c ? ` — ${c.text} (${REL_CARD_WORDS[c.text]})` : "");
 }
 function relDrawEdges() {
-  const pairs = new Set(rel.edges.map((e) => e.from + "\n" + e.to));
-  rel.edges.forEach((e) => { e.both = pairs.has(e.to + "\n" + e.from); });
+  // Lines between the same two objects (either way) fan out.
+  const pairs = new Map();
+  rel.edges.forEach((e) => { const k = e.from < e.to ? e.from + "\n" + e.to : e.to + "\n" + e.from; (pairs.get(k) || pairs.set(k, []).get(k)).push(e); });
+  for (const es of pairs.values()) es.forEach((e, i) => { e.bend = es.length > 1 ? (i - (es.length - 1) / 2) * 30 || 0 : 0; });
   const NS = "http://www.w3.org/2000/svg", g = $("relEdges");
   g.textContent = "";
   for (const e of rel.edges) {
@@ -2913,6 +3059,41 @@ function relDrawEdges() {
     e.el.appendChild(title);
     g.appendChild(e.el);
   }
+  relDrawLabels();
+}
+// relDrawLabels writes on the lines of foreign keys and assumed
+// relationships their columns (Linked columns) and, once worked out, their
+// cardinality: 1 or N at each end and N:1, 1:N, 1:1 or N:M in the middle.
+function relDrawLabels() {
+  const NS = "http://www.w3.org/2000/svg", g = $("relLabels"), cols = $("relColsOn").checked;
+  g.textContent = "";
+  for (const e of rel.edges) {
+    e.lbl = null;
+    if (e.kind !== "fk" && e.kind !== "assumed") continue;
+    const card = relCard(e), text = [card && card.text, cols && e.label].filter(Boolean).join("  ");
+    if (!text) continue;
+    e.lbl = document.createElementNS(NS, "g");
+    e.lbl.setAttribute("class", `rellbl k-${e.kind}`);
+    e.lbl.innerHTML = `<text class="relmid"></text>` + (card ? `<text class="relend"></text><text class="relend"></text>` : "");
+    e.lbl.children[0].textContent = text;
+    if (card) { e.lbl.children[1].textContent = card.from; e.lbl.children[2].textContent = card.to; }
+    g.appendChild(e.lbl);
+    relLabelAt(e);
+  }
+  if (rel.sel) relSelect(rel.sel, false, true);
+}
+function relLabelAt(e) {
+  if (!e.lbl || !e.p) return;
+  const { x1, y1, x2, y2, cx, cy, bend } = e.p;
+  const mx = bend ? 0.25 * x1 + 0.5 * cx + 0.25 * x2 : cx, my = bend ? 0.25 * y1 + 0.5 * cy + 0.25 * y2 : cy;
+  const [mid, a, b] = e.lbl.children;
+  mid.setAttribute("x", mx); mid.setAttribute("y", my - 4);
+  // The end marks: a little way along the line, beside it.
+  const mark = (el, px, py, qx, qy) => {
+    const len = Math.hypot(qx - px, qy - py) || 1, ux = (qx - px) / len, uy = (qy - py) / len;
+    el.setAttribute("x", px + ux * 16 - uy * 9); el.setAttribute("y", py + uy * 16 + ux * 9 + 4);
+  };
+  if (a) { mark(a, x1, y1, bend ? cx : x2, bend ? cy : y2); mark(b, x2, y2, bend ? cx : x1, bend ? cy : y1); }
 }
 function relApplyView() {
   const v = rel.view;
@@ -2950,7 +3131,7 @@ function relCenter(n) {
 // ---- selecting ----
 // relSelect marks an object and what is linked to it, and lists its
 // relationships (all of them, also with the types that are switched off).
-function relSelect(id, center) {
+function relSelect(id, center, marksOnly) {
   rel.sel = id || null;
   const n = id && rel.byId.get(id);
   const near = new Set(id ? [id] : []);
@@ -2958,24 +3139,29 @@ function relSelect(id, center) {
     const on = id && (e.from === id || e.to === id);
     if (on) { near.add(e.from); near.add(e.to); }
     e.el.classList.toggle("near", !!on);
+    if (e.lbl) e.lbl.classList.toggle("near", !!on);
   });
+  if (marksOnly && !id) return;
   rel.nodes.forEach((m) => { m.el.classList.toggle("near", near.has(m.id)); m.el.classList.toggle("sel", m.id === id); });
   $("relWorld").classList.toggle("dim", !!id);
   if (!id) { $("relSide").hidden = true; return; }
   if (n && center) relCenter(n);
   const node = rel.data.nodes.find((x) => x.id === id);
   const named = new Map(rel.data.nodes.map((x) => [x.id, x]));
+  let c;
   const list = (title, es, other) => {
     if (!es.length) return "";
     return `<h4>${title} (${es.length})</h4><ul>` + es.map((e) => {
       const o = named.get(other(e));
       return `<li><button type="button" class="t-${o.type}" data-relgo="${esc(o.id)}" title="${esc(relOne(o.type))} ${esc(o.name)}"><i class="bi bi-${ICONS[o.type] || "dot"}" aria-hidden="true"></i>` +
-        `<span>${esc(o.name)}${e.label ? ` <small>${esc(e.label)}</small>` : ""}${e.guess ? ` <small>(found in the source)</small>` : ""}</span></button></li>`;
+        `<span>${esc(o.name)}${e.label ? ` <small>${esc(e.label)}</small>` : ""}${e.guess ? ` <small>(found in the source)</small>` : ""}` +
+        `${e.via ? ` <small>(joined in ${esc(e.via.join(", "))})</small>` : ""}` +
+        `${(c = relCard(e)) ? ` <b class="relcard" title="${esc(REL_CARD_WORDS[c.text] || "")}">${c.text}</b>` : ""}</span></button></li>`;
     }).join("") + `</ul>`;
   };
   const out = (k) => rel.data.edges.filter((e) => e.from === id && e.kind === k), inn = (k) => rel.data.edges.filter((e) => e.to === id && e.kind === k);
   const sections = list("Refers to (foreign keys)", out("fk"), (e) => e.to) + list("Referred to by (foreign keys)", inn("fk"), (e) => e.from) +
-    list("Assumed to refer to (column names)", out("assumed"), (e) => e.to) + list("Assumed referred to by (column names)", inn("assumed"), (e) => e.from) +
+    list("Assumed to refer to", out("assumed"), (e) => e.to) + list("Assumed referred to by", inn("assumed"), (e) => e.from) +
     list("Fires on", out("trigger"), (e) => e.to) + list("Triggers", inn("trigger"), (e) => e.from) +
     list("Uses", out("uses"), (e) => e.to) + list("Used by", inn("uses"), (e) => e.from);
   $("relSide").innerHTML = `<div class="relsidehead t-${node.type}"><h3><i class="bi bi-${ICONS[node.type] || "dot"}" aria-hidden="true"></i>${esc(node.name)}</h3>` +
@@ -2983,6 +3169,8 @@ function relSelect(id, center) {
     `<p class="hint">${esc(relOne(node.type))}</p>` +
     `<div class="acts"><button type="button" class="btn btn-sm btn-outline-secondary" data-relact="open" title="Its data, or its definition">` +
     `<i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open</button>` +
+    `<button type="button" class="btn btn-sm btn-outline-secondary" data-relact="choose">${rel.chosen.has(id)
+      ? `<i class="bi bi-check2-square" aria-hidden="true"></i> Chosen` : `<i class="bi bi-plus-square" aria-hidden="true"></i> Choose`}</button>` +
     (rel.focus === id
       ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-relact="all"><i class="bi bi-diagram-3" aria-hidden="true"></i> Show everything</button>`
       : `<button type="button" class="btn btn-sm btn-outline-secondary" data-relact="focus" title="Draw only this object and what is linked to it, two steps away"><i class="bi bi-bullseye" aria-hidden="true"></i> Only what is around it</button>`) +
@@ -3012,6 +3200,7 @@ $("relSide").addEventListener("click", (ev) => {
   if (act === "close") relSelect(null);
   else if (act === "open" && n) openObject(n.type, n.name);
   else if (act === "focus" && n) { rel.focus = n.id; relBuild(); }
+  else if (act === "choose" && n) { rel.chosen.has(n.id) ? rel.chosen.delete(n.id) : rel.chosen.add(n.id); relBuild(true); relPickRender(); }
   else if (act === "all") { rel.focus = null; relBuild(); if (rel.sel) relSelect(rel.sel, true); }
 });
 $("relTypes").addEventListener("click", (ev) => {
@@ -3039,9 +3228,131 @@ $("relFind").addEventListener("change", () => {
 });
 $("relFind").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("relFind").dispatchEvent(new Event("change")); });
 
+// Expanding a table to its columns: it grows from its top left, the others
+// make room, and its lines then join the rows of their columns.
+function relExpand(ids, open) {
+  for (const id of ids) {
+    const n = rel.byId.get(id);
+    if (!n || !rel.data.columns[id]) continue;
+    open ? rel.open.add(id) : rel.open.delete(id);
+    const left = n.x - n.w / 2, top = n.y - n.h / 2, joined = new Set();
+    rel.edges.forEach((e) => { if (e.from === id) (e.fromCols || []).forEach((c) => joined.add(c)); if (e.to === id) (e.toCols || []).forEach((c) => joined.add(c)); });
+    const tmp = document.createElement("div");
+    tmp.innerHTML = relNodeHtml(n, joined);
+    const el = tmp.firstElementChild;
+    n.el.replaceWith(el); n.el = el; n.open = open;
+    if (rel.sel === id) el.classList.add("sel", "near");
+    n.w = el.offsetWidth; n.h = el.offsetHeight; n.x = left + n.w / 2; n.y = top + n.h / 2;
+  }
+  relSeparate(rel.nodes);
+  rel.nodes.forEach(relPlace);
+  relDrawEdges();
+  relOpenAllText();
+}
+$("relNodes").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-exp]");
+  if (!b) return;
+  const id = b.closest(".relnode").dataset.id;
+  relExpand([id], !rel.open.has(id));
+});
+$("relNodes").addEventListener("scroll", (ev) => {
+  const id = ev.target.closest?.(".relnode")?.dataset.id;
+  if (id) rel.edges.forEach((e) => { if (e.from === id || e.to === id) { e.el.setAttribute("d", relPath(e)); relLabelAt(e); } });
+}, true);
+// All of them: arranged again for the new sizes.
+$("relOpenAll").addEventListener("click", () => {
+  const open = !rel.open.size;
+  rel.nodes.forEach((n) => { if (rel.data.columns[n.id]) open ? rel.open.add(n.id) : rel.open.delete(n.id); });
+  relBuild();
+  relOpenAllText();
+});
+function relOpenAllText() {
+  $("relOpenAll").innerHTML = rel.open.size ? `<i class="bi bi-arrows-collapse" aria-hidden="true"></i> Hide columns` : `<i class="bi bi-arrows-expand" aria-hidden="true"></i> Columns`;
+}
+$("relColsOn").addEventListener("change", relDrawLabels);
+
+// Work out 1:1 / 1:N / N:M: for each foreign key and assumed relationship
+// drawn, whether the columns at each end are unique. Keys say so at once;
+// the other columns are asked of the database (a read, 20 at a time).
+const REL_CARD_BTN = `<i class="bi bi-diagram-2" aria-hidden="true"></i> Work out 1:N / N:M`;
+$("relCard").addEventListener("click", async () => {
+  if (!rel.data) return;
+  const es = rel.edges.filter((e) => (e.kind === "fk" || e.kind === "assumed") && e.fromCols && e.fromCols.length);
+  if (!es.length) return toast("No foreign key or assumed relationship is drawn to work out", true);
+  const seq = ++rel.cardSeq, session = state.session, btn = $("relCard");
+  rel.cardOn = true;
+  const need = new Map();
+  for (const e of es) for (const [id, cols, fkTo] of [[e.from, e.fromCols, false], [e.to, e.toCols, e.kind === "fk"]]) {
+    if (relUniqueKnown(id, cols, fkTo) === undefined) need.set(id + "|" + cols.join(","), { table: rel.byId.get(id).name, cols });
+  }
+  const sides = [...need.entries()];
+  relDrawLabels();
+  btn.disabled = true;
+  let failed = 0;
+  try {
+    for (let i = 0; i < sides.length; i += 20) {
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ${fmtInt(i)} of ${fmtInt(sides.length)} columns…`;
+      const part = sides.slice(i, i + 20);
+      const res = await api("POST", "/api/relationships/unique", { session, sides: part.map(([, x]) => x) });
+      if (seq !== rel.cardSeq) return;
+      part.forEach(([k], j) => { const r = res.results[j] || {}; rel.uniq.set(k, r.unique ?? null); if (r.unique == null) failed++; });
+      relDrawLabels();
+    }
+    const counts = {};
+    es.forEach((e) => { const c = relCard(e); if (c) counts[c.text] = (counts[c.text] || 0) + 1; });
+    toast(`Worked out ${fmtInt(es.length)} relationship${es.length === 1 ? "" : "s"}: ` +
+      Object.entries(counts).map(([k, v]) => `${fmtInt(v)} ${k}`).join(", ") + (failed ? ` (${fmtInt(failed)} column set${failed === 1 ? "" : "s"} couldn't be checked: ?)` : ""));
+  } catch (e) {
+    if (seq === rel.cardSeq) toast(e.message, true);
+  } finally {
+    if (seq === rel.cardSeq) { btn.disabled = false; btn.innerHTML = REL_CARD_BTN; }
+  }
+});
+
+// Choose tables: tick the objects to draw (with what they link to, when asked).
+function relPickRender() {
+  if ($("relPickBox").hidden || !rel.data) return;
+  const q = $("relPickQ").value.trim().toLowerCase();
+  const ns = rel.data.nodes.filter((n) => !q || n.name.toLowerCase().includes(q))
+    .sort((a, b) => (REL_ORDER.indexOf(a.type) - REL_ORDER.indexOf(b.type)) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+  const max = 500;
+  $("relPickList").innerHTML = ns.slice(0, max).map((n) => `<label class="t-${n.type}"><input type="checkbox" class="form-check-input" data-pick="${esc(n.id)}"${rel.chosen.has(n.id) ? " checked" : ""}>` +
+    `<i class="bi bi-${ICONS[n.type] || "dot"}" aria-hidden="true"></i><span>${esc(n.name)}</span></label>`).join("") +
+    (ns.length > max ? `<p class="hint">${fmtInt(ns.length - max)} more: type to find them.</p>` : ns.length ? "" : `<p class="hint">No object is named like that.</p>`);
+  $("relPickSum").textContent = rel.chosen.size ? `${fmtInt(rel.chosen.size)} chosen` : "None chosen: everything is drawn";
+}
+function relPickClose() { $("relPickBox").hidden = true; $("relPick").setAttribute("aria-expanded", "false"); }
+$("relPick").addEventListener("click", () => {
+  const box = $("relPickBox");
+  if (!box.hidden) return relPickClose();
+  box.hidden = false; $("relPick").setAttribute("aria-expanded", "true");
+  relPickRender(); $("relPickQ").focus();
+});
+$("relPickQ").addEventListener("input", relPickRender);
+$("relPickList").addEventListener("change", (ev) => {
+  const id = ev.target.dataset.pick;
+  if (!id) return;
+  ev.target.checked ? rel.chosen.add(id) : rel.chosen.delete(id);
+  rel.focus = null;
+  relPickRender(); relBuild();
+});
+$("relPickAll").addEventListener("click", () => {
+  $("relPickList").querySelectorAll("[data-pick]").forEach((c) => rel.chosen.add(c.dataset.pick));
+  rel.focus = null; relPickRender(); relBuild();
+});
+$("relPickNone").addEventListener("click", () => { rel.chosen.clear(); relPickRender(); relBuild(); });
+$("relPickNear").addEventListener("change", () => { if (rel.chosen.size) relBuild(); });
+$("relPickDone").addEventListener("click", relPickClose);
+document.addEventListener("pointerdown", (ev) => {
+  if (!$("relPickBox").hidden && !ev.target.closest("#relPickBox, #relPick")) relPickClose();
+});
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !$("relPickBox").hidden) relPickClose(); });
+
 // Dragging: an object moves it, the background pans; two fingers pinch.
 const relCanvas = $("relCanvas");
 relCanvas.addEventListener("wheel", (ev) => {
+  const list = ev.target.closest(".relcols");
+  if (list && list.scrollHeight > list.clientHeight && !ev.ctrlKey) return; // scrolls the columns
   ev.preventDefault();
   const r = relCanvas.getBoundingClientRect();
   relZoom(Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0015)), ev.clientX - r.left, ev.clientY - r.top);
@@ -3071,7 +3382,7 @@ relCanvas.addEventListener("pointermove", (ev) => {
   if (d.node) {
     d.node.x += dx / rel.view.k; d.node.y += dy / rel.view.k;
     relPlace(d.node);
-    rel.edges.forEach((e) => { if (e.s === d.node || e.t === d.node) e.el.setAttribute("d", relPath(e)); });
+    rel.edges.forEach((e) => { if (e.s === d.node || e.t === d.node) { e.el.setAttribute("d", relPath(e)); relLabelAt(e); } });
   } else if (!d.pinch) { rel.view.x += dx; rel.view.y += dy; relApplyView(); }
 });
 const relUp = (ev) => {
@@ -3130,8 +3441,33 @@ $("relPng").addEventListener("click", () => {
     ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, 4, n.h, [6, 0, 0, 6]); ctx.fill();
     ctx.fillStyle = text;
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, n.w - 6, n.h); ctx.clip();
-    ctx.fillText(n.name, x + 10, n.y); ctx.restore();
+    const list = n.open && n.el.querySelector(".relcols");
+    if (!list) ctx.fillText(n.name, x + 10, n.y);
+    else {
+      // An expanded table: its name, then the columns in view.
+      ctx.font = `600 12px ${font}`; ctx.fillText(n.name, x + 10, y + list.offsetTop / 2);
+      ctx.font = `11px ${getComputedStyle(list).fontFamily}`;
+      for (const li of list.children) {
+        const ly = li.offsetTop - list.scrollTop;
+        if (ly < list.offsetTop - 2 || ly + li.offsetHeight > list.offsetTop + list.clientHeight + 2) continue;
+        ctx.fillStyle = li.classList.contains("on") || li.querySelector(".bi-key-fill, .bi-key") ? text : v("--muted");
+        ctx.fillText((li.querySelector(".bi-key-fill") ? "🔑 " : li.classList.contains("on") ? "⇄ " : "  ") + li.textContent, x + 10, y + ly + li.offsetHeight / 2);
+      }
+      ctx.font = `12px ${font}`;
+    }
+    ctx.restore();
   }
+  // The columns and cardinality written on the lines, with a halo as on screen.
+  ctx.textBaseline = "alphabetic"; ctx.lineJoin = "round"; ctx.textAlign = "center";
+  for (const e of rel.edges) {
+    if (!e.lbl) continue;
+    [...e.lbl.children].forEach((t, i) => {
+      ctx.font = i ? `700 11px ${font}` : `10px ${font}`;
+      ctx.strokeStyle = v("--bg"); ctx.lineWidth = 3; ctx.strokeText(t.textContent, +t.getAttribute("x"), +t.getAttribute("y"));
+      ctx.fillStyle = i ? v("--rel-" + e.kind) : v("--text"); ctx.fillText(t.textContent, +t.getAttribute("x"), +t.getAttribute("y"));
+    });
+  }
+  ctx.textAlign = "left";
   cv.toBlob((blob) => {
     if (!blob) return toast("The picture is too large to make", true);
     const a = document.createElement("a");
@@ -4033,7 +4369,7 @@ function gaFromTrack(fn) {
 const GA_API = {
   "POST /api/connect": "connect", "POST /api/testconn": "test_connection", "POST /api/disconnect": "disconnect",
   "GET /api/select": "open_table", "GET /api/definition": "show_definition", "POST /api/query": "run_query",
-  "GET /api/tablestats": "table_stats", "GET /api/relationships": "relationships", "POST /api/export": "export", "POST /api/exportall": "export_all",
+  "GET /api/tablestats": "table_stats", "GET /api/relationships": "relationships", "POST /api/relationships/unique": "relationship_cardinality", "POST /api/export": "export", "POST /api/exportall": "export_all",
   "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare", "POST /api/migrate": "migrate",
   "POST /api/connections": "save_connection", "POST /api/queries": "save_query",
   "POST /api/files/zip": "zip_files", "POST /api/files/preview": "preview_file", "POST /api/files/delete": "delete_files",

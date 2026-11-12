@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.52.0 — 2026-11-12
+
+- **DB Relationships**: each foreign key and assumed relationship shows **the columns it
+  joins** on its line, and **Work out 1:N / N:M** (only when clicked) marks it one to one,
+  many to one, one to many or many to many, with 1 or N at each end: keys say so, other
+  columns are checked for duplicate values with a read-only GROUP BY.
+- **Expand a table** (▸, or *Columns* for all) to see its columns, keys and joined columns
+  marked, with the lines joining the rows of their columns; views too.
+- **Choose tables**: draw only the tables (and other objects) you tick, optionally with
+  what they link to.
+- **Relationships assumed from the DDL**: the joins in views, procedures, functions and
+  triggers (`a.x = b.y`, aliases resolved) link the tables and views they join, noted
+  *joined in …*, before the ones assumed from column names. A table named after a column
+  (`CLIENT` for `CLIENT_NO`) is now taken before another table that has it as its key.
+- Several relationships between the same two objects are drawn side by side.
+
 ## 1.51.0 — 2026-11-12
 
 - **DB Relationships** are read only when you click **Generate Relationships** in the tab,
