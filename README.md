@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.52.0
+cactusdb 1.53.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -227,6 +227,20 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
    - Empty values are shown as *NULL*.
 7. *(Optional)* Edit the SQL, e.g. add `WHERE` or `ORDER BY`, and press **Run** or
    **Ctrl+Enter**. Only read queries are accepted (see [Read-only](#read-only)).
+   - **Suggestions** while you type: after a table's name or alias and a dot
+     (`select t1.` … `from mytable t1`) a list of that table's columns (🔑 for its key);
+     after `FROM`, `JOIN`, `UPDATE` or `INTO` the tables and views; anywhere else the
+     columns of the query's tables, its aliases and keywords. **↑ ↓** choose, **Enter** or
+     **Tab** takes one (or click it), **Esc** closes, **Ctrl+Space** asks. A column in two of
+     the query's tables is written with its alias (`u.name`); names that need quotes get
+     them. The columns are read once a connection, from the catalog only. Switch off
+     *Suggestions* to type without them.
+   - **Query diagram** beside the query: its tables (with their aliases and the columns it
+     uses, the joined ones in bold, 🔑 keys) and the conditions joining them (`ur.uid = u.uid`
+     in an ON, dashed when in the WHERE), **1** or **N** at each end from the keys, LEFT /
+     RIGHT joins named. A table joined to nothing (every row paired with every row of the
+     others) is outlined red and named above; so is a name that isn't a table of the
+     database. Switch off *Query diagram* to hide it.
 8. **Export** with the **Excel**, **JSON**, **XML** or **CSV** buttons. The export
    always contains **all rows** of the query, not just the rows on screen. The file is
    saved in the connection's folder, in a subfolder for its type:
@@ -830,7 +844,7 @@ again.
 | dashed orange → | a **trigger** fires on the table (or view) at the arrow |
 | solid blue → | **uses**: a view, procedure, function, trigger or package reads or calls what is at the arrow, a trigger uses a generator, a table a sequence or domain |
 | dotted blue → | **uses, found in the source**: the database keeps no record of it, so cactusdb found the object's name in the source (switch off *Found in the source* to hide these) |
-| dash-dot purple → | **assumed**, where there is no foreign key (switch off *Assumed relationships* to hide these). First from the **joins in the DDL** of the views, procedures, functions and triggers: `FROM ledger l JOIN acct a ON a.acct_key = l.account_ref` (or the same in a WHERE) links `ledger.account_ref → acct.acct_key`, noted *joined in V_LEDGER*; the side referred to is the column that is a key, named after its table, or the table's first column. Then from **column names**: the table named after the column (`CLIENT` for `CLIENT_NO`), or else a table's key column found in other tables found in other tables (`CLIENT_NO` in `CLIENT` and `INVOICE`); without a key, the table whose name the column starts with (`ITEM_CODE` → `ITEM`), or the table that has it as its first column (`INV_NO` → `INVOICE` rather than `INVOICE_LINE`); and a column named after a table and its key or id (`customer_id`, `CustomerID` → `customers.id`). Generic names (`id`, `name`, `code`, `status`, `created`…) never link tables on their own, and tables already joined by a foreign key get no assumed line |
+| dash-dot purple → | **assumed**, where there is no foreign key (switch off *Assumed relationships* to hide these). First from the **joins in the DDL** of the views, procedures, functions and triggers: `FROM ledger l JOIN acct a ON a.acct_key = l.account_ref` (or the same in a WHERE) links `ledger.account_ref → acct.acct_key`, noted *joined in V_LEDGER*; the side referred to is the column that is a key, named after its table, or the table's first column. Then from **column names**: the table named after the column (`CLIENT` for `CLIENT_NO`), or else a table's key column found in other tables (`CLIENT_NO` in `CLIENT` and `INVOICE`); without a key, the table whose name the column starts with (`ITEM_CODE` → `ITEM`), or the table that has it as its first column (`INV_NO` → `INVOICE` rather than `INVOICE_LINE`); and a column named after a table and its key or id (`customer_id`, `CustomerID` → `customers.id`). Generic names (`id`, `name`, `code`, `status`, `created`…) never link tables on their own, and tables already joined by a foreign key get no assumed line |
 
 **The columns of each relationship** are written on its line (`CLIENT_NO = CLIENT_NO`,
 `customer_id → id`; switch off *Linked columns* to hide them). **Work out 1:N / N:M** finds,
@@ -847,6 +861,43 @@ can be expanded too. **Choose tables** draws only the objects you tick (filter t
 them), with **And what they link to** also the ones a step away; *Choose* at the side adds
 or removes the selected one.
 
+**Arranged as an ER diagram** (*Arrange: ER diagram (in tiers)*, the default; **Rearrange**
+arranges it again). As in an entity–relationship diagram, the tables referred to are above
+the tables that refer to them, tier by tier, the tiers ordered so that few lines cross and
+wrapped into rows on a grid. The lines run at right angles: up from the table that refers,
+along a lane above its row that all the lines to the same table share, up a gutter between
+the columns when that table is further up, and into it from below. They never cross a box.
+The column a line joins is written once above the table it leaves (`CLIENT_NO`, or
+`customer_id → id` when the names differ). Once worked out (see below), the ends get
+**crow's feet**: a foot for many; at the end referred to, two bars for **exactly one**
+(mandatory: the columns referring can't be empty, `NOT NULL`) or a bar and a ring for
+**zero or one** (optional: they may be empty); the table holding the foreign key of a 1:1
+depends on the other, so its end is zero or one. Hover a line, or see the side panel, for
+the same in words (*optional: uid may be empty*, *settings holds the foreign key, so it
+depends on users*). A table with three or more tables that
+refer only to it (a "hub", e.g. `opt_publ_dates` and its `opt_*` tables by `brn_no`) is
+drawn with them as one block: those tables in a grid under it, joined by one line, the
+column written once (`brn_no (27 tables)`), and the other lines entering it from the side.
+A **junction table**, how a database keeps a many to many relationship, is marked **N:M**
+with a dashed border: a table that refers to two or more tables, or twice to the same one
+(a self-referencing many to many: `employee_managers (employee_id, manager_id)` → `employee`),
+and whose primary key is made of the columns it refers with (`users_roles (uid, rid)`; it
+may hold attributes of its own, such as `since`), or that has no key and at most two other
+columns. A table with a key of its own (`comments`: `cid`, `nid`, `uid`)
+isn't one. *Free (by attraction)* arranges them as before, linked ones pulled together. An
+object you drag stays where you put it, its lines joining it at right angles, until you
+click **Rearrange**.
+
+**Saved views.** **Save view** keeps what is drawn under a name: the tables chosen (and
+*And what they link to*), the object it is around, the types and switches, the tables
+expanded, the arrangement, where the objects you moved are (every object, arranged freely)
+and the zoom. Choose it from **View** to draw it again; the same name saves over it, and 🗑
+deletes it (click twice). *Everything* draws all again. A saved connection keeps its views
+on the server, sealed with its saved queries by the connection password, for everyone who
+opens it. A connection that isn't saved keeps them in this browser. **Export view**
+downloads the view drawn, and only that, as a PNG named after the connection and the view
+(`library-Catalogue-relationships.png`).
+
 Linked objects are arranged together, each group beside the others. **Drag** an object to
 move it, drag the background to pan, the **wheel** or a pinch zooms; ⤢ shows everything.
 **Click** an object to highlight what it is linked to and list its relationships at the
@@ -854,8 +905,8 @@ side (*Refers to*, *Referred to by*, *Fires on*, *Triggers*, *Uses*, *Used by*: 
 go to it). **Only what is around it** draws just that object and what is up to two steps
 away, which is the way into a large database. A **double click** (or *Open*) shows the
 table's data or the object's definition. Above the picture: switch types on and off,
-**Find an object**, show the **objects without relationships**, **arrange** again,
-download the **picture** (PNG) and **Generate Relationships** again.
+**Find an object**, show the **objects without relationships**, **Rearrange**,
+**Export view** (PNG) and **Generate Relationships** again.
 
 Where it comes from (only the catalog is read, never a row):
 
@@ -1840,6 +1891,8 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `auth.go` | `--remotelogin`: users, signing in with the e-mailed code, invitations, password resets, requests for access, the sign-in gate in front of everything (`/api/auth/…`, `/api/users`); the sign-in page is `web/login.html` |
 | `events.go` | The Events button: the `events` table (encrypted), recording an event, `/api/events` |
 | `relations.go` | The DB Relationships tab: every object and its foreign keys, triggers and dependencies from each database's catalog or found in the source, relationships assumed from the joins in views and routines and from column names, every table's columns (`/api/relationships`), and the uniqueness check for 1:N / N:M (`/api/relationships/unique`) |
+| `relations.go` (`handleColumns`) | Every table's and view's columns for the query editor's suggestions (`/api/columns`) |
+| `relviews.go` | The saved views of DB Relationships, sealed with the saved connection like its queries (`/api/relviews`) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |

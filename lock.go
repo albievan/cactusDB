@@ -132,7 +132,16 @@ func (s *Store) migrateLocks() error {
 		data     TEXT NOT NULL,
 		saved_at TEXT NOT NULL
 	);
-	CREATE INDEX IF NOT EXISTS query_versions_query ON query_versions(query_id)`)
+	CREATE INDEX IF NOT EXISTS query_versions_query ON query_versions(query_id);
+	-- The saved views of DB Relationships, sealed like the queries (since 1.53.0).
+	CREATE TABLE IF NOT EXISTS rel_views (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		conn_id    INTEGER NOT NULL,
+		data       TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS rel_views_conn ON rel_views(conn_id)`)
 	return err
 }
 
@@ -311,31 +320,44 @@ type queryData struct {
 	SQL         string `json:"sql"`
 }
 
-// sealQuery encrypts a query's name, description and SQL: with the
-// connection's key when it has one, always with the store's key.
+// sealQuery encrypts a query's name, description and SQL (see sealData).
 func (s *Store) sealQuery(box *secretBox, d queryData) string {
 	b, _ := json.Marshal(d)
-	plain := string(b)
-	if box != nil {
-		plain = box.seal("query", plain)
-	}
-	return s.box.seal("query", plain)
+	return s.sealData(box, "query", string(b))
 }
 
 func (s *Store) openQuery(box *secretBox, data string) (queryData, error) {
 	var d queryData
-	plain, err := s.box.open("query", data)
+	plain, err := s.openData(box, "query", data)
 	if err != nil {
 		return d, err
 	}
+	return d, json.Unmarshal([]byte(plain), &d)
+}
+
+// sealData encrypts what is kept for a saved connection (purpose: "query",
+// "relview"): with the connection's key when it has one, always with the
+// store's key. openData opens it.
+func (s *Store) sealData(box *secretBox, purpose, plain string) string {
 	if box != nil {
-		if plain, err = box.open("query", plain); err != nil {
-			return d, errLockWrong
+		plain = box.seal(purpose, plain)
+	}
+	return s.box.seal(purpose, plain)
+}
+
+func (s *Store) openData(box *secretBox, purpose, data string) (string, error) {
+	plain, err := s.box.open(purpose, data)
+	if err != nil {
+		return "", err
+	}
+	if box != nil {
+		if plain, err = box.open(purpose, plain); err != nil {
+			return "", errLockWrong
 		}
 	} else if isSealed(plain) {
-		return d, errLockRequired
+		return "", errLockRequired
 	}
-	return d, json.Unmarshal([]byte(plain), &d)
+	return plain, nil
 }
 
 // Queries lists a connection's saved queries by name.
@@ -488,18 +510,18 @@ func (s *Store) DeleteQuery(connID, id int64) error {
 	return err
 }
 
-// resealQueries re-encrypts a connection's queries, and their versions, from
-// oldBox to newBox.
+// resealQueries re-encrypts a connection's queries, their versions and its
+// saved relationship views, from oldBox to newBox.
 func (s *Store) resealQueries(tx *sql.Tx, connID int64, oldBox, newBox *secretBox) error {
-	for _, table := range []string{"queries", "query_versions"} {
-		if err := s.resealTable(tx, table, connID, oldBox, newBox); err != nil {
+	for _, t := range []struct{ table, purpose string }{{"queries", "query"}, {"query_versions", "query"}, {"rel_views", "relview"}} {
+		if err := s.resealTable(tx, t.table, t.purpose, connID, oldBox, newBox); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *Store) resealTable(tx *sql.Tx, table string, connID int64, oldBox, newBox *secretBox) error {
+func (s *Store) resealTable(tx *sql.Tx, table, purpose string, connID int64, oldBox, newBox *secretBox) error {
 	rows, err := tx.Query(`SELECT id, data FROM `+table+` WHERE conn_id = ?`, connID)
 	if err != nil {
 		return err
@@ -519,11 +541,11 @@ func (s *Store) resealTable(tx *sql.Tx, table string, connID int64, oldBox, newB
 	}
 	rows.Close()
 	for _, r := range all {
-		d, err := s.openQuery(oldBox, r.data)
+		plain, err := s.openData(oldBox, purpose, r.data)
 		if err != nil {
-			return fmt.Errorf("saved query (%s %d): %w", table, r.id, err)
+			return fmt.Errorf("saved %s (%s %d): %w", purpose, table, r.id, err)
 		}
-		if _, err := tx.Exec(`UPDATE `+table+` SET data = ? WHERE id = ?`, s.sealQuery(newBox, d), r.id); err != nil {
+		if _, err := tx.Exec(`UPDATE `+table+` SET data = ? WHERE id = ?`, s.sealData(newBox, purpose, plain), r.id); err != nil {
 			return err
 		}
 	}

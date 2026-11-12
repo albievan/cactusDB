@@ -289,13 +289,12 @@ func (s *Store) Save(c SavedConn) (int64, error) {
 	return id, err
 }
 
-// Delete deletes a saved connection and its saved queries.
+// Delete deletes a saved connection, its saved queries and relationship views.
 func (s *Store) Delete(id int64) error {
-	if _, err := s.DB().Exec(`DELETE FROM queries WHERE conn_id = ?`, id); err != nil {
-		return err
-	}
-	if _, err := s.DB().Exec(`DELETE FROM query_versions WHERE conn_id = ?`, id); err != nil {
-		return err
+	for _, table := range []string{"queries", "query_versions", "rel_views"} {
+		if _, err := s.DB().Exec(`DELETE FROM `+table+` WHERE conn_id = ?`, id); err != nil {
+			return err
+		}
 	}
 	_, err := s.DB().Exec(`DELETE FROM connections WHERE id = ?`, id)
 	return err

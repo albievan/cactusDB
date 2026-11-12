@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.53.0 — 2026-11-12
+
+- **Query suggestions in the Data tab**: after `t1.` the columns of `t1`'s table, after
+  FROM / JOIN the tables and views, elsewhere the columns of the query's tables, its
+  aliases and keywords, in a list at the cursor (↑ ↓, Enter or Tab, Esc, Ctrl+Space).
+  The columns are read once a connection from the catalog (`/api/columns`).
+- **Query diagram** beside the query: its tables and the conditions that join them, 1 or N
+  at each end from the keys, a table joined to nothing marked.
+- **DB Relationships arranged as an ER diagram** (*Rearrange*): the tables referred to above
+  those that refer to them, in tiers wrapped into rows and columns, lines at right angles
+  sharing a lane per table and passing rows by in gutters, never through a box. A table's
+  column is written once on its line (`brn_no`). Once 1:N / N:M is worked out, the ends get
+  crow's feet, with the end referred to marked **exactly one** (mandatory, the referring
+  columns are NOT NULL) or **zero or one** (optional, they may be empty); the columns' NULL
+  rule is now read for every database. A table that three or more tables refer to alone is drawn with them as one
+  block (one line, `brn_no (27 tables)`). Junction tables (many to many, also a
+  table with itself: `employee_managers`) are marked **N:M**.
+  *Arrange: Free* keeps the previous arrangement. Dragged objects stay put until Rearrange.
+- **Saved views**: *Save view* keeps what is drawn under a name (tables chosen, types and
+  switches, tables expanded, arrangement, moved objects, zoom), and **View** draws it again.
+  They're kept on the server for a saved connection, sealed with its queries, or in the
+  browser otherwise.
+- **Export view** downloads only the view drawn, named after the view.
+- SQLite: a view that no longer works costs only its own columns in DB Relationships, not
+  every table's.
+
 ## 1.52.0 — 2026-11-12
 
 - **DB Relationships**: each foreign key and assumed relationship shows **the columns it

@@ -47,6 +47,7 @@ type relEdge struct {
 type relColumn struct {
 	Name string `json:"n"`
 	Key  string `json:"k,omitempty"` // PRI or UNI: a single-column key
+	Null bool   `json:"o,omitempty"` // it may be empty (NULL): a relationship by it is optional
 }
 
 // relObj is an object as the catalog queries name it: its sidebar name and
@@ -684,6 +685,7 @@ type relCol struct {
 	table, name string
 	pos         int
 	key         string // PRI, UNI (single-column keys only) or ""
+	null        bool   // it may be NULL
 }
 
 var relGenericCols = map[string]bool{}
@@ -896,25 +898,28 @@ func (g *relGraph) assume(cols []relCol) int {
 }
 
 // relColumnsQuery reads every table's and view's columns: table (as the
-// sidebar names it), column, position and PRI / UNI for a single-column key.
+// sidebar names it), column, position, PRI / UNI for a single-column key and
+// Y when it may be NULL.
 func relColumnsQuery(engine string) string {
 	switch engine {
 	case EngineSQLite:
 		return `SELECT m.name, p.name, p.cid + 1, CASE WHEN p.pk = 1 AND (SELECT COUNT(*) FROM pragma_table_info(m.name) x WHERE x.pk > 0) = 1 THEN 'PRI'
 			WHEN EXISTS (SELECT 1 FROM pragma_index_list(m.name) il JOIN pragma_index_info(il.name) ii WHERE il."unique" = 1
-				AND ii.name = p.name AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1) THEN 'UNI' ELSE '' END
+				AND ii.name = p.name AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1) THEN 'UNI' ELSE '' END,
+			CASE WHEN p."notnull" = 1 OR p.pk > 0 THEN 'N' ELSE 'Y' END
 			FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type IN ('table', 'view') AND m.name NOT LIKE 'sqlite_%'`
 	case EngineMySQL, EngineMariaDB:
 		return `SELECT c.table_name, c.column_name, c.ordinal_position, CASE WHEN c.column_key IN ('PRI', 'UNI') AND (SELECT COUNT(*)
 				FROM information_schema.statistics s WHERE s.table_schema = c.table_schema AND s.table_name = c.table_name
 				AND s.index_name = (SELECT MIN(s2.index_name) FROM information_schema.statistics s2 WHERE s2.table_schema = c.table_schema
-					AND s2.table_name = c.table_name AND s2.column_name = c.column_name AND s2.non_unique = 0)) = 1 THEN c.column_key ELSE '' END
+					AND s2.table_name = c.table_name AND s2.column_name = c.column_name AND s2.non_unique = 0)) = 1 THEN c.column_key ELSE '' END,
+			CASE WHEN c.is_nullable = 'YES' THEN 'Y' ELSE 'N' END
 			FROM information_schema.columns c JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
 			WHERE c.table_schema = DATABASE() AND t.table_type IN ('BASE TABLE', 'SYSTEM VERSIONED', 'VIEW')`
 	case EnginePostgres:
 		return `SELECT n.nspname || '.' || c.relname, a.attname, a.attnum, COALESCE((SELECT CASE WHEN i.indisprimary THEN 'PRI' ELSE 'UNI' END
 				FROM pg_index i WHERE i.indrelid = c.oid AND (i.indisprimary OR i.indisunique) AND i.indnatts = 1 AND i.indkey[0] = a.attnum
-				ORDER BY i.indisprimary DESC LIMIT 1), '')
+				ORDER BY i.indisprimary DESC LIMIT 1), ''), CASE WHEN a.attnotnull THEN 'N' ELSE 'Y' END
 			FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
 			WHERE c.relkind IN ('r', 'p', 'v', 'm') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\_%'`
 	case EngineMSSQL:
@@ -922,7 +927,7 @@ func relColumnsQuery(engine string) string {
 				FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
 				WHERE i.object_id = t.object_id AND (i.is_primary_key = 1 OR i.is_unique = 1) AND ic.column_id = c.column_id
 				AND (SELECT COUNT(*) FROM sys.index_columns x WHERE x.object_id = i.object_id AND x.index_id = i.index_id AND x.is_included_column = 0) = 1
-				ORDER BY i.is_primary_key DESC), '')
+				ORDER BY i.is_primary_key DESC), ''), CASE WHEN c.is_nullable = 1 THEN 'Y' ELSE 'N' END
 			FROM sys.objects t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.columns c ON c.object_id = t.object_id
 			WHERE t.type IN ('U', 'V') AND t.is_ms_shipped = 0`
 	case EngineFirebird:
@@ -930,52 +935,52 @@ func relColumnsQuery(engine string) string {
 				IIF(EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS rc WHERE rc.RDB$INDEX_NAME = i.RDB$INDEX_NAME AND rc.RDB$CONSTRAINT_TYPE = 'PRIMARY KEY'), 'PRI', 'UNI')
 				FROM RDB$INDICES i JOIN RDB$INDEX_SEGMENTS s ON s.RDB$INDEX_NAME = i.RDB$INDEX_NAME
 				WHERE i.RDB$RELATION_NAME = f.RDB$RELATION_NAME AND i.RDB$UNIQUE_FLAG = 1 AND i.RDB$SEGMENT_COUNT = 1 AND s.RDB$FIELD_NAME = f.RDB$FIELD_NAME
-				ORDER BY 1), '')
+				ORDER BY 1), ''), IIF(COALESCE(f.RDB$NULL_FLAG, (SELECT d.RDB$NULL_FLAG FROM RDB$FIELDS d WHERE d.RDB$FIELD_NAME = f.RDB$FIELD_SOURCE), 0) = 1, 'N', 'Y')
 			FROM RDB$RELATION_FIELDS f JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = f.RDB$RELATION_NAME
 			WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0`
 	case EngineOracle:
 		return `SELECT c.owner || '.' || c.table_name, c.column_name, c.column_id, (SELECT MIN(DECODE(k.constraint_type, 'P', 'PRI', 'UNI'))
 				FROM all_constraints k JOIN all_cons_columns kc ON kc.owner = k.owner AND kc.constraint_name = k.constraint_name
 				WHERE k.owner = c.owner AND k.table_name = c.table_name AND k.constraint_type IN ('P', 'U') AND kc.column_name = c.column_name
-				AND (SELECT COUNT(*) FROM all_cons_columns x WHERE x.owner = k.owner AND x.constraint_name = k.constraint_name) = 1)
+				AND (SELECT COUNT(*) FROM all_cons_columns x WHERE x.owner = k.owner AND x.constraint_name = k.constraint_name) = 1),
+			DECODE(c.nullable, 'N', 'N', 'Y')
 			FROM all_tab_columns c WHERE c.owner = :1 AND c.table_name NOT LIKE 'BIN$%'`
 	}
 	return ""
 }
 
 // assumeFromColumns reads the columns and adds the assumed relationships.
+// sqliteColumns reads the columns of an SQLite database one table or view at
+// a time: SQLite can't give the columns of a view that no longer works (a
+// table it uses is gone, an ambiguous column), and that would stop them all.
+func (g *relGraph) sqliteColumns(ctx context.Context, db *sql.DB, q string, add func([]sql.NullString)) {
+	var names []string
+	g.relRows(ctx, db, "tables and views", `SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`,
+		func(c []sql.NullString) { names = append(names, c[0].String) })
+	var broken []string
+	for _, name := range names {
+		var got [][]sql.NullString
+		one := &relGraph{}
+		one.relRows(ctx, db, "columns", q+` AND m.name = ?`, func(c []sql.NullString) { got = append(got, c) }, name)
+		if len(one.notes) > 0 {
+			broken = append(broken, name)
+			continue
+		}
+		for _, c := range got {
+			add(c)
+		}
+	}
+	if len(broken) > 0 {
+		more := ""
+		if len(broken) > 5 {
+			broken, more = broken[:5], fmt.Sprintf(" and %d more", len(broken)-5)
+		}
+		g.notes = append(g.notes, fmt.Sprintf("The columns of %s%s couldn't be read (a view that no longer works?)", strings.Join(broken, ", "), more))
+	}
+}
+
 func (g *relGraph) assumeFromColumns(ctx context.Context, ss *session) {
-	q := relColumnsQuery(ss.engine)
-	if q == "" {
-		return
-	}
-	var args []any
-	if ss.engine == EngineOracle {
-		owner, err := oracleOwner(ctx, ss.db)
-		if err != nil {
-			return
-		}
-		args = append(args, owner)
-	}
-	var cols []relCol
-	g.relRows(ctx, ss.db, "columns", q, func(c []sql.NullString) {
-		pos, _ := strconv.Atoi(c[2].String)
-		cols = append(cols, relCol{table: c[0].String, name: c[1].String, pos: pos, key: c[3].String})
-	}, args...)
-	slices.SortStableFunc(cols, func(a, b relCol) int { return cmp.Compare(a.pos, b.pos) })
-	keys := map[string]string{} // table id → its primary key column
-	var tableCols []relCol
-	for _, c := range cols {
-		if id := g.find(relOf(c.table, ObjTable, ObjView, ObjMatView)); id != "" {
-			g.columns[id] = append(g.columns[id], relColumn{Name: c.name, Key: c.key})
-			if c.key == "PRI" {
-				keys[id] = c.name
-			}
-			if strings.HasPrefix(id, ObjTable+":") {
-				tableCols = append(tableCols, c)
-			}
-		}
-	}
+	keys, tableCols := g.readColumns(ctx, ss)
 	// A foreign key to the parent's primary key without naming it (SQLite).
 	for _, e := range g.edges {
 		if e.Kind == "fk" && len(e.ToCols) == 0 && len(e.FromCols) == 1 && keys[e.To] != "" {
@@ -985,6 +990,78 @@ func (g *relGraph) assumeFromColumns(ctx context.Context, ss *session) {
 	}
 	g.assumeJoins(ctx, ss)
 	g.assume(tableCols)
+}
+
+// readColumns reads the columns of every table and view into g.columns. It
+// returns each table's primary key column (by id) and the tables' columns.
+func (g *relGraph) readColumns(ctx context.Context, ss *session) (map[string]string, []relCol) {
+	keys := map[string]string{} // table id → its primary key column
+	q := relColumnsQuery(ss.engine)
+	if q == "" {
+		return keys, nil
+	}
+	var args []any
+	if ss.engine == EngineOracle {
+		owner, err := oracleOwner(ctx, ss.db)
+		if err != nil {
+			return keys, nil
+		}
+		args = append(args, owner)
+	}
+	var cols []relCol
+	add := func(c []sql.NullString) {
+		pos, _ := strconv.Atoi(c[2].String)
+		cols = append(cols, relCol{table: c[0].String, name: c[1].String, pos: pos, key: c[3].String, null: c[4].String == "Y"})
+	}
+	if ss.engine == EngineSQLite {
+		g.sqliteColumns(ctx, ss.db, q, add)
+	} else {
+		g.relRows(ctx, ss.db, "columns", q, add, args...)
+	}
+	slices.SortStableFunc(cols, func(a, b relCol) int { return cmp.Compare(a.pos, b.pos) })
+	var tableCols []relCol
+	for _, c := range cols {
+		if id := g.find(relOf(c.table, ObjTable, ObjView, ObjMatView)); id != "" {
+			g.columns[id] = append(g.columns[id], relColumn{Name: c.name, Key: c.key, Null: c.null})
+			if c.key == "PRI" {
+				keys[id] = c.name
+			}
+			if strings.HasPrefix(id, ObjTable+":") {
+				tableCols = append(tableCols, c)
+			}
+		}
+	}
+	return keys, tableCols
+}
+
+// handleColumns gives the columns of every table and view, by their names as
+// the sidebar lists them, for the query editor's suggestions. Only the
+// catalog is read; a database that keeps no columns this way gives none.
+func (s *server) handleColumns(w http.ResponseWriter, r *http.Request) {
+	ss, err := s.session(r, r.URL.Query().Get("session"))
+	if err != nil {
+		writeErr(w, 401, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	out := map[string][]relColumn{}
+	var notes []string
+	if backendOf(ss.db) == nil {
+		groups, err := listObjects(ctx, ss.engine, ss.db)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		g := newRelGraph(groups)
+		g.readColumns(ctx, ss)
+		for id, cols := range g.columns {
+			_, name, _ := strings.Cut(id, ":")
+			out[name] = cols
+		}
+		notes = g.notes
+	}
+	writeJSON(w, 200, map[string]any{"columns": out, "notes": notes})
 }
 
 // ---- relationships assumed from the joins in views, procedures… ----

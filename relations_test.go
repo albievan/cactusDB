@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"net/http/httptest"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -115,7 +117,8 @@ func TestRelationshipsAssumed(t *testing.T) {
 		CREATE TABLE ACCT (ACCT_KEY INT PRIMARY KEY, TITLE TEXT);
 		CREATE TABLE LEDGER (LINE INT, ACCOUNT_REF INT, AMOUNT REAL);
 		CREATE VIEW V_LEDGER AS SELECT l.LINE, a.TITLE FROM LEDGER AS l JOIN ACCT a ON a.ACCT_KEY = l.ACCOUNT_REF;
-		CREATE VIEW V_INV AS SELECT * FROM INVOICE, CLIENT WHERE CLIENT.CLIENT_NO = INVOICE.CLIENT_NO;`)
+		CREATE VIEW V_INV AS SELECT * FROM INVOICE, CLIENT WHERE CLIENT.CLIENT_NO = INVOICE.CLIENT_NO;
+		CREATE TABLE gone (x INT); CREATE VIEW v_broken AS SELECT x FROM gone; DROP TABLE gone;`)
 	w.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -136,6 +139,14 @@ func TestRelationshipsAssumed(t *testing.T) {
 			continue
 		}
 		got = append(got, e.From+" "+e.Kind+" "+e.To+" ("+e.Label+")"+strings.Join(e.Via, ","))
+	}
+	// Nullable columns are marked (a relationship by them is optional), keys aren't.
+	if c := g.columns["table:INVOICE"]; len(c) != 3 || !c[1].Null || g.columns["table:CLIENT_DETAIL"][0].Null {
+		t.Errorf("nullability: INVOICE %v, CLIENT_DETAIL %v", c, g.columns["table:CLIENT_DETAIL"])
+	}
+	// A view that no longer works costs only its own columns.
+	if len(g.notes) != 1 || !strings.Contains(g.notes[0], "v_broken") || len(g.columns["table:CLIENT"]) != 2 {
+		t.Errorf("notes %v, CLIENT columns %v", g.notes, g.columns["table:CLIENT"])
 	}
 	slices.Sort(got)
 	want := []string{
@@ -171,5 +182,33 @@ func TestSQLJoins(t *testing.T) {
 	want := "table:acct.acct_key=table:ledger.account_ref table:person.pid=table:visit.who"
 	if strings.Join(got, " ") != want {
 		t.Errorf("joins %v, want %s", got, want)
+	}
+}
+
+// The query editor's suggestions: every table's and view's columns by the
+// names the sidebar lists, keys and NULL rules marked.
+func TestAPIColumns(t *testing.T) {
+	s := newTestServer(t)
+	db, err := openDB(context.Background(), ConnParams{Engine: EngineSQLite, Database: newShopDB(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s.sessions["s1"] = &session{engine: EngineSQLite, label: "shop", db: db}
+	rec := httptest.NewRecorder()
+	s.handleColumns(rec, httptest.NewRequest("GET", "/api/columns?session=s1", nil))
+	var res struct {
+		Columns map[string][]relColumn `json:"columns"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != 200 {
+		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
+	}
+	if len(res.Columns) == 0 {
+		t.Fatal("no columns")
+	}
+	for table, cols := range res.Columns {
+		if len(cols) == 0 || cols[0].Name == "" {
+			t.Errorf("%s: %v", table, cols)
+		}
 	}
 }

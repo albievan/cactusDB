@@ -566,6 +566,41 @@
   .editor { padding: 12px 16px 8px; background: var(--panel); border-bottom: 1px solid var(--border); }
   textarea#sql { font-family: var(--mono); font-size: 13px; min-height: 76px; height: 96px; resize: vertical; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .qaswitch { margin: 0; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .sqlrow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .sqlrow.diag { grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr); }
+  .sqlwrap { position: relative; min-width: 0; }
+  .qalist { position: absolute; z-index: 30; min-width: 220px; max-width: min(460px, 100%); max-height: 240px; overflow-y: auto; padding: 3px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12.5px var(--mono); }
+  .qalist[hidden] { display: none; }
+  .qalist .qa { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+  .qalist .qa.on { background: var(--accent-soft); }
+  .qalist .qa i { width: 13px; flex: none; color: var(--muted); font-size: 11px; }
+  .qalist .qa i.bi-key-fill, .qalist .qa i.bi-key { color: #b7791f; }
+  .qalist .qa .n { overflow: hidden; text-overflow: ellipsis; }
+  .qalist .qa .n b { color: var(--accent); }
+  .qalist .qa .d { margin-left: auto; padding-left: 12px; color: var(--muted); font-family: var(--sans, inherit); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+  .qalist .qahint { padding: 3px 6px 1px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 2px; font-family: inherit; }
+  .qdiag { display: flex; flex-direction: column; min-width: 0; min-height: 76px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); overflow: hidden; }
+  .qdiag[hidden] { display: none; }
+  .qdhead { display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .qdhead .hint { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+  .qdhead .hint.bad { color: var(--danger); }
+  .qdbody { flex: 1; min-height: 0; display: grid; place-items: center; padding: 4px; }
+  .qdbody svg { width: 100%; height: 100%; display: block; }
+  .qdbody .none { font-size: 12px; color: var(--muted); padding: 8px; text-align: center; }
+  .qd-box { fill: var(--panel); stroke: var(--border); }
+  .qd-box.cross { stroke: var(--danger); stroke-dasharray: 4 3; }
+  .qd-bar { fill: #2f7d4f; } .qd-bar.view { fill: #2563eb; } .qd-bar.unknown { fill: var(--muted); }
+  .qd-name { font: 600 12px var(--mono); fill: var(--text); }
+  .qd-alias { font: 11px var(--mono); fill: var(--muted); }
+  .qd-col { font: 11px var(--mono); fill: var(--muted); }
+  .qd-col.on { fill: var(--text); font-weight: 600; }
+  .qd-line { fill: none; stroke: #9333ea; stroke-width: 1.5; }
+  .qd-line.where { stroke-dasharray: 5 3; }
+  .qd-lbl { font: 10.5px var(--mono); fill: var(--text); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+  .qd-end { font: 700 11px var(--sans, sans-serif); fill: #9333ea; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+  @media (max-width: 760px) { .sqlrow.diag { grid-template-columns: minmax(0, 1fr); } .qdiag { height: 180px; } }
   .toolbar .form-select { width: auto; }
   .toolbar .spacer { flex: 1; }
   .toolbar .group { display: flex; gap: 4px; align-items: center; }
@@ -743,7 +778,7 @@
   #relPane { --t-table: #2f7d4f; --t-view: #2563eb; --t-matview: #0e7490; --t-trigger: #c2410c; --t-procedure: #7c3aed; --t-function: #c026d3;
     --t-package: #8a5a2b; --t-sequence: #dc2626; --t-domain: #64748b; --t-exception: #9f1239; --t-event: #a16207; --t-synonym: #475569;
     --rel-fk: #5b6660; --rel-trigger: #c2410c; --rel-uses: #2563eb; --rel-assumed: #9333ea;
-    display: grid; grid-template-rows: auto auto 1fr; gap: 8px; padding: 12px 16px; background: var(--panel); min-height: 0; }
+    display: grid; grid-template-rows: auto auto auto 1fr; gap: 8px; padding: 12px 16px; background: var(--panel); min-height: 0; }
   @media (prefers-color-scheme: dark) {
     #relPane { --t-table: #4fb57a; --t-view: #6ea8fe; --t-matview: #22c3d6; --t-trigger: #fb923c; --t-procedure: #a78bfa; --t-function: #e879f9;
       --t-package: #d6a36b; --t-sequence: #f87171; --t-domain: #94a3b8; --t-exception: #fb7185; --t-event: #facc15; --t-synonym: #a1acbb;
@@ -798,6 +833,19 @@
   .rellbl .relend { font-size: 11px; font-weight: 700; text-anchor: middle; }
   .rellbl.k-fk .relend { fill: var(--rel-fk); } .rellbl.k-assumed .relend { fill: var(--rel-assumed); }
   .relworld.dim .rellbl:not(.near) { opacity: .08; }
+  .relviewbar { margin-top: -2px; }
+  .relviewbar .form-select { width: auto; max-width: 240px; }
+  .relviewlbl { margin: 0; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .relsep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
+  .relsavebox { width: 300px; }
+  .relsavebox .hint { margin: 6px 0 0; }
+  .rellbl .relmid.start { text-anchor: start; }
+  .relcrow { fill: none; stroke-width: 1.4; stroke-linecap: round; }
+  .relring { fill: var(--bg); }
+  .relcrow.k-fk, .rellbl.k-fk .relcrow { stroke: var(--rel-fk); } .rellbl.k-assumed .relcrow { stroke: var(--rel-assumed); }
+  .relbadge { flex: none; margin-left: auto; padding: 0 4px; font-size: 10px; font-weight: 700; line-height: 14px; color: var(--rel-fk);
+    border: 1px solid var(--rel-fk); border-radius: 4px; }
+  .relnode.junction { border-style: dashed; }
   .relside .relcard { margin-left: 4px; padding: 0 5px; font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; }
   .relpickwrap { position: relative; }
   .relpickbox { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; width: 320px; max-width: calc(100vw - 32px); padding: 10px;
@@ -1172,7 +1220,16 @@
     </div>
     <div class="pane" id="dataPane">
     <div class="editor">
-      <textarea class="form-control form-control-sm" id="sql" spellcheck="false" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
+      <div class="sqlrow">
+        <div class="sqlwrap">
+          <textarea class="form-control form-control-sm" id="sql" spellcheck="false" autocomplete="off" aria-autocomplete="list" aria-controls="qaList" placeholder="Select a table, or write a SELECT query here and press Ctrl+Enter (read-only: no INSERT / UPDATE / DELETE)"></textarea>
+          <div class="qalist" id="qaList" role="listbox" aria-label="Suggestions" hidden></div>
+        </div>
+        <aside class="qdiag" id="qDiag" hidden aria-label="The tables of the query and how it joins them">
+          <div class="qdhead"><span><i class="bi bi-diagram-2" aria-hidden="true"></i> Tables of the query</span><span class="hint" id="qDiagSum"></span></div>
+          <div class="qdbody" id="qDiagBody"></div>
+        </aside>
+      </div>
       <div class="toolbar">
         <button class="btn btn-primary" id="runBtn" disabled><i class="bi bi-play-fill" aria-hidden="true"></i> Run <small>(Ctrl+Enter)</small></button>
         <button class="btn btn-outline-secondary" id="saveQueryBtn" disabled title="Save this query for the connection"><i class="bi bi-floppy" aria-hidden="true"></i> Save query</button>
@@ -1185,6 +1242,8 @@
             <option value="100000">100,000 rows</option>
           </select>
         </div>
+        <label class="form-check form-switch qaswitch" title="While you type a query, suggest the tables, the columns of a table or alias after its name and a dot (t1.), and keywords: ↑ ↓ to choose, Enter or Tab to take, Esc to close, Ctrl+Space to ask"><input class="form-check-input" type="checkbox" id="qaOn" role="switch" checked> Suggestions</label>
+        <label class="form-check form-switch qaswitch" title="Draw, beside the query, its tables and the columns it joins them by"><input class="form-check-input" type="checkbox" id="qdOn" role="switch" checked> Query diagram</label>
         <div class="spacer"></div>
         <div class="group">
           <span>Export all rows to folder</span>
@@ -1413,6 +1472,29 @@
         <h2 id="relTitle"><i class="bi bi-diagram-3" aria-hidden="true"></i> DB Relationships · <span id="relLabel"></span></h2>
         <p class="hint" id="relSub"></p>
       </div>
+      <div class="relbar relviewbar">
+        <label class="relviewlbl" for="relViewSel"><i class="bi bi-bookmarks" aria-hidden="true"></i> View</label>
+        <select class="form-select form-select-sm" id="relViewSel" title="The saved views of this connection: choose one to draw it as it was saved"><option value="">Everything (not a saved view)</option></select>
+        <div class="relpickwrap">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="relViewSave" aria-haspopup="true" aria-expanded="false" title="Save what is drawn now (the objects chosen, the types and switches, where each object is, the zoom) as a view to choose again later"><i class="bi bi-bookmark-plus" aria-hidden="true"></i> Save view</button>
+          <div class="relpickbox relsavebox" id="relSaveBox" hidden role="dialog" aria-label="Save the view">
+            <label class="form-label" for="relSaveName">Name of the view</label>
+            <input type="text" class="form-control form-control-sm" id="relSaveName" maxlength="100" placeholder="e.g. Invoicing" autocomplete="off">
+            <p class="hint" id="relSaveWhere"></p>
+            <div class="relpickfoot"><button type="button" class="btn btn-sm btn-outline-secondary" id="relSaveCancel">Cancel</button>
+              <button type="button" class="btn btn-sm btn-primary" id="relSaveOk">Save</button></div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relViewDel" aria-label="Delete the view" title="Delete the saved view chosen"><i class="bi bi-trash" aria-hidden="true"></i></button>
+        <span class="relsep" aria-hidden="true"></span>
+        <label class="relviewlbl" for="relArrange">Arrange</label>
+        <select class="form-select form-select-sm" id="relArrange" title="How the objects are arranged">
+          <option value="er">ER diagram (in tiers)</option>
+          <option value="free">Free (by attraction)</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relRelayout" title="Arrange the objects again: as an ER diagram, the tables referred to above the tables that refer to them, in rows and columns with the lines at right angles (objects you moved go back in place)"><i class="bi bi-grid-1x2" aria-hidden="true"></i> Rearrange</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" title="Download the view drawn now as a picture (PNG): only the objects of the view chosen, as they are arranged"><i class="bi bi-image" aria-hidden="true"></i> Export view</button>
+      </div>
       <div class="relbar">
         <div class="reltypes" id="relTypes" role="group" aria-label="Types of objects shown"></div>
         <span class="spacer"></span>
@@ -1436,8 +1518,6 @@
         <label class="form-check form-switch" title="Also the relationships assumed where there is no foreign key: from the joins in the views, procedures, functions and triggers (a.x = b.y), and from columns of the same name (a table's key column in other tables, or customer_id → customers.id)"><input class="form-check-input" type="checkbox" id="relAssumed" role="switch" checked> Assumed relationships</label>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relOpenAll" title="Show or hide the columns of every table drawn (or click ▸ on a table)"><i class="bi bi-arrows-expand" aria-hidden="true"></i> Columns</button>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relCard" title="Work out for each foreign key and assumed relationship drawn whether it is one to one (1:1), many to one (N:1), one to many (1:N) or many to many (N:M): keys say so, other columns are checked in the database for duplicate values (a read, never a change)"><i class="bi bi-diagram-2" aria-hidden="true"></i> Work out 1:N / N:M</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="relRelayout" aria-label="Arrange again" title="Arrange the objects again"><i class="bi bi-shuffle" aria-hidden="true"></i></button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" aria-label="Download the picture" title="Download the picture as it is arranged now (PNG)"><i class="bi bi-image" aria-hidden="true"></i></button>
         <button type="button" class="btn btn-sm btn-primary" id="relRefresh" title="Read the objects and their relationships from the database's catalog now (only then are they read)"><i class="bi bi-diagram-3" aria-hidden="true"></i> Generate Relationships</button>
       </div>
       <div class="relbody">
@@ -1459,7 +1539,10 @@
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses"/></svg>Uses</span>
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses guess"/></svg>Found in the source</span>
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-assumed"/></svg>Assumed (joins in views…, same column names)</span>
-            <span><b>1</b> / <b>N</b> at the ends: one or many rows (Work out 1:N / N:M)</span>
+            <span><svg width="30" height="12"><path d="M2 6H28M5 2V10M9 2V10" class="relcrow k-fk"/></svg>exactly one ·
+              <svg width="30" height="12"><path d="M2 6H28M5 2V10" class="relcrow k-fk"/><circle cx="13" cy="6" r="4" class="relcrow k-fk relring"/></svg>zero or one ·
+              <svg width="30" height="12"><path d="M2 6H28M2 1L12 6L2 11" class="relcrow k-fk"/></svg>many (Work out 1:N / N:M)</span>
+            <span><b class="relbadge">N:M</b> junction table: many to many between the tables it refers to</span>
           </div>
           <div class="relzoom">
             <button type="button" class="btn btn-sm btn-outline-secondary" id="relZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
@@ -2699,8 +2782,10 @@ $("dbMove").addEventListener("click", () => moveDb($("dbPath").value));
 // Every object of the connected database and how they hang together
 // (relations.go): foreign keys, the tables triggers fire on, and what views,
 // procedures, functions and triggers use. Each group of connected objects is
-// arranged by a force layout (linked objects pull together, all push apart),
-// the groups side by side. Drag an object to move it, drag the background to
+// arranged as an ER diagram (relER: the objects referred to above those that
+// refer to them, lines at right angles, crow's feet once 1:N is worked out),
+// or freely by a force layout (linked objects pull together, all push apart),
+// the groups side by side. What is drawn can be saved as a view. Drag an object to move it, drag the background to
 // pan, the wheel or a pinch zooms; a click shows an object's relationships,
 // a double click opens it.
 const rel = { data: null, seq: 0, nodes: [], byId: new Map(), edges: [], sel: null, focus: null, hidden: new Set(),
@@ -2708,6 +2793,9 @@ const rel = { data: null, seq: 0, nodes: [], byId: new Map(), edges: [], sel: nu
   chosen: new Set(), // the objects picked with Choose tables (none: all)
   open: new Set(),   // the tables expanded to their columns
   uniq: new Map(),   // "id|col,col" → whether the columns are unique (Work out 1:N)
+  moved: new Map(),  // id → [x, y] of the objects put somewhere by hand (or by a saved view)
+  junction: new Map(), // id → the tables a junction table links many to many
+  arrange: (() => { try { return localStorage.getItem("cactusdb.relArrange") === "free" ? "free" : "er"; } catch (e) { return "er"; } })(),
   cardOn: false, cardSeq: 0 };
 const REL_ORDER = ["table", "view", "matview", "trigger", "procedure", "function", "package", "sequence", "domain", "exception", "event", "synonym"];
 const REL_MAX = 2500; // objects drawn at once
@@ -2718,7 +2806,8 @@ const relOne = (type) => relLabel(type).replace(/ies$/, "y").replace(/s$/, "");
 // what was drawn goes, and nothing is read until Generate Relationships.
 function relReset() {
   rel.seq++; rel.data = null; rel.sel = null; rel.focus = null; rel.hidden.clear(); rel.drawn = false;
-  rel.chosen.clear(); rel.open.clear(); rel.uniq.clear(); rel.cardOn = false; rel.cardSeq++; relPickClose();
+  rel.chosen.clear(); rel.open.clear(); rel.uniq.clear(); rel.moved.clear(); rel.cardOn = false; rel.cardSeq++; relPickClose(); relSaveClose();
+  relViews.list = []; relViews.saved = false; relViewsRender("");
   relOpenAllText();
   $("relTab").hidden = !state.session;
   $("relNodes").innerHTML = ""; $("relEdges").innerHTML = ""; $("relSide").hidden = true; $("relTypes").innerHTML = ""; $("relSub").textContent = "";
@@ -2739,7 +2828,9 @@ function relOpen() {
 // The controls that work on a picture: only once one is generated.
 function relControls() {
   const none = !rel.data;
-  ["relFind", "relLonely", "relGuess", "relAssumed", "relColsOn", "relCard", "relPick", "relOpenAll", "relRelayout", "relPng", "relZoomIn", "relZoomOut", "relFit"].forEach((id) => { $(id).disabled = none; });
+  ["relFind", "relLonely", "relGuess", "relAssumed", "relColsOn", "relCard", "relPick", "relOpenAll", "relRelayout", "relPng", "relZoomIn", "relZoomOut", "relFit",
+    "relViewSel", "relViewSave", "relArrange"].forEach((id) => { $(id).disabled = none; });
+  $("relViewDel").disabled = none || !$("relViewSel").value;
   if (!none) $("relLonely").disabled = !!rel.focus || rel.chosen.size > 0;
 }
 async function relLoad() {
@@ -2759,9 +2850,10 @@ async function relLoad() {
     rel.uniq.clear(); rel.cardOn = false; rel.cardSeq++;
     d.columns = d.columns || {};
     $("relNames").innerHTML = d.nodes.map((n) => `<option value="${esc(n.name)}">${esc(relOne(n.type))}</option>`).join("");
-    rel.drawn = false;
+    rel.drawn = false; rel.moved.clear();
     relControls();
     if (!$("relPane").hidden) relBuild(); // sizes are measured: only when shown
+    relViewsLoad();
   } catch (e) {
     if (seq === rel.seq) relMsg(`<div><p>✘ ${esc(e.message)}</p><button type="button" class="btn btn-outline-secondary" data-relgen>Try again</button></div>`);
   } finally { if (seq === rel.seq) { rel.loading = false; $("relRefresh").disabled = false; } }
@@ -2816,14 +2908,43 @@ function relNodeHtml(n, joined) {
     return `<li data-col="${esc(c.n)}" class="${on ? "on" : ""}" title="${esc(c.n)}${c.k === "PRI" ? " (primary key)" : c.k === "UNI" ? " (unique)" : ""}${on ? ", joined by a line" : ""}">` +
       `<i class="bi bi-${c.k === "PRI" ? "key-fill" : c.k === "UNI" ? "key" : on ? "link-45deg" : "dot"}" aria-hidden="true"></i><span>${esc(c.n)}</span></li>`;
   }).join("") + `</ul>` : "";
-  return `<div class="relnode t-${n.type}${open ? " open" : ""}" data-id="${esc(n.id)}" title="${esc(relOne(n.type))} ${esc(n.name)}">` +
-    `<div class="relnh">${exp}<i class="bi bi-${ICONS[n.type] || "dot"}" aria-hidden="true"></i><span>${esc(n.name)}</span></div>${list}</div>`;
+  const jn = rel.junction.get(n.id), named = (id) => rel.data.nodes.find((x) => x.id === id)?.name || id;
+  const badge = jn ? `<b class="relbadge" title="${jn.length === 1 ? `A junction table: ${esc(named(jn[0]))} many to many with itself` : `A junction table: many to many between ${esc(jn.map(named).join(" and "))}`}">N:M</b>` : "";
+  return `<div class="relnode t-${n.type}${open ? " open" : ""}${jn ? " junction" : ""}" data-id="${esc(n.id)}" title="${esc(relOne(n.type))} ${esc(n.name)}">` +
+    `<div class="relnh">${exp}<i class="bi bi-${ICONS[n.type] || "dot"}" aria-hidden="true"></i><span>${esc(n.name)}</span>${badge}</div>${list}</div>`;
 }
 
-function relBuild(keepView) {
+// relJunctions finds the junction (intermediate) tables, how a database keeps
+// a many to many relationship: a table that refers twice or more, by
+// different columns, to other tables or twice to the same one (a
+// self-referencing N:M: employee_managers → employee, employee), whose
+// primary key is made of the columns it refers with or, without a primary
+// key, that has at most two other columns (a junction may hold attributes of
+// its own: priority, added). One with a key of its own (comments: cid, nid,
+// uid) is a thing of its own, not a junction.
+function relJunctions() {
+  const d = rel.data, out = new Map();
+  for (const n of d.nodes) {
+    const cols = d.columns[n.id];
+    if (n.type !== "table" || !cols) continue;
+    const es = d.edges.filter((e) => e.from === n.id && e.to !== n.id && (e.kind === "fk" || (e.kind === "assumed" && $("relAssumed").checked)));
+    const to = [...new Set(es.map((e) => e.to))];
+    if (new Set(es.map((e) => e.to + "|" + (e.fromCols || []).join())).size < 2) continue;
+    const linked = new Set(es.flatMap((e) => e.fromCols || []));
+    const keys = cols.filter((c) => c.k === "PRI");
+    if (keys.length ? keys.length >= 2 && keys.every((c) => linked.has(c.n)) : cols.filter((c) => !linked.has(c.n)).length <= 2) out.set(n.id, to);
+  }
+  return out;
+}
+
+// relBuild draws what is shown again; the objects moved by hand stay where
+// they were put only when keepMoved (a table expanded, a saved view).
+function relBuild(keepView, keepMoved) {
   const d = rel.data;
   if (!d) return;
   rel.drawn = true;
+  if (!keepMoved) rel.moved.clear();
+  rel.junction = relJunctions();
   relChips();
   const shown = relShown();
   $("relLonelyText").textContent = `Objects without relationships (${fmtInt(shown.lonely)})`;
@@ -2876,7 +2997,8 @@ function relLayout() {
   rel.nodes.forEach((n) => { const r = root(n.id); if (!comps.has(r)) comps.set(r, { nodes: [], edges: [] }); comps.get(r).nodes.push(n); });
   rel.edges.forEach((e) => comps.get(root(e.from)).edges.push(e));
   const boxes = [], alone = [];
-  for (const c of comps.values()) (c.nodes.length > 1 ? boxes.push(relForce(c.nodes, c.edges)) : alone.push(c.nodes[0]));
+  rel.edges.forEach((e) => { e.er = null; });
+  for (const c of comps.values()) (c.nodes.length > 1 ? boxes.push(rel.arrange === "er" ? relER(c.nodes, c.edges) : relForce(c.nodes, c.edges)) : alone.push(c.nodes[0]));
   boxes.sort((a, b) => b.w * b.h - a.w * a.h);
   // The objects without relationships: a grid per type, under a label.
   $("relNodes").querySelectorAll(".rellabel").forEach((l) => l.remove());
@@ -2904,9 +3026,219 @@ function relLayout() {
     if (x > 0 && x + b.w > maxW) { x = 0; y += rowH + gap; rowH = 0; }
     const dx = x - b.minX, dy = y - b.minY;
     b.nodes.forEach((n) => { n.x += dx; n.y += dy; });
+    (b.edges || []).forEach((e) => {
+      if (!e.er) return;
+      e.er.pts = e.er.pts.map(([px, py]) => [px + dx, py + dy]);
+      if (e.er.lx != null) { e.er.lx += dx; e.er.ly += dy; }
+    });
     if (b.label) b.label.style.transform = `translate(${x}px, ${y}px)`;
     x += b.w + gap; rowH = Math.max(rowH, b.h);
   }
+  // The objects put somewhere by hand, or by a saved view.
+  for (const n of rel.nodes) { const p = rel.moved.get(n.id); if (p) { n.x = p[0]; n.y = p[1]; } }
+}
+
+// relER arranges one group of connected objects as an entity–relationship
+// diagram. Each line goes from the object that refers (a foreign key, a
+// trigger, a view…) up to the one it refers to, so the objects referred to
+// are in the tiers above (cycles are broken where a depth-first search meets
+// them again). The tiers are ordered to cross few lines (barycentres), and a
+// tier wider than the group is wrapped into rows, on a grid of columns with
+// gutters between them. The lines run at right angles: up from the object
+// that refers, along a lane of the channel above its row that all the lines
+// to the same object share (a bus), up a gutter when that object is further
+// up, and into it from below. A table with three or more tables that refer
+// only to it is drawn with them as a block (see below). The route is kept in
+// e.er for relPath.
+function relER(ns, es) {
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+  // A table referred to by three or more tables that have no other line (leaves)
+  // is drawn with them as one block: the table, its leaves in a grid under it
+  // and one line (a comb) joining them.
+  const deg = new Map(ns.map((n) => [n, []]));
+  es.forEach((e) => { if (e.s !== e.t) { deg.get(e.s).push(e); deg.get(e.t).push(e); } });
+  const leavesOf = new Map(), inBlock = new Map();
+  for (const n of ns) {
+    const es1 = deg.get(n);
+    if (!es1.length || es1.some((e) => e.s !== n) || new Set(es1.map((e) => e.t)).size !== 1) continue;
+    const p = es1[0].t;
+    (leavesOf.get(p) || leavesOf.set(p, []).get(p)).push(n);
+  }
+  const blocks = [];
+  for (const [p, lv] of leavesOf) {
+    if (lv.length < 3 || inBlock.has(p)) continue;
+    lv.sort(byName);
+    const lcols = Math.max(1, Math.min(lv.length, Math.ceil(Math.sqrt(lv.length * 2)))), lw = Math.max(...lv.map((n) => n.w)) + 18, IND = 28;
+    let y = p.h, rowsY = [];
+    for (let i = 0; i < lv.length; i += lcols) {
+      const row = lv.slice(i, i + lcols);
+      y += 30; rowsY.push(y - 16);
+      row.forEach((n, j) => { n.bx = IND + j * lw + n.w / 2; n.by = y + n.h / 2; n.brow = rowsY.length - 1; });
+      y += Math.max(...row.map((n) => n.h));
+    }
+    const b = { block: true, id: "block:" + p.id, name: p.name, p, leaves: lv, rowsY, w: Math.max(p.w, IND + lcols * lw - 18), h: y };
+    blocks.push(b); inBlock.set(p, b); lv.forEach((n) => inBlock.set(n, b));
+  }
+  const M = (n) => inBlock.get(n) && inBlock.get(n).p === n ? inBlock.get(n) : n;
+  const items = [...ns.filter((n) => !inBlock.has(n)), ...blocks];
+  // The lines between the items; those in a block are its comb.
+  const links = [];
+  for (const e of es) {
+    if (e.s === e.t) continue;
+    const bs = inBlock.get(e.s);
+    if (bs && bs.p !== e.s) { e.comb = bs; continue; }
+    links.push({ e, s: M(e.s), t: M(e.t) });
+  }
+  const out = new Map(items.map((n) => [n, []]));
+  links.forEach((l) => out.get(l.s).push(l));
+  const seen = new Map(); // 1 on the search's path, 2 done
+  for (const root of [...items].sort(byName)) {
+    if (seen.has(root)) continue;
+    const stack = [[root, 0]];
+    seen.set(root, 1);
+    while (stack.length) {
+      const top = stack[stack.length - 1], [n, i] = top;
+      if (i >= out.get(n).length) { seen.set(n, 2); stack.pop(); continue; }
+      top[1]++;
+      const l = out.get(n)[i];
+      l.rev = seen.get(l.t) === 1; // a line back up the search's path: drawn the other way
+      if (!seen.has(l.t)) { seen.set(l.t, 1); stack.push([l.t, 0]); }
+    }
+  }
+  const up = new Map(items.map((n) => [n, []])), down = new Map(items.map((n) => [n, []]));
+  for (const l of links) {
+    l.up = l.rev ? l.s : l.t; l.dn = l.rev ? l.t : l.s;
+    if (l.up !== l.dn && !up.get(l.dn).includes(l.up)) { up.get(l.dn).push(l.up); down.get(l.up).push(l.dn); }
+  }
+  // Tiers: below everything an item refers to (longest path); one that only
+  // is referred to comes down to just above the highest that refers to it.
+  const rank = new Map(), need = new Map(items.map((n) => [n, up.get(n).length]));
+  let ready = items.filter((n) => !need.get(n));
+  ready.forEach((n) => rank.set(n, 0));
+  while (ready.length) {
+    const next = [];
+    for (const n of ready) for (const c of down.get(n)) {
+      rank.set(c, Math.max(rank.get(c) || 0, rank.get(n) + 1));
+      need.set(c, need.get(c) - 1);
+      if (!need.get(c)) next.push(c);
+    }
+    ready = next;
+  }
+  items.forEach((n) => { if (!rank.has(n)) rank.set(n, 0); });
+  for (const n of items) if (!up.get(n).length && down.get(n).length) rank.set(n, Math.max(0, Math.min(...down.get(n).map((c) => rank.get(c))) - 1));
+  // First in the order a search down from the tops meets them, which keeps related ones together.
+  const order = new Map(), tiers = [];
+  const visit = (n) => { if (order.has(n)) return; order.set(n, order.size); [...down.get(n)].sort(byName).forEach(visit); };
+  [...items].sort((a, b) => rank.get(a) - rank.get(b) || down.get(b).length - down.get(a).length || byName(a, b)).forEach(visit);
+  items.forEach((n) => (tiers[rank.get(n)] = tiers[rank.get(n)] || []).push(n));
+  for (let r = 0; r < tiers.length; r++) tiers[r] = (tiers[r] || []).sort((a, b) => order.get(a) - order.get(b));
+  const pos = new Map();
+  const index = () => tiers.forEach((t) => t.forEach((n, i) => pos.set(n, (i + 0.5) / t.length)));
+  const sweep = (t, nb) => {
+    const key = new Map(t.map((n) => { const m = nb.get(n); return [n, m.length ? m.reduce((a, x) => a + pos.get(x), 0) / m.length : pos.get(n)]; }));
+    t.sort((a, b) => key.get(a) - key.get(b));
+  };
+  index();
+  for (let it = 0; it < 6; it++) {
+    for (let r = 1; r < tiers.length; r++) { sweep(tiers[r], up); index(); }
+    for (let r = tiers.length - 2; r >= 0; r--) { sweep(tiers[r], down); index(); }
+  }
+  // Rows of at most cols items, each item in a column.
+  const widest = Math.max(...tiers.map((t) => t.length));
+  const cols = Math.max(1, Math.min(widest, Math.max(3, Math.ceil(Math.sqrt(items.length * 2.5)))));
+  const rows = [];
+  for (const t of tiers) for (let i = 0; i < t.length; i += cols) rows.push(t.slice(i, i + cols));
+  rows.forEach((row, r) => row.forEach((n) => { n.row = r; }));
+  const place = (row, want) => {
+    const k = row.length, w = new Map(row.map((n, i) => [n, want(n, i)]));
+    row.sort((a, b) => w.get(a) - w.get(b));
+    let prev = -1;
+    row.forEach((n, i) => { n.col = Math.min(Math.max(Math.round(w.get(n)), prev + 1), cols - (k - i)); prev = n.col; });
+  };
+  const mean = (m) => m.reduce((a, x) => a + x.col, 0) / m.length;
+  rows.forEach((row) => place(row, (n, i) => { const p = up.get(n).filter((x) => x.row < n.row); return p.length ? mean(p) : (cols - row.length) / 2 + i; }));
+  for (let r = rows.length - 1; r >= 0; r--) place(rows[r], (n) => { const c = down.get(n).filter((x) => x.row > n.row); return c.length ? mean(c) : n.col; });
+  rows.forEach((row) => place(row, (n) => { const p = up.get(n).filter((x) => x.row < n.row); return p.length ? (mean(p) + n.col) / 2 : n.col; }));
+  // Lanes: in the channel above a row, one for each item its lines go up to;
+  // in a gutter, one for each item whose lines pass rows by there.
+  const chan = rows.map(() => []), gut = Array.from({ length: cols + 1 }, () => []), gutOf = new Map(), stubs = new Map();
+  const lane = (list, key) => { if (!list.includes(key)) list.push(key); };
+  for (const l of links) {
+    const U = l.up, L = l.dn;
+    if (U === L) continue;
+    lane(chan[U.row + 1], U); lane(chan[L.row], U);
+    if (L.row > U.row + 1 && !gutOf.has(U)) {
+      const far = down.get(U).filter((c) => c.row > U.row + 1);
+      gutOf.set(U, mean(far) < U.col ? U.col : U.col + 1);
+      lane(gut[gutOf.get(U)], U);
+    }
+    (stubs.get(L) || stubs.set(L, []).get(L)).push(l);
+  }
+  chan.forEach((c) => c.sort((a, b) => a.col - b.col || a.row - b.row));
+  // Each column as wide as its widest item, the gutters as wide as their lanes need.
+  const cw = Array.from({ length: cols }, (_, j) => Math.max(60, ...items.filter((n) => n.col === j).map((n) => n.w)));
+  const maxGut = Math.max(0, ...gut.map((g) => g.length)), G = 36 + Math.min(maxGut, 14) * 7, gStep = maxGut ? Math.min(7, (G - 18) / maxGut) : 0;
+  const left = [G];
+  for (let j = 1; j <= cols; j++) left[j] = left[j - 1] + cw[j - 1] + G;
+  const gutX = (g, U) => left[g] - G / 2 + (gut[g].indexOf(U) - (gut[g].length - 1) / 2) * gStep;
+  // Rows top to bottom: a channel above each (its lanes, then the column names written above the items).
+  const LANE = 8, LBL = 13, laneY = [];
+  let y = 0;
+  rows.forEach((row, r) => {
+    const labels = r ? Math.min(3, Math.max(0, ...row.map((n) => (stubs.get(n) || []).length))) : 0;
+    const h = r ? Math.max(44, 14 + chan[r].length * LANE + 8 + labels * LBL) : 0;
+    laneY[r] = y + 14;
+    y += h;
+    // A block's table at the left of its column, the rest centred in it.
+    row.forEach((n) => { n.x = n.block ? left[n.col] + n.w / 2 : left[n.col] + cw[n.col] / 2; n.y = y + n.h / 2; });
+    y += Math.max(...row.map((n) => n.h));
+  });
+  // The block's table and leaves inside it; lines join the block at its table.
+  for (const b of blocks) {
+    const bl = b.x - b.w / 2, bt = b.y - b.h / 2, p = b.p;
+    p.x = bl + p.w / 2; p.y = bt + p.h / 2;
+    b.leaves.forEach((n) => { n.x = bl + n.bx; n.y = bt + n.by; });
+    b.ax = p.x;
+  }
+  const ax = (n) => n.block ? n.ax : n.x;
+  for (const [L, list] of stubs) {
+    const lw = L.block ? L.p.w : L.w;
+    list.sort((a, b) => ax(a.up) - ax(b.up) || a.up.y - b.up.y);
+    const k = list.length, step = Math.min(12, (lw - 16) / Math.max(1, k - 1));
+    list.forEach((l, i) => {
+      const U = l.up, sx = ax(L) + (i - (k - 1) / 2) * step, ly = laneY[L.row] + chan[L.row].indexOf(U) * LANE, top = L.y - L.h / 2;
+      const pts = [[sx, top], [sx, ly]];
+      let uy = ly;
+      if (L.row !== U.row + 1) {
+        const gx = gutX(gutOf.get(U), U);
+        uy = laneY[U.row + 1] + chan[U.row + 1].indexOf(U) * LANE;
+        pts.push([gx, ly], [gx, uy]);
+      }
+      if (U.block) { // into the block's table from its left, past the leaves
+        const gx = U.x - U.w / 2 - 10;
+        pts.push([gx, uy], [gx, U.p.y], [U.p.x - U.p.w / 2, U.p.y]);
+      } else pts.push([U.x, uy], [U.x, U.y + U.h / 2]);
+      // From the object the line starts at (its from) to the one it ends at.
+      l.e.er = { pts: l.rev ? pts.reverse() : pts, lx: sx + 4, ly: top - 5 - (k > 1 ? (k - 1 - i) % 3 : 0) * LBL };
+    });
+  }
+  // The combs: from each leaf up to the lane above its row, along it to the
+  // trunk down the left of the block, up the trunk to the table. Their
+  // columns are written once, by the trunk, when all are called the same.
+  for (const b of blocks) {
+    const es1 = es.filter((e) => e.comb === b), tx = b.x - b.w / 2 + 12, p = b.p, bt = b.y - b.h / 2;
+    const same = new Set(es1.map(relColsText)).size === 1;
+    es1.forEach((e, i) => {
+      const n = e.s, ly = bt + b.rowsY[n.brow];
+      e.er = { pts: [[n.x, n.y - n.h / 2], [n.x, ly], [tx, ly], [tx, p.y + p.h / 2]], lx: same ? (i ? null : tx + 5) : n.x + 4, ly: same ? p.y + p.h / 2 + 12 : n.y - n.h / 2 - 4, quiet: same && i > 0 };
+      if (same && !i && es1.length > 1) e.er.text = `${relColsText(e)} (${fmtInt(es1.length)} tables)`;
+    });
+  }
+  ns.forEach((n) => { delete n.row; delete n.col; delete n.bx; delete n.by; delete n.brow; });
+  const all = [...ns, ...blocks];
+  const minX = Math.min(0, ...all.map((p) => p.x - p.w / 2)), maxX = Math.max(...all.map((p) => p.x + p.w / 2), left[cols]);
+  const minY = Math.min(...all.map((p) => p.y - p.h / 2)), maxY = Math.max(...all.map((p) => p.y + p.h / 2));
+  return { nodes: ns, edges: es, w: maxX - minX, h: maxY - minY, minX, minY };
 }
 
 // relForce arranges one group of connected objects (Fruchterman–Reingold,
@@ -2992,10 +3324,21 @@ function relEnd(a, bx, by, pad) {
 }
 function relPath(e) {
   const { s, t } = e;
+  e.geo = null;
   if (s === t) { // a table that refers to itself: a loop over its right end
     const x = s.x + s.w / 2 - 14, y = s.y - s.h / 2;
     e.head = [x + 40, y + 20, s.x + s.w / 2 + 4, s.y];
+    e.p = { x1: x, y1: y - 2, x2: s.x + s.w / 2 + 4, y2: s.y, cx: x + 30, cy: y - 22, bend: 0 };
     return `M${x} ${y - 2}C${x + 10} ${y - 34} ${x + 52} ${y - 8} ${s.x + s.w / 2 + 4} ${s.y}`;
+  }
+  if (rel.arrange === "er") {
+    // The route of the ER diagram, or, from or to an object moved by hand, at right angles between the two.
+    const pts = e.er && !rel.moved.has(e.from) && !rel.moved.has(e.to) ? e.er.pts : relElbow(s, t);
+    const n = pts.length;
+    const er = e.er && pts === e.er.pts ? e.er : {};
+    e.geo = { pts, lx: er.lx ?? null, ly: er.ly ?? null, quiet: !!er.quiet, text: er.text };
+    e.head = [...pts[n - 2], ...pts[n - 1]];
+    return relRound(pts);
   }
   // Several lines between the same two objects bend apart (e.bend, set by relDrawEdges).
   const bend = e.bend || 0, len = Math.hypot(t.x - s.x, t.y - s.y) || 1;
@@ -3005,6 +3348,44 @@ function relPath(e) {
   e.head = [bend ? cx : x1, bend ? cy : y1, x2, y2]; // for the arrow of the picture
   e.p = { x1, y1, x2, y2, cx: bend ? cx : (x1 + x2) / 2, cy: bend ? cy : (y1 + y2) / 2, bend };
   return bend ? `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}` : `M${x1} ${y1}L${x2} ${y2}`;
+}
+// relElbow joins two objects at right angles: from the side of one facing
+// the other, across halfway.
+function relElbow(a, b) {
+  const gapY = Math.abs(b.y - a.y) - (a.h + b.h) / 2, gapX = Math.abs(b.x - a.x) - (a.w + b.w) / 2;
+  if (gapY >= 16 || gapY >= gapX) {
+    const d = b.y > a.y ? 1 : -1, y1 = a.y + d * a.h / 2, y2 = b.y - d * b.h / 2, my = (y1 + y2) / 2;
+    return [[a.x, y1], [a.x, my], [b.x, my], [b.x, y2]];
+  }
+  const d = b.x > a.x ? 1 : -1, x1 = a.x + d * a.w / 2, x2 = b.x - d * b.w / 2, mx = (x1 + x2) / 2;
+  return [[x1, a.y], [mx, a.y], [mx, b.y], [x2, b.y]];
+}
+// relRound is a path through points at right angles, its corners rounded.
+function relRound(pts) {
+  const p = pts.filter((q, i) => !i || Math.abs(q[0] - pts[i - 1][0]) + Math.abs(q[1] - pts[i - 1][1]) > 0.5);
+  let d = `M${p[0][0]} ${p[0][1]}`;
+  for (let i = 1; i < p.length - 1; i++) {
+    const [ax, ay] = p[i - 1], [bx, by] = p[i], [cx, cy] = p[i + 1];
+    const r = Math.min(6, Math.hypot(bx - ax, by - ay) / 2, Math.hypot(cx - bx, cy - by) / 2);
+    const u = (x, y, len) => { const l = Math.hypot(x, y) || 1; return [x / l * len, y / l * len]; };
+    const [ix, iy] = u(ax - bx, ay - by, r), [ox, oy] = u(cx - bx, cy - by, r);
+    d += `L${bx + ix} ${by + iy}Q${bx} ${by} ${bx + ox} ${by + oy}`;
+  }
+  return d + `L${p[p.length - 1][0]} ${p[p.length - 1][1]}`;
+}
+// relCrow is the crow's-foot mark of one end of a line (at x, y, the line
+// leaving along ux, uy): a foot for many, a bar and a ring for zero or one
+// (optional), two bars for exactly one (mandatory).
+function relCrow(x, y, ux, uy, many, optional) {
+  const vx = -uy, vy = ux, at = (a, b) => `${x + ux * a + vx * b} ${y + uy * a + vy * b}`;
+  if (many) return `M${at(0, 6)}L${at(11, 0)}L${at(0, -6)}M${at(0, 0)}L${at(11, 0)}M${at(15, 5)}L${at(15, -5)}`;
+  if (!optional) return `M${at(6, 5)}L${at(6, -5)}M${at(10, 5)}L${at(10, -5)}`;
+  return `M${at(6, 5)}L${at(6, -5)}M${at(17, 0)}A4 4 0 1 0 ${at(9, 0)}A4 4 0 1 0 ${at(17, 0)}`;
+}
+// relColsText is what a line's columns are called: one name when both ends are called the same.
+function relColsText(e) {
+  if (e.fromCols && e.toCols && e.fromCols.join() === e.toCols.join()) return e.fromCols.join(", ");
+  return e.label || "";
 }
 // relAnchor is where a line leaves an object: at the row of its first column
 // when the table is expanded (on the side toward the other end), else its box.
@@ -3034,13 +3415,24 @@ function relCard(e) {
   const from = a ? "1" : "N", to = b ? "1" : a ? "N" : "M";
   return { text: from + ":" + to, from, to };
 }
+// relOptional: a relationship whose columns may be empty (NULL) on the side
+// that refers is optional (zero or one at the other end), else mandatory;
+// null when the columns aren't known.
+function relOptional(e) {
+  const cols = rel.data.columns[e.from];
+  if (!cols || !e.fromCols || !e.fromCols.length || (e.kind !== "fk" && e.kind !== "assumed")) return null;
+  const by = new Map(cols.map((c) => [c.n, c]));
+  if (e.fromCols.some((c) => !by.has(c))) return null;
+  return e.fromCols.some((c) => by.get(c).o);
+}
 const REL_CARD_WORDS = { "1:1": "one to one", "N:1": "many to one", "1:N": "one to many", "N:M": "many to many", "?": "not known" };
 function relEdgeTitle(e) {
   const what = { fk: "refers to (foreign key)", trigger: "fires on", uses: e.guess ? "uses (found in its source)" : "uses",
     assumed: e.via ? "is assumed to refer to (joined in " + e.via.join(", ") + ")" : "is assumed to refer to (same column name)" }[e.kind];
-  const c = relCard(e);
+  const c = relCard(e), opt = relOptional(e);
   return `${relOne(e.s.type)} ${e.s.name} ${what} ${relOne(e.t.type).toLowerCase()} ${e.t.name}` + (e.label ? `: ${e.label}` : "") +
-    (c ? ` — ${c.text} (${REL_CARD_WORDS[c.text]})` : "");
+    (c ? ` — ${c.text} (${REL_CARD_WORDS[c.text]}${c.text === "1:1" ? `; ${e.s.name} holds the foreign key, so it depends on ${e.t.name}` : ""})` : "") +
+    (opt === null ? "" : opt ? ` — optional: ${e.fromCols.join(", ")} may be empty` : ` — mandatory: ${e.fromCols.join(", ")} can't be empty`);
 }
 function relDrawEdges() {
   // Lines between the same two objects (either way) fan out.
@@ -3070,19 +3462,44 @@ function relDrawLabels() {
   for (const e of rel.edges) {
     e.lbl = null;
     if (e.kind !== "fk" && e.kind !== "assumed") continue;
-    const card = relCard(e), text = [card && card.text, cols && e.label].filter(Boolean).join("  ");
-    if (!text) continue;
+    const card = relCard(e), er = !!e.geo, crows = er && card && card.text !== "?";
+    // ER: the crow's feet replace the arrow head.
+    e.el.setAttribute("marker-end", crows ? "none" : `url(#relArrow-${e.kind})`);
+    const text = er ? (e.geo.quiet ? "" : [cols && (e.geo.text || relColsText(e)), card && card.text].filter(Boolean).join(" · ")) : [card && card.text, cols && e.label].filter(Boolean).join("  ");
+    if (!text && !crows) continue;
     e.lbl = document.createElementNS(NS, "g");
     e.lbl.setAttribute("class", `rellbl k-${e.kind}`);
-    e.lbl.innerHTML = `<text class="relmid"></text>` + (card ? `<text class="relend"></text><text class="relend"></text>` : "");
+    e.lbl.innerHTML = `<text class="relmid${er && e.geo.lx != null ? " start" : ""}"></text>` +
+      // The end referred to is optional when the columns referring may be empty; the
+      // other end of a 1:1, the table holding the foreign key, is (it depends on it).
+      (crows ? `<path class="relcrow" data-many="${card.from !== "1"}" data-opt="true"/><path class="relcrow" data-many="${card.to !== "1"}" data-opt="${!!relOptional(e)}"/>` : card && !er ? `<text class="relend"></text><text class="relend"></text>` : "");
     e.lbl.children[0].textContent = text;
-    if (card) { e.lbl.children[1].textContent = card.from; e.lbl.children[2].textContent = card.to; }
+    if (card && !er) { e.lbl.children[1].textContent = card.from; e.lbl.children[2].textContent = card.to; }
     g.appendChild(e.lbl);
     relLabelAt(e);
   }
   if (rel.sel) relSelect(rel.sel, false, true);
 }
 function relLabelAt(e) {
+  if (e.lbl && e.geo) {
+    const { pts, lx, ly } = e.geo, n = pts.length, [mid, a, b] = e.lbl.children;
+    mid.classList.toggle("start", lx != null);
+    if (lx != null) { mid.setAttribute("x", lx); mid.setAttribute("y", ly); }
+    else { // halfway along the longest stretch
+      let best = 1;
+      for (let i = 1; i < n; i++) if (Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) > Math.hypot(pts[best][0] - pts[best - 1][0], pts[best][1] - pts[best - 1][1])) best = i;
+      mid.setAttribute("x", (pts[best][0] + pts[best - 1][0]) / 2); mid.setAttribute("y", (pts[best][1] + pts[best - 1][1]) / 2 - 4);
+    }
+    const end = (el, [x, y], [qx, qy]) => {
+      if (!el || el.tagName !== "path") return;
+      const len = Math.hypot(qx - x, qy - y) || 1;
+      const ring = el.dataset.many !== "true" && el.dataset.opt === "true";
+      el.setAttribute("d", relCrow(x, y, (qx - x) / len, (qy - y) / len, el.dataset.many === "true", el.dataset.opt === "true"));
+      el.classList.toggle("relring", ring); // the ring hides the line under it
+    };
+    end(a, pts[0], pts[1]); end(b, pts[n - 1], pts[n - 2]);
+    return;
+  }
   if (!e.lbl || !e.p) return;
   const { x1, y1, x2, y2, cx, cy, bend } = e.p;
   const mx = bend ? 0.25 * x1 + 0.5 * cx + 0.25 * x2 : cx, my = bend ? 0.25 * y1 + 0.5 * cy + 0.25 * y2 : cy;
@@ -3140,6 +3557,7 @@ function relSelect(id, center, marksOnly) {
     if (on) { near.add(e.from); near.add(e.to); }
     e.el.classList.toggle("near", !!on);
     if (e.lbl) e.lbl.classList.toggle("near", !!on);
+    if (on) e.el.parentNode?.appendChild(e.el); // over the lines it shares a lane with
   });
   if (marksOnly && !id) return;
   rel.nodes.forEach((m) => { m.el.classList.toggle("near", near.has(m.id)); m.el.classList.toggle("sel", m.id === id); });
@@ -3156,7 +3574,8 @@ function relSelect(id, center, marksOnly) {
       return `<li><button type="button" class="t-${o.type}" data-relgo="${esc(o.id)}" title="${esc(relOne(o.type))} ${esc(o.name)}"><i class="bi bi-${ICONS[o.type] || "dot"}" aria-hidden="true"></i>` +
         `<span>${esc(o.name)}${e.label ? ` <small>${esc(e.label)}</small>` : ""}${e.guess ? ` <small>(found in the source)</small>` : ""}` +
         `${e.via ? ` <small>(joined in ${esc(e.via.join(", "))})</small>` : ""}` +
-        `${(c = relCard(e)) ? ` <b class="relcard" title="${esc(REL_CARD_WORDS[c.text] || "")}">${c.text}</b>` : ""}</span></button></li>`;
+        `${(c = relCard(e)) ? ` <b class="relcard" title="${esc(REL_CARD_WORDS[c.text] || "")}">${c.text}</b>` : ""}` +
+        `${relOptional(e) ? ` <small title="Its columns may be empty: the relationship is optional">(optional)</small>` : ""}</span></button></li>`;
     }).join("") + `</ul>`;
   };
   const out = (k) => rel.data.edges.filter((e) => e.from === id && e.kind === k), inn = (k) => rel.data.edges.filter((e) => e.to === id && e.kind === k);
@@ -3214,6 +3633,12 @@ $("relLonely").addEventListener("change", () => relBuild());
 $("relGuess").addEventListener("change", () => relBuild());
 $("relAssumed").addEventListener("change", () => relBuild());
 $("relRelayout").addEventListener("click", () => { rel.spin = Math.random() * 6.28; relBuild(); });
+$("relArrange").value = rel.arrange;
+$("relArrange").addEventListener("change", () => {
+  rel.arrange = $("relArrange").value === "free" ? "free" : "er";
+  try { localStorage.setItem("cactusdb.relArrange", rel.arrange); } catch (e) { /* not remembered */ }
+  relBuild();
+});
 $("relRefresh").addEventListener("click", () => relLoad());
 $("relMsg").addEventListener("click", (ev) => { if (ev.target.closest("[data-relgen]")) relLoad(); });
 $("relZoomIn").addEventListener("click", () => relZoom(1.3));
@@ -3231,6 +3656,11 @@ $("relFind").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("re
 // Expanding a table to its columns: it grows from its top left, the others
 // make room, and its lines then join the rows of their columns.
 function relExpand(ids, open) {
+  if (rel.arrange === "er") { // the diagram is arranged again around the new sizes
+    ids.forEach((id) => { if (rel.data.columns[id]) open ? rel.open.add(id) : rel.open.delete(id); });
+    relBuild(true, true); relOpenAllText();
+    return;
+  }
   for (const id of ids) {
     const n = rel.byId.get(id);
     if (!n || !rel.data.columns[id]) continue;
@@ -3382,6 +3812,7 @@ relCanvas.addEventListener("pointermove", (ev) => {
   if (d.node) {
     d.node.x += dx / rel.view.k; d.node.y += dy / rel.view.k;
     relPlace(d.node);
+    if (rel.arrange === "er" && !rel.moved.has(d.node.id)) rel.moved.set(d.node.id, [d.node.x, d.node.y]);
     rel.edges.forEach((e) => { if (e.s === d.node || e.t === d.node) { e.el.setAttribute("d", relPath(e)); relLabelAt(e); } });
   } else if (!d.pinch) { rel.view.x += dx; rel.view.y += dy; relApplyView(); }
 });
@@ -3390,6 +3821,7 @@ const relUp = (ev) => {
   const d = rel.drag;
   if (rel.ptr.size === 0) {
     relCanvas.classList.remove("panning");
+    if (d && d.node && d.moved >= 5) rel.moved.set(d.node.id, [Math.round(d.node.x), Math.round(d.node.y)]);
     if (d && !d.pinch && d.moved < 5) {
       const id = d.node ? d.node.id : null, now = Date.now();
       // A second click on the same object soon after opens it.
@@ -3406,6 +3838,11 @@ relCanvas.addEventListener("pointercancel", relUp);
 $("relPng").addEventListener("click", () => {
   const b = relBounds();
   if (!b) return toast("There is nothing drawn to make a picture of", true);
+  // What is written on the lines may reach past the objects.
+  try {
+    const l = $("relLabels").getBBox(), e = $("relEdges").getBBox();
+    for (const r of [l, e]) if (r.width || r.height) { b.x0 = Math.min(b.x0, r.x); b.y0 = Math.min(b.y0, r.y); b.x1 = Math.max(b.x1, r.x + r.width); b.y1 = Math.max(b.y1, r.y + r.height); }
+  } catch (err) { /* the objects' bounds */ }
   const pad = 30, w = b.x1 - b.x0 + pad * 2, h = b.y1 - b.y0 + pad * 2;
   const scale = Math.min(2, 16000 / w, 16000 / h, Math.sqrt(120e6 / (w * h)));
   const cv = document.createElement("canvas");
@@ -3419,6 +3856,7 @@ $("relPng").addEventListener("click", () => {
     ctx.setLineDash(e.guess ? [2, 3] : { trigger: [7, 4], assumed: [10, 3, 2, 3] }[e.kind] || []);
     const p = new Path2D(relPath(e));
     ctx.stroke(p);
+    if (e.el.getAttribute("marker-end") === "none") continue; // crow's feet instead
     // The arrow head, along the line's last stretch.
     const [x1, y1, x2, y2] = e.head, a = Math.atan2(y2 - y1, x2 - x1);
     ctx.setLineDash([]);
@@ -3462,6 +3900,14 @@ $("relPng").addEventListener("click", () => {
   for (const e of rel.edges) {
     if (!e.lbl) continue;
     [...e.lbl.children].forEach((t, i) => {
+      if (t.tagName === "path") { // a crow's foot
+        ctx.setLineDash([]); ctx.lineCap = "round"; ctx.strokeStyle = v("--rel-" + e.kind); ctx.lineWidth = 1.4;
+        const crow = new Path2D(t.getAttribute("d"));
+        if (t.classList.contains("relring")) { ctx.fillStyle = v("--bg"); ctx.fill(crow); }
+        ctx.stroke(crow);
+        return;
+      }
+      ctx.textAlign = t.classList.contains("start") ? "left" : "center";
       ctx.font = i ? `700 11px ${font}` : `10px ${font}`;
       ctx.strokeStyle = v("--bg"); ctx.lineWidth = 3; ctx.strokeText(t.textContent, +t.getAttribute("x"), +t.getAttribute("y"));
       ctx.fillStyle = i ? v("--rel-" + e.kind) : v("--text"); ctx.fillText(t.textContent, +t.getAttribute("x"), +t.getAttribute("y"));
@@ -3472,10 +3918,135 @@ $("relPng").addEventListener("click", () => {
     if (!blob) return toast("The picture is too large to make", true);
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${state.label.replace(/[^\w.-]+/g, "_")}-relationships.png`;
+    const view = relViews.list.find((x) => String(x.id) === $("relViewSel").value);
+    a.download = `${[state.label, view && view.name].filter(Boolean).join("-").replace(/[^\w.-]+/g, "_")}-relationships.png`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }, "image/png");
+});
+
+// ---- saved views ----
+// A view is what is drawn: the objects chosen (and what they link to), the
+// object it is around, the types and switches, the tables expanded, how it is
+// arranged, where the objects moved by hand are (every object, arranged
+// freely) and the zoom. Kept on the server for a saved connection (sealed
+// with its saved queries), in this browser for one that isn't saved.
+const relViews = { list: [], saved: false };
+const relLocalKey = () => "cactusdb.relviews:" + state.label;
+function relLocalViews() { try { const v = JSON.parse(localStorage.getItem(relLocalKey()) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function relLocalKeep(list) { try { localStorage.setItem(relLocalKey(), JSON.stringify(list)); return true; } catch (e) { return false; } }
+async function relViewsLoad() {
+  const seq = rel.seq;
+  let saved = false, list = [];
+  try { const d = await api("GET", "/api/relviews?session=" + encodeURIComponent(state.session)); saved = d.saved; list = d.views || []; } catch (e) { /* this browser's */ }
+  if (seq !== rel.seq) return;
+  relViews.saved = saved; relViews.list = saved ? list : relLocalViews();
+  relViewsRender();
+}
+function relViewsRender(pick) {
+  const sel = $("relViewSel"), cur = pick ?? sel.value;
+  sel.innerHTML = `<option value="">Everything (not a saved view)</option>` +
+    relViews.list.map((v) => `<option value="${esc(String(v.id))}">${esc(v.name)}</option>`).join("");
+  sel.value = relViews.list.some((v) => String(v.id) === String(cur)) ? String(cur) : "";
+  relDelArm(false);
+  relControls();
+}
+function relViewState() {
+  return {
+    v: 1, arrange: rel.arrange, chosen: [...rel.chosen], near: $("relPickNear").checked, focus: rel.focus, hidden: [...rel.hidden],
+    lonely: $("relLonely").checked, guess: $("relGuess").checked, assumed: $("relAssumed").checked, cols: $("relColsOn").checked, open: [...rel.open],
+    pos: Object.fromEntries(rel.arrange === "er" ? [...rel.moved].filter(([id]) => rel.byId.has(id)).map(([id]) => { const n = rel.byId.get(id); return [id, [Math.round(n.x), Math.round(n.y)]]; })
+      : rel.nodes.map((n) => [n.id, [Math.round(n.x), Math.round(n.y)]])),
+    zoom: { x: Math.round(rel.view.x), y: Math.round(rel.view.y), k: +rel.view.k.toFixed(4) },
+  };
+}
+// relViewApply draws a saved view (the objects no longer in the database left out).
+function relViewApply(v) {
+  const s = (v && v.view) || {}, ids = new Set(rel.data.nodes.map((n) => n.id)), has = (id) => ids.has(id);
+  rel.arrange = s.arrange === "free" ? "free" : "er"; $("relArrange").value = rel.arrange;
+  rel.chosen = new Set((s.chosen || []).filter(has));
+  rel.focus = has(s.focus) ? s.focus : null;
+  rel.hidden = new Set(s.hidden || []);
+  rel.open = new Set((s.open || []).filter(has));
+  $("relPickNear").checked = !!s.near; $("relLonely").checked = !!s.lonely;
+  $("relGuess").checked = s.guess !== false; $("relAssumed").checked = s.assumed !== false; $("relColsOn").checked = s.cols !== false;
+  rel.moved = new Map(Object.entries(s.pos || {}).filter(([id, p]) => has(id) && Array.isArray(p)));
+  rel.sel = null;
+  relBuild(!!s.zoom, true);
+  if (s.zoom && rel.nodes.length) { rel.view = { x: +s.zoom.x || 0, y: +s.zoom.y || 0, k: Math.min(4, Math.max(0.03, +s.zoom.k || 1)) }; relApplyView(); }
+  relOpenAllText(); relPickRender(); relControls();
+  const gone = (s.chosen || []).filter((id) => !has(id)).length;
+  if (gone) toast(`${fmtInt(gone)} of the objects of “${v.name}” are no longer in the database`, true);
+}
+$("relViewSel").addEventListener("change", () => {
+  if (!rel.data) return;
+  const v = relViews.list.find((x) => String(x.id) === $("relViewSel").value);
+  relDelArm(false);
+  if (v) return relViewApply(v);
+  // Everything: nothing chosen, nothing moved.
+  rel.chosen.clear(); rel.focus = null; rel.sel = null;
+  relBuild(); relPickRender(); relControls();
+});
+function relSaveClose() { $("relSaveBox").hidden = true; $("relViewSave").setAttribute("aria-expanded", "false"); }
+$("relViewSave").addEventListener("click", () => {
+  if (!$("relSaveBox").hidden) return relSaveClose();
+  const cur = relViews.list.find((x) => String(x.id) === $("relViewSel").value);
+  $("relSaveName").value = cur ? cur.name : "";
+  $("relSaveWhere").textContent = relViews.saved ? `Kept with the saved connection ${state.label}, for everyone who opens it. The same name saves over that view.`
+    : "This connection isn't saved: the view is kept in this browser only. Save the connection to keep its views on the server.";
+  $("relSaveBox").hidden = false; $("relViewSave").setAttribute("aria-expanded", "true");
+  $("relSaveName").focus(); $("relSaveName").select();
+});
+$("relSaveCancel").addEventListener("click", relSaveClose);
+$("relSaveName").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("relSaveOk").click(); if (ev.key === "Escape") relSaveClose(); });
+$("relSaveOk").addEventListener("click", async () => {
+  const name = $("relSaveName").value.trim();
+  if (!name) { $("relSaveName").focus(); return toast("Give the view a name", true); }
+  if (!rel.data) return;
+  const view = relViewState(), same = relViews.list.find((x) => x.name.toLowerCase() === name.toLowerCase());
+  const btn = $("relSaveOk");
+  btn.disabled = true;
+  try {
+    let id;
+    if (relViews.saved) {
+      id = (await api("POST", "/api/relviews", { session: state.session, id: same ? same.id : 0, name, view })).id;
+      await relViewsLoad();
+    } else {
+      const list = relLocalViews().filter((x) => x.name.toLowerCase() !== name.toLowerCase());
+      id = same ? same.id : "b" + Date.now();
+      list.push({ id, name, view, updated: new Date().toISOString() });
+      list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      if (!relLocalKeep(list)) throw new Error("This browser wouldn't keep the view (its storage is off or full)");
+      relViews.list = list;
+    }
+    relViewsRender(id);
+    relSaveClose();
+    toast(`${same ? "Saved over" : "Saved"} the view “${name}”`);
+  } catch (e) { toast(e.message, true); } finally { btn.disabled = false; }
+});
+// Deleting asks a second click (no browser dialog).
+function relDelArm(on) {
+  const b = $("relViewDel");
+  clearTimeout(rel.delTimer);
+  b.dataset.armed = on ? "1" : "";
+  b.classList.toggle("btn-danger", on); b.classList.toggle("btn-outline-secondary", !on);
+  b.innerHTML = on ? `<i class="bi bi-trash" aria-hidden="true"></i> Delete?` : `<i class="bi bi-trash" aria-hidden="true"></i>`;
+  if (on) rel.delTimer = setTimeout(() => relDelArm(false), 4000);
+}
+$("relViewDel").addEventListener("click", async () => {
+  const v = relViews.list.find((x) => String(x.id) === $("relViewSel").value);
+  if (!v) return;
+  if (!$("relViewDel").dataset.armed) return relDelArm(true);
+  relDelArm(false);
+  try {
+    if (relViews.saved) { await api("POST", `/api/relviews/${encodeURIComponent(v.id)}/delete?session=${encodeURIComponent(state.session)}`); await relViewsLoad(); }
+    else { relViews.list = relLocalViews().filter((x) => String(x.id) !== String(v.id)); relLocalKeep(relViews.list); }
+    relViewsRender("");
+    toast(`Deleted the view “${v.name}”`);
+  } catch (e) { toast(e.message, true); }
+});
+document.addEventListener("pointerdown", (ev) => {
+  if (!$("relSaveBox").hidden && !ev.target.closest("#relSaveBox, #relViewSave")) relSaveClose();
 });
 
 // ---- the dashboard of the connected database -------------------------------------
@@ -4180,7 +4751,7 @@ async function connect(extra = {}) {
     $("engineBadge").hidden = false;
     // The dashboard, for the databases whose statistics cactusdb can read.
     dashReset(!!res.dashboard);
-    relReset();
+    relReset(); qaReset();
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
     $("backupBtn").disabled = !!eng.noBackup;
     $("backupBtn").title = eng.noBackup ? `A backup as an SQL script isn't available for ${eng.name}: use Export all and DDL` : backupTitle;
@@ -4227,7 +4798,7 @@ async function disconnect(reason = "") {
   $("status").textContent = "Not connected";
   $("engineBadge").hidden = true;
   dashReset(false);
-  relReset();
+  relReset(); qaReset();
   $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
@@ -4371,7 +4942,7 @@ const GA_API = {
   "GET /api/select": "open_table", "GET /api/definition": "show_definition", "POST /api/query": "run_query",
   "GET /api/tablestats": "table_stats", "GET /api/relationships": "relationships", "POST /api/relationships/unique": "relationship_cardinality", "POST /api/export": "export", "POST /api/exportall": "export_all",
   "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare", "POST /api/migrate": "migrate",
-  "POST /api/connections": "save_connection", "POST /api/queries": "save_query",
+  "POST /api/connections": "save_connection", "POST /api/queries": "save_query", "POST /api/relviews": "save_relationships_view",
   "POST /api/files/zip": "zip_files", "POST /api/files/preview": "preview_file", "POST /api/files/delete": "delete_files",
   "POST /api/settings": "save_settings", "POST /api/usage/delete": "usage_housekeeping",
 };
@@ -4498,7 +5069,7 @@ $("qTable").addEventListener("click", async (ev) => {
   const x = queries.list.find((q) => q.id === +b.closest("tr").dataset.qid);
   if (!x) return;
   if (b.dataset.qact === "run") {
-    $("sql").value = x.sql; state.result = null;
+    $("sql").value = x.sql; state.result = null; qdSoon();
     showTab("data"); $("runBtn").click();
   } else if (b.dataset.qact === "edit" || b.dataset.qact === "versions") {
     openQueryDialog(x, b.dataset.qact === "versions");
@@ -4769,7 +5340,7 @@ async function refreshAll() {
     const res = await api("POST", "/api/refresh", { session });
     if (session !== state.session) return;
     state.objects = res.objects; resetTableStats(); state.defFor = null;
-    relReset();
+    relReset(); qaReset();
     const sel = state.sel;
     if (sel && !state.objects.some((g) => g.type === sel.type && g.items.includes(sel.name))) {
       state.sel = null; state.table = null; $("tabTitle").textContent = "";
@@ -4813,7 +5384,7 @@ async function loadTable(name) {
   try {
     const q = new URLSearchParams({ session: state.session, table: name, limit: $("limit").value });
     const res = await api("GET", "/api/select?" + q);
-    $("sql").value = res.sql;
+    $("sql").value = res.sql; qdSoon();
     res.table = name;
     showResult(res);
   } catch (e) { setInfo(e.message, true); }
@@ -5315,6 +5886,408 @@ $("sql").addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); }
 });
 $("limit").addEventListener("change", () => { if (state.result) run(); });
+
+// ---- query editor: suggestions, and the query's tables drawn beside it ----
+// While a query is typed the editor suggests what can come next: after a
+// table's name or alias and a dot (t1.) that table's columns; after FROM,
+// JOIN, UPDATE or INTO (or a comma after FROM) the tables and views; anywhere
+// else the columns of the query's tables, its aliases and keywords. ↑ ↓
+// choose, Enter or Tab takes one, Esc closes, Ctrl+Space asks. The columns
+// are read once a connection from the catalog (/api/columns). Beside the
+// query its tables are drawn with the conditions that join them (a.x = b.y),
+// 1 or N at each end from the keys, and a table joined by nothing marked.
+const qa = { cols: null, loading: null, seq: 0, req: 0, items: [], at: 0, from: 0, to: 0, open: false, skip: false };
+const QA_KW = ["SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "ON", "AND", "OR", "NOT",
+  "IN", "EXISTS", "BETWEEN", "LIKE", "IS NULL", "IS NOT NULL", "AS", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "OFFSET", "DISTINCT", "UNION",
+  "UNION ALL", "WITH", "CASE", "WHEN", "THEN", "ELSE", "END", "COUNT(*)", "SUM(", "MIN(", "MAX(", "AVG(", "COALESCE(", "ASC", "DESC"];
+const QA_WORDS = new Set(("select from where join left right inner outer full cross natural on and or not in exists between like ilike is null as group " +
+  "order by having limit offset fetch first next rows only top distinct union all intersect except with case when then else end asc desc using update " +
+  "into insert delete set values lateral apply window over partition straight_join").split(" "));
+const QA_TABLE_AFTER = new Set(["from", "join", "update", "into", "table", "straight_join"]);
+const QA_ENDS_FROM = new Set(["where", "group", "order", "having", "limit", "union", "on", "set", "values", "select", "using", "window", "fetch", "offset", "intersect", "except"]);
+
+function qaIsSQL() {
+  const e = state.engines.find((x) => x.id === state.engine);
+  return !!state.session && (!e || !e.language || e.language === "SQL");
+}
+function qaReset() { qa.seq++; qa.cols = null; qa.loading = null; qaClose(); qdDraw(); }
+// qaColumns reads the columns of every table and view, once a connection.
+function qaColumns() {
+  if (qa.cols || !qaIsSQL()) return Promise.resolve(qa.cols);
+  if (!qa.loading) {
+    const seq = qa.seq;
+    qa.loading = api("GET", "/api/columns?session=" + encodeURIComponent(state.session)).then((d) => {
+      if (seq === qa.seq) qa.cols = new Map(Object.entries(d.columns || {}).map(([k, v]) => [k.toLowerCase(), { name: k, cols: v }]));
+      return qa.cols;
+    }).catch(() => { if (seq === qa.seq) qa.cols = new Map(); return qa.cols; });
+  }
+  return qa.loading;
+}
+function qaTables() {
+  return state.objects.filter((g) => g.queryable).flatMap((g) => g.items.map((name) => ({ name, type: g.type })));
+}
+// qaFind is the table or view of a name as written (with or without its schema).
+function qaFind(name) {
+  const l = name.toLowerCase(), ts = qaTables();
+  const t = ts.find((x) => x.name.toLowerCase() === l) || ts.find((x) => x.name.toLowerCase().endsWith("." + l)) ||
+    ts.find((x) => l.endsWith("." + x.name.toLowerCase()));
+  const c = qa.cols && (qa.cols.get(t ? t.name.toLowerCase() : l));
+  return t || c ? { name: t ? t.name : c.name, type: t ? t.type : "table", cols: c ? c.cols : null } : null;
+}
+// qaQuote writes a name as the database wants it when it isn't a plain word.
+function qaQuote(name) {
+  return name.split(".").map((p) => {
+    if (/^[A-Za-z_][\w$#]*$/.test(p) && !QA_WORDS.has(p.toLowerCase())) return p;
+    return state.engine === "mysql" || state.engine === "mariadb" ? "`" + p.replace(/`/g, "``") + "`"
+      : state.engine === "mssql" ? "[" + p.replace(/]/g, "]]") + "]" : `"${p.replace(/"/g, '""')}"`;
+  }).join(".");
+}
+
+function qaTokens(src) {
+  const out = [], re = /--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:[^']|'')*'?|"(?:[^"]|"")*"?|`[^`]*`?|\[[^\]]*\]?|[A-Za-z_À-￿][\w$#À-￿]*|\d[\d.]*|<>|!=|<=|>=|::|\S/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const t = m[0];
+    if (t.startsWith("--") || t.startsWith("/*")) continue;
+    const kind = t[0] === "'" ? "str" : /^["`[]/.test(t) ? "id" : /^[A-Za-z_À-￿]/.test(t) ? "word" : /^\d/.test(t) ? "num" : "op";
+    out.push({ t, l: t.toLowerCase(), kind, at: m.index, end: m.index + t.length, v: kind === "id" ? t.slice(1, /["`\]]$/.test(t) && t.length > 1 ? -1 : undefined) : t });
+  }
+  return out;
+}
+// qaParse finds the query's tables (with their aliases and how they are
+// joined), the conditions joining them (a.x = b.y, in an ON or a WHERE) and
+// the columns used by each alias.
+function qaParse(src) {
+  const tk = qaTokens(src), tables = [], joins = [], refs = new Map();
+  const nameAt = (i) => {
+    const parts = [];
+    while (tk[i] && (tk[i].kind === "id" || tk[i].kind === "word")) {
+      parts.push(tk[i].v);
+      // Parts are joined by a dot written next to them (u. from: no).
+      if (tk[i + 1] && tk[i + 1].t === "." && tk[i + 1].at === tk[i].end && tk[i + 2] && tk[i + 2].at === tk[i + 1].end &&
+        (tk[i + 2].kind === "id" || tk[i + 2].kind === "word")) i += 2; else { i++; break; }
+    }
+    return [parts, i];
+  };
+  const isAlias = (x) => x && (x.kind === "id" || (x.kind === "word" && !QA_WORDS.has(x.l)));
+  const readTable = (i, how) => {
+    if (!tk[i]) return i;
+    let parts = [];
+    if (tk[i].t === "(") return i; // a subquery: its own tables are read with the rest
+    [parts, i] = nameAt(i);
+    if (!parts.length || (parts.length === 1 && tk[i - 1].kind === "word" && QA_WORDS.has(tk[i - 1].l))) return i;
+    if (tk[i] && tk[i].t === "(") return i; // a function, not a table
+    let alias = "";
+    if (tk[i] && tk[i].l === "as") i++;
+    if (isAlias(tk[i])) { alias = tk[i].v; i++; }
+    tables.push({ name: parts.join("."), alias, how });
+    return i;
+  };
+  let inFrom = false, cond = "", joinHow = "";
+  for (let i = 0; i < tk.length; i++) {
+    const x = tk[i];
+    if (x.kind === "word") {
+      if (x.l === "from") { inFrom = true; i = readTable(i + 1, "from") - 1; continue; }
+      if (x.l === "join" || x.l === "straight_join") { i = readTable(i + 1, joinHow || "join") - 1; joinHow = ""; inFrom = true; continue; }
+      if (["left", "right", "full", "cross", "inner", "natural"].includes(x.l)) { joinHow = joinHow || x.l; continue; }
+      if (x.l === "update" || x.l === "into") { i = readTable(i + 1, x.l) - 1; continue; }
+      if (QA_ENDS_FROM.has(x.l)) inFrom = false;
+      if (x.l === "on" || x.l === "where" || x.l === "having") cond = x.l;
+    } else if (x.t === "," && inFrom) { i = readTable(i + 1, "from") - 1; continue; }
+    else if (x.t === ";") { inFrom = false; cond = ""; }
+    // a.x = b.y
+    const ref = (j) => {
+      const [parts, k] = nameAt(j);
+      return parts.length >= 2 ? [{ qual: parts.slice(0, -1).join("."), col: parts[parts.length - 1] }, k] : [null, k];
+    };
+    if (x.kind === "id" || x.kind === "word") {
+      const [a, k] = ref(i);
+      if (!a) continue;
+      (refs.get(a.qual.toLowerCase()) || refs.set(a.qual.toLowerCase(), new Set()).get(a.qual.toLowerCase())).add(a.col);
+      if (tk[k] && tk[k].t === "=") {
+        const [b, k2] = ref(k + 1);
+        if (b) {
+          (refs.get(b.qual.toLowerCase()) || refs.set(b.qual.toLowerCase(), new Set()).get(b.qual.toLowerCase())).add(b.col);
+          joins.push({ a: a.qual, ac: a.col, b: b.qual, bc: b.col, where: cond !== "on" });
+          i = k2 - 1;
+          continue;
+        }
+      }
+      i = k - 1;
+    }
+  }
+  return { tables, joins, refs };
+}
+// qaOf finds the query's table a qualifier (alias, table name) stands for.
+function qaOf(p, qual) {
+  const l = qual.toLowerCase();
+  return p.tables.find((t) => t.alias && t.alias.toLowerCase() === l) ||
+    p.tables.find((t) => !t.alias && (t.name.toLowerCase() === l || t.name.toLowerCase().endsWith("." + l))) ||
+    p.tables.find((t) => t.name.toLowerCase() === l || t.name.toLowerCase().endsWith("." + l));
+}
+
+// qaSuggest is what can be written at pos, and from where it replaces.
+function qaSuggest(src, pos, force) {
+  const before = src.slice(0, pos);
+  const tk = qaTokens(before), last = tk[tk.length - 1];
+  if (last && last.end === pos && last.kind === "str" && (last.t.length === 1 || !last.t.endsWith("'"))) return null; // in a string
+  const line = before.slice(before.lastIndexOf("\n") + 1), dash = line.indexOf("--");
+  if (dash >= 0 && (line.slice(0, dash).split("'").length % 2) === 1) return null; // in a comment
+  const m = /(?:((?:(?:[\w$#À-￿]+|"[^"]*"|`[^`]*`|\[[^\]]*\])\.)+))?([\w$#À-￿]*)$/.exec(before);
+  const qual = m[1] ? m[1].slice(0, -1).split(".").map((s) => s.replace(/^["`[]|["`\]]$/g, "")).join(".") : "", part = m[2], from = pos - part.length;
+  const p = qaParse(src), pl = part.toLowerCase(), items = [];
+  const rank = (name) => { const l = name.toLowerCase(); return !pl ? 1 : l.startsWith(pl) ? 0 : l.includes(pl) ? 1 : -1; };
+  const add = (it) => { const r = rank(it.label); if (r >= 0) items.push({ ...it, r, i: items.length }); };
+  // What comes before the word: a table after FROM, JOIN…, else a column.
+  const prev = qaTokens(before.slice(0, pos - m[0].length));
+  let ctx = "col", lastKw = "";
+  for (let i = prev.length - 1; i >= 0; i--) if (prev[i].kind === "word" && (QA_WORDS.has(prev[i].l))) { lastKw = prev[i].l; break; }
+  const p1 = prev[prev.length - 1], p2 = prev[prev.length - 2];
+  const named = (x) => x && (x.kind === "id" || (x.kind === "word" && !QA_WORDS.has(x.l)));
+  // A table's alias is being written (FROM users u, JOIN role AS r): nothing to suggest.
+  if (!qual && (p1 && p1.l === "as" ? p2 && named(p2) : named(p1) && p2 && ((p2.kind === "word" && QA_TABLE_AFTER.has(p2.l)) || (p2.t === "," && lastKw === "from") || p2.t === "."))) return null;
+  if (p1 && p1.kind === "word" && QA_TABLE_AFTER.has(p1.l)) ctx = "table";
+  else if (p1 && p1.t === "," && lastKw === "from") ctx = "table";
+  if (qual) {
+    const t = qaOf(p, qual), found = t && qaFind(t.name);
+    const tab = found || qaFind(qual);
+    if (tab && tab.cols) {
+      tab.cols.forEach((c) => add({ kind: "col", label: c.n, insert: qaQuote(c.n), key: c.k, detail: (t && t.alias ? t.alias + " · " : "") + tab.name + (c.o ? "" : " · not null") }));
+    } else { // a schema: its tables
+      const ql = qual.toLowerCase() + ".";
+      qaTables().filter((x) => x.name.toLowerCase().startsWith(ql)).forEach((x) => add({ kind: x.type, label: x.name.slice(ql.length), insert: qaQuote(x.name.slice(ql.length)), detail: relOneType(x.type) }));
+    }
+    if (!items.length && !force && !qa.cols) return null;
+  } else if (ctx === "table") {
+    qaTables().forEach((x) => add({ kind: x.type, label: x.name, insert: qaQuote(x.name), detail: relOneType(x.type) }));
+  } else {
+    if (!part && !force) return null;
+    const seen = new Map();
+    for (const t of p.tables) {
+      const tab = qaFind(t.name);
+      if (t.alias) add({ kind: "alias", label: t.alias, insert: t.alias, detail: "alias of " + t.name });
+      if (!tab || !tab.cols) continue;
+      for (const c of tab.cols) {
+        const k = c.n.toLowerCase();
+        seen.set(k, (seen.get(k) || 0) + 1);
+        add({ kind: "col", label: c.n, insert: qaQuote(c.n), key: c.k, q: t.alias || t.name.split(".").pop(), detail: (t.alias ? t.alias + " · " : "") + tab.name });
+      }
+    }
+    // A column in two of the tables is written with its table's alias.
+    items.forEach((it) => { if (it.kind === "col" && seen.get(it.label.toLowerCase()) > 1) { it.insert = qaQuote(it.q) + "." + it.insert; it.label = it.q + "." + it.label; } });
+    QA_KW.forEach((k) => add({ kind: "kw", label: k, insert: k + (/[(*]$/.test(k) ? "" : " "), detail: "keyword" }));
+    if (!p.tables.length) qaTables().forEach((x) => add({ kind: x.type, label: x.name, insert: qaQuote(x.name), detail: relOneType(x.type) }));
+  }
+  items.sort((a, b) => a.r - b.r || a.i - b.i);
+  const out = items.slice(0, 80);
+  if (!force && out.length === 1 && out[0].label.toLowerCase() === pl) return null; // written already
+  return { items: out, from, qual };
+}
+function relOneType(type) {
+  const g = state.objects.find((x) => x.type === type);
+  return g ? g.label.replace(/ies$/, "y").replace(/s$/, "").toLowerCase() : type;
+}
+
+function qaCaretXY(ta, pos) {
+  const cs = getComputedStyle(ta), div = document.createElement("div");
+  for (const p of ["boxSizing", "width", "fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "paddingTop", "paddingRight", "paddingBottom",
+    "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "borderStyle", "tabSize", "textIndent", "wordSpacing"]) div.style[p] = cs[p];
+  Object.assign(div.style, { position: "absolute", visibility: "hidden", whiteSpace: "pre-wrap", overflowWrap: "break-word", top: "0", left: "-9999px", overflow: "hidden" });
+  div.textContent = ta.value.slice(0, pos);
+  const span = document.createElement("span");
+  span.textContent = "​";
+  div.appendChild(span);
+  document.body.appendChild(div);
+  const r = { x: span.offsetLeft - ta.scrollLeft, y: span.offsetTop - ta.scrollTop, h: span.offsetHeight || parseFloat(cs.lineHeight) || 16 };
+  div.remove();
+  return r;
+}
+async function qaUpdate(force) {
+  const ta = $("sql");
+  if (!$("qaOn").checked || !qaIsSQL() || ta.selectionStart !== ta.selectionEnd) return qaClose();
+  const req = ++qa.req;
+  await qaColumns();
+  if (req !== qa.req || document.activeElement !== ta) return;
+  const r = qaSuggest(ta.value, ta.selectionStart, force);
+  if (!r || !r.items.length) {
+    if (force) { qaShow([], ta); $("qaList").innerHTML = `<div class="qahint">${qa.cols && qa.cols.size ? "Nothing to suggest here" : "No columns could be read for this database"}</div>`; return; }
+    return qaClose();
+  }
+  qa.items = r.items; qa.from = r.from; qa.to = ta.selectionStart; qa.at = 0;
+  qaShow(r.items, ta, ta.value.slice(r.from, qa.to));
+}
+function qaShow(items, ta, part = "") {
+  const list = $("qaList"), pl = part.toLowerCase();
+  const icon = (it) => it.kind === "col" ? (it.key === "PRI" ? "key-fill" : it.key === "UNI" ? "key" : "dot") : it.kind === "alias" ? "link-45deg" : it.kind === "kw" ? "code" : ICONS[it.kind] || "table";
+  const mark = (s) => { const i = pl ? s.toLowerCase().indexOf(pl) : -1; return i < 0 ? esc(s) : esc(s.slice(0, i)) + "<b>" + esc(s.slice(i, i + pl.length)) + "</b>" + esc(s.slice(i + pl.length)); };
+  list.innerHTML = items.map((it, i) => `<div class="qa${i === qa.at ? " on" : ""}" role="option" id="qa${i}" data-i="${i}" aria-selected="${i === qa.at}">` +
+    `<i class="bi bi-${icon(it)}" aria-hidden="true"></i><span class="n">${mark(it.label)}</span><span class="d">${esc(it.detail || "")}</span></div>`).join("") +
+    (items.length ? `<div class="qahint">↑ ↓ choose · Enter or Tab takes · Esc closes</div>` : "");
+  const xy = qaCaretXY(ta, ta.selectionStart);
+  list.hidden = false; qa.open = items.length > 0;
+  list.style.left = Math.max(0, Math.min(ta.offsetLeft + xy.x, ta.offsetLeft + ta.clientWidth - Math.min(list.offsetWidth, ta.clientWidth))) + "px";
+  list.style.top = (ta.offsetTop + Math.min(Math.max(xy.y, 0), ta.clientHeight - xy.h) + xy.h + 2) + "px";
+  ta.setAttribute("aria-expanded", "true");
+  if (qa.open) ta.setAttribute("aria-activedescendant", "qa" + qa.at);
+}
+function qaClose() {
+  qa.open = false; qa.req++;
+  const list = $("qaList");
+  if (list) { list.hidden = true; list.innerHTML = ""; }
+  $("sql").setAttribute("aria-expanded", "false"); $("sql").removeAttribute("aria-activedescendant");
+}
+function qaMove(d) {
+  if (!qa.items.length) return;
+  qa.at = (qa.at + d + qa.items.length) % qa.items.length;
+  $("qaList").querySelectorAll(".qa").forEach((el, i) => { el.classList.toggle("on", i === qa.at); el.setAttribute("aria-selected", i === qa.at); });
+  $("qaList").querySelector(".qa.on")?.scrollIntoView({ block: "nearest" });
+  $("sql").setAttribute("aria-activedescendant", "qa" + qa.at);
+}
+function qaAccept(i) {
+  const it = qa.items[i], ta = $("sql");
+  if (!it) return;
+  ta.focus();
+  ta.setSelectionRange(qa.from, qa.to);
+  qa.skip = true;
+  // As typed (it can be undone), where the browser allows.
+  if (!document.execCommand("insertText", false, it.insert)) { ta.setRangeText(it.insert, qa.from, qa.to, "end"); ta.dispatchEvent(new Event("input")); }
+  qa.skip = false;
+  qaClose(); qdSoon();
+}
+$("sql").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.code === "Space") { e.preventDefault(); qaUpdate(true); return; }
+  if (!qa.open) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); qaMove(e.key === "ArrowDown" ? 1 : -1); }
+  else if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); qaAccept(qa.at); }
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); qaClose(); }
+  else if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key)) qaClose();
+});
+$("sql").addEventListener("input", () => { if (!qa.skip) qaUpdate(false); qdSoon(); });
+$("sql").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("sql")) qaClose(); }, 120));
+$("sql").addEventListener("click", qaClose);
+$("sql").addEventListener("scroll", qaClose);
+$("qaList").addEventListener("mousedown", (e) => e.preventDefault()); // the editor keeps the focus
+$("qaList").addEventListener("click", (e) => { const el = e.target.closest("[data-i]"); if (el) qaAccept(+el.dataset.i); });
+for (const id of ["qaOn", "qdOn"]) {
+  try { const v = localStorage.getItem("cactusdb." + id); if (v) $(id).checked = v === "1"; } catch (e) { /* default */ }
+  $(id).addEventListener("change", () => {
+    try { localStorage.setItem("cactusdb." + id, $(id).checked ? "1" : "0"); } catch (e) { /* not remembered */ }
+    if (id === "qdOn") qdDraw(); else qaClose();
+  });
+}
+
+// ---- the query's diagram ----
+let qdTimer = 0;
+function qdSoon() { clearTimeout(qdTimer); qdTimer = setTimeout(qdDraw, 250); }
+async function qdDraw() {
+  const ta = $("sql"), p = $("qdOn").checked && qaIsSQL() ? qaParse(ta.value) : null;
+  const tables = p ? p.tables : [];
+  const show = tables.length > 0;
+  $("qDiag").hidden = !show;
+  $("qDiag").parentElement.classList.toggle("diag", show);
+  if (!show) return;
+  // The aside is as tall as the editor, and tall enough to read.
+  $("qDiag").style.height = Math.max(ta.offsetHeight, 170) + "px";
+  await qaColumns();
+  if ($("qDiag").hidden) return;
+  // One box for each table as the query names it (a table twice: twice).
+  const nodes = [];
+  for (const t of tables) {
+    const key = (t.alias || t.name).toLowerCase();
+    if (nodes.some((n) => n.key === key)) continue;
+    const tab = qaFind(t.name);
+    nodes.push({ key, t, tab, used: new Set(), edges: [] });
+  }
+  const nodeOf = (qual) => { const t = qaOf(p, qual); return t && nodes.find((n) => n.key === (t.alias || t.name).toLowerCase()); };
+  for (const n of nodes) {
+    for (const k of [n.t.alias, n.t.name, n.t.name.split(".").pop()]) if (k && p.refs.has(k.toLowerCase())) p.refs.get(k.toLowerCase()).forEach((c) => n.used.add(c));
+  }
+  const pairs = new Map();
+  for (const j of p.joins) {
+    const a = nodeOf(j.a), b = nodeOf(j.b);
+    if (!a || !b || a === b) continue;
+    const k = a.key < b.key ? a.key + "|" + b.key : b.key + "|" + a.key;
+    const e = pairs.get(k) || { a, b, conds: [], where: true };
+    if (!pairs.has(k)) { pairs.set(k, e); a.edges.push(e); b.edges.push(e); }
+    e.conds.push(e.a === a ? { ac: j.ac, bc: j.bc } : { ac: j.bc, bc: j.ac });
+    e.where = e.where && j.where;
+  }
+  // Columns: the joined ones first, then the others used, at most 7.
+  const W = (s, bold) => { const c = qdDraw.ctx || (qdDraw.ctx = document.createElement("canvas").getContext("2d")); c.font = `${bold ? "600 12px" : "11px"} ${getComputedStyle($("sql")).fontFamily}`; return c.measureText(s).width; };
+  for (const n of nodes) {
+    const joined = new Set([...n.edges].flatMap((e) => e.conds.map((c) => (e.a === n ? c.ac : c.bc).toLowerCase())));
+    const list = [...n.used].sort((x, y) => (joined.has(y.toLowerCase()) - joined.has(x.toLowerCase())));
+    const key = (c) => { const cc = n.tab && n.tab.cols && n.tab.cols.find((x) => x.n.toLowerCase() === c.toLowerCase()); return cc ? cc.k : ""; };
+    n.rows = list.slice(0, 7).map((c) => ({ c, on: joined.has(c.toLowerCase()), k: key(c) }));
+    if (list.length > 7) n.rows.push({ c: `+${list.length - 7} more`, more: true });
+    n.title = n.t.name + (n.t.alias ? " " + n.t.alias : "");
+    n.w = Math.max(W(n.t.name, true) + (n.t.alias ? W(" " + n.t.alias) : 0), ...n.rows.map((r) => W((r.k ? "🔑 " : "") + r.c))) + 22;
+    n.h = 24 + n.rows.length * 15 + (n.rows.length ? 4 : 0);
+  }
+  // Columns of boxes: the first table, then what is joined to it, and so on.
+  const depth = new Map([[nodes[0], 0]]), queue = [nodes[0]];
+  while (queue.length) { const n = queue.shift(); for (const e of n.edges) { const o = e.a === n ? e.b : e.a; if (!depth.has(o)) { depth.set(o, depth.get(n) + 1); queue.push(o); } } }
+  let maxD = Math.max(...depth.values());
+  const cross = nodes.filter((n) => !depth.has(n));
+  cross.forEach((n) => { depth.set(n, ++maxD); });
+  const cols = [];
+  nodes.forEach((n) => (cols[depth.get(n)] = cols[depth.get(n)] || []).push(n));
+  const GX = 70, GY = 18;
+  let x = 0;
+  const heights = cols.map((c) => c.reduce((a, n) => a + n.h + GY, -GY)), H = Math.max(...heights);
+  cols.forEach((c, d) => {
+    const w = Math.max(...c.map((n) => n.w));
+    let y = (H - heights[d]) / 2;
+    c.forEach((n) => { n.x = x; n.y = y; n.cw = w; y += n.h + GY; });
+    x += w + GX;
+  });
+  const Wt = x - GX, NS = "http://www.w3.org/2000/svg";
+  const rowY = (n, col) => { const i = n.rows.findIndex((r) => !r.more && r.c.toLowerCase() === col.toLowerCase()); return i < 0 ? n.y + 12 : n.y + 24 + i * 15 + 7; };
+  const uniq = (n, cols1) => { if (!n.tab || !n.tab.cols || cols1.length !== 1) return null; const c = n.tab.cols.find((x) => x.n.toLowerCase() === cols1[0].toLowerCase()); return c ? !!c.k : null; };
+  let svg = "";
+  const edges = [...pairs.values()];
+  for (const e of edges) {
+    let [a, b] = [e.a, e.b];
+    let conds = e.conds;
+    if (a.x > b.x) { [a, b] = [b, a]; conds = conds.map((c) => ({ ac: c.bc, bc: c.ac })); }
+    const c0 = conds[0], y1 = rowY(a, c0.ac), y2 = rowY(b, c0.bc);
+    let d, lx, ly, e1, e2;
+    if (a.x === b.x) { // same column: round the right side
+      const x1 = a.x + a.w, x2 = b.x + b.w, xr = Math.max(x1, x2) + 26;
+      d = `M${x1} ${y1}H${xr - 6}Q${xr} ${y1} ${xr} ${y1 + Math.sign(y2 - y1) * 6}V${y2 - Math.sign(y2 - y1) * 6}Q${xr} ${y2} ${xr - 6} ${y2}H${x2}`;
+      lx = xr + 4; ly = (y1 + y2) / 2; e1 = [x1 + 8, y1 - 3]; e2 = [x2 + 8, y2 - 3];
+    } else {
+      const x1 = a.x + a.w, x2 = b.x, mx = (a.x + a.cw + x2) / 2;
+      d = `M${x1} ${y1}H${mx}V${y2}H${x2}`;
+      lx = mx; ly = Math.min(y1, y2) + Math.abs(y2 - y1) / 2; e1 = [x1 + 8, y1 - 3]; e2 = [x2 - 8, y2 - 3];
+    }
+    const how = b.t.how === "left" || b.t.how === "right" || b.t.how === "full" ? b.t.how.toUpperCase() + " · " : a.t.how === "left" || a.t.how === "right" ? a.t.how.toUpperCase() + " · " : "";
+    const text = how + conds.map((c) => c.ac.toLowerCase() === c.bc.toLowerCase() ? c.ac : `${c.ac} = ${c.bc}`).join(", ");
+    const u1 = uniq(a, conds.map((c) => c.ac)), u2 = uniq(b, conds.map((c) => c.bc));
+    svg += `<path class="qd-line${e.where ? " where" : ""}" d="${d}"><title>${esc(a.title)} ${esc(conds.map((c) => `${c.ac} = ${c.bc}`).join(" and "))} ${esc(b.title)}${e.where ? " (in the WHERE)" : ""}</title></path>` +
+      `<text class="qd-lbl" x="${lx}" y="${ly - 4}" text-anchor="${a.x === b.x ? "start" : "middle"}">${esc(text)}</text>` +
+      (u1 === null ? "" : `<text class="qd-end" x="${e1[0]}" y="${e1[1]}" text-anchor="middle">${u1 ? "1" : "N"}</text>`) +
+      (u2 === null ? "" : `<text class="qd-end" x="${e2[0]}" y="${e2[1]}" text-anchor="middle">${u2 ? "1" : "N"}</text>`);
+  }
+  for (const n of nodes) {
+    const isCross = nodes.length > 1 && !n.edges.length, kind = n.tab ? (n.tab.type === "table" ? "" : " view") : " unknown";
+    svg += `<g><title>${esc(n.tab ? `${relOneType(n.tab.type)} ${n.tab.name}` : `${n.t.name}: not a table or view of this database`)}${isCross ? " — joined to no other table: every row is paired with every row of the others" : ""}</title>` +
+      `<rect class="qd-box${isCross ? " cross" : ""}" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="5"/>` +
+      `<rect class="qd-bar${kind}" x="${n.x}" y="${n.y}" width="4" height="${n.h}" rx="2"/>` +
+      `<text class="qd-name" x="${n.x + 10}" y="${n.y + 16}">${esc(n.t.name)}${n.t.alias ? `<tspan class="qd-alias"> ${esc(n.t.alias)}</tspan>` : ""}</text>` +
+      n.rows.map((r, i) => `<text class="qd-col${r.on ? " on" : ""}" x="${n.x + 10}" y="${n.y + 24 + i * 15 + 11}">${r.k ? "🔑 " : ""}${esc(r.c)}</text>`).join("") + `</g>`;
+  }
+  const pad = 10, right = Math.max(Wt, ...edges.filter((e) => e.a.x === e.b.x).map((e) => Math.max(e.a.x + e.a.w, e.b.x + e.b.w) + 26 + W(e.conds.map((c) => c.ac).join(", ")) + 8));
+  $("qDiagBody").innerHTML = `<svg viewBox="${-pad} ${-pad - 4} ${right + pad * 2} ${H + pad * 2 + 4}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The tables of the query">${svg}</svg>`;
+  const unjoined = nodes.length > 1 ? nodes.filter((n) => !n.edges.length) : [];
+  const unknown = nodes.filter((n) => !n.tab);
+  const sum = $("qDiagSum");
+  sum.className = "hint" + (unjoined.length || unknown.length ? " bad" : "");
+  sum.textContent = unjoined.length ? `${unjoined.map((n) => n.t.alias || n.t.name).join(", ")} joined to nothing`
+    : unknown.length ? `${unknown.map((n) => n.t.name).join(", ")}: not in this database`
+    : `${nodes.length} table${nodes.length === 1 ? "" : "s"} · ${edges.length} join${edges.length === 1 ? "" : "s"}`;
+}
+new ResizeObserver(() => { if (!$("qDiag").hidden) $("qDiag").style.height = Math.max($("sql").offsetHeight, 170) + "px"; }).observe($("sql"));
 
 // The grid comes back (and the export panel shrinks) once there is
 // something to show in it.
