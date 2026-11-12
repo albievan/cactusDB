@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.54.4 — 2026-11-12
+
+- Saving a query no longer closes the dialog: it becomes *Edit saved query* with the new
+  version listed and *Saved … (version n)* shown, to go on editing, executing and saving.
+- The **query diagram** is drawn in the saved query dialog too, with its own *Query
+  diagram* switch to hide or show it (the Data tab keeps its own switch).
+- The query diagram is drawn at its natural size (no longer blown up for two tables), with
+  room between the tables for what is written on the lines.
+
 ## 1.54.3 — 2026-11-12
 
 - The query of the Save / Edit saved query dialog gets the same suggestions as the Data

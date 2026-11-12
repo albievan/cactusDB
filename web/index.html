@@ -587,7 +587,8 @@
   .qdhead .hint { margin: 0; overflow: hidden; text-overflow: ellipsis; }
   .qdhead .hint.bad { color: var(--danger); }
   .qdbody { flex: 1; min-height: 0; display: grid; place-items: center; padding: 4px; }
-  .qdbody svg { width: 100%; height: 100%; display: block; }
+  .qdbody { overflow: hidden; }
+  .qdbody svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
   .qdbody .none { font-size: 12px; color: var(--muted); padding: 8px; text-align: center; }
   .qd-box { fill: var(--panel); stroke: var(--border); }
   .qd-box.cross { stroke: var(--danger); stroke-dasharray: 4 3; }
@@ -697,8 +698,13 @@
   .sqrowsbar .hint { margin: 0; font-size: 11.5px; }
   /* With rows under it the query keeps the height it is given (drag its bottom edge). */
   #sqDialog.rows #sqSql { flex: none; resize: vertical; min-height: 60px; max-height: 70vh; }
-  .sqqawrap { display: flex; flex-direction: column; flex: 1 1 0; min-height: 120px; }
-  #sqDialog.rows .sqqawrap { flex: none; min-height: 0; }
+  .sqdrow { flex: 1 1 0; min-height: 120px; }
+  .sqqawrap { display: flex; flex-direction: column; min-height: 0; }
+  .sqqawrap #sqSql { flex: 1 1 0; }
+  #sqDialog .qdiag { min-height: 120px; }
+  #sqDialog.rows .sqdrow { flex: none; min-height: 0; }
+  #sqDialog.rows .sqqawrap #sqSql { flex: none; }
+  .dactions .qaswitch { align-self: center; }
   .sqrows.stale { opacity: .55; }
   .sqrows table { margin: 0; }
   .sqrows th { position: sticky; top: 0; z-index: 1; background: var(--panel-2); }
@@ -2018,9 +2024,15 @@
     <label class="form-label" for="sqDesc">Description</label>
     <textarea class="form-control form-control-sm" id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
     <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
-    <div class="sqlwrap sqqawrap">
-      <textarea id="sqSql" rows="8" spellcheck="false" autocomplete="off" aria-autocomplete="list" aria-controls="sqQaList" class="form-control form-control-sm mono grow"></textarea>
-      <div class="qalist" id="sqQaList" role="listbox" aria-label="Suggestions" hidden></div>
+    <div class="sqlrow sqdrow">
+      <div class="sqlwrap sqqawrap">
+        <textarea id="sqSql" rows="8" spellcheck="false" autocomplete="off" aria-autocomplete="list" aria-controls="sqQaList" class="form-control form-control-sm mono grow"></textarea>
+        <div class="qalist" id="sqQaList" role="listbox" aria-label="Suggestions" hidden></div>
+      </div>
+      <aside class="qdiag" id="sqDiag" hidden aria-label="The tables of the query and how it joins them">
+        <div class="qdhead"><span><i class="bi bi-diagram-2" aria-hidden="true"></i> Tables of the query</span><span class="hint" id="sqDiagSum"></span></div>
+        <div class="qdbody" id="sqDiagBody"></div>
+      </aside>
     </div>
     <div id="sqResult" class="dresult alert alert-danger" hidden></div>
     <div class="sqrowsbar" id="sqRowsBar" hidden>
@@ -2030,6 +2042,7 @@
     <div class="sqrows" id="sqRows" hidden></div>
     <div class="dactions">
       <button class="btn btn-outline-secondary" type="button" id="sqCheck" title="Ask the database whether the query is valid, without running it"><i class="bi bi-check2-circle" aria-hidden="true"></i> Check syntax</button>
+      <label class="form-check form-switch qaswitch" title="Show or hide, beside the query, its tables and the columns it joins them by"><input class="form-check-input" type="checkbox" id="sqDiagOn" role="switch" checked> Query diagram</label>
       <button class="btn btn-outline-primary" type="button" id="sqRun" title="Run the query as it is written here (read-only) and show its first 100 rows below, without saving it or leaving the form (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Execute</button>
       <span class="spacer"></span>
       <button class="btn btn-outline-secondary" type="button" id="sqCancel">Cancel</button>
@@ -5109,7 +5122,7 @@ $("qTable").addEventListener("click", async (ev) => {
 let sqEdit = 0, sqOrig = null, sqVersions = [];
 const sqForm = () => ({ name: $("sqName").value, description: $("sqDesc").value, sql: $("sqSql").value });
 const sqDirty = () => { const f = sqForm(); return !!sqOrig && (f.name !== sqOrig.name || f.description !== sqOrig.description || f.sql !== sqOrig.sql); };
-function sqFill(v) { $("sqName").value = v.name; $("sqDesc").value = v.description || ""; $("sqSql").value = v.sql; $("sqResult").hidden = true; }
+function sqFill(v) { $("sqName").value = v.name; $("sqDesc").value = v.description || ""; $("sqSql").value = v.sql; $("sqResult").hidden = true; qdSoon(QD_DLG); }
 function openQueryDialog(x, versions) {
   if (!state.savedConn) {
     toast("Queries can only be saved for a saved connection: save this connection first.", true);
@@ -5227,9 +5240,14 @@ $("sqForm").addEventListener("submit", async (ev) => {
   sqShow("busy", "Checking the query with the database, then saving it…");
   try {
     const res = await api("POST", "/api/queries", body);
-    sqOrig = null; $("sqDialog").close();
-    toast(`Saved “${body.name.trim()}” (version ${res.version})` + (res.checked ? "" : ": the database couldn't check the query in time"));
+    // The form stays open, as the saved query's: keep editing, executing, saving.
+    const first = !sqEdit;
+    sqEdit = res.id; sqOrig = sqForm();
+    $("sqTitle").textContent = "Edit saved query";
+    sqShow("success", `Saved “${body.name.trim()}” (version ${res.version})` + (res.checked ? "" : ": the database couldn't check the query in time") + ". The form stays open: Cancel closes it.");
     loadQueries();
+    loadQueryVersions({ id: res.id, name: body.name.trim() }, false);
+    if (first) toast(`Saved “${body.name.trim()}”`);
   } catch (e) {
     sqShow("danger", e.message);
   } finally { $("sqSave").disabled = $("sqCheck").disabled = false; }
@@ -6219,7 +6237,7 @@ function qaAccept(i) {
   if (!document.execCommand("insertText", false, it.insert)) { ta.setRangeText(it.insert, qa.from, qa.to, "end"); ta.dispatchEvent(new Event("input")); }
   qa.skip = false;
   qaClose();
-  if (ta === $("sql")) qdSoon();
+  qdSoon(ta === $("sql") ? QD_MAIN : QD_DLG);
 }
 // The suggestions work in the Data tab's editor and in the saved query's.
 for (const [ta, list] of [[$("sql"), $("qaList")], [$("sqSql"), $("sqQaList")]]) {
@@ -6231,35 +6249,39 @@ for (const [ta, list] of [[$("sql"), $("qaList")], [$("sqSql"), $("sqQaList")]])
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); qaClose(); } // not the dialog's Esc
     else if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key)) qaClose();
   });
-  ta.addEventListener("input", () => { if (!qa.skip) qaUpdate(false, ta); if (ta === $("sql")) qdSoon(); });
+  ta.addEventListener("input", () => { if (!qa.skip) qaUpdate(false, ta); qdSoon(ta === $("sql") ? QD_MAIN : QD_DLG); });
   ta.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== ta) qaClose(); }, 120));
   ta.addEventListener("click", qaClose);
   ta.addEventListener("scroll", qaClose);
   list.addEventListener("mousedown", (e) => e.preventDefault()); // the editor keeps the focus
   list.addEventListener("click", (e) => { const el = e.target.closest("[data-i]"); if (el) qaAccept(+el.dataset.i); });
 }
-for (const id of ["qaOn", "qdOn"]) {
+for (const id of ["qaOn", "qdOn", "sqDiagOn"]) {
   try { const v = localStorage.getItem("cactusdb." + id); if (v) $(id).checked = v === "1"; } catch (e) { /* default */ }
   $(id).addEventListener("change", () => {
     try { localStorage.setItem("cactusdb." + id, $(id).checked ? "1" : "0"); } catch (e) { /* not remembered */ }
-    if (id === "qdOn") qdDraw(); else qaClose();
+    if (id === "qdOn") qdDraw(QD_MAIN); else if (id === "sqDiagOn") qdDraw(QD_DLG); else qaClose();
   });
 }
 
 // ---- the query's diagram ----
-let qdTimer = 0;
-function qdSoon() { clearTimeout(qdTimer); qdTimer = setTimeout(qdDraw, 250); }
-async function qdDraw() {
-  const ta = $("sql"), p = $("qdOn").checked && qaIsSQL() ? qaParse(ta.value) : null;
+// The diagram is drawn beside the Data tab's editor, and beside the query of
+// the saved query dialog: each with its own place and switch.
+const QD_MAIN = { ta: "sql", aside: "qDiag", body: "qDiagBody", sum: "qDiagSum", on: "qdOn" };
+const QD_DLG = { ta: "sqSql", aside: "sqDiag", body: "sqDiagBody", sum: "sqDiagSum", on: "sqDiagOn" };
+const qdTimers = new Map();
+function qdSoon(w = QD_MAIN) { clearTimeout(qdTimers.get(w)); qdTimers.set(w, setTimeout(() => qdDraw(w), 250)); }
+async function qdDraw(w = QD_MAIN) {
+  const ta = $(w.ta), aside = $(w.aside), p = $(w.on).checked && qaIsSQL() ? qaParse(ta.value) : null;
   const tables = p ? p.tables : [];
   const show = tables.length > 0;
-  $("qDiag").hidden = !show;
-  $("qDiag").parentElement.classList.toggle("diag", show);
+  aside.hidden = !show;
+  aside.parentElement.classList.toggle("diag", show);
   if (!show) return;
-  // The aside is as tall as the editor, and tall enough to read.
-  $("qDiag").style.height = Math.max(ta.offsetHeight, 170) + "px";
+  // The aside is as tall as the editor, and tall enough to read (in the dialog: as its row).
+  if (w === QD_MAIN) aside.style.height = Math.max(ta.offsetHeight, 170) + "px";
   await qaColumns();
-  if ($("qDiag").hidden) return;
+  if (aside.hidden) return;
   // One box for each table as the query names it (a table twice: twice).
   const nodes = [];
   for (const t of tables) {
@@ -6302,7 +6324,9 @@ async function qdDraw() {
   cross.forEach((n) => { depth.set(n, ++maxD); });
   const cols = [];
   nodes.forEach((n) => (cols[depth.get(n)] = cols[depth.get(n)] || []).push(n));
-  const GX = 70, GY = 18;
+  // Room between the columns for what is written on the lines.
+  const label = (e) => (e.a.t.how !== "from" || e.b.t.how !== "from" ? "RIGHT · " : "") + e.conds.map((c) => c.ac.toLowerCase() === c.bc.toLowerCase() ? c.ac : `${c.ac} = ${c.bc}`).join(", ");
+  const GX = Math.max(70, ...[...pairs.values()].map((e) => W(label(e)) + 44)), GY = 18;
   let x = 0;
   const heights = cols.map((c) => c.reduce((a, n) => a + n.h + GY, -GY)), H = Math.max(...heights);
   cols.forEach((c, d) => {
@@ -6348,10 +6372,10 @@ async function qdDraw() {
       n.rows.map((r, i) => `<text class="qd-col${r.on ? " on" : ""}" x="${n.x + 10}" y="${n.y + 24 + i * 15 + 11}">${r.k ? "🔑 " : ""}${esc(r.c)}</text>`).join("") + `</g>`;
   }
   const pad = 10, right = Math.max(Wt, ...edges.filter((e) => e.a.x === e.b.x).map((e) => Math.max(e.a.x + e.a.w, e.b.x + e.b.w) + 26 + W(e.conds.map((c) => c.ac).join(", ")) + 8));
-  $("qDiagBody").innerHTML = `<svg viewBox="${-pad} ${-pad - 4} ${right + pad * 2} ${H + pad * 2 + 4}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The tables of the query">${svg}</svg>`;
+  $(w.body).innerHTML = `<svg width="${Math.ceil(right + pad * 2)}" height="${Math.ceil(H + pad * 2 + 4)}" viewBox="${-pad} ${-pad - 4} ${right + pad * 2} ${H + pad * 2 + 4}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The tables of the query">${svg}</svg>`;
   const unjoined = nodes.length > 1 ? nodes.filter((n) => !n.edges.length) : [];
   const unknown = nodes.filter((n) => !n.tab);
-  const sum = $("qDiagSum");
+  const sum = $(w.sum);
   sum.className = "hint" + (unjoined.length || unknown.length ? " bad" : "");
   sum.textContent = unjoined.length ? `${unjoined.map((n) => n.t.alias || n.t.name).join(", ")} joined to nothing`
     : unknown.length ? `${unknown.map((n) => n.t.name).join(", ")}: not in this database`
