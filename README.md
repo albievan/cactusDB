@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.53.0
+cactusdb 1.54.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -386,6 +386,10 @@ databases (Oracle among them) start it, read-only, and it is stopped as soon as 
 are known, before any row is read, or after 15 seconds. The database's own error is shown
 when it isn't valid. **Save** does the same check first: a query that isn't valid isn't
 saved (one the database couldn't check in time is saved, and the notice says so).
+**Execute** (or **Ctrl+Enter** in the query) runs the query as it is written in the dialog,
+read-only like any query, and shows its first 100 rows under it, without saving it or
+closing the dialog: edit, execute, look, and save when it's right. The rows are greyed out
+once the query is changed, until it is executed again.
 
 **Closing with changes.** **Cancel** or Esc after changing anything in the dialog asks
 whether to **Save** the changes, **Discard** them or **Keep editing**.

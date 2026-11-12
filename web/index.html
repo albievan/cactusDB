@@ -690,6 +690,11 @@
   .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
   .hint code { overflow-wrap: anywhere; }
   .dresult { margin-top: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .sqrows { flex: 0 1 auto; max-height: 42vh; min-height: 0; overflow: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+  .sqrows[hidden] { display: none; }
+  .sqrows.stale { opacity: .55; }
+  .sqrows table { margin: 0; }
+  .sqrows th { position: sticky; top: 0; z-index: 1; background: var(--panel-2); }
   .gabanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 1060; display: flex; flex-direction: row; align-items: center; gap: 10px;
     max-width: min(760px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 10px; font-size: 13px; }
   .gabanner[hidden] { display: none; }
@@ -2008,8 +2013,10 @@
     <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
     <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono grow"></textarea>
     <div id="sqResult" class="dresult alert alert-danger" hidden></div>
+    <div class="sqrows" id="sqRows" hidden></div>
     <div class="dactions">
       <button class="btn btn-outline-secondary" type="button" id="sqCheck" title="Ask the database whether the query is valid, without running it"><i class="bi bi-check2-circle" aria-hidden="true"></i> Check syntax</button>
+      <button class="btn btn-outline-primary" type="button" id="sqRun" title="Run the query as it is written here (read-only) and show its first 100 rows below, without saving it or leaving the form (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Execute</button>
       <span class="spacer"></span>
       <button class="btn btn-outline-secondary" type="button" id="sqCancel">Cancel</button>
       <button type="submit" class="btn btn-primary" id="sqSave">Save</button>
@@ -5099,6 +5106,7 @@ function openQueryDialog(x, versions) {
   sqFill(x || { name: "", description: "", sql: $("sql").value.trim() });
   sqOrig = sqForm();
   sqVersions = []; $("sqVersRow").hidden = true;
+  $("sqRows").hidden = true; $("sqRows").innerHTML = ""; $("sqResult").hidden = true;
   if (x) loadQueryVersions(x, versions);
   $("sqDialog").showModal();
   $("sqName").focus();
@@ -5153,7 +5161,33 @@ $("sqCheck").addEventListener("click", async () => {
   } catch (e) { sqShow("danger", e.message); }
   finally { $("sqCheck").disabled = false; }
 });
-$("sqSql").addEventListener("input", () => { $("sqResult").hidden = true; }); // a result is of the query as it was
+// Execute: the query as written in the form, its first 100 rows under it.
+async function sqRun() {
+  const sql = $("sqSql").value.trim();
+  if (!sql) { sqShow("danger", "The query is empty."); return; }
+  $("sqRun").disabled = true; sqShow("busy", "Running the query…");
+  try {
+    const res = await api("POST", "/api/query", { session: state.session, sql, limit: 100 });
+    const n = res.rows.length;
+    sqShow("success", `${fmtInt(n)} row${n === 1 ? "" : "s"}${res.truncated ? " shown (the first 100)" : ""} · ${fmtInt(res.columns.length)} columns · ${fmtInt(res.elapsedMs)} ms`);
+    const cell = (v) => {
+      if (v === null) return `<td class="null">NULL</td>`;
+      const t = String(v);
+      return `<td${typeof v === "number" ? ` class="num"` : ""} title="${t.length > 40 ? esc(t.slice(0, 2000)) : ""}">${esc(t.length > 300 ? t.slice(0, 300) + "…" : t)}</td>`;
+    };
+    $("sqRows").innerHTML = res.columns.length
+      ? `<table class="table table-sm table-striped datagrid"><thead><tr><th class="n">#</th>${res.columns.map((c) => `<th title="${esc(c)}">${esc(c)}</th>`).join("")}</tr></thead>` +
+        `<tbody>${res.rows.map((r, i) => `<tr><td class="n">${i + 1}</td>${r.map(cell).join("")}</tr>`).join("")}</tbody></table>`
+      : `<p class="hint" style="margin:8px">The statement returned no rows.</p>`;
+    $("sqRows").classList.remove("stale"); $("sqRows").hidden = false;
+  } catch (e) {
+    sqShow("danger", e.message);
+    $("sqRows").hidden = true;
+  } finally { $("sqRun").disabled = false; }
+}
+$("sqRun").addEventListener("click", sqRun);
+$("sqSql").addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); sqRun(); } });
+$("sqSql").addEventListener("input", () => { $("sqResult").hidden = true; $("sqRows").classList.add("stale"); }); // a result is of the query as it was
 $("sqForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const body = { session: state.session, id: sqEdit, ...sqForm() };

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.54.0 — 2026-11-12
+
+- **Execute** in the Save / Edit saved query dialog (or Ctrl+Enter in its query): runs the
+  query as written there, read-only, and shows its first 100 rows under it, without saving
+  or closing the dialog. The rows grey out once the query is changed.
+
 ## 1.53.0 — 2026-11-12
 
 - **Query suggestions in the Data tab**: after `t1.` the columns of `t1`'s table, after
