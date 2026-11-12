@@ -52,6 +52,11 @@ func backupToDir(ctx context.Context, dir, engine string, db *sql.DB, label, nam
 		progress = func(string, int64) {}
 	}
 	var res backupResult
+	// name is the database's name, which may hold / or ..: the zip entry
+	// must not point outside the folder it is unpacked in.
+	if name = strings.Trim(unsafeFileChars.ReplaceAllString(name, "_"), "_."); name == "" {
+		name = "backup"
+	}
 	path, _, err := writeExportFile(dir, name+"_backup", "zip", func(w io.Writer) (int, error) {
 		zw := zip.NewWriter(w)
 		zw.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
@@ -108,7 +113,7 @@ func writeBackupScript(ctx context.Context, w io.Writer, engine string, db *sql.
 				}
 				// One unreadable table doesn't lose the rest of the backup.
 				res.Failed = append(res.Failed, t)
-				fmt.Fprintf(bw, "-- (rows of %s not available: %s)\n", t, strings.ReplaceAll(err.Error(), "\n", " "))
+				fmt.Fprintf(bw, "-- (rows of %s not available: %s)\n", inComment(t), inComment(err.Error()))
 				continue
 			}
 			res.Tables++
@@ -148,7 +153,7 @@ func writeTableRows(ctx context.Context, bw *bufio.Writer, engine string, db *sq
 	insert += " VALUES"
 	identity := engine == EngineMSSQL && mssqlHasIdentity(ctx, db, table)
 
-	fmt.Fprintf(bw, "\n-- rows of %s\n", table)
+	fmt.Fprintf(bw, "\n-- rows of %s\n", inComment(table))
 	if identity {
 		fmt.Fprintf(bw, "SET IDENTITY_INSERT %s ON;\n", obj)
 	}
@@ -157,7 +162,7 @@ func writeTableRows(ctx context.Context, bw *bufio.Writer, engine string, db *sq
 	inBatch := 0
 	var types []string
 	var line strings.Builder
-	err = streamRows(ctx, engine, db, "SELECT "+strings.Join(quoted, ", ")+" FROM "+obj,
+	err = streamRows(ctx, engine, db, "SELECT "+strings.Join(quoted, ", ")+" FROM "+fromOnly(engine, db)+obj,
 		func(_, t []string) error { types = t; return nil },
 		func(raw []any) (bool, error) {
 			line.Reset()
@@ -271,7 +276,7 @@ func writeSequenceValues(ctx context.Context, bw *bufio.Writer, engine string, d
 		return
 	}
 	if err != nil {
-		fmt.Fprintf(bw, "\n-- (sequence values not available: %s)\n", strings.ReplaceAll(err.Error(), "\n", " "))
+		fmt.Fprintf(bw, "\n-- (sequence values not available: %s)\n", inComment(err.Error()))
 		return
 	}
 	if len(stmts) == 0 {

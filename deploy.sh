@@ -329,10 +329,11 @@ ce_install_docker() {
   local script='set -e
 if ! command -v docker >/dev/null 2>&1; then
   echo "Installing Docker CE…"
-  if command -v curl >/dev/null 2>&1; then curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-  else wget -qO /tmp/get-docker.sh https://get.docker.com; fi
-  sudo sh /tmp/get-docker.sh
-  rm -f /tmp/get-docker.sh
+  t=$(mktemp)
+  if command -v curl >/dev/null 2>&1; then curl -fsSL https://get.docker.com -o "$t"
+  else wget -qO "$t" https://get.docker.com; fi
+  sudo sh "$t"
+  rm -f "$t"
 fi
 sudo systemctl enable --now docker 2>/dev/null || sudo service docker start
 if ! id -nG | tr " " "\n" | grep -qx docker; then sudo usermod -aG docker "$(id -un)"; fi'
@@ -420,9 +421,11 @@ eng_install() {
   local args=(-v "$E_CONN:$APP/conn:rw$z" -v "$E_EXPORT:$APP/export:rw$z" -e "CACTUSDB_PORT=$PORT")
   [[ -n $E_SQLITE ]] && args+=(-v "$E_SQLITE:/sqlite:ro$z")
   [[ -n $TZ_NAME ]] && args+=(-e "TZ=$TZ_NAME")
-  [[ -n $PASSPHRASE ]] && args+=(-e "CACTUSDB_PASSPHRASE=$PASSPHRASE")
+  # Secrets go by name only: their values are taken from this script's
+  # environment, so they don't show on the command line (ps).
+  if [[ -n $PASSPHRASE ]]; then export CACTUSDB_PASSPHRASE=$PASSPHRASE; args+=(-e CACTUSDB_PASSPHRASE); fi
   # Sets the superuser password on the first start (never changes one).
-  [[ -n $SUPERUSER_PW ]] && args+=(-e "CACTUSDB_SUPERUSER_PASSWORD=$SUPERUSER_PW")
+  if [[ -n $SUPERUSER_PW ]]; then export CACTUSDB_SUPERUSER_PASSWORD=$SUPERUSER_PW; args+=(-e CACTUSDB_SUPERUSER_PASSWORD); fi
   # Not as root, so the files in the data folders belong to a real user
   # (rootless podman maps root to you already).
   [[ $RUNTIME == podman ]] || args+=(--user "$user")

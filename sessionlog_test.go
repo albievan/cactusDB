@@ -22,7 +22,7 @@ func TestRequestLogHasSession(t *testing.T) {
 			logAction(r, "[shop] open table customers")
 		}
 	}))
-	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/query", nil))
+	h.ServeHTTP(httptest.NewRecorder(), jsonReq("POST", "/api/query", nil))
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/select?session=fedcba9876543210&table=x", nil))
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/engines", nil))
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")

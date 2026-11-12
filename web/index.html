@@ -2166,7 +2166,7 @@ const usage = { page: Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) 
 // The query box's and Backup button's texts for SQL databases (each engine
 // has its own query hint: engineInfo().queryHint).
 const sqlHint = document.getElementById("sql").placeholder, backupTitle = document.getElementById("backupBtn").title;
-const state = { engines: [], engine: "sqlite", session: null, label: "", objects: [], sel: null, table: null,
+const state = { engines: [], engine: "sqlite", session: null, gridSeq: 0, label: "", objects: [], sel: null, table: null,
   result: null, sort: null, objTab: "table", tab: "data", defFor: null };
 
 let pending = 0; // API calls in flight: the header animation speeds up while busy
@@ -2197,6 +2197,13 @@ async function api(method, url, body, retried = false) {
   gaApi(method, url, body, status, performance.now() - t0);
   // Signed out meanwhile (--remotelogin): to the sign-in page.
   if (status === 401 && data.signin) { location.replace("/login"); throw new Error("Signed out: sign in again"); }
+  // The server no longer knows this page's connection (it restarted, or
+  // closed it): show that, instead of an error on every click.
+  const sess = state.session;
+  if (status === 401 && sess && /^not connected \(session expired\)/.test(data.error || "") && !url.startsWith("/api/disconnect") &&
+      ((body && body.session === sess) || url.includes("session=" + encodeURIComponent(sess)))) {
+    setTimeout(() => { if (state.session === sess) disconnect("The connection to %s was closed on the server: connect again"); }, 0);
+  }
   if (status >= 400 || !res.ok) {
     const err = new Error(data.error || res.statusText || `error ${status}`);
     err.status = status; err.data = data;
@@ -4794,6 +4801,8 @@ async function connect(extra = {}) {
     const res = c ? await withUnlock(c, (cr) => api("POST", "/api/connect", { ...body, ...cr }), "connect") : await api("POST", "/api/connect", body);
     if (!res) return; // cancelled
     if (state.session) api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
+    sqOrig = null; sqHidePane(); // a query being written belongs to the old connection
+    state.gridSeq++;
     state.session = res.session; state.label = res.label; state.engine = res.engine;
     state.savedConn = res.savedConn || 0; state.folder = res.folder || "";
     if (state.savedConn && c && unlocks[c.id]) fileUnlocks[state.folder] = unlocks[c.id].lockPassword;
@@ -4829,6 +4838,7 @@ async function connect(extra = {}) {
     setCollapsed("objects", false, false);
     clearGrid("Pick a table on the left to view its data.", true);
     clearDef("Select an object on the left to see its definition.");
+    setExportEnabled(false); $("tabTitle").textContent = ""; $("tabTitle").title = ""; $("exportNote").hidden = true;
     showTab("data");
     if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
     else if (res.savedId) { toast("Connected and saved, protected by its connection password"); loadSaved(); }
@@ -4849,11 +4859,17 @@ window.addEventListener("pagehide", () => {
   if (state.session) navigator.sendBeacon("/api/disconnect", new Blob([JSON.stringify({ session: state.session })], { type: "application/json" }));
 });
 
+// Back to this page from the browser's back/forward cache: pagehide already
+// ended its connection on the server.
+window.addEventListener("pageshow", (ev) => { if (ev.persisted && state.session) disconnect(); });
+
 $("disconnectBtn").addEventListener("click", () => disconnect());
 async function disconnect(reason = "") {
   const label = state.label;
   await api("POST", "/api/disconnect", { session: state.session }).catch(() => {});
   state.idleNote = reason ? reason.replace("%s", label) : "";
+  sqOrig = null; sqHidePane();
+  state.gridSeq++;
   state.session = null; state.objects = []; state.sel = null; state.table = null; state.result = null; state.defFor = null; resetTableStats();
   state.savedConn = 0; state.folder = "";
   $("status").textContent = "Not connected";
@@ -5503,15 +5519,24 @@ function openObject(type, name) {
   }
 }
 
+// gridNow starts a grid load (a table or a query) and returns a check that is
+// false once another load started or the connection changed: a slow answer
+// then mustn't replace what is on screen.
+function gridNow() {
+  const seq = ++state.gridSeq, sess = state.session;
+  return () => seq === state.gridSeq && sess === state.session;
+}
 async function loadTable(name) {
   setInfo("Loading " + name + "…");
+  const current = gridNow();
   try {
     const q = new URLSearchParams({ session: state.session, table: name, limit: $("limit").value });
     const res = await api("GET", "/api/select?" + q);
+    if (!current()) return;
     $("sql").value = res.sql; qdSoon();
     res.table = name;
     showResult(res);
-  } catch (e) { setInfo(e.message, true); }
+  } catch (e) { if (current()) setInfo(e.message, true); }
 }
 
 // ---- exported files ----------------------------------------------------------
@@ -6053,12 +6078,13 @@ async function run() {
   if (!sql) return;
   setInfo("Running…");
   $("runBtn").disabled = true;
+  const current = gridNow();
   try {
     const res = await api("POST", "/api/query", { session: state.session, sql, limit: +$("limit").value });
-    showResult(res);
+    if (current()) showResult(res);
   } catch (e) {
-    setInfo(e.message, true);
-  } finally { $("runBtn").disabled = false; }
+    if (current()) setInfo(e.message, true);
+  } finally { $("runBtn").disabled = !state.session; }
 }
 $("runBtn").addEventListener("click", run);
 $("sql").addEventListener("keydown", (e) => {
@@ -6341,7 +6367,7 @@ for (const [ta, list] of [[$("sql"), $("qaList")], [$("sqSql"), $("sqQaList")]])
     if ((e.ctrlKey || e.metaKey) && e.code === "Space") { e.preventDefault(); qaUpdate(true, ta); return; }
     if (!qa.open || qa.ta !== ta) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); qaMove(e.key === "ArrowDown" ? 1 : -1); }
-    else if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); qaAccept(qa.at); }
+    else if ((e.key === "Enter" || e.key === "Tab") && !e.isComposing && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); qaAccept(qa.at); }
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); qaClose(); } // not the dialog's Esc
     else if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key)) qaClose();
   });
@@ -6525,7 +6551,7 @@ async function runWithOverall(label, fn, summary) {
 
 function showResult(res) {
   closeExportPanel(false);
-  state.result = res; state.sort = null;
+  state.result = res; state.sort = null; state.gridShown = GRID_PAGE;
   const n = res.rows.length;
   setInfo(`${n.toLocaleString()} row${n === 1 ? "" : "s"}` +
     (res.truncated ? ` shown (limited to ${res.limit.toLocaleString()} – exports include all rows)` : "") +
@@ -6655,6 +6681,9 @@ function showNoConnection() {
   </div></div>`;
 }
 
+// The grid draws GRID_PAGE rows at a time: 100,000 rows as one table would
+// freeze the page. Show more adds the next ones; sorting sorts them all.
+const GRID_PAGE = 2000;
 function renderGrid() {
   const res = state.result;
   if (!res.columns.length) { clearGrid("Statement executed. No result set returned."); return; }
@@ -6665,12 +6694,15 @@ function renderGrid() {
   }
   const head = `<tr><th class="n">#</th>` + res.columns.map((c, i) =>
     `<th data-col="${i}" title="${esc(c)} – click to sort">${esc(c)}${state.sort && state.sort.col === i ? `<span class="dir">${state.sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
+  const shown = state.gridShown || GRID_PAGE, more = rows.length - shown;
+  if (more > 0) rows = rows.slice(0, shown);
   const body = rows.map(([i, r]) => `<tr><td class="n">${i + 1}</td>` + r.map((v) => {
     if (v === null) return `<td class="null">NULL</td>`;
     const s = String(v);
     const cls = typeof v === "number" ? ` class="num"` : "";
     return `<td${cls} title="${s.length > 40 ? esc(s.slice(0, 2000)) : ""}">${esc(s.length > 500 ? s.slice(0, 500) + "…" : s)}</td>`;
-  }).join("") + `</tr>`).join("");
+  }).join("") + `</tr>`).join("") +
+    (more > 0 ? `<tr><td class="n"></td><td colspan="${res.columns.length}"><button class="btn btn-sm btn-outline-secondary" data-act="more-rows">Show ${Math.min(more, GRID_PAGE).toLocaleString()} more of ${more.toLocaleString()} rows not shown</button></td></tr>` : "");
   $("grid").innerHTML = `<table class="table table-sm table-striped table-hover datagrid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
@@ -6683,6 +6715,7 @@ function cmp(a, b) {
 }
 
 $("grid").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-act=more-rows]")) { state.gridShown = (state.gridShown || GRID_PAGE) + GRID_PAGE; renderGrid(); return; }
   const th = ev.target.closest("th[data-col]");
   if (!th) return;
   const col = +th.dataset.col;
@@ -6710,7 +6743,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
     $("exportNote").hidden = false;
     toast("Saved " + res.file);
   } catch (e) { toast("Export failed: " + e.message, true); }
-  finally { b.disabled = false; b.textContent = label; }
+  finally { b.disabled = !state.result || !state.session; b.textContent = label; }
 }));
 
 $("ddlBtn").addEventListener("click", async () => {
@@ -6848,7 +6881,7 @@ $("exportNote").addEventListener("click", (ev) => {
 // ---- logs (the Logs tab) -----------------------------------------------------
 // Today's log or the log of another day, or the crash log. Live asks every
 // 2 s for the lines added since ("after"), newest at the top.
-const logs = { lines: [], shown: [], kind: "log", day: "", end: 0, fresh: 0, timer: null, busy: false };
+const logs = { lines: [], shown: [], kind: "log", day: "", end: 0, fresh: 0, timer: null, busy: false, seq: 0 };
 const LOG_PROBLEM = /FAILED|ERROR|error|warning|panic|fatal|-> [45]\d\d|dropped|SIGHUP|SIGPIPE|stopping|stopped/;
 const LIVE_MS = 2000;
 function logQuery(extra) {
@@ -6866,22 +6899,27 @@ function fillDays(r) {
   const cur = logs.day || r.today;
   $("lgDay").innerHTML = days.map((d) => `<option value="${d}"${d === cur ? " selected" : ""}>${d === r.today ? "Today" : d}</option>`).join("");
 }
+// logs.seq: a load or poll whose answer arrives after a newer load started
+// (another day or log picked) is dropped.
 async function loadLogs() {
-  if (logs.busy) return;
+  const seq = ++logs.seq;
   logs.busy = true;
   $("lgText").textContent = "Loading…";
   try {
     const r = await api("GET", logQuery({}));
+    if (seq !== logs.seq) return;
     logs.lines = r.lines || []; logs.end = r.end || 0; logs.fresh = 0;
     fillDays(r); renderLogs(); showLogInfo(r);
-  } catch (e) { $("lgText").textContent = "Could not load the log: " + e.message; }
-  finally { logs.busy = false; }
+  } catch (e) { if (seq === logs.seq) $("lgText").textContent = "Could not load the log: " + e.message; }
+  finally { if (seq === logs.seq) logs.busy = false; }
 }
 async function pollLogs() {
   if (logs.busy || $("logsPane").hidden) return;
+  const seq = logs.seq;
   logs.busy = true;
   try {
     const r = await api("GET", logQuery({ after: logs.end }));
+    if (seq !== logs.seq) return;
     if (r.append) {
       logs.fresh = (r.lines || []).length;
       if (logs.fresh) logs.lines = logs.lines.concat(r.lines).slice(-Number($("lgLines").value));
@@ -6890,7 +6928,7 @@ async function pollLogs() {
     if (logs.fresh || !r.append) renderLogs();
     showLogInfo(r);
   } catch (e) { /* try again at the next tick */ }
-  finally { logs.busy = false; }
+  finally { if (seq === logs.seq) logs.busy = false; }
 }
 function renderLogs() {
   // A crash report reads top to bottom: never reversed.
@@ -7211,7 +7249,12 @@ async function loadInfo() {
     // Once per restart, say why the previous cactusdb ended when it didn't stop normally.
     const seenKey = "cactusdb.previousRun." + info.pid;
     let seen = false;
-    try { seen = localStorage.getItem(seenKey) === "1"; localStorage.setItem(seenKey, "1"); } catch (e) { /* no storage: show it */ }
+    try {
+      seen = localStorage.getItem(seenKey) === "1";
+      // Only this run's key is kept: one per restart would pile up.
+      Object.keys(localStorage).filter((k) => k.startsWith("cactusdb.previousRun.") && k !== seenKey).forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(seenKey, "1");
+    } catch (e) { /* no storage: show it */ }
     if (info.previousRun && !seen) toast(`cactusdb was restarted: ${info.previousRun}.`, true);
     $("appVersion").textContent = info.version ? "v" + info.version : "";
     $("appVersion").title = info.version ? `cactusdb ${info.version}` : "";
@@ -7925,7 +7968,7 @@ $("ctInstall").addEventListener("click", async (ev) => {
   }
   const c = ev.target.closest("[data-icopy]");
   if (c) {
-    try { await navigator.clipboard.writeText(c.dataset.icopy); } catch { toast("Copy didn't work here: select the command and copy it", true); return; }
+    if (!(await copyText(c.dataset.icopy))) { toast("Copy didn't work here: select the command and copy it", true); return; }
     c.innerHTML = '<i class="bi bi-check2" aria-hidden="true"></i>'; c.classList.add("on");
     setTimeout(() => { c.innerHTML = '<i class="bi bi-clipboard" aria-hidden="true"></i>'; c.classList.remove("on"); }, 1500);
   }
@@ -8170,7 +8213,7 @@ $("ctList").addEventListener("click", async (ev) => {
 // database the server creates on the target server, a saved connection, or
 // written as a script only (migrate.go). The page polls the job and shows
 // every object: done, to check, to finish by hand, failed or skipped.
-const mg = { job: "", timer: 0, res: null, sel: -1, running: false };
+const mg = { job: "", timer: 0, res: null, sel: -1, running: false, fails: 0 };
 const MG_TARGET_KIND = { mariadb: ["mysql", "mariadb"], mysql: ["mysql", "mariadb"], postgres: ["postgres", "pgvector", "azurepg", "horizondb"],
   mssql: ["mssql"], firebird: ["firebird"], sqlite: [] };
 const MG_STATUS = { done: "✓ done", check: "check", manual: "by hand", failed: "✘ failed", skipped: "skipped" };
@@ -8289,8 +8332,14 @@ $("mgStop").addEventListener("click", async () => {
 async function mgPoll() {
   clearTimeout(mg.timer);
   let st;
-  try { st = await api("GET", "/api/migrate/" + encodeURIComponent(mg.job)); }
-  catch (e) { mg.timer = setTimeout(mgPoll, 2000); return; }
+  try { st = await api("GET", "/api/migrate/" + encodeURIComponent(mg.job)); mg.fails = 0; }
+  catch (e) {
+    // The job is gone (cactusdb restarted): stop asking after a minute.
+    if (++mg.fails < 30) { mg.timer = setTimeout(mgPoll, 2000); return; }
+    mg.running = false; $("mgGo").disabled = false; $("mgStop").hidden = true;
+    $("mgPhase").textContent = "Lost touch with the migration: " + e.message;
+    return;
+  }
   $("mgPhase").textContent = st.phase + (st.finished ? "" : "…");
   const pct = st.total ? Math.floor(100 * st.done / st.total) : 0;
   $("mgBar").style.width = (st.finished ? 100 : pct) + "%";

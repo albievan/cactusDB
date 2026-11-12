@@ -175,7 +175,7 @@ func (a *accessBackend) Definition(_ context.Context, typ, name string) (string,
 	case ObjView:
 		return a.querySQL(name)
 	case ObjSynonym:
-		return "-- " + name + " is a linked table: its data is in another database or file.\n", nil
+		return "-- " + inComment(name) + " is a linked table: its data is in another database or file.\n", nil
 	}
 	return "", fmt.Errorf("unsupported object type %q", typ)
 }
@@ -284,7 +284,7 @@ func (a *accessBackend) querySQL(name string) (string, error) {
 	}
 	if kind != 1 && kind != 0 {
 		what := map[int64]string{2: "crosstab", 3: "delete", 4: "update", 5: "append", 6: "make-table", 7: "data-definition", 8: "pass-through", 9: "union"}[kind]
-		return fmt.Sprintf("-- query %s is a %s query: its SQL can't be rebuilt here\n", name, cmpOr(what, "special")), nil
+		return fmt.Sprintf("-- query %s is a %s query: its SQL can't be rebuilt here\n", inComment(name), cmpOr(what, "special")), nil
 	}
 	var b strings.Builder
 	if len(params) > 0 {
@@ -509,6 +509,9 @@ func parseAccessQuery(q string) (*accessQuery, error) {
 }
 
 func unquoteAccess(t string) string {
+	if len(t) < 2 { // a lone quote: no name inside
+		return t
+	}
 	switch {
 	case strings.HasPrefix(t, "["):
 		return strings.ReplaceAll(t[1:len(t)-1], "]]", "]")
@@ -522,6 +525,8 @@ func accessLiteral(t string) (any, error) {
 	switch {
 	case t == "":
 		return nil, errors.New("a value is missing")
+	case len(t) < 2 && (t == "'" || t == `"`):
+		return nil, errors.New("a quote isn't closed")
 	case strings.HasPrefix(t, "'"):
 		return strings.ReplaceAll(t[1:len(t)-1], "''", "'"), nil
 	case strings.HasPrefix(t, `"`):

@@ -179,6 +179,7 @@ func (h *authHarness) call(c *http.Client, method, path string, body any) (int, 
 	}
 	req, _ := http.NewRequest(method, h.ts.URL+path, rd)
 	req.Header.Set("X-Cactusdb-Errors", "in-header")
+	req.Header.Set("Content-Type", "application/json")
 	res, err := c.Do(req)
 	if err != nil {
 		h.t.Fatal(err)

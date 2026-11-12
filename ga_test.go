@@ -18,7 +18,7 @@ func TestGASettingsAndCLI(t *testing.T) {
 	t.Setenv(gaSecretEnv, "")
 	s := newTestServer(t)
 	post := func(body string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest("POST", "/api/settings", strings.NewReader(body))
+		req := jsonReq("POST", "/api/settings", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		s.handleSaveSettings(rec, req)
@@ -100,7 +100,7 @@ func TestUsageHousekeeping(t *testing.T) {
 		s.store.DB().Exec(`INSERT INTO usage_events (at, source, function) VALUES (?, 'ui', 'x')`, at)
 	}
 	del := func(body string) (int, map[string]any) {
-		req := httptest.NewRequest("POST", "/api/usage/delete", strings.NewReader(body))
+		req := jsonReq("POST", "/api/usage/delete", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		s.handleUsageDelete(rec, req)
@@ -137,12 +137,12 @@ func TestRefresh(t *testing.T) {
 	}
 	rw.Close()
 	rec := httptest.NewRecorder()
-	s.handleRefresh(rec, httptest.NewRequest("POST", "/api/refresh", strings.NewReader(`{"session":"s1"}`)))
+	s.handleRefresh(rec, jsonReq("POST", "/api/refresh", strings.NewReader(`{"session":"s1"}`)))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "added_later") || !strings.Contains(rec.Body.String(), "trg_neg") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	rec = httptest.NewRecorder()
-	s.handleRefresh(rec, httptest.NewRequest("POST", "/api/refresh", strings.NewReader(`{"session":"gone"}`)))
+	s.handleRefresh(rec, jsonReq("POST", "/api/refresh", strings.NewReader(`{"session":"gone"}`)))
 	if rec.Code != 401 {
 		t.Errorf("unknown session: %d", rec.Code)
 	}

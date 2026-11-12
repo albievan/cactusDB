@@ -46,7 +46,7 @@ func TestExportedFilesZip(t *testing.T) {
 
 	prepare := func(contentType, body string) (int, map[string]any) {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/files/zip", strings.NewReader(body))
+		req := jsonReq("POST", "/api/files/zip", strings.NewReader(body))
 		req.Header.Set("Content-Type", contentType)
 		s.handlePrepareZip(rec, req)
 		var out map[string]any
@@ -152,7 +152,7 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
 	preview := func(kind, name string) (int, map[string]any) {
 		rec := httptest.NewRecorder()
 		b, _ := json.Marshal(map[string]string{"kind": kind, "name": name})
-		s.handlePreviewFile(rec, httptest.NewRequest("POST", "/api/files/preview", bytes.NewReader(b)))
+		s.handlePreviewFile(rec, jsonReq("POST", "/api/files/preview", bytes.NewReader(b)))
 		var out map[string]any
 		json.Unmarshal(rec.Body.Bytes(), &out)
 		return rec.Code, out
@@ -184,7 +184,7 @@ func TestExportedFilesPreviewAndDelete(t *testing.T) {
 
 	del := func(contentType, body string) (int, map[string]any) {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/files/delete", strings.NewReader(body))
+		req := jsonReq("POST", "/api/files/delete", strings.NewReader(body))
 		req.Header.Set("Content-Type", contentType)
 		s.handleDeleteFiles(rec, req)
 		var out map[string]any
@@ -267,7 +267,7 @@ func TestExportedFilesByConnection(t *testing.T) {
 		t.Errorf("listed %v", got)
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/files/zip", strings.NewReader(`{"files":[{"conn":"optimo-prod","kind":"csv","name":"orders.csv"},{"conn":"optimo-prod","kind":"backup","name":"b.zip"}]}`))
+	req := jsonReq("POST", "/api/files/zip", strings.NewReader(`{"files":[{"conn":"optimo-prod","kind":"csv","name":"orders.csv"},{"conn":"optimo-prod","kind":"backup","name":"b.zip"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	s.handlePrepareZip(rec, req)
 	var res map[string]any
@@ -277,7 +277,7 @@ func TestExportedFilesByConnection(t *testing.T) {
 	}
 	// Deleting one connection's file leaves the other connection's alone.
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest("POST", "/api/files/delete", strings.NewReader(`{"files":[{"conn":"optimo-test","kind":"csv","name":"orders.csv"}]}`))
+	req = jsonReq("POST", "/api/files/delete", strings.NewReader(`{"files":[{"conn":"optimo-test","kind":"csv","name":"orders.csv"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	s.handleDeleteFiles(rec, req)
 	if _, err := os.Stat(filepath.Join(dir, "optimo-prod/csv/orders.csv")); err != nil {

@@ -303,13 +303,22 @@ func redisArgs(q string) ([]string, error) {
 					cur.WriteByte('\n')
 				case 't':
 					cur.WriteByte('\t')
+				case 'r':
+					cur.WriteByte('\r')
+				case 'x': // \xHH, as redis-cli and strconv.Quote write bytes
+					if b, err := strconv.ParseUint(q[min(i+1, len(q)):min(i+3, len(q))], 16, 8); err == nil && i+2 < len(q) {
+						cur.WriteByte(byte(b))
+						i += 2
+					} else {
+						cur.WriteByte('x')
+					}
 				default:
 					cur.WriteByte(q[i])
 				}
 			} else if c == quote {
 				quote = 0
 			} else {
-				cur.WriteRune(c)
+				cur.WriteByte(q[i]) // bytes as they are: a key in UTF-8 stays UTF-8
 			}
 		case c == '"' || c == '\'':
 			quote, in, started = c, true, true
@@ -329,7 +338,7 @@ func redisArgs(q string) ([]string, error) {
 				return nil, errors.New("run one Redis command at a time")
 			}
 		default:
-			cur.WriteRune(c)
+			cur.WriteByte(q[i])
 			in, started = true, true
 		}
 	}
@@ -490,7 +499,10 @@ func parseFullScan(args []string) (redisScan, bool) {
 
 // redisValueLimit is how many elements of a list, set, sorted set or stream
 // a SCAN listing shows.
-const redisValueLimit = 1000
+const (
+	redisValueLimit  = 1000
+	redisStringLimit = 64 << 10
+)
 
 // scanRows lists the keys matching s with their type, time to live and
 // value, reading them in batches.
@@ -537,10 +549,10 @@ func (r *redisBackend) keyRows(ctx context.Context, keys []string) ([][]any, err
 	vals := make([]redis.Cmder, len(keys))
 	for i, k := range keys {
 		switch types[i].Val() {
-		case "string":
-			vals[i] = pipe.Get(ctx, k)
-		case "hash":
-			vals[i] = pipe.HGetAll(ctx, k)
+		case "string": // the start of a long one: the listing shows values, it doesn't copy them
+			vals[i] = pipe.GetRange(ctx, k, 0, redisStringLimit-1)
+		case "hash": // about redisValueLimit fields, not millions
+			vals[i] = pipe.HScan(ctx, k, 0, "", redisValueLimit)
 		case "list":
 			vals[i] = pipe.LRange(ctx, k, 0, redisValueLimit-1)
 		case "set":
@@ -573,6 +585,14 @@ func redisCmdValue(c redis.Cmder) any {
 	switch t := c.(type) {
 	case *redis.StringCmd:
 		return t.Val()
+	case *redis.ScanCmd: // HSCAN: field, value, field, value…
+		kv, _ := t.Val()
+		d := make(doc, 0, len(kv)/2)
+		for i := 0; i+1 < len(kv); i += 2 {
+			d = append(d, field{kv[i], kv[i+1]})
+		}
+		sort.Slice(d, func(a, b int) bool { return d[a].Key < d[b].Key })
+		return d
 	case *redis.MapStringStringCmd:
 		m := t.Val()
 		keys := make([]string, 0, len(m))

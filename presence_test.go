@@ -12,7 +12,7 @@ func TestPresenceAndNotices(t *testing.T) {
 	s := newTestServer(t)
 	checkIn := func(client, ip string) (clients []presenceView, notices []notice) {
 		t.Helper()
-		r := httptest.NewRequest("POST", "/api/presence", strings.NewReader(`{"client":"`+client+`"}`))
+		r := jsonReq("POST", "/api/presence", strings.NewReader(`{"client":"`+client+`"}`))
 		r.RemoteAddr = ip + ":50000"
 		w := httptest.NewRecorder()
 		s.handlePresence(w, r)
@@ -36,7 +36,7 @@ func TestPresenceAndNotices(t *testing.T) {
 	}
 
 	// A change made by page b: page a is told, page b isn't.
-	r := httptest.NewRequest("POST", "/api/connections", nil)
+	r := jsonReq("POST", "/api/connections", nil)
 	r.RemoteAddr = "10.0.0.2:50001"
 	r.Header.Set("X-Cactusdb-Client", "page-bbbb")
 	s.notify(r, "connections", 0, "added the saved connection “%s”", "shop")
@@ -57,13 +57,13 @@ func TestPresenceAndNotices(t *testing.T) {
 		t.Errorf("a quiet page is still listed: %+v", clients)
 	}
 	w := httptest.NewRecorder()
-	s.handlePresenceLeave(w, httptest.NewRequest("POST", "/api/presence/leave", strings.NewReader(`{"client":"page-bbbb"}`)))
+	s.handlePresenceLeave(w, jsonReq("POST", "/api/presence/leave", strings.NewReader(`{"client":"page-bbbb"}`)))
 	if len(s.presence.clients) != 0 {
 		t.Errorf("a page that left is still listed")
 	}
 
 	w = httptest.NewRecorder()
-	s.handlePresence(w, httptest.NewRequest("POST", "/api/presence", strings.NewReader(`{"client":"x"}`)))
+	s.handlePresence(w, jsonReq("POST", "/api/presence", strings.NewReader(`{"client":"x"}`)))
 	if w.Code != 400 {
 		t.Errorf("a bad client id: %d", w.Code)
 	}
@@ -77,7 +77,7 @@ func TestDirectMessages(t *testing.T) {
 	}
 	checkIn := func(client, ip, name string) answer {
 		t.Helper()
-		r := httptest.NewRequest("POST", "/api/presence", strings.NewReader(`{"client":"`+client+`","name":"`+name+`"}`))
+		r := jsonReq("POST", "/api/presence", strings.NewReader(`{"client":"`+client+`","name":"`+name+`"}`))
 		r.RemoteAddr = ip + ":50000"
 		w := httptest.NewRecorder()
 		s.handlePresence(w, r)
@@ -89,7 +89,7 @@ func TestDirectMessages(t *testing.T) {
 		t.Helper()
 		body, _ := json.Marshal(map[string]string{"client": client, "to": to, "text": text})
 		w := httptest.NewRecorder()
-		s.handleMessage(w, httptest.NewRequest("POST", "/api/messages", strings.NewReader(string(body))))
+		s.handleMessage(w, jsonReq("POST", "/api/messages", strings.NewReader(string(body))))
 		var m message
 		json.Unmarshal(w.Body.Bytes(), &m)
 		return w.Code, m
@@ -156,11 +156,11 @@ func TestDirectMessages(t *testing.T) {
 	if code, _ := send("page-aaaa", b, "   "); code != 400 {
 		t.Errorf("empty: %d", code)
 	}
-	s.handlePresenceLeave(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/presence/leave", strings.NewReader(`{"client":"page-bbbb"}`)))
+	s.handlePresenceLeave(httptest.NewRecorder(), jsonReq("POST", "/api/presence/leave", strings.NewReader(`{"client":"page-bbbb"}`)))
 	if code, _ := send("page-aaaa", b, "still there?"); code != 404 {
 		t.Errorf("to a closed page: %d", code)
 	}
-	s.handlePresenceLeave(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/presence/leave", strings.NewReader(`{"client":"page-aaaa"}`)))
+	s.handlePresenceLeave(httptest.NewRecorder(), jsonReq("POST", "/api/presence/leave", strings.NewReader(`{"client":"page-aaaa"}`)))
 	if len(s.presence.messages) != 0 {
 		t.Errorf("messages kept after both pages closed: %d", len(s.presence.messages))
 	}

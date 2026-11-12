@@ -101,7 +101,7 @@ func redshiftDefinition(ctx context.Context, db *sql.DB, typ, name string) (stri
 		if err != nil {
 			return "", err
 		}
-		return "-- function " + name + ", language " + lang.String + "\n" + strings.TrimSpace(src.String) + "\n", nil
+		return "-- function " + inComment(name) + ", language " + lang.String + "\n" + strings.TrimSpace(src.String) + "\n", nil
 	default:
 		return "", nil
 	}

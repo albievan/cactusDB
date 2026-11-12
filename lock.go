@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/argon2"
@@ -75,9 +76,24 @@ func parseConnLock(s string) (connLock, error) {
 	return connLock{time: uint32(t), memory: uint32(m), threads: uint8(p), salt: salt}, nil
 }
 
+// kdfSlots limits how many Argon2 derivations run at once: each takes
+// l.memory (64 MiB), so a burst of password guesses would otherwise run the
+// server out of memory.
+var (
+	kdfSlots  = make(chan struct{}, 2)
+	kdfQueued atomic.Int32
+)
+
+// key derives n bytes from password with Argon2id, waiting for a free slot.
+func (l connLock) key(password string, n uint32) []byte {
+	kdfSlots <- struct{}{}
+	defer func() { <-kdfSlots }()
+	return argon2.IDKey([]byte(password), l.salt, l.time, l.memory, l.threads, n)
+}
+
 // box derives the connection key from password.
 func (l connLock) box(password string) *secretBox {
-	b, err := newSecretBox(argon2.IDKey([]byte(password), l.salt, l.time, l.memory, l.threads, 32))
+	b, err := newSecretBox(l.key(password, 32))
 	if err != nil {
 		panic(err) // a 32-byte key is always valid
 	}

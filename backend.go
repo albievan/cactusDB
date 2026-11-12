@@ -411,7 +411,8 @@ func docCell(v any) any {
 	return v
 }
 
-var jsonNumber = regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$`)
+// jsonNumber is a number as JSON writes it: no leading zeros, NaN or Inf.
+var jsonNumber = regexp.MustCompile(`^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][-+]?[0-9]+)?$`)
 
 // sliceRows is a result that is already in memory.
 type sliceRows struct {

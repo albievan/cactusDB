@@ -316,7 +316,7 @@ func showTables(ctx context.Context, o cliOptions, db *sql.DB, groups []ObjectGr
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "-- %s %s\n%s\n", t.typ, t.name, strings.TrimRight(src, "\n"))
+	fmt.Fprintf(out, "-- %s %s\n%s\n", t.typ, inComment(t.name), strings.TrimRight(src, "\n"))
 	return nil
 }
 

@@ -55,8 +55,22 @@ func openBigQuery(ctx context.Context, p ConnParams, opts map[string]string) (ba
 		return nil, errors.New("paste the service account key (JSON) into the key field, or give the path of the key file on the server")
 	}
 	if key != "" {
+		// A Google sign-in is only ever sent to Google: with the key of a
+		// file on the server, another endpoint would receive a token made
+		// from the server's own credentials.
+		if e := opts["endpoint"]; e != "" {
+			u, err := url.Parse(strings.TrimSpace(e))
+			if err != nil || u.Scheme != "https" || !strings.HasSuffix(strings.ToLower(u.Hostname()), ".googleapis.com") {
+				return nil, errors.New("a key is only sent to Google (https://….googleapis.com): leave the key empty for an emulator endpoint")
+			}
+		}
 		if !strings.HasPrefix(key, "{") {
-			b2, err := os.ReadFile(key)
+			f, err := os.Open(key)
+			if err != nil {
+				return nil, fmt.Errorf("the key isn't JSON and can't be read as a file: %w", err)
+			}
+			b2, err := io.ReadAll(io.LimitReader(f, 1<<20)) // a key file is a few kB
+			f.Close()
 			if err != nil {
 				return nil, fmt.Errorf("the key isn't JSON and can't be read as a file: %w", err)
 			}

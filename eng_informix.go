@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -114,12 +115,23 @@ func (x *informixBackend) Objects(ctx context.Context) ([]ObjectGroup, error) {
 	return out, nil
 }
 
+// informixName is name as SQL: plain names as they are, any other in double
+// quotes (a delimited name), so a name can't carry SQL of its own.
+func informixName(name string) string {
+	if informixPlain.MatchString(name) {
+		return name
+	}
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+var informixPlain = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
+
 func (x *informixBackend) SelectFor(_ context.Context, name string) (string, error) {
-	return "SELECT * FROM " + name, nil
+	return "SELECT * FROM " + informixName(name), nil
 }
 
 func (x *informixBackend) Count(ctx context.Context, name string) (int64, error) {
-	v, err := x.strings(ctx, "SELECT COUNT(*) FROM "+name)
+	v, err := x.strings(ctx, "SELECT COUNT(*) FROM "+informixName(name))
 	if err != nil || len(v) == 0 {
 		return -1, err
 	}

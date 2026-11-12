@@ -62,7 +62,7 @@ func writeScript(ctx context.Context, w io.Writer, engine string, db *sql.DB, ti
 	}
 	bw := bufio.NewWriter(w)
 	fmt.Fprintf(bw, "-- %s of %s (%s)\n-- exported by cactusdb %s on %s, %d object(s)\n",
-		title, label, engine, version, time.Now().Format("2006-01-02 15:04:05"), len(targets))
+		title, inComment(label), engine, version, time.Now().Format("2006-01-02 15:04:05"), len(targets))
 	switch engine {
 	case EngineFirebird:
 		bw.WriteString("-- Routines and triggers use SET TERM ^ ; as isql requires.\n")
@@ -129,12 +129,12 @@ func writeScript(ctx context.Context, w io.Writer, engine string, db *sql.DB, ti
 			src, err = objectDefinition(ctx, engine, db, t.typ, t.name)
 		}
 		src = strings.TrimSpace(src)
-		fmt.Fprintf(bw, "\n-- %s %s\n", t.typ, t.name)
+		fmt.Fprintf(bw, "\n-- %s %s\n", t.typ, inComment(t.name))
 		if err != nil || src == "" {
 			if err == nil {
 				err = fmt.Errorf("no definition")
 			}
-			fmt.Fprintf(bw, "-- (definition not available: %s)\n", strings.ReplaceAll(err.Error(), "\n", " "))
+			fmt.Fprintf(bw, "-- (definition not available: %s)\n", inComment(err.Error()))
 			progress(i + 1)
 			continue
 		}

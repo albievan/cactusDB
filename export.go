@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -267,8 +268,8 @@ func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, 
 					v = t.String()
 				}
 			case string:
-				if len(t) > excelize.TotalCellChars {
-					v = t[:excelize.TotalCellChars]
+				if len(t) > excelize.TotalCellChars && utf8.RuneCountInString(t) > excelize.TotalCellChars {
+					v = string([]rune(t)[:excelize.TotalCellChars]) // whole characters, not bytes
 				}
 			}
 			vals[i] = v

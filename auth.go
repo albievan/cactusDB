@@ -20,8 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/crypto/argon2"
 )
 
 // --remotelogin: nothing of cactusdb can be seen or used before signing in.
@@ -322,7 +320,7 @@ func nowText() string { return time.Now().UTC().Format(time.RFC3339) }
 // hashPassword is "argon2id:v1:<time>:<memory>:<threads>:<salt>:<hash>".
 func hashPassword(pw string) string {
 	l := newConnLock()
-	sum := argon2.IDKey([]byte(pw), l.salt, l.time, l.memory, l.threads, 32)
+	sum := l.key(pw, 32)
 	return l.String() + ":" + base64.StdEncoding.EncodeToString(sum)
 }
 
@@ -339,7 +337,14 @@ func checkPassword(hash, pw string) bool {
 	if err != nil || err2 != nil {
 		return false
 	}
-	got := argon2.IDKey([]byte(pw), l.salt, l.time, l.memory, l.threads, uint32(len(want)))
+	// A sign-in that would queue behind many others is refused as wrong: a
+	// burst of guesses gets a few tries, not one per request.
+	if kdfQueued.Add(1) > 16 {
+		kdfQueued.Add(-1)
+		return false
+	}
+	got := l.key(pw, uint32(len(want)))
+	kdfQueued.Add(-1)
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
@@ -548,7 +553,7 @@ func (s *server) sessionUser(w http.ResponseWriter, r *http.Request) (appUser, b
 }
 
 func setCookie(w http.ResponseWriter, r *http.Request, name, value string, life time.Duration) {
-	c := &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil}
+	c := &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")}
 	if life < 0 {
 		c.MaxAge = -1
 	} else if life > 0 {
@@ -677,8 +682,14 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !checkPassword(hash, req.Password) || err != nil || u.pw == "" {
 		s.authThrottle.failed(keys...)
-		log.Printf("%s sign-in as %q failed: wrong user name or password", ip, name)
-		s.eventAs(r, name, "signin-failed", true, "sign-in failed: wrong user name or password")
+		// An unknown name isn't logged: it is often a password typed in the
+		// wrong box.
+		who := "an unknown user"
+		if err == nil {
+			who = strconv.Quote(u.Username)
+		}
+		log.Printf("%s sign-in as %s failed: wrong user name or password", ip, who)
+		s.eventAs(r, strings.Trim(who, `"`), "signin-failed", true, "sign-in failed: wrong user name or password")
 		writeErr(w, 400, errors.New("wrong user name or password"))
 		return
 	}
@@ -804,8 +815,16 @@ func (s *server) handleLoginCode(w http.ResponseWriter, r *http.Request) {
 		}
 		return -1
 	}, req.Code)
+	// Each guess takes one try before it is compared, in one statement, so
+	// guesses sent in parallel can't all see the same count.
+	res, err := s.store.DB().Exec(`UPDATE auth_tokens SET tries = tries + 1 WHERE hash = ? AND tries < ?`, tokenHash(t), maxCodeTries)
+	if n, _ := res.RowsAffected(); err != nil || n != 1 {
+		s.store.dropToken(t)
+		writeOpaqueErr(w, 400, map[string]string{"restart": "true"}, "too many wrong codes: sign in again")
+		return
+	}
+	a.tries++
 	if subtle.ConstantTimeCompare([]byte(tokenHash(code)), []byte(a.code)) != 1 || time.Since(a.sentAt) > codeLife {
-		a.tries++
 		if a.tries >= maxCodeTries {
 			s.store.dropToken(t)
 			log.Printf("%s %s: %d wrong sign-in codes, sign-in cancelled", clientIP(r), u.Username, a.tries)
@@ -813,7 +832,6 @@ func (s *server) handleLoginCode(w http.ResponseWriter, r *http.Request) {
 			writeOpaqueErr(w, 400, map[string]string{"restart": "true"}, "too many wrong codes: sign in again")
 			return
 		}
-		s.store.DB().Exec(`UPDATE auth_tokens SET tries = ? WHERE hash = ?`, a.tries, tokenHash(t))
 		msg := "that isn't the code: check the newest e-mail"
 		if time.Since(a.sentAt) > codeLife {
 			msg = "the code has expired: send a new one"

@@ -73,7 +73,7 @@ func TestMSSQLReadOnlyGuard(t *testing.T) {
 		`DBCC CHECKDB`,
 		`SELECT 1; TRUNCATE TABLE x`,
 		`MERGE INTO t USING s ON 1 = 1 WHEN MATCHED THEN DELETE;`,
-		`SELECT [a]] DELETE FROM t]`, // stays rejected even if the escape confuses the scanner
+		`SELECT [a]]' FROM t] DELETE FROM t --'`, // ]] is an escaped ], not the end of the name
 	}
 	for _, q := range ok {
 		if err := checkReadOnly(EngineMSSQL, q); err != nil {

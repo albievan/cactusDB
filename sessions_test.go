@@ -48,7 +48,7 @@ func TestIdleMinutesSetting(t *testing.T) {
 	}
 	post := func(body string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/settings", strings.NewReader(body))
+		req := jsonReq("POST", "/api/settings", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		s.handleSaveSettings(rec, req)
 		return rec

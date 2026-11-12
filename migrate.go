@@ -31,8 +31,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -210,7 +210,17 @@ func (s *server) handleMigrate(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 		start := time.Now()
-		err := m.run(ctx)
+		// A crash on an odd source (a parser bug, a damaged file) fails this
+		// migration, not the whole server.
+		err := func() (err error) {
+			defer func() {
+				if p := recover(); p != nil {
+					log.Printf("migration %s panicked: %v\n%s", id, p, debug.Stack())
+					err = fmt.Errorf("internal error: %v", p)
+				}
+			}()
+			return m.run(ctx)
+		}()
 		job.mu.Lock()
 		defer job.mu.Unlock()
 		job.finished = true
@@ -466,7 +476,7 @@ func (m *migrator) execOne(ctx context.Context, stmt string) error {
 
 func (m *migrator) comment(format string, args ...any) {
 	for _, l := range strings.Split(fmt.Sprintf(format, args...), "\n") {
-		fmt.Fprintf(m.out, "-- %s\n", l)
+		fmt.Fprintf(m.out, "-- %s\n", inComment(l))
 	}
 }
 
@@ -549,7 +559,9 @@ func (m *migrator) migrate(ctx context.Context) error {
 		engineName(m.dst), req.NewDatabase, version, time.Now().Format("2006-01-02 15:04:05"))
 	switch {
 	case req.ScriptOnly && mysqlFamily(m.dst) && !mysqlFamily(m.srcEngine):
-		fmt.Fprint(m.out, "SET SESSION sql_mode = CONCAT(@@sql_mode, ',PIPES_AS_CONCAT');\n")
+		fmt.Fprint(m.out, "SET SESSION sql_mode = CONCAT(@@sql_mode, ',PIPES_AS_CONCAT,NO_AUTO_VALUE_ON_ZERO');\n")
+	case req.ScriptOnly && mysqlFamily(m.dst):
+		fmt.Fprint(m.out, "SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO');\n")
 	case m.dst == EngineMSSQL: // sqlcmd's defaults are off; filtered indexes need them
 		fmt.Fprint(m.out, "SET ANSI_NULLS ON;\nSET QUOTED_IDENTIFIER ON;\nGO\n")
 	}
@@ -736,11 +748,19 @@ func (m *migrator) migrate(ctx context.Context) error {
 	}
 
 	// 6. Views and code.
+	// A view that reads a function fails until the function is there: those
+	// that fail are tried again after the code.
+	code := req.Routines || req.Triggers
+	var later []*mView
 	if req.Views {
-		m.migrateViews(ctx)
+		later = m.migrateViews(ctx, !code)
 	}
-	if req.Routines || req.Triggers {
+	if code {
 		m.migrateCode(ctx, fb)
+		if len(later) > 0 {
+			m.setPhase("Creating the views that read functions", len(later))
+			m.createViews(ctx, later, true)
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -1116,7 +1136,7 @@ func (m *migrator) copyRows(ctx context.Context, t *mTable) (int64, error) {
 		for i, c := range t.Cols {
 			cols[i] = quoteIdent(m.srcEngine, c.Src)
 		}
-		q = "SELECT " + strings.Join(cols, ", ") + " FROM " + quoteObject(m.srcEngine, t.Src)
+		q = "SELECT " + strings.Join(cols, ", ") + " FROM " + fromOnly(m.srcEngine, m.src.db) + quoteObject(m.srcEngine, t.Src)
 	}
 	tcols := make([]string, len(t.Cols))
 	identity := -1
@@ -1485,21 +1505,25 @@ func (m *migrator) viewQuery(ctx context.Context, name string) (string, []string
 	return strings.TrimSpace(src), cols, nil
 }
 
-func (m *migrator) migrateViews(ctx context.Context) {
+// mView is a view to create on the target.
+type mView struct {
+	it   *migItem
+	stmt string
+	deps []string
+}
+
+// migrateViews creates the views. Those that fail are returned, not failed,
+// when final is false: they may read functions that are created next.
+func (m *migrator) migrateViews(ctx context.Context, final bool) []*mView {
 	names := append(slices.Clone(m.groups[ObjView]), m.groups[ObjMatView]...)
 	if len(names) == 0 {
-		return
+		return nil
 	}
 	m.setPhase("Creating the views", len(names))
-	type view struct {
-		it   *migItem
-		stmt string
-		deps []string
-	}
-	var views []*view
+	var views []*mView
 	for _, n := range names {
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		m.step(n)
 		it := m.item(ObjView, n, m.targetName(n))
@@ -1525,7 +1549,7 @@ func (m *migrator) migrateViews(ctx context.Context) {
 		if m.x.todo {
 			it.Status = "check"
 		}
-		v := &view{it: it, stmt: stmt}
+		v := &mView{it: it, stmt: stmt}
 		for _, t := range toks { // the other views it reads
 			if t.k == tWord || t.k == tIdent {
 				for _, o := range names {
@@ -1537,15 +1561,47 @@ func (m *migrator) migrateViews(ctx context.Context) {
 		}
 		views = append(views, v)
 	}
-	// Dependencies first; on the database, a view that fails is tried
-	// again after the others.
-	sort.SliceStable(views, func(i, j int) bool { return slices.Contains(views[j].deps, views[i].it.Name) })
-	pending := views
+	return m.createViews(ctx, viewOrder(views), final)
+}
+
+// viewOrder puts every view after the views it reads (a cycle keeps the
+// order it had).
+func viewOrder(views []*mView) []*mView {
+	byName := map[string]*mView{}
+	for _, v := range views {
+		byName[v.it.Name] = v
+	}
+	var out []*mView
+	state := map[*mView]int{} // 1 visiting, 2 done
+	var visit func(v *mView)
+	visit = func(v *mView) {
+		if state[v] != 0 {
+			return
+		}
+		state[v] = 1
+		for _, d := range v.deps {
+			if dv := byName[d]; dv != nil {
+				visit(dv)
+			}
+		}
+		state[v] = 2
+		out = append(out, v)
+	}
+	for _, v := range views {
+		visit(v)
+	}
+	return out
+}
+
+// createViews runs the views' statements; on the database, a view that
+// fails is tried again after the others. With final, those that still fail
+// are failed; otherwise they are returned to be tried later.
+func (m *migrator) createViews(ctx context.Context, pending []*mView, final bool) []*mView {
 	for pass := 0; len(pending) > 0 && pass < 10; pass++ {
-		var again []*view
+		var again []*mView
 		for _, v := range pending {
 			if ctx.Err() != nil {
-				return
+				return nil
 			}
 			err := m.exec(ctx, nil, v.stmt, false)
 			if err != nil && m.tdb != nil {
@@ -1563,11 +1619,15 @@ func (m *migrator) migrateViews(ctx context.Context) {
 		}
 		pending = again
 	}
+	if !final {
+		return pending
+	}
 	for _, v := range pending {
 		v.it.SQL = v.stmt
 		v.it.fail(errors.New(v.it.Error))
 		m.stepDone()
 	}
+	return nil
 }
 
 // ---- functions, procedures and triggers ------------------------------------------------
@@ -1903,7 +1963,8 @@ func createTarget(ctx context.Context, p ConnParams, engine, name string, pipesC
 		cfg.User, cfg.Passwd, cfg.Net, cfg.Addr = p.Username, p.Password, "tcp", hostPort(p.Host, p.Port, 3306)
 		cfg.ParseTime = true
 		cfg.Timeout = 10 * time.Second
-		mode := "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+		// NO_AUTO_VALUE_ON_ZERO: a row with id 0 keeps it (it would get a new number).
+		mode := "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,NO_AUTO_VALUE_ON_ZERO"
 		if pipesConcat {
 			mode += ",PIPES_AS_CONCAT"
 		}

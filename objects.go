@@ -225,6 +225,9 @@ func mysqlDefinition(ctx context.Context, db *sql.DB, typ, name string) (string,
 	defer rows.Close()
 	cols, _ := rows.Columns()
 	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return "", err // a privilege or query error, not "not found"
+		}
 		return "", sql.ErrNoRows
 	}
 	vals := make([]sql.NullString, len(cols))
@@ -873,7 +876,9 @@ func postgresDefinition(ctx context.Context, db *sql.DB, typ, name string) (stri
 // only when fks is set.
 func postgresTableDDL(ctx context.Context, db *sql.DB, table string, fks bool) (string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull,
-			pg_get_expr(d.adbin, d.adrelid), a.attidentity, a.attgenerated
+			pg_get_expr(d.adbin, d.adrelid),
+			-- by name: PostgreSQL 9.6 has no attidentity, 11 no attgenerated
+			COALESCE(to_jsonb(a)->>'attidentity', ''), COALESCE(to_jsonb(a)->>'attgenerated', '')
 		FROM pg_attribute a
 		JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace
 		LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum

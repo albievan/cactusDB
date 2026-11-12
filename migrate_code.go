@@ -592,6 +592,9 @@ func (x *xlate) rewriteCall(b *strings.Builder, t []tok, i int, W string, inSQL 
 		return false, i
 	}
 	end := closeParen(t, j)
+	if end <= j { // ( is the last token: nothing to translate
+		return false, i
+	}
 	args := splitArgs(t[j+1 : end])
 	r := func(k int) string { return x.render(args[k], inSQL) }
 	switch W {
@@ -898,10 +901,13 @@ func anyArrayPass(t []tok) []tok {
 			continue
 		}
 		r := skipSp(t, o+1)
-		if r+1 >= len(t) || !t[r].is("ARRAY") || !t[skipSp(t, r+1)].op("[") {
+		if r+1 >= len(t) || !t[r].is("ARRAY") {
 			continue
 		}
 		lb := skipSp(t, r+1)
+		if lb >= len(t) || !t[lb].op("[") {
+			continue
+		}
 		depth, rb := 0, -1
 		for k := lb; k < len(t); k++ {
 			if t[k].op("[") {
@@ -1086,6 +1092,7 @@ func (p *psqlParser) fail(format string, args ...any) {
 
 // untilSemi returns the tokens up to the next top-level ; (which it skips).
 func (p *psqlParser) untilSemi() []tok {
+	p.i = min(p.i, len(p.t)) // a statement cut short may have stepped past the end
 	from, depth := p.i, 0
 	for ; p.i < len(p.t); p.i++ {
 		c := p.t[p.i]
@@ -1326,6 +1333,10 @@ func (p *psqlParser) parens() []tok {
 		return nil
 	}
 	e := closeParen(p.t, p.i)
+	if e <= p.i || !p.t[e].op(")") {
+		p.fail("a ( isn't closed")
+		return nil
+	}
 	in := p.t[p.i+1 : e]
 	p.i = e + 1
 	return trimToks(in)
@@ -1663,7 +1674,7 @@ func (w *codeWriter) stmt(s *pst, depth int) {
 	default: // todo
 		x.todo = true
 		x.note("not translated: %s", strings.TrimSpace(s.raw))
-		w.line(depth, "-- TODO (cactusdb couldn't translate this): "+strings.ReplaceAll(strings.TrimSpace(s.raw), "\n", " "))
+		w.line(depth, "-- TODO (cactusdb couldn't translate this): "+inComment(strings.TrimSpace(s.raw)))
 	}
 }
 
@@ -1982,7 +1993,8 @@ func autoIncrementTrigger(r *psqlRoutine) (col, gen string, ok bool) {
 	e := trimToks(s.expr)
 	switch {
 	case len(e) >= 4 && e[0].is("GEN_ID"):
-		args := splitArgs(e[skipSp(e, 1)+1 : closeParen(e, skipSp(e, 1))])
+		o := skipSp(e, 1)
+		args := splitArgs(e[min(o+1, len(e)):max(closeParen(e, o), min(o+1, len(e)))])
 		if len(args) == 2 && strings.TrimSpace(joinRaw(trimToks(args[1]), EngineFirebird)) == "1" {
 			if a := trimToks(args[0]); len(a) == 1 {
 				return l[2].s, a[0].s, true

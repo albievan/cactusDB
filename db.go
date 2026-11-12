@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"net"
 	"net/url"
 	"os"
 	"regexp"
@@ -387,6 +389,17 @@ func flavorOf(db *sql.DB) string {
 	return ""
 }
 
+// fromOnly is "ONLY " for a PostgreSQL table: a partitioned or inherited
+// table's SELECT otherwise also returns its partitions' or children's rows,
+// which are listed (and copied) as tables of their own. CockroachDB and
+// Redshift have no inheritance.
+func fromOnly(engine string, db *sql.DB) string {
+	if f := flavorOf(db); engine != EnginePostgres || f == EngineCockroach || f == EngineRedshift {
+		return ""
+	}
+	return "ONLY "
+}
+
 func openAndPing(ctx context.Context, driver, dsn string, maxConns int) (*sql.DB, error) {
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
@@ -494,6 +507,9 @@ func hostPort(host string, port, def int) string {
 	}
 	if port == 0 {
 		port = def
+	}
+	if strings.Contains(host, ":") && net.ParseIP(host) != nil {
+		return net.JoinHostPort(host, strconv.Itoa(port)) // an IPv6 address: [::1]:5432
 	}
 	return host + ":" + strconv.Itoa(port)
 }
@@ -640,6 +656,8 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 	if err := checkReadOnly(engine, q); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	var rows *sql.Rows
 	var err error
 	switch {
@@ -706,6 +724,10 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 			return err
 		}
 		if !more {
+			// Cancel before the deferred rows.Close: MySQL's and PostgreSQL's
+			// drivers otherwise read every remaining row of the result (a
+			// whole table for a grid that wanted the first 1000).
+			cancel()
 			return nil
 		}
 	}
@@ -717,10 +739,8 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 // type name, used to format dates and recognise decimals.
 func normalize(v any, dbType string) any {
 	out := normalizeValue(v, dbType)
-	if s, ok := out.(string); ok && isDecimalType(dbType) {
-		if _, err := strconv.ParseFloat(s, 64); err == nil {
-			return json.Number(s)
-		}
+	if s, ok := out.(string); ok && isDecimalType(dbType) && jsonNumber.MatchString(s) {
+		return json.Number(s) // not NaN or Infinity: JSON has no such numbers
 	}
 	return out
 }
@@ -743,8 +763,10 @@ func normalizeValue(v any, dbType string) any {
 		return "0x" + hex.EncodeToString(t)
 	case string:
 		return t
-	case bool, int64, float64:
+	case bool, int64:
 		return t
+	case float64:
+		return finite(t)
 	case int:
 		return int64(t)
 	case int8:
@@ -762,11 +784,15 @@ func normalizeValue(v any, dbType string) any {
 	case uint64:
 		return strconv.FormatUint(t, 10)
 	case float32:
-		return float64(t)
+		return finite(float64(t))
 	case time.Time:
 		switch {
-		case dbType == "DATE":
+		case dbType == "DATE" && t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0:
+			// An Oracle DATE has a time of day, and SQLite parses any text
+			// in a DATE column: only a date without one is shown short.
 			return t.Format("2006-01-02")
+		case dbType == "DATE":
+			return t.Format("2006-01-02 15:04:05")
 		case strings.HasPrefix(dbType, "TIME") && !strings.HasPrefix(dbType, "TIMESTAMP"):
 			return t.Format("15:04:05.999999")
 		}
@@ -778,7 +804,7 @@ func normalizeValue(v any, dbType string) any {
 		// Exact numeric types such as Firebird's scaled NUMERIC (decimal.Decimal)
 		// or big integers: keep every digit by emitting a JSON number literal.
 		s := fmt.Sprint(t)
-		if plainNumber.MatchString(s) {
+		if jsonNumber.MatchString(s) {
 			return json.Number(s)
 		}
 		return s
@@ -786,6 +812,19 @@ func normalizeValue(v any, dbType string) any {
 }
 
 var plainNumber = regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`)
+
+// finite is f, or its name when JSON can't hold it (NaN, ±Infinity).
+func finite(f float64) any {
+	switch {
+	case math.IsNaN(f):
+		return "NaN"
+	case math.IsInf(f, 1):
+		return "Infinity"
+	case math.IsInf(f, -1):
+		return "-Infinity"
+	}
+	return f
+}
 
 // formatGUID renders SQL Server's mixed-endian UNIQUEIDENTIFIER bytes.
 func formatGUID(b []byte) string {

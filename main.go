@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"crypto/rand"
@@ -36,7 +37,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.57.2"
+var version = "1.58.0"
 
 //go:embed web
 var webFS embed.FS
@@ -59,6 +60,38 @@ type session struct {
 func (ss *session) kind() string { return cmp.Or(ss.flavor, ss.engine) }
 
 // exportDir is where this connection's exports go: <export folder>/<connection>.
+// moveFolder moves the folder from to to, into it when to exists already
+// (files there of the same name are kept). A missing from is nothing to do.
+func moveFolder(from, to string) error {
+	if _, err := os.Stat(from); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if _, err := os.Stat(to); errors.Is(err, fs.ErrNotExist) {
+		return os.Rename(from, to)
+	}
+	entries, err := os.ReadDir(from)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		src, dst := filepath.Join(from, e.Name()), filepath.Join(to, e.Name())
+		if e.IsDir() {
+			if err := moveFolder(src, dst); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := os.Lstat(dst); err == nil {
+			continue
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return err
+		}
+	}
+	os.Remove(from) // only when empty
+	return nil
+}
+
 func (ss *session) exportDir(base string) string {
 	f := ss.folder
 	if f == "" {
@@ -576,7 +609,7 @@ func main() {
 	// firewall, VPN or NAT between it and cactusdb silently drops it: the
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
-	srv := &http.Server{Handler: statusInHeader(logRequests(recoverPanics(s.requireLogin(mux)))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
+	srv := &http.Server{Handler: statusInHeader(logRequests(recoverPanics(sameOriginOnly(s.requireLogin(mux))))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
 	go s.expireSessions()
 	go logUpdate()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)
@@ -823,6 +856,55 @@ func (w statusInHeaderWriter) Flush() {
 	}
 }
 
+// sameOriginOnly refuses requests that change something when the browser
+// says they come from another site, so a web page the user visits can't use
+// cactusdb on their behalf (CSRF): test a saved connection against its own
+// server to catch the password, change the mail settings, install an update…
+// Tools that send no Origin or Sec-Fetch-Site (curl, scripts) are not
+// affected. The answer is 400, not 403: the request comes from the user's
+// own browser, and a firewall that blocks on 403 would block them.
+func sameOriginOnly(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No other site may show cactusdb in a frame (clickjacking), and
+		// links out don't carry its URLs (session ids in download links).
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			h.ServeHTTP(w, r)
+			return
+		}
+		if crossSite(r) {
+			writeErr(w, 400, errors.New("refused: the request came from another web site"))
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+func crossSite(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "cross-site", "same-site":
+		return true
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return true // "null" (a sandboxed frame, a file) or garbage
+	}
+	for _, h := range []string{r.Host, r.Header.Get("X-Forwarded-Host")} {
+		if h != "" && strings.EqualFold(u.Host, h) {
+			return false
+		}
+	}
+	return true
+}
+
 func statusInHeader(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Download links can't send a header: they say so in the URL.
@@ -978,6 +1060,11 @@ func logAction(r *http.Request, format string, args ...any) {
 	}
 }
 
+// inComment makes s safe to write in a "-- " SQL comment: a name with a line
+// break in it would otherwise end the comment, and the rest of the name would
+// run as SQL when the script is run.
+var inComment = strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ", "\v", " ", "\f", " ", "\u0085", " ", "\u2028", " ", "\u2029", " ").Replace
+
 func oneLine(sql string) string {
 	sql = strings.Join(strings.Fields(sql), " ")
 	if r := []rune(sql); len(r) > 500 {
@@ -989,9 +1076,17 @@ func oneLine(sql string) string {
 // ---- helpers ---------------------------------------------------------------
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	// Encoded first: a value JSON can't hold is an error the page sees, not
+	// an empty answer.
+	var b bytes.Buffer
+	if err := json.NewEncoder(&b).Encode(v); err != nil {
+		log.Printf("can't write the answer as JSON: %v", err)
+		writeErr(w, 500, fmt.Errorf("the answer can't be written as JSON: %w", err))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	w.Write(b.Bytes())
 }
 
 // writeErr answers with an error. To the page (see statusInHeader) it is an
@@ -1052,7 +1147,13 @@ func opaqueJSON(s string) string {
 	return b.String()
 }
 
+// readJSON decodes a JSON request body. The body must say it is JSON: a
+// form or text/plain post, which any web page can make without asking, is
+// refused.
 func readJSON(r *http.Request, v any) error {
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		return errors.New("expected a JSON request")
+	}
 	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 4<<20))
 	return dec.Decode(v)
 }
@@ -1196,11 +1297,9 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 		}
 		p, label, savedID, connBox = c.ConnParams, c.Name, c.ID, box
 	} else if req.KeepPasswordOf != 0 && p.Password == "" {
-		c, _, ok := s.unlockConnAs(w, r, req.KeepPasswordOf, req.LockPassword, req.SuperPassword)
-		if !ok {
+		if !s.keepPassword(w, r, &p, req.keep()) {
 			return
 		}
-		p.Password = c.Password
 	}
 	if req.Save && req.SavedID == 0 {
 		// Every saved connection gets its own password: check it before connecting.
@@ -1270,6 +1369,40 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 // handleTestConn checks that a connection works, without saving it or
 // keeping it open: it connects, lists the tables and reports the server.
+// keepPassword fills p.Password from the saved connection KeepPasswordOf, but
+// only for the same server: a saved password is never sent to another host,
+// port or user (the database could be one that asks for it in clear text).
+func (s *server) keepPassword(w http.ResponseWriter, r *http.Request, p *ConnParams, req keepReq) bool {
+	c, _, ok := s.unlockConnAs(w, r, req.id, req.lock, req.super)
+	if !ok {
+		return false
+	}
+	if dialect(c.Engine) != dialect(p.Engine) || !strings.EqualFold(strings.TrimSpace(c.Host), strings.TrimSpace(p.Host)) ||
+		effPort(c.ConnParams) != effPort(*p) || c.Username != p.Username || c.Options != p.Options {
+		writeErr(w, 400, errors.New("enter the password again: the engine, server, port, user name or options are not those of the saved connection"))
+		return false
+	}
+	p.Password = c.Password
+	return true
+}
+
+// effPort is p's port, the engine's default when not given.
+func effPort(p ConnParams) int {
+	if e := engineByID(p.Engine); p.Port == 0 && e != nil {
+		return e.DefaultPort
+	}
+	return p.Port
+}
+
+type keepReq struct {
+	id          int64
+	lock, super string
+}
+
+func (req connectReq) keep() keepReq {
+	return keepReq{req.KeepPasswordOf, req.LockPassword, req.SuperPassword}
+}
+
 func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 	var req connectReq
 	if err := readJSON(r, &req); err != nil {
@@ -1278,11 +1411,9 @@ func (s *server) handleTestConn(w http.ResponseWriter, r *http.Request) {
 	}
 	p := req.ConnParams
 	if req.KeepPasswordOf != 0 && p.Password == "" {
-		c, _, ok := s.unlockConnAs(w, r, req.KeepPasswordOf, req.LockPassword, req.SuperPassword)
-		if !ok {
+		if !s.keepPassword(w, r, &p, req.keep()) {
 			return
 		}
-		p.Password = c.Password
 	}
 	start := time.Now()
 	db, err := openDB(r.Context(), p)
@@ -1523,6 +1654,9 @@ func (s *server) runGrid(w http.ResponseWriter, r *http.Request, ss *session, q 
 	if q == "" {
 		writeErr(w, 400, errors.New("SQL is empty"))
 		return
+	}
+	if limit > 100000 { // the most the page offers: one answer holds them all
+		limit = 100000
 	}
 	if limit <= 0 {
 		limit = 1000
@@ -1835,11 +1969,26 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, code, err)
 		return
 	}
+	// Its exported files move with a new name: files are protected by the
+	// folder of a connection with a password, and the old folder would no
+	// longer be one.
+	folderMoved := true
+	if oldName != "" && connFolderName(oldName) != connFolderName(c.Name) {
+		for _, base := range s.exportFolders() {
+			if err := moveFolder(filepath.Join(base, connFolderName(oldName)), filepath.Join(base, connFolderName(c.Name))); err != nil {
+				folderMoved = false
+				log.Printf("renaming the export folder of %q in %s: %v", oldName, base, err)
+			}
+		}
+	}
 	// Open sessions of this connection follow a new name or password.
 	s.mu.Lock()
 	for _, ss := range s.sessions {
 		if ss.savedID == id {
 			ss.connBox, ss.label = box, c.Name
+			if folderMoved {
+				ss.folder = connFolderName(c.Name)
+			}
 		}
 	}
 	s.mu.Unlock()

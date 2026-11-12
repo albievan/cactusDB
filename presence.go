@@ -203,7 +203,7 @@ func (s *server) handlePresence(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s opened cactusdb (%d using it now)", c.ip, len(p.clients))
 	}
 	c.seen, c.ip, c.name = now, clientIP(r), cleanName(req.Name)
-	if u, ok := currentUser(r); ok && c.name == "" { // signed in (--remotelogin): known by name
+	if u, ok := currentUser(r); ok { // signed in (--remotelogin): known by their own name, not one they type
 		c.name = cleanName(u.Username)
 	}
 	out := []notice{}

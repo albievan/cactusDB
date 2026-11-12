@@ -315,10 +315,7 @@ func expectedSum(ctx context.Context, name string) (string, error) {
 		return "", fmt.Errorf("cannot download the checksums: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == 404 {
-		return "", nil
-	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 { // a release always has SHA256SUMS: no checksum, no install
 		return "", fmt.Errorf("GitHub answered %s for %s", resp.Status, distURL+"SHA256SUMS")
 	}
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
@@ -591,9 +588,7 @@ func (s *server) runUpgrade(j *upgradeJob, exe string, opts startupOptions, late
 				os.Remove(tmp)
 				return "", err
 			}
-			if want == "" {
-				log.Printf("upgrade: dist/SHA256SUMS isn't on GitHub; checking the file by running it only")
-			} else if got, err := fileSum(tmp); err != nil || got != want {
+			if got, err := fileSum(tmp); err != nil || got != want {
 				os.Remove(tmp)
 				return "", fmt.Errorf("the download of %s is damaged: its SHA-256 isn't the one in SHA256SUMS", binaryName())
 			}

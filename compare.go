@@ -58,7 +58,13 @@ type schemaSnap struct {
 	order         []string // keys in DDL order
 }
 
+// objKey pairs objects of the databases compared by name, in any case: the
+// same table is CUSTOMERS on Oracle and customers on PostgreSQL.
 func objKey(typ, name string) string { return typ + "\x00" + strings.ToLower(name) }
+
+// exactKey is the key of an object whose name differs from another's only
+// in case ("Users" and "users" on PostgreSQL): they are different objects.
+func exactKey(typ, name string) string { return typ + "\x00=" + name }
 
 // compareJob is a comparison running in the background, polled by the page.
 type compareJob struct {
@@ -83,6 +89,7 @@ type compareObject struct {
 	Name   string        `json:"name"`
 	Master *schemaObj    `json:"master,omitempty"`
 	Cells  []compareCell `json:"cells"`
+	key    string        // its key in the snapshots (objKey)
 }
 
 type compareTarget struct {
@@ -275,6 +282,9 @@ func readSchema(ctx context.Context, d *compareDB, job *compareJob) (*schemaSnap
 		}
 		o.key = defKey(o.Def)
 		k := objKey(t.typ, t.name)
+		if prev := snap.objs[k]; prev != nil && prev.Name != t.name {
+			k = exactKey(t.typ, t.name)
+		}
 		if _, dup := snap.objs[k]; !dup {
 			snap.order = append(snap.order, k)
 		}
@@ -359,7 +369,7 @@ func compareSnaps(snaps []*schemaSnap, drops bool) *compareResult {
 	tdiffs := make([]map[string]*tableDiff, len(snaps)) // per target: the tables that differ
 	for _, k := range keys {
 		mo := master.objs[k]
-		co := compareObject{Master: mo}
+		co := compareObject{Master: mo, key: k}
 		for _, s := range snaps {
 			if o := s.objs[k]; o != nil {
 				co.Type, co.Name = o.Type, o.Name
@@ -419,7 +429,7 @@ func compareSnaps(snaps []*schemaSnap, drops bool) *compareResult {
 			t.Script = syncScript(master, s, res.Objects, ti, tdiffs[ti+1], drops)
 		} else {
 			t.Script = fmt.Sprintf("-- %s is a %s database and the master %s is %s:\n-- only databases of the same kind can be compared object by object, so no script was made.\n",
-				s.Label, s.Engine, master.Label, master.Engine)
+				inComment(s.Label), s.Engine, inComment(master.Label), master.Engine)
 		}
 		res.Targets = append(res.Targets, t)
 	}
@@ -686,7 +696,7 @@ type scriptWriter struct {
 
 func (w *scriptWriter) comment(format string, args ...any) {
 	for _, l := range strings.Split(fmt.Sprintf(format, args...), "\n") {
-		w.b.WriteString("-- " + l + "\n")
+		w.b.WriteString("-- " + inComment(l) + "\n")
 	}
 }
 
@@ -706,7 +716,7 @@ func (w *scriptWriter) section(title string) { w.b.WriteString("\n-- ==== " + ti
 // commentOut writes src as comment lines, for what must be done by hand.
 func (w *scriptWriter) commentOut(src string) {
 	for _, l := range strings.Split(strings.TrimSpace(src), "\n") {
-		w.b.WriteString("--   " + l + "\n")
+		w.b.WriteString("--   " + inComment(l) + "\n")
 	}
 }
 
@@ -929,7 +939,7 @@ func isFK(s string) bool { return strings.Contains(strings.ToUpper(s), "FOREIGN 
 func syncScript(master, t *schemaSnap, objs []compareObject, ti int, tdiffs map[string]*tableDiff, drops bool) string {
 	engine := t.Engine
 	w := &scriptWriter{engine: engine}
-	fmt.Fprintf(&w.b, "-- Structure changes that make %s match the master %s (%s)\n", t.Label, master.Label, engine)
+	fmt.Fprintf(&w.b, "-- Structure changes that make %s match the master %s (%s)\n", inComment(t.Label), inComment(master.Label), engine)
 	fmt.Fprintf(&w.b, "-- made by cactusdb %s on %s. cactusdb doesn't run it: read it, take a\n-- backup, then run it with your own tool.\n",
 		version, time.Now().Format("2006-01-02 15:04:05"))
 	if !drops {
@@ -953,7 +963,7 @@ func syncScript(master, t *schemaSnap, objs []compareObject, ti int, tdiffs map[
 			_, inPlace := replaceInPlace(engine, typ, defOf(o.Master))
 			if st == "extra" && drops || st == "diff" && typ != ObjTable && !inPlace && !byHand(typ) {
 				if st == "extra" && typ == ObjTable {
-					dropped = append(dropped, "-- WARNING: drops table "+o.Name+" and every row in it\n")
+					dropped = append(dropped, "-- WARNING: drops table "+inComment(o.Name)+" and every row in it\n")
 				} else {
 					dropped = append(dropped, "")
 				}
@@ -987,7 +997,7 @@ func syncScript(master, t *schemaSnap, objs []compareObject, ti int, tdiffs map[
 		changes++
 		q := qualify(engine, o.Name)
 		if st == "missing" {
-			w.b.WriteString("\n-- new table " + o.Name + "\n")
+			w.b.WriteString("\n-- new table " + inComment(o.Name) + "\n")
 			shape, ok := parseTable(o.Master.Def)
 			if !ok || mysqlFamily(engine) || engine == EngineSQLite {
 				w.b.WriteString(terminate(engine, ObjTable, o.Master.Def))
@@ -1015,8 +1025,8 @@ func syncScript(master, t *schemaSnap, objs []compareObject, ti int, tdiffs map[
 			}
 			continue
 		}
-		w.b.WriteString("\n-- table " + o.Name + "\n")
-		d := tdiffs[objKey(o.Type, o.Name)]
+		w.b.WriteString("\n-- table " + inComment(o.Name) + "\n")
+		d := tdiffs[o.key]
 		if d == nil {
 			w.comment("the definitions differ but couldn't be compared column by column; the master's is:")
 			w.commentOut(o.Master.Def)
@@ -1050,7 +1060,7 @@ func syncScript(master, t *schemaSnap, objs []compareObject, ti int, tdiffs map[
 				first = false
 			}
 			changes++
-			w.b.WriteString("\n-- " + map[string]string{"missing": "new", "diff": "changed"}[st] + " " + typ + " " + o.Name + "\n")
+			w.b.WriteString("\n-- " + map[string]string{"missing": "new", "diff": "changed"}[st] + " " + typ + " " + inComment(o.Name) + "\n")
 			if o.Master.Err != "" || o.Master.Def == "" {
 				w.comment("the master's definition couldn't be read: %s", orNone(o.Master.Err))
 				continue

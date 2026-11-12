@@ -171,7 +171,7 @@ func TestAPIKeepsPasswordsServerSide(t *testing.T) {
 	s := &server{store: st, sessions: map[string]*session{}}
 	post := func(body string) int64 {
 		rec := httptest.NewRecorder()
-		s.handleSaveConn(rec, httptest.NewRequest("POST", "/api/connections", strings.NewReader(body)))
+		s.handleSaveConn(rec, jsonReq("POST", "/api/connections", strings.NewReader(body)))
 		if rec.Code != 200 {
 			t.Fatalf("save: %d %s", rec.Code, rec.Body)
 		}

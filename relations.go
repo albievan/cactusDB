@@ -873,23 +873,30 @@ func (g *relGraph) assume(cols []relCol) int {
 		}
 	}
 	// 2. customer_id / CustomerID → the table customer(s) and its key or id.
+	// The column names that point at a table are indexed once: comparing
+	// every column with every table's names is too slow on big schemas.
+	type target struct{ table, key string }
+	byCol := map[string][]target{}
+	for _, tn := range names {
+		t := tables[tn]
+		for _, k := range slices.Compact([]string{t.key, "id"}) {
+			if k == "" || t.cols[k] == "" {
+				continue
+			}
+			for _, w := range t.words {
+				byCol[w+"_"+k] = append(byCol[w+"_"+k], target{tn, k})
+				if w+k != w+"_"+k {
+					byCol[w+k] = append(byCol[w+k], target{tn, k})
+				}
+			}
+		}
+	}
 	for _, n := range names {
 		for _, lc := range slices.Sorted(maps.Keys(tables[n].cols)) {
 			name := tables[n].cols[lc]
-			for _, tn := range names {
-				t := tables[tn]
-				if tn == n {
-					continue
-				}
-				for _, k := range slices.Compact([]string{t.key, "id"}) {
-					if k == "" || t.cols[k] == "" {
-						continue
-					}
-					for _, w := range t.words {
-						if lc == w+"_"+k || lc == w+k {
-							link(n, tn, name, t.cols[k], name+" → "+t.cols[k])
-						}
-					}
+			for _, tg := range byCol[lc] {
+				if tg.table != n {
+					link(n, tg.table, name, tables[tg.table].cols[tg.key], name+" → "+tables[tg.table].cols[tg.key])
 				}
 			}
 		}

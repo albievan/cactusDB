@@ -176,7 +176,9 @@ func (s *server) handleGetSMTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSaveSMTP saves the mail server. A password of null keeps the saved
-// one, "" removes it, anything else replaces it.
+// one, "" removes it, anything else replaces it. The saved password is only
+// kept for the same server, port, security and user name: otherwise saving
+// another server would send it there.
 func (s *server) handleSaveSMTP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		smtpSettings
@@ -197,6 +199,10 @@ func (s *server) handleSaveSMTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pw := old.Password
+	if req.Password == nil && pw != "" && (!strings.EqualFold(old.Host, st.Host) || old.Port != st.Port || old.TLS != st.TLS || old.Username != st.Username) {
+		writeErr(w, 400, errors.New("enter the password again: the server, port, security or user name changed"))
+		return
+	}
 	if req.Password != nil {
 		pw = ""
 		if *req.Password != "" {

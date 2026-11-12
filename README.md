@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.57.2
+cactusdb 1.58.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -1238,7 +1238,13 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
 
 1. **Query check:** only a single `SELECT`, `WITH`, `SHOW`, `DESCRIBE` or `EXPLAIN`
    statement is accepted. Anything that changes data is rejected, even when hidden
-   inside a `WITH` query or after a `;`.
+   inside a `WITH` query or after a `;`. The check reads comments and strings the way
+   each database does (nested `/* */` comments, PostgreSQL `E'…'` strings, Oracle
+   `q'[…]'` strings, MariaDB `/*M! */`), and a comment, string or quoted name that is
+   never closed is refused. Functions that change the server from inside a `SELECT` are
+   refused too: `dblink…`, advisory and named locks (`pg_advisory_lock`, `GET_LOCK`),
+   replication slots, `pg_promote`, statistics resets, large-object writes, Oracle
+   inline functions (`WITH FUNCTION`) and Athena `UNLOAD`.
 2. **Database lock:** even if a query got past the check, the database itself refuses
    to write:
    - SQLite files are opened in read-only mode.
@@ -1759,9 +1765,22 @@ is sent and how to set it up. In short:
   writes (and, on the *Exported files* page when you confirm, deletes) are `cactus.conn.db`,
   `cactus.key` and the files in the export folder, and, when an update is installed from
   the web UI, the program itself (the previous one is kept as `cactusdb.old`).
+- **Requests from other websites are refused:** a request that changes something is
+  turned away when the browser says another site sent it (`Origin`, `Sec-Fetch-Site`), and
+  every JSON request must say it is JSON, so a page you visit can't use cactusdb on your
+  behalf. Its pages can't be shown in another site's frame.
+- **A saved password only goes back to its own server:** testing a saved connection, or
+  listing its databases, with another engine, server, port, user name or options needs the
+  password typed again. Saving the e-mail server with another server, port, security or
+  user name likewise asks for its password again.
+- **Password checks are limited to two at a time** (each takes 64 MiB), so a flood of
+  guesses can't run the server out of memory; each e-mailed sign-in code allows 5 tries in
+  all, however many are sent at once. A sign-in with an unknown user name doesn't log the
+  name (it is often a password typed in the wrong box).
 - **Installing an update from the web UI** only ever downloads the file for this system
   from `dist/` of this repository on GitHub (over HTTPS), checks it against
-  `dist/SHA256SUMS` and runs it with `--version` before using it; it must be newer than the
+  `dist/SHA256SUMS` (no checksum, no install) and runs it with `--version` before using it;
+  `setup.sh` and `setup.ps1` check the checksum too; it must be newer than the
   running version. Like Shutdown it only accepts a JSON request, so other websites can't
   start it. A file sent from the browser (for a server without internet access) needs the
   superuser password. `startup_options` holds the names of `CACTUSDB_…` variables, never

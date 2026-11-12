@@ -108,13 +108,13 @@ func TestAPIConnectionPasswordAndSavedQueries(t *testing.T) {
 	// Save with a connection password.
 	rec := httptest.NewRecorder()
 	body, _ := json.Marshal(map[string]any{"name": "shop", "engine": "sqlite", "database": db})
-	s.handleSaveConn(rec, httptest.NewRequest("POST", "/api/connections", bytes.NewReader(body)))
+	s.handleSaveConn(rec, jsonReq("POST", "/api/connections", bytes.NewReader(body)))
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "connection password") {
 		t.Errorf("saving without a connection password: %d %s", rec.Code, rec.Body)
 	}
 	rec = httptest.NewRecorder()
 	body, _ = json.Marshal(map[string]any{"name": "shop", "engine": "sqlite", "database": db, "newLockPassword": "open sesame"})
-	s.handleSaveConn(rec, httptest.NewRequest("POST", "/api/connections", bytes.NewReader(body)))
+	s.handleSaveConn(rec, jsonReq("POST", "/api/connections", bytes.NewReader(body)))
 	var saved struct{ ID int64 }
 	json.Unmarshal(rec.Body.Bytes(), &saved)
 	if rec.Code != 200 || saved.ID == 0 {
@@ -124,7 +124,7 @@ func TestAPIConnectionPasswordAndSavedQueries(t *testing.T) {
 	connect := func(pw string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
 		body, _ := json.Marshal(map[string]any{"savedId": saved.ID, "lockPassword": pw})
-		s.handleConnect(rec, httptest.NewRequest("POST", "/api/connect", bytes.NewReader(body)))
+		s.handleConnect(rec, jsonReq("POST", "/api/connect", bytes.NewReader(body)))
 		return rec
 	}
 	if rec := connect(""); rec.Code != 403 || !strings.Contains(rec.Body.String(), `"locked":true`) {
@@ -153,7 +153,7 @@ func TestAPIConnectionPasswordAndSavedQueries(t *testing.T) {
 		q["session"] = sess.Session
 		b, _ := json.Marshal(q)
 		rec := httptest.NewRecorder()
-		s.handleSaveQuery(rec, httptest.NewRequest("POST", "/api/queries", bytes.NewReader(b)))
+		s.handleSaveQuery(rec, jsonReq("POST", "/api/queries", bytes.NewReader(b)))
 		return rec
 	}
 	for _, bad := range []map[string]any{
@@ -194,7 +194,7 @@ func TestAPIConnectionPasswordAndSavedQueries(t *testing.T) {
 	// Deleting the connection needs its password too.
 	del := func(pw string) int {
 		b, _ := json.Marshal(map[string]any{"lockPassword": pw})
-		req := httptest.NewRequest("DELETE", "/api/connections/x", bytes.NewReader(b))
+		req := jsonReq("DELETE", "/api/connections/x", bytes.NewReader(b))
 		req.Header.Set("Content-Type", "application/json")
 		req.SetPathValue("id", strconv.FormatInt(saved.ID, 10))
 		rec := httptest.NewRecorder()
@@ -291,7 +291,7 @@ func TestExportedFilesOfProtectedConnection(t *testing.T) {
 	zip := func(body map[string]any) (int, string) {
 		body["files"] = []map[string]string{{"conn": "optimo-prod", "kind": "csv", "name": "orders.csv"}}
 		b, _ := json.Marshal(body)
-		req := httptest.NewRequest("POST", "/api/files/zip", bytes.NewReader(b))
+		req := jsonReq("POST", "/api/files/zip", bytes.NewReader(b))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		s.handlePrepareZip(rec, req)
@@ -312,7 +312,7 @@ func TestExportedFilesOfProtectedConnection(t *testing.T) {
 	// An unprotected folder needs nothing.
 	b, _ := json.Marshal(map[string]any{"conn": "other", "kind": "csv", "name": "x.csv"})
 	rec = httptest.NewRecorder()
-	s.handlePreviewFile(rec, httptest.NewRequest("POST", "/api/files/preview", bytes.NewReader(b)))
+	s.handlePreviewFile(rec, jsonReq("POST", "/api/files/preview", bytes.NewReader(b)))
 	if rec.Code != 200 {
 		t.Errorf("unprotected preview: %d %s", rec.Code, rec.Body)
 	}

@@ -30,6 +30,7 @@ func TestUsageLog(t *testing.T) {
 	do := func(method, url, body string) {
 		req := httptest.NewRequest(method, url, strings.NewReader(body))
 		req.RemoteAddr = "10.1.2.3:5555"
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Cactusdb-Page", "page1")
 		req.Header.Set("User-Agent", "test-browser")
 		h.ServeHTTP(httptest.NewRecorder(), req)

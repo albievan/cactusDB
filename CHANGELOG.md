@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.58.0 — 2026-11-12
+
+Security:
+- **The read-only query check can no longer be fooled** by SQL Server and PostgreSQL nested
+  comments, PostgreSQL `E'…'` strings, Oracle `q'[…]'` strings, MariaDB `/*M! */` comments or a
+  `]]` inside a SQL Server `[name]`. A comment, string or quoted name that is never closed is
+  refused. Also refused: `dblink_*` (a second session outside the read-only transaction),
+  advisory and named locks, replication slots, `pg_promote`, `pg_switch_wal`, statistics
+  resets, large-object writes, Oracle `WITH FUNCTION`, Athena `UNLOAD`/`OPTIMIZE`.
+- Neo4j: a `CALL` of a procedure with a quoted name (`` `apoc`.`load`.`json` ``) is refused.
+- **Requests from other websites are refused** (CSRF): anything that changes something must
+  come from cactusdb's own page, and JSON requests must say they are JSON. Pages can't be
+  framed by other sites, and links out carry no referrer.
+- A saved connection's password is only used for the same engine, server, port, user name
+  and options; the saved e-mail server password only for the same server, port, security
+  and user name. Otherwise it must be typed again.
+- BigQuery: a key is only ever sent to `*.googleapis.com`; a key file on the server is read
+  up to 1 MB.
+- At most two Argon2 password checks run at once, and a burst of sign-in guesses gets a few
+  tries, not one each (a flood could run the server out of memory). The 5 tries of an
+  e-mailed sign-in code now hold when guesses are sent all at once.
+- Unknown user names are no longer written to the log on a failed sign-in. Messages show the
+  signed-in user's own name, not a name the page sends.
+- Table, view and connection names written in SQL comments of backups, DDL exports, compare
+  and migration scripts can't break out of the comment with a line break. The `.sql` inside a
+  backup `.zip` can't be named outside the folder it is unpacked in.
+- An update without `SHA256SUMS` on GitHub is not installed; `setup.sh` and `setup.ps1` now
+  check the checksum. `deploy.sh` passes secrets to Docker by name (not on the command line)
+  and downloads the Docker installer to a private temporary file.
+- The sign-in cookie is marked Secure behind an HTTPS proxy (`X-Forwarded-Proto`).
+
+Fixes:
+- Opening a big MySQL or PostgreSQL table no longer reads the whole table on the server
+  after the first rows are shown.
+- Oracle `DATE` values (and SQLite dates with a time) keep their time of day.
+- `NaN` and `Infinity` (PostgreSQL `numeric`, floats) show as text instead of an empty answer
+  or a failed JSON export.
+- The grid draws 2,000 rows at a time with **Show more**, so 100,000 rows no longer freeze
+  the page; sorting still sorts them all.
+- A slow table or query result can no longer replace a newer one, or land after a
+  disconnect or on another connection. A saved query form is closed when the connection
+  changes (it could be saved to the other one). A connection the server closed (after a
+  restart) is shown as disconnected instead of an error on every click.
+- Renaming a protected connection moves its exported files with it, so they stay protected.
+- PostgreSQL partitioned and inherited tables are copied once by migrations and backups
+  (they were copied once through the parent and again per partition).
+- Migrations to MySQL/MariaDB keep a row whose id is 0; views that read functions are
+  created after the functions; views are created in dependency order; a parser error on
+  odd code fails the migration instead of crashing cactusdb.
+- Compare keeps `Users` and `users` apart on databases where they are different tables.
+- Oracle objects whose names start with `SYS` and another letter (`SYSTEM_CONFIG`) are no
+  longer hidden.
+- Table definitions work on PostgreSQL 11 and older. Missing rows in DDL exports after a
+  network error are reported instead of a short script. IPv6 server addresses connect.
+- Redis keys with non-ASCII characters or `\xHH` escapes work; the key listing reads at most
+  1,000 fields of a hash and 64 kB of a string.
+- Informix table names that need quoting are quoted. An Access query with a lone quote is an
+  error, not a crash. `new Date(0)` in a MongoDB query works.
+- Excel exports cut over-long cells at a whole character. Assumed relationships are found
+  much faster on big schemas. The log viewer no longer mixes two logs, the install guide's
+  copy buttons work over plain HTTP, and a lost migration stops polling after a minute.
+
 ## 1.57.2 — 2026-11-12
 
 - All binaries rebuilt; nothing else changed.

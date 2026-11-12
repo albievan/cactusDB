@@ -62,7 +62,7 @@ func oracleObjects(ctx context.Context, db *sql.DB) ([]ObjectGroup, error) {
 	}
 	objs := func(types string) string {
 		return `SELECT owner || '.' || object_name FROM all_objects WHERE owner = :1 AND object_type IN (` + types + `)
-			AND object_name NOT LIKE 'BIN$%' AND object_name NOT LIKE 'SYS_%' AND generated = 'N' ORDER BY object_name`
+			AND object_name NOT LIKE 'BIN$%' AND object_name NOT LIKE 'SYS\_%' ESCAPE '\' AND generated = 'N' ORDER BY object_name`
 	}
 	groups := []struct {
 		typ, label, q string

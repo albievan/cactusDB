@@ -45,6 +45,12 @@ Write-Host "downloading $file ($ref) to $dest"
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp
+    # Check it against the published checksums before running it.
+    $sums = (Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$repo/raw/$ref/dist/SHA256SUMS").Content
+    if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
+    $want = ($sums -split "`n" | ForEach-Object { $f = -split $_; if ($f.Count -eq 2 -and $f[1].TrimStart('*') -eq $file) { $f[0] } } | Select-Object -First 1)
+    if (-not $want) { throw "dist/SHA256SUMS has no checksum for $file" }
+    if ((Get-FileHash -Algorithm SHA256 -Path $tmp).Hash -ne $want.ToUpper()) { throw "the download of $file is damaged: its SHA-256 isn't the one in SHA256SUMS" }
     if ($os -ne "windows") { chmod +x $tmp }
     # Check it runs before replacing an existing cactusdb.
     $version = & $tmp --version

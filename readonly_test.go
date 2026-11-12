@@ -101,3 +101,47 @@ func TestSQLiteConnectionIsReadOnly(t *testing.T) {
 		t.Errorf("select failed: %v", err)
 	}
 }
+
+// Ways past the first layer found in review: nested comments, escape strings,
+// q-quotes and unclosed literals hiding code, and functions that write from a
+// SELECT.
+func TestCheckReadOnlyRejectsHiddenCode(t *testing.T) {
+	bad := []struct{ engine, q string }{
+		{EngineMSSQL, `SELECT 1 /* /* */ ' */ COMMIT DELETE FROM t --'`},
+		{EngineMSSQL, `SELECT 1 /* /* */ ' */ COMMIT; EXEC xp_cmdshell 'whoami' --'`},
+		{EngineMSSQL, `SELECT [a FROM t`},
+		{EngineMSSQL, `SELECT [a]]' FROM t] DELETE FROM t --'`},
+		{EnginePostgres, `SELECT dblink_connect('c','dbname=x'), dblink_send_query('c','DELETE FROM t')`},
+		{EnginePostgres, `SELECT E'\''; COMMIT; DELETE FROM t; --'`},
+		{EnginePostgres, `SELECT 1 /* /* */ ; DELETE FROM t`},
+		{EnginePostgres, `SELECT pg_advisory_lock(1)`},
+		{EnginePostgres, `SELECT pg_create_logical_replication_slot('s', 'pgoutput')`},
+		{EnginePostgres, `SELECT pg_stat_reset()`},
+		{EnginePostgres, `SELECT lo_from_bytea(0, 'x')`},
+		{EnginePostgres, `SELECT $$ never closed`},
+		{EngineOracle, `WITH FUNCTION f RETURN NUMBER IS s VARCHAR2(9) := q'[ ' ]'; PRAGMA AUTONOMOUS_TRANSACTION; BEGIN COMMIT; RETURN 1; END; SELECT f FROM dual`},
+		{EngineOracle, `WITH FUNCTION f RETURN NUMBER IS BEGIN RETURN 1; END; SELECT f FROM dual`},
+		{EngineMariaDB, `SELECT 1 /*M! , (DELETE FROM t) */`},
+		{EngineSQLite, `SELECT 'unclosed`},
+		{EngineSQLite, `SELECT 1 /* unclosed`},
+	}
+	for _, c := range bad {
+		if err := checkReadOnly(c.engine, c.q); err == nil {
+			t.Errorf("%s %q: allowed", c.engine, c.q)
+		}
+	}
+	ok := []struct{ engine, q string }{
+		{EngineMSSQL, `SELECT [a]]b] FROM t /* a /* nested */ comment */`},
+		{EnginePostgres, `SELECT E'it\'s; delete' FROM t`},
+		{EnginePostgres, `SELECT 'C:\' AS path, 1`},
+		{EngineOracle, `SELECT q'[it's; delete]' FROM dual`},
+		{EngineOracle, `SELECT 'a' "q" FROM dual`},
+		{EngineMySQL, `SELECT 1 /* a /* b */`},
+		{EnginePostgres, `SELECT 1 /* /* */ ; DELETE FROM t */`}, // all one nested comment
+	}
+	for _, c := range ok {
+		if err := checkReadOnly(c.engine, c.q); err != nil {
+			t.Errorf("%s %q: unexpected error %v", c.engine, c.q, err)
+		}
+	}
+}

@@ -122,7 +122,7 @@ func TestErrorsAreOpaque(t *testing.T) {
 	answer := func(fromPage bool, write func(w http.ResponseWriter)) (string, map[string]any) {
 		t.Helper()
 		h := statusInHeader(logRequests(recoverPanics(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { write(w) }))))
-		r := httptest.NewRequest("POST", "/api/query", nil)
+		r := jsonReq("POST", "/api/query", nil)
 		if fromPage {
 			r.Header.Set(statusInHeaderReq, "in-header")
 		}

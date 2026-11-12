@@ -257,7 +257,18 @@ var cypherProcs = map[string]bool{
 	"dbms.components": true, "dbms.procedures": true, "dbms.functions": true,
 }
 
-var cypherCall = regexp.MustCompile(`(?i)\bCALL\s*([A-Za-z_][\w.]*|\{)`)
+var (
+	cypherCall     = regexp.MustCompile(`(?i)^CALL\s*([A-Za-z_][\w.]*\b|\{)(?:[^.\w]|$)`)
+	cypherCallWord = regexp.MustCompile(`(?i)\bCALL\b`)
+)
+
+// cypherIsName says whether the word at loc is a property (n.set), a label or
+// type (n:Start) or a map key ({load: 1}) rather than a clause.
+func cypherIsName(code string, loc []int) bool {
+	before := strings.TrimRight(code[:loc[0]], " \t\r\n")
+	after := strings.TrimLeft(code[loc[1]:], " \t\r\n")
+	return strings.HasSuffix(before, ".") || strings.HasSuffix(before, ":") || strings.HasPrefix(after, ":")
+}
 
 var errCypherReadOnly = errors.New("cactusdb is read-only: only Cypher that reads is allowed (MATCH, RETURN, WITH, UNWIND, SHOW…), no CREATE, MERGE, SET or DELETE")
 
@@ -270,10 +281,22 @@ func (n *neo4jBackend) CheckReadOnly(q string) error {
 	if strings.Contains(code, ";") {
 		return fmt.Errorf("%w; run one query at a time", errCypherReadOnly)
 	}
-	if m := cypherWrites.FindString(code); m != "" {
-		return fmt.Errorf("%w (found %s)", errCypherReadOnly, strings.ToUpper(m))
+	for _, loc := range cypherWrites.FindAllStringIndex(code, -1) {
+		if cypherIsName(code, loc) {
+			continue // n.set, (n:Start), {load: 1}: a property, label or key
+		}
+		return fmt.Errorf("%w (found %s)", errCypherReadOnly, strings.ToUpper(code[loc[0]:loc[1]]))
 	}
-	for _, m := range cypherCall.FindAllStringSubmatch(code, -1) {
+	for _, loc := range cypherCallWord.FindAllStringIndex(code, -1) {
+		if cypherIsName(code, loc) {
+			continue
+		}
+		// Every CALL must name its procedure in plain letters: a quoted
+		// name (`apoc`.`load`.`json`) is blanked above and can't be checked.
+		m := cypherCall.FindStringSubmatch(code[loc[0]:])
+		if m == nil {
+			return fmt.Errorf("%w (CALL with a quoted procedure name)", errCypherReadOnly)
+		}
 		if m[1] == "{" {
 			continue // a subquery: its clauses are checked above
 		}

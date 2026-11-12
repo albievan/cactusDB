@@ -1,6 +1,7 @@
 package main
 
 import (
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -210,5 +211,36 @@ func TestConvertValue(t *testing.T) {
 	g := []byte{0x78, 0x56, 0x34, 0x12, 0x34, 0x12, 0x34, 0x12, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0}
 	if v := convertValue(g, &mCol{Kind: kUUID, SrcType: "uniqueidentifier"}, EnginePostgres); v != "12345678-1234-1234-1234-56789ABCDEF0" && v != "12345678-1234-1234-1234-56789abcdef0" {
 		t.Errorf("GUID → %v", v)
+	}
+}
+
+// Code cut short ends a parse with an error or a TODO, never a crash.
+func TestParserEndsDontPanic(t *testing.T) {
+	for _, src := range []string{
+		"AS BEGIN EXECUTE PROCEDURE",
+		"AS BEGIN EXECUTE PROCEDURE p",
+		"AS BEGIN EXECUTE PROCEDURE p RETURNING_VALUES",
+		"BEGIN EXECUTE",
+		"AS BEGIN IF (",
+		"AS DECLARE VARIABLE",
+	} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("parseBody(%q) panics: %v\n%s", src, r, debug.Stack())
+				}
+			}()
+			parseBody(src)
+		}()
+	}
+	for _, src := range []string{"SELECT 1 WHERE a = ANY (ARRAY", "SELECT 1 WHERE a = ANY (ARRAY "} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("anyArrayPass(%q) panics: %v", src, r)
+				}
+			}()
+			anyArrayPass(lexSQL(src, EnginePostgres))
+		}()
 	}
 }

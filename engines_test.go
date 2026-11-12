@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -646,5 +647,84 @@ func TestPortFree(t *testing.T) {
 	port := l.Addr().(*net.TCPAddr).Port
 	if portFree(port, false) || portFree(port, true) {
 		t.Errorf("port %d is in use but looks free", port)
+	}
+}
+
+// Cypher: a CALL must name a read-only procedure in plain letters, and
+// properties or labels named like clauses are not clauses.
+func TestCypherReadOnlyEdges(t *testing.T) {
+	n := &neo4jBackend{}
+	for _, q := range []string{
+		"CALL `apoc`.`load`.`json`('http://169.254.169.254/')",
+		"CALL apoc.`export`.csv.all('x', {})",
+		"CALL `dbms`.setConfigValue('a','b')",
+		"MATCH (n) CALL apoc.create.node(['X'], {}) YIELD node RETURN node",
+		"MATCH (n) SET n.x = 1",
+	} {
+		if n.CheckReadOnly(q) == nil {
+			t.Errorf("%q allowed", q)
+		}
+	}
+	for _, q := range []string{
+		"MATCH (e:Event) RETURN e.start, e.set, e.load",
+		"MATCH (n:Start) RETURN n {load: 1}",
+		"CALL db.labels() YIELD label RETURN label",
+		"CALL db.labels",
+		"CALL { MATCH (n) RETURN n } RETURN n",
+	} {
+		if err := n.CheckReadOnly(q); err != nil {
+			t.Errorf("%q: %v", q, err)
+		}
+	}
+}
+
+// Redis command words keep their bytes: UTF-8 keys and \xHH escapes.
+func TestRedisArgsBytes(t *testing.T) {
+	for in, want := range map[string][]string{
+		`GET café`:                       {"GET", "café"},
+		`GET "naïve key"`:                {"GET", "naïve key"},
+		`GET "\xff\x00k"`:                {"GET", "\xff\x00k"},
+		`GET ` + strconv.Quote("a\xffb"): {"GET", "a\xffb"},
+	} {
+		got, err := redisArgs(in)
+		if err != nil || strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("%s: %q %v", in, got, err)
+		}
+	}
+}
+
+// A lone quote in an Access query is an error, not a crash.
+func TestAccessLoneQuote(t *testing.T) {
+	for _, q := range []string{"SELECT ` FROM t", `SELECT a FROM t WHERE a = '`, `SELECT a FROM t WHERE a = "`, "SELECT [ FROM t"} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("%q panics: %v", q, r)
+				}
+			}()
+			parseAccessQuery(q)
+		}()
+	}
+}
+
+// Values JSON can't hold are shown by name; a DATE keeps a time of day.
+func TestNormalizeEdges(t *testing.T) {
+	for _, c := range []struct {
+		v    any
+		typ  string
+		want any
+	}{
+		{math.NaN(), "FLOAT8", "NaN"},
+		{math.Inf(1), "DOUBLE", "Infinity"},
+		{"NaN", "NUMERIC", "NaN"},
+		{"Infinity", "NUMERIC", "Infinity"},
+		{"12.50", "NUMERIC", json.Number("12.50")},
+		{"007", "NUMERIC", "007"},
+		{time.Date(2024, 5, 1, 13, 45, 0, 0, time.UTC), "DATE", "2024-05-01 13:45:00"},
+		{time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC), "DATE", "2024-05-01"},
+	} {
+		if got := normalize(c.v, c.typ); got != c.want {
+			t.Errorf("%v %s: %#v, want %#v", c.v, c.typ, got, c.want)
+		}
 	}
 }

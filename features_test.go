@@ -209,7 +209,7 @@ func TestAPISaveRenameKeepsPassword(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	body, _ := json.Marshal(map[string]any{"id": id, "name": "new", "engine": "mysql", "host": "h2", "keepPassword": true, "lockPassword": "lock-pw-1"})
-	s.handleSaveConn(rec, httptest.NewRequest("POST", "/api/connections", bytes.NewReader(body)))
+	s.handleSaveConn(rec, jsonReq("POST", "/api/connections", bytes.NewReader(body)))
 	if rec.Code != 200 {
 		t.Fatalf("save: %d %s", rec.Code, rec.Body)
 	}
@@ -224,13 +224,13 @@ func TestAPITestConn(t *testing.T) {
 	s := newTestServer(t)
 	rec := httptest.NewRecorder()
 	body, _ := json.Marshal(map[string]any{"engine": "sqlite", "database": newShopDB(t)})
-	s.handleTestConn(rec, httptest.NewRequest("POST", "/api/testconn", bytes.NewReader(body)))
+	s.handleTestConn(rec, jsonReq("POST", "/api/testconn", bytes.NewReader(body)))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"tables":2`) || !strings.Contains(rec.Body.String(), `"version":"SQLite 3.`) {
 		t.Errorf("test connection: %d %s", rec.Code, rec.Body)
 	}
 	rec = httptest.NewRecorder()
 	body, _ = json.Marshal(map[string]any{"engine": "sqlite", "database": "/no/such.db"})
-	s.handleTestConn(rec, httptest.NewRequest("POST", "/api/testconn", bytes.NewReader(body)))
+	s.handleTestConn(rec, jsonReq("POST", "/api/testconn", bytes.NewReader(body)))
 	if rec.Code != 400 {
 		t.Errorf("missing file should fail: %d %s", rec.Code, rec.Body)
 	}
@@ -249,7 +249,7 @@ func TestAPIExportAll(t *testing.T) {
 	s.sessions["s1"] = &session{engine: EngineSQLite, label: "shop", db: db}
 
 	rec := httptest.NewRecorder()
-	s.handleExportAll(rec, httptest.NewRequest("POST", "/api/exportall", strings.NewReader(`{"session":"s1","format":"excel"}`)))
+	s.handleExportAll(rec, jsonReq("POST", "/api/exportall", strings.NewReader(`{"session":"s1","format":"excel"}`)))
 	var start struct {
 		Job    string
 		Tables int
@@ -338,7 +338,7 @@ func TestAPIShutdown(t *testing.T) {
 	s.shutdown = make(chan struct{})
 	post := func(contentType string) int {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/shutdown", strings.NewReader("{}"))
+		req := jsonReq("POST", "/api/shutdown", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", contentType)
 		s.handleShutdown(rec, req)
 		return rec.Code
@@ -372,7 +372,7 @@ func TestAPIExportFolderSetting(t *testing.T) {
 	s := newTestServer(t)
 	post := func(contentType, body string) (int, map[string]any) {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/settings", strings.NewReader(body))
+		req := jsonReq("POST", "/api/settings", strings.NewReader(body))
 		req.Header.Set("Content-Type", contentType)
 		s.handleSaveSettings(rec, req)
 		var out map[string]any
@@ -394,7 +394,7 @@ func TestAPIExportFolderSetting(t *testing.T) {
 	s.sessions["s1"] = &session{engine: EngineSQLite, label: "shop", db: db}
 	export := func() map[string]any {
 		rec := httptest.NewRecorder()
-		s.handleExport(rec, httptest.NewRequest("POST", "/api/export", strings.NewReader(`{"session":"s1","sql":"SELECT 1 AS x","format":"json","name":"q"}`)))
+		s.handleExport(rec, jsonReq("POST", "/api/export", strings.NewReader(`{"session":"s1","sql":"SELECT 1 AS x","format":"json","name":"q"}`)))
 		var out map[string]any
 		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &out) != nil {
 			t.Fatalf("export: %d %s", rec.Code, rec.Body)
@@ -458,7 +458,7 @@ func TestRecoverPanics(t *testing.T) {
 		m["boom"]++ // panics: assignment to entry in nil map
 	}))
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest("POST", "/api/query", nil))
+	h.ServeHTTP(rec, jsonReq("POST", "/api/query", nil))
 	if rec.Code != 500 || !strings.Contains(rec.Body.String(), "internal error in cactusdb while handling POST /api/query") ||
 		!strings.Contains(rec.Body.String(), "nil map") {
 		t.Errorf("got %d %s", rec.Code, rec.Body)
@@ -471,4 +471,26 @@ func TestRecoverPanics(t *testing.T) {
 	}()
 	recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) })).
 		ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+}
+
+// A saved password is only used for the server it was saved for: testing it
+// against another host would hand it to that host.
+func TestKeepPasswordOnlyForSameServer(t *testing.T) {
+	s := newTestServer(t)
+	id, err := s.store.SaveUnlocked(SavedConn{Name: "cli-pg", ConnParams: ConnParams{Engine: "postgres", Host: "db1", Username: "app", Password: "secret"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		host string
+		port int
+		ok   bool
+	}{{"db1", 0, true}, {"DB1", 5432, true}, {"evil.example", 0, false}, {"db1", 6543, false}} {
+		p := ConnParams{Engine: "postgres", Host: c.host, Port: c.port, Username: "app"}
+		rec := httptest.NewRecorder()
+		got := s.keepPassword(rec, jsonReq("POST", "/api/testconn", nil), &p, keepReq{id: id})
+		if got != c.ok || (got && p.Password != "secret") || (!got && p.Password != "") {
+			t.Errorf("%s:%d: kept=%v password=%q (%d %s)", c.host, c.port, got, p.Password, rec.Code, rec.Body)
+		}
+	}
 }

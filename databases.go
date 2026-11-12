@@ -97,11 +97,9 @@ func (s *server) handleDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.KeepPasswordOf != 0 && p.Password == "" {
-		c, _, ok := s.unlockConnAs(w, r, req.KeepPasswordOf, req.LockPassword, req.SuperPassword)
-		if !ok {
+		if !s.keepPassword(w, r, &p, req.keep()) {
 			return
 		}
-		p.Password = c.Password
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()

@@ -405,8 +405,13 @@ func (p *jsParser) named() (any, error) {
 		if len(args) == 0 {
 			return time.Now().UTC(), nil
 		}
-		if n, ok := args[0].(int64); ok {
+		switch n := args[0].(type) { // milliseconds: small numbers parse as int32
+		case int64:
 			return time.UnixMilli(n).UTC(), nil
+		case int32:
+			return time.UnixMilli(int64(n)).UTC(), nil
+		case float64:
+			return time.UnixMilli(int64(n)).UTC(), nil
 		}
 		return parseShellDate(arg())
 	case "NumberLong", "Long":

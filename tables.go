@@ -148,6 +148,9 @@ func firebirdConstraints(ctx context.Context, db *sql.DB, table string) ([]strin
 		uqs = append(uqs, u)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	var lines []string
 	for _, u := range uqs {
 		cols, err := firebirdIndexColumns(ctx, db, u.index)
@@ -204,6 +207,9 @@ func firebirdIndexes(ctx context.Context, db *sql.DB, table string) ([]string, e
 		list = append(list, x)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	var out []string
 	for _, x := range list {
 		s := "CREATE "
@@ -259,6 +265,9 @@ func firebirdForeignKeys(ctx context.Context, db *sql.DB, table string) ([]strin
 		list = append(list, f)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	var out []string
 	for _, f := range list {
 		cols, err := firebirdIndexColumns(ctx, db, f.index)
@@ -332,6 +341,9 @@ func mssqlConstraints(ctx context.Context, db *sql.DB, table string) ([]string, 
 		uqs = append(uqs, u)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	var lines []string
 	for _, u := range uqs {
 		cols, _, err := mssqlIndexColumns(ctx, db, table, u.index)
@@ -376,6 +388,9 @@ func mssqlIndexes(ctx context.Context, db *sql.DB, table string) ([]string, erro
 		list = append(list, x)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	var out []string
 	for _, x := range list {
 		keys, include, err := mssqlIndexColumns(ctx, db, table, x.id)
@@ -422,6 +437,9 @@ func mssqlForeignKeys(ctx context.Context, db *sql.DB, table string) ([]string, 
 		list = append(list, f)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	var out []string
 	for _, f := range list {
 		pairs, err := db.QueryContext(ctx, `SELECT pc.name, rc.name FROM sys.foreign_key_columns k
@@ -442,6 +460,9 @@ func mssqlForeignKeys(ctx context.Context, db *sql.DB, table string) ([]string, 
 			refCols = append(refCols, quoteIdent(EngineMSSQL, r))
 		}
 		pairs.Close()
+		if err := pairs.Err(); err != nil {
+			return nil, err
+		}
 		out = append(out, fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)%s%s;",
 			quoteObject(EngineMSSQL, table), quoteIdent(EngineMSSQL, f.name), strings.Join(cols, ", "),
 			quoteObject(EngineMSSQL, f.ref), strings.Join(refCols, ", "),

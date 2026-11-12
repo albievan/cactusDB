@@ -49,6 +49,14 @@ elif command -v wget >/dev/null 2>&1; then
 else
   fail "curl or wget is needed to download cactusdb"
 fi
+# Check it against the published checksums before running it.
+sums=$(curl -fsSL "https://github.com/$repo/raw/$ref/dist/SHA256SUMS" 2>/dev/null || wget -qO- "https://github.com/$repo/raw/$ref/dist/SHA256SUMS" 2>/dev/null) ||
+  fail "can't download dist/SHA256SUMS to check the file"
+want=$(printf '%s\n' "$sums" | awk -v f="$file" '$2 == f || $2 == "*" f { print $1 }')
+[ -n "$want" ] || fail "dist/SHA256SUMS has no checksum for $file"
+if command -v sha256sum >/dev/null 2>&1; then got=$(sha256sum "$tmp" | awk '{print $1}')
+else got=$(shasum -a 256 "$tmp" | awk '{print $1}'); fi
+[ "$got" = "$want" ] || fail "the download of $file is damaged: its SHA-256 isn't the one in SHA256SUMS"
 chmod +x "$tmp"
 if [ "$os" = darwin ]; then
   xattr -d com.apple.quarantine "$tmp" 2>/dev/null || true # let macOS run it
