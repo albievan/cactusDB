@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.57.2 — 2026-11-12
+
+- All binaries rebuilt; nothing else changed.
+
 ## 1.57.1 — 2026-11-12
 
 - Code comments and documentation describe cactusdb on its own; nothing else changed.
