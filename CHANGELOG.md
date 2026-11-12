@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.54.2 — 2026-11-12
+
+- Saved query dialog: **Hide rows** / **Show rows** collapses and expands the rows of
+  Execute (hidden, the query fills the dialog), and while they show the query can be
+  resized by dragging its bottom edge (the rows take the rest; the height is kept).
+
 ## 1.54.1 — 2026-11-12
 
 - A new build of 1.54.0 for every platform, with no changes to what cactusdb does. It

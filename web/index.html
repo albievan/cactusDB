@@ -690,8 +690,13 @@
   .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
   .hint code { overflow-wrap: anywhere; }
   .dresult { margin-top: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
-  .sqrows { flex: 0 1 auto; max-height: 42vh; min-height: 0; overflow: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
-  .sqrows[hidden] { display: none; }
+  .sqrows { flex: 1 1 0; min-height: 80px; overflow: auto; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+  .sqrows[hidden], .sqrowsbar[hidden] { display: none; }
+  .sqrowsbar { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .sqrowsbar .btn { padding: 0 2px; text-decoration: none; }
+  .sqrowsbar .hint { margin: 0; font-size: 11.5px; }
+  /* With rows under it the query keeps the height it is given (drag its bottom edge). */
+  #sqDialog.rows #sqSql { flex: none; resize: vertical; min-height: 60px; max-height: 70vh; }
   .sqrows.stale { opacity: .55; }
   .sqrows table { margin: 0; }
   .sqrows th { position: sticky; top: 0; z-index: 1; background: var(--panel-2); }
@@ -2013,6 +2018,10 @@
     <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
     <textarea id="sqSql" rows="8" spellcheck="false" class="form-control form-control-sm mono grow"></textarea>
     <div id="sqResult" class="dresult alert alert-danger" hidden></div>
+    <div class="sqrowsbar" id="sqRowsBar" hidden>
+      <button type="button" class="btn btn-sm btn-link" id="sqRowsToggle" aria-expanded="true" aria-controls="sqRows"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span>Hide rows</span></button>
+      <span class="hint">Drag the query's bottom edge to give it more or less room</span>
+    </div>
     <div class="sqrows" id="sqRows" hidden></div>
     <div class="dactions">
       <button class="btn btn-outline-secondary" type="button" id="sqCheck" title="Ask the database whether the query is valid, without running it"><i class="bi bi-check2-circle" aria-hidden="true"></i> Check syntax</button>
@@ -5106,7 +5115,7 @@ function openQueryDialog(x, versions) {
   sqFill(x || { name: "", description: "", sql: $("sql").value.trim() });
   sqOrig = sqForm();
   sqVersions = []; $("sqVersRow").hidden = true;
-  $("sqRows").hidden = true; $("sqRows").innerHTML = ""; $("sqResult").hidden = true;
+  $("sqRows").innerHTML = ""; sqRowsOpen(false); $("sqResult").hidden = true;
   if (x) loadQueryVersions(x, versions);
   $("sqDialog").showModal();
   $("sqName").focus();
@@ -5161,6 +5170,22 @@ $("sqCheck").addEventListener("click", async () => {
   } catch (e) { sqShow("danger", e.message); }
   finally { $("sqCheck").disabled = false; }
 });
+// The rows of Execute can be hidden (the query then fills the dialog) and
+// shown again; while they show, the query keeps the height it is dragged to.
+let sqQueryH = 0;
+function sqRowsOpen(open) {
+  const has = !$("sqRows").innerHTML ? false : true, d = $("sqDialog"), ta = $("sqSql");
+  if (d.classList.contains("rows") && ta.offsetHeight) sqQueryH = ta.offsetHeight;
+  $("sqRowsBar").hidden = !has;
+  $("sqRows").hidden = !has || !open;
+  d.classList.toggle("rows", has && open);
+  ta.style.height = has && open ? (sqQueryH || Math.max(120, Math.round(d.clientHeight * 0.3))) + "px" : "";
+  $("sqRowsToggle").setAttribute("aria-expanded", String(open));
+  $("sqRowsToggle").innerHTML = `<i class="bi bi-chevron-${open ? "down" : "right"}" aria-hidden="true"></i> <span>${open ? "Hide rows" : "Show rows"}</span>`;
+  $("sqRowsBar").querySelector(".hint").hidden = !open;
+}
+$("sqRowsToggle").addEventListener("click", () => sqRowsOpen($("sqRows").hidden));
+new ResizeObserver(() => { if ($("sqDialog").classList.contains("rows") && $("sqSql").offsetHeight) sqQueryH = $("sqSql").offsetHeight; }).observe($("sqSql"));
 // Execute: the query as written in the form, its first 100 rows under it.
 async function sqRun() {
   const sql = $("sqSql").value.trim();
@@ -5179,10 +5204,11 @@ async function sqRun() {
       ? `<table class="table table-sm table-striped datagrid"><thead><tr><th class="n">#</th>${res.columns.map((c) => `<th title="${esc(c)}">${esc(c)}</th>`).join("")}</tr></thead>` +
         `<tbody>${res.rows.map((r, i) => `<tr><td class="n">${i + 1}</td>${r.map(cell).join("")}</tr>`).join("")}</tbody></table>`
       : `<p class="hint" style="margin:8px">The statement returned no rows.</p>`;
-    $("sqRows").classList.remove("stale"); $("sqRows").hidden = false;
+    $("sqRows").classList.remove("stale");
+    sqRowsOpen(true);
   } catch (e) {
     sqShow("danger", e.message);
-    $("sqRows").hidden = true;
+    $("sqRows").innerHTML = ""; sqRowsOpen(false);
   } finally { $("sqRun").disabled = false; }
 }
 $("sqRun").addEventListener("click", sqRun);
