@@ -365,7 +365,8 @@
   /* The open object looks like the active tab pill. */
   #objTree ul.list li.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); border-radius: 14px; }
   main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
-  .tabs { align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); flex-wrap: nowrap; }
+  .tabs { align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .tabs .nav-link { flex: none; white-space: nowrap; }
   .tabs .title { margin-left: 12px; font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     color: var(--accent); font-weight: 600; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 4px; max-width: 45%; }
   .tabs .title:empty { display: none; }
@@ -738,6 +739,99 @@
   #mgLog { max-height: 160px; }
   /* The dashboard of the connected database: a page in the main area. */
   #dashPane { overflow-y: auto; background: var(--panel); }
+  /* DB Relationships: every object, and the lines between them */
+  #relPane { --t-table: #2f7d4f; --t-view: #2563eb; --t-matview: #0e7490; --t-trigger: #c2410c; --t-procedure: #7c3aed; --t-function: #c026d3;
+    --t-package: #8a5a2b; --t-sequence: #dc2626; --t-domain: #64748b; --t-exception: #9f1239; --t-event: #a16207; --t-synonym: #475569;
+    --rel-fk: #5b6660; --rel-trigger: #c2410c; --rel-uses: #2563eb;
+    display: grid; grid-template-rows: auto auto 1fr; gap: 8px; padding: 12px 16px; background: var(--panel); min-height: 0; }
+  @media (prefers-color-scheme: dark) {
+    #relPane { --t-table: #4fb57a; --t-view: #6ea8fe; --t-matview: #22c3d6; --t-trigger: #fb923c; --t-procedure: #a78bfa; --t-function: #e879f9;
+      --t-package: #d6a36b; --t-sequence: #f87171; --t-domain: #94a3b8; --t-exception: #fb7185; --t-event: #facc15; --t-synonym: #a1acbb;
+      --rel-fk: #a3ada7; --rel-trigger: #fb923c; --rel-uses: #6ea8fe; }
+  }
+  #relPane[hidden] { display: none; }
+  #relPane { grid-template-columns: minmax(0, 1fr); }
+  #relPane > * { min-width: 0; }
+  .relbody { grid-template-columns: minmax(0, 1fr) auto; }
+  .relhead { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; min-width: 0; }
+  .relbar { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+  .relbar .spacer { flex: 1; }
+  .relhead h2 { margin: 0; font-size: 18px; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .relhead .hint { margin: 0; }
+  .relbar input[type=search] { width: 200px; }
+  .relbar .form-check { margin: 0; font-size: 13px; white-space: nowrap; }
+  .reltypes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .relchip { --c: var(--muted); display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 8px; font-size: 12px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--panel-2); color: var(--muted); cursor: pointer; }
+  .relchip i { color: var(--c); }
+  .relchip .cnt { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .relchip.on { color: var(--text); border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, var(--panel)); }
+  .relchip:not(.on) { text-decoration: line-through; opacity: .75; }
+  .relbody { position: relative; display: grid; grid-template-columns: 1fr auto; min-height: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .relcanvas { position: relative; overflow: hidden; touch-action: none; cursor: grab; min-height: 240px; background-color: var(--bg);
+    background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 22px 22px; }
+  .relcanvas.panning { cursor: grabbing; }
+  .relworld { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .relworld svg { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }
+  .relnode { --c: var(--muted); position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; max-width: 280px;
+    padding: 3px 9px 3px 7px; font-size: 12px; line-height: 18px; white-space: nowrap; color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / .08);
+    cursor: pointer; user-select: none; transition: opacity .15s; }
+  .relnode span { overflow: hidden; text-overflow: ellipsis; }
+  .relnode i { color: var(--c); }
+  .relnode.sel { outline: 2px solid var(--c); outline-offset: 2px; font-weight: 600; }
+  .relnode.hit { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent); }
+  .rellabel { position: absolute; left: 0; top: 0; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .relworld.dim .relnode:not(.near), .relworld.dim .rellabel { opacity: .18; }
+  .reledge { fill: none; stroke-width: 1.4; transition: opacity .15s; }
+  .reledge.k-fk { stroke: var(--rel-fk); }
+  .reledge.k-trigger { stroke: var(--rel-trigger); stroke-dasharray: 7 4; }
+  .reledge.k-uses { stroke: var(--rel-uses); }
+  .reledge.guess { stroke-dasharray: 2 3; }
+  .relworld.dim .reledge:not(.near) { opacity: .08; }
+  .reledge.near { stroke-width: 2.4; }
+  .relarrow-fk { fill: var(--rel-fk); } .relarrow-trigger { fill: var(--rel-trigger); } .relarrow-uses { fill: var(--rel-uses); }
+  .relmsg { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+  .relmsg[hidden] { display: none; }
+  .rellegend { position: absolute; left: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 4px 10px; font-size: 11px;
+    color: var(--muted); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 6px; pointer-events: none; }
+  .rellegend svg { vertical-align: middle; margin-right: 4px; }
+  .relzoom { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .relzoom .btn { width: 32px; padding: 3px 0; }
+  .relside { width: 300px; padding: 12px 14px 16px; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--border); }
+  .relside[hidden] { display: none; }
+  .relside .relsidehead { display: flex; align-items: flex-start; gap: 8px; }
+  .relside h3 { flex: 1; margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+  .relside h3 i { color: var(--c); margin-right: 4px; }
+  .relside .acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+  .relside h4 { margin: 14px 0 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .relside ul { list-style: none; margin: 0; padding: 0; }
+  .relside li button { --c: var(--muted); display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 2px 6px; font-size: 12.5px; text-align: left;
+    color: var(--text); background: none; border: 0; border-radius: 4px; }
+  .relside li button:hover { background: var(--row-hover); }
+  .relside li button i { color: var(--c); }
+  .relside li button span { overflow-wrap: anywhere; }
+  .relside li small { color: var(--muted); }
+  .relside .none { font-size: 12px; color: var(--muted); }
+  .t-table { --c: var(--t-table); }
+  .t-view { --c: var(--t-view); }
+  .t-matview { --c: var(--t-matview); }
+  .t-trigger { --c: var(--t-trigger); }
+  .t-procedure { --c: var(--t-procedure); }
+  .t-function { --c: var(--t-function); }
+  .t-package { --c: var(--t-package); }
+  .t-sequence { --c: var(--t-sequence); }
+  .t-domain { --c: var(--t-domain); }
+  .t-exception { --c: var(--t-exception); }
+  .t-event { --c: var(--t-event); }
+  .t-synonym { --c: var(--t-synonym); }
+  @media (max-width: 640px) {
+    #relPane { padding: 8px; }
+    .relbar input[type=search] { width: 100%; }
+    .relbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(240px, 1fr) auto; }
+    .relside { width: auto; max-height: 42vh; border-left: 0; border-top: 1px solid var(--border); }
+    .rellegend { display: none; }
+  }
   .dashpage { padding: 16px 20px 24px; }
   .dashhead { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
   .dashhead h2 { margin: 0; font-size: 18px; }
@@ -1033,6 +1127,7 @@
       <button class="nav-link" data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <button class="nav-link" data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
       <button class="nav-link" data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
+      <button class="nav-link" data-tab="relations" id="relTab" hidden title="A picture of how the objects of the connected database hang together: foreign keys, triggers, and what views, procedures and functions use">DB Relationships</button>
       <button class="nav-link" data-tab="dashboard" id="dashTab" hidden title="The statistics of the connected database">Dashboard</button>
       <button class="nav-link" data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
       <span class="title" id="tabTitle"></span>
@@ -1273,6 +1368,48 @@
             </div>
           </div>
         </section>
+      </div>
+    </div>
+    <div class="pane" id="relPane" hidden>
+      <div class="relhead">
+        <h2 id="relTitle"><i class="bi bi-diagram-3" aria-hidden="true"></i> DB Relationships · <span id="relLabel"></span></h2>
+        <p class="hint" id="relSub"></p>
+      </div>
+      <div class="relbar">
+        <div class="reltypes" id="relTypes" role="group" aria-label="Types of objects shown"></div>
+        <span class="spacer"></span>
+        <input type="search" class="form-control form-control-sm" id="relFind" list="relNames" placeholder="Find an object…" aria-label="Find an object" autocomplete="off">
+        <datalist id="relNames"></datalist>
+        <label class="form-check form-switch" title="Also the objects that have no relationships with any other"><input class="form-check-input" type="checkbox" id="relLonely" role="switch"> <span id="relLonelyText">Objects without relationships</span></label>
+        <label class="form-check form-switch" title="Also the uses found by an object's name in a view's, procedure's, function's or trigger's source, where the database keeps no record of them"><input class="form-check-input" type="checkbox" id="relGuess" role="switch" checked> Found in the source</label>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relRelayout" aria-label="Arrange again" title="Arrange the objects again"><i class="bi bi-shuffle" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" aria-label="Download the picture" title="Download the picture as it is arranged now (PNG)"><i class="bi bi-image" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relRefresh" aria-label="Read again" title="Read the relationships again"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+      </div>
+      <div class="relbody">
+        <div class="relcanvas" id="relCanvas">
+          <div class="relworld" id="relWorld">
+            <svg aria-hidden="true"><defs>
+              <marker id="relArrow-fk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-fk" d="M0 0L10 5L0 10z"/></marker>
+              <marker id="relArrow-trigger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-trigger" d="M0 0L10 5L0 10z"/></marker>
+              <marker id="relArrow-uses" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-uses" d="M0 0L10 5L0 10z"/></marker>
+            </defs><g id="relEdges"></g></svg>
+            <div id="relNodes"></div>
+          </div>
+          <div class="relmsg" id="relMsg"></div>
+          <div class="rellegend">
+            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-fk"/></svg>Foreign key → the table it refers to</span>
+            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-trigger"/></svg>Trigger → its table</span>
+            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses"/></svg>Uses</span>
+            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses guess"/></svg>Found in the source</span>
+          </div>
+          <div class="relzoom">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="relZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="relZoomOut" title="Zoom out" aria-label="Zoom out"><i class="bi bi-dash-lg" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="relFit" title="Show everything" aria-label="Show everything"><i class="bi bi-arrows-fullscreen" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <aside class="relside" id="relSide" hidden aria-live="polite"></aside>
       </div>
     </div>
     <div class="pane" id="dashPane" hidden>
@@ -2500,6 +2637,480 @@ async function moveDb(target) {
 }
 $("dbMove").addEventListener("click", () => moveDb($("dbPath").value));
 
+// ---- DB Relationships ----------------------------------------------------------
+// Every object of the connected database and how they hang together
+// (relations.go): foreign keys, the tables triggers fire on, and what views,
+// procedures, functions and triggers use. Each group of connected objects is
+// arranged by a force layout (linked objects pull together, all push apart),
+// the groups side by side. Drag an object to move it, drag the background to
+// pan, the wheel or a pinch zooms; a click shows an object's relationships,
+// a double click opens it.
+const rel = { data: null, seq: 0, nodes: [], byId: new Map(), edges: [], sel: null, focus: null, hidden: new Set(),
+  view: { x: 0, y: 0, k: 1 }, ptr: new Map(), drag: null };
+const REL_ORDER = ["table", "view", "matview", "trigger", "procedure", "function", "package", "sequence", "domain", "exception", "event", "synonym"];
+const REL_MAX = 2500; // objects drawn at once
+const relLabel = (type) => (rel.data && rel.data.labels[type]) || type;
+const relOne = (type) => relLabel(type).replace(/ies$/, "y").replace(/s$/, "");
+
+// relReset follows a new connection (or none), or a refresh of its objects.
+function relReset() {
+  rel.seq++; rel.data = null; rel.sel = null; rel.focus = null; rel.hidden.clear();
+  $("relTab").hidden = !state.session;
+  $("relNodes").innerHTML = ""; $("relEdges").innerHTML = ""; $("relSide").hidden = true; $("relTypes").innerHTML = ""; $("relSub").textContent = "";
+  if (state.tab === "relations") { if (state.session) relLoad(); else showTab("data"); }
+}
+async function relLoad(force) {
+  if (!state.session) return;
+  $("relLabel").textContent = state.label; $("relTitle").title = state.label;
+  if (rel.data && !force) { if (!rel.drawn) relBuild(); return; }
+  const seq = ++rel.seq;
+  relMsg(`<span><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Reading the relationships of ${esc(state.label)}…</span>`);
+  $("relRefresh").disabled = true;
+  try {
+    const d = await api("GET", "/api/relationships?session=" + encodeURIComponent(state.session));
+    if (seq !== rel.seq) return;
+    rel.data = d; rel.sel = null; rel.focus = null;
+    $("relNames").innerHTML = d.nodes.map((n) => `<option value="${esc(n.name)}">${esc(relOne(n.type))}</option>`).join("");
+    rel.drawn = false;
+    if (!$("relPane").hidden) relBuild(); // sizes are measured: only when shown
+  } catch (e) {
+    if (seq === rel.seq) relMsg(`<span>✘ ${esc(e.message)}</span>`);
+  } finally { if (seq === rel.seq) $("relRefresh").disabled = false; }
+}
+function relMsg(html) {
+  $("relMsg").hidden = !html; $("relMsg").innerHTML = html || "";
+  if (html) { $("relNodes").innerHTML = ""; $("relEdges").innerHTML = ""; rel.nodes = []; rel.edges = []; }
+}
+
+// relShown is what is drawn: the types switched on, around the focused
+// object if one is, and without the objects on their own unless asked.
+function relShown() {
+  const d = rel.data;
+  let ids = new Set(d.nodes.filter((n) => !rel.hidden.has(n.type)).map((n) => n.id));
+  let edges = d.edges.filter((e) => ids.has(e.from) && ids.has(e.to) && (!e.guess || $("relGuess").checked));
+  const linked = new Set(edges.flatMap((e) => [e.from, e.to]));
+  if (rel.focus && ids.has(rel.focus)) {
+    const near = new Set([rel.focus]);
+    for (let frontier = [rel.focus], depth = 0; frontier.length && depth < 2; depth++) {
+      const next = [];
+      for (const e of edges) for (const [a, b] of [[e.from, e.to], [e.to, e.from]]) if (frontier.includes(a) && !near.has(b)) { near.add(b); next.push(b); }
+      frontier = next;
+    }
+    ids = near;
+  } else if (!$("relLonely").checked) ids = new Set([...ids].filter((id) => linked.has(id)));
+  edges = edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+  return { nodes: d.nodes.filter((n) => ids.has(n.id)), edges, lonely: d.nodes.filter((n) => !rel.hidden.has(n.type) && !linked.has(n.id)).length };
+}
+
+function relChips() {
+  const d = rel.data, count = {};
+  d.nodes.forEach((n) => { count[n.type] = (count[n.type] || 0) + 1; });
+  const types = Object.keys(count).sort((a, b) => REL_ORDER.indexOf(a) - REL_ORDER.indexOf(b));
+  $("relTypes").innerHTML = types.map((t) => `<button type="button" class="relchip t-${t}${rel.hidden.has(t) ? "" : " on"}" data-type="${t}" aria-pressed="${!rel.hidden.has(t)}" title="Show or hide the ${esc(relLabel(t).toLowerCase())}">` +
+    `<i class="bi bi-${ICONS[t] || "dot"}" aria-hidden="true"></i>${esc(relLabel(t))} <span class="cnt">${fmtInt(count[t])}</span></button>`).join("");
+}
+
+function relBuild(keepView) {
+  const d = rel.data;
+  if (!d) return;
+  rel.drawn = true;
+  relChips();
+  const shown = relShown();
+  $("relLonelyText").textContent = `Objects without relationships (${fmtInt(shown.lonely)})`;
+  $("relLonely").disabled = !!rel.focus;
+  const notes = (d.notes || []).map((n) => " · " + n).join("");
+  $("relSub").textContent = `${fmtInt(d.nodes.length)} objects · ${fmtInt(d.edges.length)} relationships` +
+    (rel.focus ? ` · showing what is around ${rel.byId.get(rel.focus)?.name || d.nodes.find((n) => n.id === rel.focus)?.name}` : "") + notes;
+  if (!d.nodes.length) return relMsg("<span>This database has no objects to draw.</span>");
+  if (!shown.nodes.length) {
+    return relMsg(shown.lonely && !$("relLonely").checked
+      ? `<span>None of the objects shown has a relationship with another.<br>Switch on <b>Objects without relationships</b> to see them all.</span>`
+      : `<span>No object is shown: switch on a type above.</span>`);
+  }
+  if (shown.nodes.length > REL_MAX) {
+    return relMsg(`<span>${fmtInt(shown.nodes.length)} objects are too many to draw at once.<br>Switch off some types above, or find an object and show only what is around it.</span>`);
+  }
+  relMsg("");
+  if (shown.nodes.length > 300 && !rel.focus) $("relSub").textContent += " · zoom in, or find an object and show only what is around it";
+  $("relNodes").innerHTML = shown.nodes.map((n) => `<div class="relnode t-${n.type}" data-id="${esc(n.id)}" title="${esc(relOne(n.type))} ${esc(n.name)}">` +
+    `<i class="bi bi-${ICONS[n.type] || "dot"}" aria-hidden="true"></i><span>${esc(n.name)}</span></div>`).join("");
+  rel.byId = new Map();
+  rel.nodes = [...$("relNodes").children].map((el, i) => {
+    const n = { ...shown.nodes[i], el, w: el.offsetWidth, h: el.offsetHeight, x: 0, y: 0 };
+    rel.byId.set(n.id, n);
+    return n;
+  });
+  rel.edges = shown.edges.map((e) => ({ ...e, s: rel.byId.get(e.from), t: rel.byId.get(e.to) }));
+  relLayout();
+  relDrawEdges();
+  rel.nodes.forEach(relPlace);
+  if (rel.sel && !rel.byId.has(rel.sel)) rel.sel = null;
+  relSelect(rel.sel, false);
+  if (!keepView) relFit();
+}
+
+// ---- layout ----
+function relLayout() {
+  const parent = new Map(rel.nodes.map((n) => [n.id, n.id]));
+  const root = (a) => { while (parent.get(a) !== a) { parent.set(a, parent.get(parent.get(a))); a = parent.get(a); } return a; };
+  rel.edges.forEach((e) => parent.set(root(e.from), root(e.to)));
+  const comps = new Map();
+  rel.nodes.forEach((n) => { const r = root(n.id); if (!comps.has(r)) comps.set(r, { nodes: [], edges: [] }); comps.get(r).nodes.push(n); });
+  rel.edges.forEach((e) => comps.get(root(e.from)).edges.push(e));
+  const boxes = [], alone = [];
+  for (const c of comps.values()) (c.nodes.length > 1 ? boxes.push(relForce(c.nodes, c.edges)) : alone.push(c.nodes[0]));
+  boxes.sort((a, b) => b.w * b.h - a.w * a.h);
+  // The objects without relationships: a grid per type, under a label.
+  $("relNodes").querySelectorAll(".rellabel").forEach((l) => l.remove());
+  const byType = {};
+  alone.forEach((n) => (byType[n.type] = byType[n.type] || []).push(n));
+  for (const t of Object.keys(byType).sort((a, b) => REL_ORDER.indexOf(a) - REL_ORDER.indexOf(b))) {
+    const ns = byType[t].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const cols = Math.max(1, Math.round(Math.sqrt(ns.length * 1.6))), colW = Math.max(...ns.map((n) => n.w)) + 16, rowH = 32;
+    ns.forEach((n, i) => { n.x = (i % cols) * colW + n.w / 2; n.y = 30 + Math.floor(i / cols) * rowH + n.h / 2; });
+    const label = document.createElement("div");
+    label.className = "rellabel"; label.textContent = `${relLabel(t)} without relationships`;
+    $("relNodes").appendChild(label);
+    boxes.push({ nodes: ns, label, w: Math.max(Math.min(ns.length, cols) * colW, label.offsetWidth), h: 30 + Math.ceil(ns.length / cols) * rowH, minX: 0, minY: 0 });
+  }
+  // Shelves: as wide as a square of all of it, a little wider for screens.
+  const gap = 90, area = boxes.reduce((a, b) => a + (b.w + gap) * (b.h + gap), 0);
+  const maxW = Math.max(...boxes.map((b) => b.w), Math.sqrt(area) * 1.5);
+  let x = 0, y = 0, rowH = 0;
+  for (const b of boxes) {
+    if (x > 0 && x + b.w > maxW) { x = 0; y += rowH + gap; rowH = 0; }
+    const dx = x - b.minX, dy = y - b.minY;
+    b.nodes.forEach((n) => { n.x += dx; n.y += dy; });
+    if (b.label) b.label.style.transform = `translate(${x}px, ${y}px)`;
+    x += b.w + gap; rowH = Math.max(rowH, b.h);
+  }
+}
+
+// relForce arranges one group of connected objects (Fruchterman–Reingold,
+// the pushing apart only between near objects, on a grid), then moves
+// objects that still overlap apart. The objects are wide, so it works in a
+// space squeezed sideways by SX, where they are about square, and stretches
+// the result. It returns the group's bounds.
+function relForce(ns, es) {
+  const SX = 2.4, K = 62, n = ns.length, deg = new Map();
+  es.forEach((e) => { deg.set(e.s, (deg.get(e.s) || 0) + 1); deg.set(e.t, (deg.get(e.t) || 0) + 1); });
+  // A sunflower to start with, the most connected in the middle.
+  [...ns].sort((a, b) => (deg.get(b) || 0) - (deg.get(a) || 0)).forEach((p, i) => {
+    const r = K * 0.8 * Math.sqrt(i), a = i * 2.39996 + (rel.spin || 0); p.x = r * Math.cos(a); p.y = r * Math.sin(a);
+  });
+  const iters = n < 60 ? 400 : n < 400 ? 250 : 150;
+  let temp = K * Math.max(2, Math.sqrt(n) / 2);
+  const near = (fn, cell = K * 3) => {
+    const grid = new Map();
+    for (const p of ns) { const k = Math.floor(p.x / cell) + "," + Math.floor(p.y / cell); (grid.get(k) || grid.set(k, []).get(k)).push(p); }
+    for (const p of ns) {
+      const cx = Math.floor(p.x / cell), cy = Math.floor(p.y / cell);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) for (const q of grid.get(gx + "," + gy) || []) if (q !== p) fn(p, q);
+    }
+  };
+  for (let it = 0; it < iters; it++) {
+    for (const p of ns) { p.dx = 0; p.dy = 0; }
+    near((p, q) => {
+      let dx = p.x - q.x, dy = p.y - q.y;
+      if (!dx && !dy) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; }
+      const f = (K * K) / Math.max(dx * dx + dy * dy, 25);
+      p.dx += dx * f; p.dy += dy * f;
+    });
+    for (const e of es) {
+      const dx = e.t.x - e.s.x, dy = e.t.y - e.s.y, f = Math.hypot(dx, dy) / K;
+      e.s.dx += dx * f; e.s.dy += dy * f; e.t.dx -= dx * f; e.t.dy -= dy * f;
+    }
+    for (const p of ns) {
+      const d = Math.hypot(p.dx, p.dy);
+      if (d > 0) { const m = Math.min(d, temp) / d; p.x += p.dx * m; p.y += p.dy * m; }
+    }
+    temp = Math.max(temp * 0.97, 0.5);
+  }
+  for (const p of ns) p.x *= SX;
+  for (let it = 0; it < 200; it++) {
+    let moved = false;
+    near((p, q) => {
+      const ox = (p.w + q.w) / 2 + 18 - Math.abs(p.x - q.x), oy = (p.h + q.h) / 2 + 14 - Math.abs(p.y - q.y);
+      if (ox <= 0 || oy <= 0) return;
+      moved = true;
+      // Half the overlap each way parts them (the second visit of the pair then finds none).
+      if (ox / (p.w + q.w) < oy / (p.h + q.h)) { const s = (p.x < q.x || (p.x === q.x && p.id < q.id) ? -1 : 1) * ox / 2; p.x += s; q.x -= s; }
+      else { const s = (p.y < q.y || (p.y === q.y && p.id < q.id) ? -1 : 1) * oy / 2; p.y += s; q.y -= s; }
+    }, 300); // wider than the widest object
+    if (!moved) break;
+  }
+  const minX = Math.min(...ns.map((p) => p.x - p.w / 2)), maxX = Math.max(...ns.map((p) => p.x + p.w / 2));
+  const minY = Math.min(...ns.map((p) => p.y - p.h / 2)), maxY = Math.max(...ns.map((p) => p.y + p.h / 2));
+  return { nodes: ns, w: maxX - minX, h: maxY - minY, minX, minY };
+}
+
+// ---- drawing ----
+function relPlace(n) { n.el.style.transform = `translate(${n.x - n.w / 2}px, ${n.y - n.h / 2}px)`; }
+// relEnd is where the line from a toward b leaves a's box.
+function relEnd(a, bx, by, pad) {
+  const dx = bx - a.x, dy = by - a.y;
+  const s = Math.min(dx ? (a.w / 2 + pad) / Math.abs(dx) : Infinity, dy ? (a.h / 2 + pad) / Math.abs(dy) : Infinity, 1);
+  return [a.x + dx * s, a.y + dy * s];
+}
+function relPath(e) {
+  const { s, t } = e;
+  if (s === t) { // a table that refers to itself: a loop over its right end
+    const x = s.x + s.w / 2 - 14, y = s.y - s.h / 2;
+    e.head = [x + 40, y + 20, s.x + s.w / 2 + 4, s.y];
+    return `M${x} ${y - 2}C${x + 10} ${y - 34} ${x + 52} ${y - 8} ${s.x + s.w / 2 + 4} ${s.y}`;
+  }
+  // Two objects that use each other: the two lines bend apart.
+  const bend = e.both ? 26 : 0, mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2, len = Math.hypot(t.x - s.x, t.y - s.y) || 1;
+  const cx = mx - ((t.y - s.y) / len) * bend, cy = my + ((t.x - s.x) / len) * bend;
+  const [x1, y1] = relEnd(s, cx, cy, 2), [x2, y2] = relEnd(t, cx, cy, 4);
+  e.head = [bend ? cx : x1, bend ? cy : y1, x2, y2]; // for the arrow of the picture
+  return bend ? `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}` : `M${x1} ${y1}L${x2} ${y2}`;
+}
+function relEdgeTitle(e) {
+  const what = { fk: "refers to (foreign key)", trigger: "fires on", uses: e.guess ? "uses (found in its source)" : "uses" }[e.kind];
+  return `${relOne(e.s.type)} ${e.s.name} ${what} ${relOne(e.t.type).toLowerCase()} ${e.t.name}` + (e.label ? `: ${e.label}` : "");
+}
+function relDrawEdges() {
+  const pairs = new Set(rel.edges.map((e) => e.from + "\n" + e.to));
+  rel.edges.forEach((e) => { e.both = pairs.has(e.to + "\n" + e.from); });
+  const NS = "http://www.w3.org/2000/svg", g = $("relEdges");
+  g.textContent = "";
+  for (const e of rel.edges) {
+    e.el = document.createElementNS(NS, "path");
+    e.el.setAttribute("class", `reledge k-${e.kind}${e.guess ? " guess" : ""}`);
+    e.el.setAttribute("marker-end", `url(#relArrow-${e.kind})`);
+    e.el.setAttribute("d", relPath(e));
+    const title = document.createElementNS(NS, "title");
+    title.textContent = relEdgeTitle(e);
+    e.el.appendChild(title);
+    g.appendChild(e.el);
+  }
+}
+function relApplyView() {
+  const v = rel.view;
+  $("relWorld").style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.k})`;
+}
+function relBounds(ns = rel.nodes) {
+  if (!ns.length) return null;
+  return { x0: Math.min(...ns.map((n) => n.x - n.w / 2)), x1: Math.max(...ns.map((n) => n.x + n.w / 2)),
+    y0: Math.min(...ns.map((n) => n.y - n.h / 2)), y1: Math.max(...ns.map((n) => n.y + n.h / 2)) };
+}
+function relFit() {
+  const b = relBounds(), c = $("relCanvas");
+  if (!b) return;
+  const cw = c.clientWidth, ch = c.clientHeight, pad = 40;
+  const k = Math.min((cw - pad * 2) / Math.max(1, b.x1 - b.x0), (ch - pad * 2) / Math.max(1, b.y1 - b.y0), 1.4);
+  rel.view = { k: Math.max(0.05, k), x: 0, y: 0 };
+  rel.view.x = cw / 2 - ((b.x0 + b.x1) / 2) * rel.view.k;
+  rel.view.y = ch / 2 - ((b.y0 + b.y1) / 2) * rel.view.k;
+  relApplyView();
+}
+function relZoom(f, cx, cy) {
+  const c = $("relCanvas"), v = rel.view;
+  if (cx === undefined) { cx = c.clientWidth / 2; cy = c.clientHeight / 2; }
+  const k = Math.min(4, Math.max(0.03, v.k * f));
+  v.x = cx - ((cx - v.x) * k) / v.k; v.y = cy - ((cy - v.y) * k) / v.k; v.k = k;
+  relApplyView();
+}
+function relCenter(n) {
+  const c = $("relCanvas"), v = rel.view;
+  if (v.k < 0.7) v.k = 1;
+  v.x = c.clientWidth / 2 - n.x * v.k; v.y = c.clientHeight / 2 - n.y * v.k;
+  relApplyView();
+}
+
+// ---- selecting ----
+// relSelect marks an object and what is linked to it, and lists its
+// relationships (all of them, also with the types that are switched off).
+function relSelect(id, center) {
+  rel.sel = id || null;
+  const n = id && rel.byId.get(id);
+  const near = new Set(id ? [id] : []);
+  rel.edges.forEach((e) => {
+    const on = id && (e.from === id || e.to === id);
+    if (on) { near.add(e.from); near.add(e.to); }
+    e.el.classList.toggle("near", !!on);
+  });
+  rel.nodes.forEach((m) => { m.el.classList.toggle("near", near.has(m.id)); m.el.classList.toggle("sel", m.id === id); });
+  $("relWorld").classList.toggle("dim", !!id);
+  if (!id) { $("relSide").hidden = true; return; }
+  if (n && center) relCenter(n);
+  const node = rel.data.nodes.find((x) => x.id === id);
+  const named = new Map(rel.data.nodes.map((x) => [x.id, x]));
+  const list = (title, es, other) => {
+    if (!es.length) return "";
+    return `<h4>${title} (${es.length})</h4><ul>` + es.map((e) => {
+      const o = named.get(other(e));
+      return `<li><button type="button" class="t-${o.type}" data-relgo="${esc(o.id)}" title="${esc(relOne(o.type))} ${esc(o.name)}"><i class="bi bi-${ICONS[o.type] || "dot"}" aria-hidden="true"></i>` +
+        `<span>${esc(o.name)}${e.label ? ` <small>${esc(e.label)}</small>` : ""}${e.guess ? ` <small>(found in the source)</small>` : ""}</span></button></li>`;
+    }).join("") + `</ul>`;
+  };
+  const out = (k) => rel.data.edges.filter((e) => e.from === id && e.kind === k), inn = (k) => rel.data.edges.filter((e) => e.to === id && e.kind === k);
+  const sections = list("Refers to (foreign keys)", out("fk"), (e) => e.to) + list("Referred to by (foreign keys)", inn("fk"), (e) => e.from) +
+    list("Fires on", out("trigger"), (e) => e.to) + list("Triggers", inn("trigger"), (e) => e.from) +
+    list("Uses", out("uses"), (e) => e.to) + list("Used by", inn("uses"), (e) => e.from);
+  $("relSide").innerHTML = `<div class="relsidehead t-${node.type}"><h3><i class="bi bi-${ICONS[node.type] || "dot"}" aria-hidden="true"></i>${esc(node.name)}</h3>` +
+    `<button type="button" class="btn-close" data-relact="close" aria-label="Close"></button></div>` +
+    `<p class="hint">${esc(relOne(node.type))}</p>` +
+    `<div class="acts"><button type="button" class="btn btn-sm btn-outline-secondary" data-relact="open" title="Its data, or its definition">` +
+    `<i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open</button>` +
+    (rel.focus === id
+      ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-relact="all"><i class="bi bi-diagram-3" aria-hidden="true"></i> Show everything</button>`
+      : `<button type="button" class="btn btn-sm btn-outline-secondary" data-relact="focus" title="Draw only this object and what is linked to it, two steps away"><i class="bi bi-bullseye" aria-hidden="true"></i> Only what is around it</button>`) +
+    `</div>` + (sections || `<p class="none">It has no relationships with other objects.</p>`);
+  $("relSide").hidden = false;
+}
+// relGo selects an object, first drawing it if it isn't.
+function relGo(id) {
+  const n = rel.data.nodes.find((x) => x.id === id);
+  if (!n) return;
+  if (!rel.byId.has(id)) {
+    rel.hidden.delete(n.type);
+    if (rel.focus) rel.focus = id;
+    else if (!rel.data.edges.some((e) => e.from === id || e.to === id)) $("relLonely").checked = true;
+    rel.sel = id;
+    relBuild(true);
+  }
+  relSelect(id, true);
+  const el = rel.byId.get(id)?.el;
+  if (el) { el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 1200); }
+}
+
+$("relSide").addEventListener("click", (ev) => {
+  const go = ev.target.closest("[data-relgo]");
+  if (go) return relGo(go.dataset.relgo);
+  const act = ev.target.closest("[data-relact]")?.dataset.relact, n = rel.data?.nodes.find((x) => x.id === rel.sel);
+  if (act === "close") relSelect(null);
+  else if (act === "open" && n) openObject(n.type, n.name);
+  else if (act === "focus" && n) { rel.focus = n.id; relBuild(); }
+  else if (act === "all") { rel.focus = null; relBuild(); if (rel.sel) relSelect(rel.sel, true); }
+});
+$("relTypes").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-type]");
+  if (!b) return;
+  const t = b.dataset.type;
+  rel.hidden.has(t) ? rel.hidden.delete(t) : rel.hidden.add(t);
+  relBuild();
+});
+$("relLonely").addEventListener("change", () => relBuild());
+$("relGuess").addEventListener("change", () => relBuild());
+$("relRelayout").addEventListener("click", () => { rel.spin = Math.random() * 6.28; relBuild(); });
+$("relRefresh").addEventListener("click", () => relLoad(true));
+$("relZoomIn").addEventListener("click", () => relZoom(1.3));
+$("relZoomOut").addEventListener("click", () => relZoom(1 / 1.3));
+$("relFit").addEventListener("click", relFit);
+$("relFind").addEventListener("change", () => {
+  const q = $("relFind").value.trim().toLowerCase();
+  if (!q || !rel.data) return;
+  const ns = rel.data.nodes;
+  const n = ns.find((x) => x.name.toLowerCase() === q) || ns.find((x) => x.name.toLowerCase().startsWith(q)) || ns.find((x) => x.name.toLowerCase().includes(q));
+  if (n) relGo(n.id); else toast(`No object is named like “${$("relFind").value.trim()}”`, true);
+});
+$("relFind").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("relFind").dispatchEvent(new Event("change")); });
+
+// Dragging: an object moves it, the background pans; two fingers pinch.
+const relCanvas = $("relCanvas");
+relCanvas.addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  const r = relCanvas.getBoundingClientRect();
+  relZoom(Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0015)), ev.clientX - r.left, ev.clientY - r.top);
+}, { passive: false });
+relCanvas.addEventListener("pointerdown", (ev) => {
+  if (ev.target.closest(".relzoom, button")) return;
+  relCanvas.setPointerCapture(ev.pointerId);
+  rel.ptr.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  const el = ev.target.closest(".relnode");
+  if (rel.ptr.size === 1) rel.drag = { node: el ? rel.byId.get(el.dataset.id) : null, x: ev.clientX, y: ev.clientY, moved: 0 };
+  else { rel.drag = { pinch: true }; }
+  if (!el) relCanvas.classList.add("panning");
+});
+relCanvas.addEventListener("pointermove", (ev) => {
+  const p = rel.ptr.get(ev.pointerId), d = rel.drag;
+  if (!p || !d) return;
+  if (d.pinch && rel.ptr.size === 2) {
+    const [a, b] = [...rel.ptr.values()], before = Math.hypot(a.x - b.x, a.y - b.y);
+    p.x = ev.clientX; p.y = ev.clientY;
+    const [a2, b2] = [...rel.ptr.values()], after = Math.hypot(a2.x - b2.x, a2.y - b2.y), r = relCanvas.getBoundingClientRect();
+    if (before > 0) relZoom(after / before, (a2.x + b2.x) / 2 - r.left, (a2.y + b2.y) / 2 - r.top);
+    return;
+  }
+  const dx = ev.clientX - p.x, dy = ev.clientY - p.y;
+  p.x = ev.clientX; p.y = ev.clientY;
+  d.moved += Math.abs(dx) + Math.abs(dy);
+  if (d.node) {
+    d.node.x += dx / rel.view.k; d.node.y += dy / rel.view.k;
+    relPlace(d.node);
+    rel.edges.forEach((e) => { if (e.s === d.node || e.t === d.node) e.el.setAttribute("d", relPath(e)); });
+  } else if (!d.pinch) { rel.view.x += dx; rel.view.y += dy; relApplyView(); }
+});
+const relUp = (ev) => {
+  if (!rel.ptr.delete(ev.pointerId)) return;
+  const d = rel.drag;
+  if (rel.ptr.size === 0) {
+    relCanvas.classList.remove("panning");
+    if (d && !d.pinch && d.moved < 5) {
+      const id = d.node ? d.node.id : null, now = Date.now();
+      // A second click on the same object soon after opens it.
+      if (id && rel.lastClick && rel.lastClick.id === id && now - rel.lastClick.at < 450) { rel.lastClick = null; openObject(d.node.type, d.node.name); }
+      else { rel.lastClick = { id, at: now }; relSelect(id); }
+    }
+    rel.drag = null;
+  }
+};
+relCanvas.addEventListener("pointerup", relUp);
+relCanvas.addEventListener("pointercancel", relUp);
+
+// The picture: drawn again on a canvas, twice as sharp where it fits.
+$("relPng").addEventListener("click", () => {
+  const b = relBounds();
+  if (!b) return toast("There is nothing drawn to make a picture of", true);
+  const pad = 30, w = b.x1 - b.x0 + pad * 2, h = b.y1 - b.y0 + pad * 2;
+  const scale = Math.min(2, 16000 / w, 16000 / h, Math.sqrt(120e6 / (w * h)));
+  const cv = document.createElement("canvas");
+  cv.width = Math.ceil(w * scale); cv.height = Math.ceil(h * scale);
+  const ctx = cv.getContext("2d"), css = getComputedStyle($("relPane")), v = (n) => css.getPropertyValue(n).trim();
+  ctx.scale(scale, scale); ctx.translate(pad - b.x0, pad - b.y0);
+  ctx.fillStyle = v("--bg"); ctx.fillRect(b.x0 - pad, b.y0 - pad, w, h);
+  for (const e of rel.edges) {
+    const color = v("--rel-" + e.kind);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = 1.4;
+    ctx.setLineDash(e.guess ? [2, 3] : e.kind === "trigger" ? [7, 4] : []);
+    const p = new Path2D(relPath(e));
+    ctx.stroke(p);
+    // The arrow head, along the line's last stretch.
+    const [x1, y1, x2, y2] = e.head, a = Math.atan2(y2 - y1, x2 - x1);
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - 8 * Math.cos(a - 0.4), y2 - 8 * Math.sin(a - 0.4)); ctx.lineTo(x2 - 8 * Math.cos(a + 0.4), y2 - 8 * Math.sin(a + 0.4));
+    ctx.closePath(); ctx.fill();
+  }
+  const font = getComputedStyle(document.body).fontFamily;
+  ctx.textBaseline = "middle"; ctx.font = `600 12px ${font}`; ctx.fillStyle = v("--muted");
+  for (const lbl of $("relNodes").querySelectorAll(".rellabel")) {
+    const t = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(lbl.style.transform);
+    if (t) ctx.fillText(lbl.textContent, +t[1], +t[2] + 8);
+  }
+  ctx.font = `12px ${font}`;
+  const text = v("--text"), panel = v("--panel");
+  for (const n of rel.nodes) {
+    const x = n.x - n.w / 2, y = n.y - n.h / 2, c = v("--t-" + n.type) || "#888";
+    ctx.fillStyle = panel; ctx.strokeStyle = v("--border") || "#ccc"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x, y, n.w, n.h, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, 4, n.h, [6, 0, 0, 6]); ctx.fill();
+    ctx.fillStyle = text;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, n.w - 6, n.h); ctx.clip();
+    ctx.fillText(n.name, x + 10, n.y); ctx.restore();
+  }
+  cv.toBlob((blob) => {
+    if (!blob) return toast("The picture is too large to make", true);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${state.label.replace(/[^\w.-]+/g, "_")}-relationships.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }, "image/png");
+});
+
 // ---- the dashboard of the connected database -------------------------------------
 // Its statistics (dbstats.go), read again every 10 seconds while the tab is
 // shown and Live is on. Columns named "… %" are bars, "… (bytes)" sizes and
@@ -3202,6 +3813,7 @@ async function connect(extra = {}) {
     $("engineBadge").hidden = false;
     // The dashboard, for the databases whose statistics cactusdb can read.
     dashReset(!!res.dashboard);
+    relReset();
     $("objFilter").disabled = false; $("objFilter").value = ""; $("refreshBtn").disabled = false; $("ddlBtn").disabled = false;
     $("backupBtn").disabled = !!eng.noBackup;
     $("backupBtn").title = eng.noBackup ? `A backup as an SQL script isn't available for ${eng.name}: use Export all and DDL` : backupTitle;
@@ -3248,6 +3860,7 @@ async function disconnect(reason = "") {
   $("status").textContent = "Not connected";
   $("engineBadge").hidden = true;
   dashReset(false);
+  relReset();
   $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
@@ -3389,7 +4002,7 @@ function gaFromTrack(fn) {
 const GA_API = {
   "POST /api/connect": "connect", "POST /api/testconn": "test_connection", "POST /api/disconnect": "disconnect",
   "GET /api/select": "open_table", "GET /api/definition": "show_definition", "POST /api/query": "run_query",
-  "GET /api/tablestats": "table_stats", "POST /api/export": "export", "POST /api/exportall": "export_all",
+  "GET /api/tablestats": "table_stats", "GET /api/relationships": "relationships", "POST /api/export": "export", "POST /api/exportall": "export_all",
   "POST /api/exportddl": "export_ddl", "POST /api/backup": "backup", "POST /api/compare": "compare", "POST /api/migrate": "migrate",
   "POST /api/connections": "save_connection", "POST /api/queries": "save_query",
   "POST /api/files/zip": "zip_files", "POST /api/files/preview": "preview_file", "POST /api/files/delete": "delete_files",
@@ -3789,6 +4402,7 @@ async function refreshAll() {
     const res = await api("POST", "/api/refresh", { session });
     if (session !== state.session) return;
     state.objects = res.objects; resetTableStats(); state.defFor = null;
+    relReset();
     const sel = state.sel;
     if (sel && !state.objects.some((g) => g.type === sel.type && g.items.includes(sel.name))) {
       state.sel = null; state.table = null; $("tabTitle").textContent = "";
@@ -3807,12 +4421,15 @@ async function refreshAll() {
 $("refreshBtn").addEventListener("click", refreshAll);
 $("reconnectBtn").addEventListener("click", refreshAll);
 
-$("objTree").addEventListener("click", async (ev) => {
+$("objTree").addEventListener("click", (ev) => {
   const li = ev.target.closest("li[data-type]");
-  if (!li) return;
-  const type = li.dataset.type, name = li.dataset.name;
+  if (li) openObject(li.dataset.type, li.dataset.name);
+});
+// openObject shows a table's or view's data, or the definition of anything else.
+function openObject(type, name) {
   const group = state.objects.find((g) => g.type === type);
   state.sel = { type, name, label: group ? group.label.replace(/s$/, "") : type };
+  state.objTab = type;
   renderObjects();
   $("tabTitle").textContent = name; $("tabTitle").title = name;
   if (group && group.queryable) {
@@ -3822,7 +4439,7 @@ $("objTree").addEventListener("click", async (ev) => {
   } else {
     showTab("def");
   }
-});
+}
 
 async function loadTable(name) {
   setInfo("Loading " + name + "…");
@@ -4233,6 +4850,8 @@ function showTab(tab) {
   if (tab === "container") cvLoad(); else cvPause();
   $("dashPane").hidden = tab !== "dashboard";
   if (tab === "dashboard") dashLoad(); else dashPause();
+  $("relPane").hidden = tab !== "relations";
+  if (tab === "relations") relLoad();
 }
 
 async function loadDefinition() {

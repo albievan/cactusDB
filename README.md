@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.49.0
+cactusdb 1.50.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -812,6 +812,45 @@ waiting locks, more than 100 failed connections, a statement running for more th
 minute, a table with many dead rows (VACUUM it), a large index that is never used, forced
 writes off or a long-open transaction (Firebird), and a SQLite file that is mostly free
 space. Without any, the top says *No potential issues found*.
+
+<a id="relationships"></a>
+### DB Relationships: a picture of how the objects hang together
+
+The **DB Relationships** tab (next to *Migrate* once connected) draws every object of the
+connected database (tables, views, triggers, procedures, functions, packages, generators /
+sequences, domains, exceptions, events, synonyms), each as a box in its type's colour, with
+lines between the ones that depend on each other:
+
+| Line | Means |
+|---|---|
+| solid grey → | a **foreign key**: the table refers to the table at the arrow (hover for the columns, e.g. `customer_id → id`; a table that refers to itself gets a loop) |
+| dashed orange → | a **trigger** fires on the table (or view) at the arrow |
+| solid blue → | **uses**: a view, procedure, function, trigger or package reads or calls what is at the arrow, a trigger uses a generator, a table a sequence or domain |
+| dotted blue → | **uses, found in the source**: the database keeps no record of it, so cactusdb found the object's name in the source (switch off *Found in the source* to hide these) |
+
+Linked objects are arranged together, each group beside the others. **Drag** an object to
+move it, drag the background to pan, the **wheel** or a pinch zooms; ⤢ shows everything.
+**Click** an object to highlight what it is linked to and list its relationships at the
+side (*Refers to*, *Referred to by*, *Fires on*, *Triggers*, *Uses*, *Used by*: click one to
+go to it). **Only what is around it** draws just that object and what is up to two steps
+away, which is the way into a large database. A **double click** (or *Open*) shows the
+table's data or the object's definition. Above the picture: switch types on and off,
+**Find an object**, show the **objects without relationships**, **arrange** again,
+download the **picture** (PNG) and **read again**.
+
+Where it comes from (only the catalog is read, never a row):
+
+| Database | Relationships |
+|---|---|
+| Firebird | `RDB$DEPENDENCIES` (views, triggers, procedures, functions, packages → tables, views, generators, exceptions, procedures), foreign keys, the tables of triggers, the domains of columns |
+| PostgreSQL | foreign keys, what views and materialized views read (`pg_depend`), triggers and their functions, sequences owned by or in the default of a column; function bodies are searched |
+| SQL Server | foreign keys, the tables of triggers, `sys.sql_expression_dependencies` (views, procedures, functions, triggers, defaults → everything they name) |
+| Oracle | foreign keys, the tables of triggers, `ALL_DEPENDENCIES` |
+| MySQL, MariaDB | foreign keys, the tables of triggers; views, procedures, functions, triggers, events and sequence defaults are searched |
+| SQLite | foreign keys, the tables of triggers; views and triggers are searched |
+
+Databases that don't speak SQL have no relationships: their objects are drawn on their own.
+A part the connection may not read is noted under the title; the rest is still drawn.
 
 <a id="browsing-objects"></a>
 ### Browsing objects: views, stored procedures, generators…
@@ -1781,6 +1820,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `lock.go` | Connection passwords (Argon2id keys), saved queries in the store, the wrong-password throttle |
 | `auth.go` | `--remotelogin`: users, signing in with the e-mailed code, invitations, password resets, requests for access, the sign-in gate in front of everything (`/api/auth/…`, `/api/users`); the sign-in page is `web/login.html` |
 | `events.go` | The Events button: the `events` table (encrypted), recording an event, `/api/events` |
+| `relations.go` | The DB Relationships tab: every object and its foreign keys, triggers and dependencies from each database's catalog, or found in the source (`/api/relationships`) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |

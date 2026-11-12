@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.50.0 — 2026-11-12
+
+- **DB Relationships**: a new tab draws every object of the connected database (tables,
+  views, triggers, procedures, functions, packages, generators / sequences, domains,
+  exceptions…) with lines for foreign keys (with their columns), the tables triggers fire
+  on, and what views, procedures, functions and triggers use, read from the database's own
+  catalog (Firebird, PostgreSQL, SQL Server, Oracle) or found in the source (MySQL,
+  MariaDB, SQLite, PostgreSQL function bodies; dotted). Drag, pan and zoom; click an object
+  for its relationships, *Only what is around it* for a large database, double click to
+  open it; switch types on and off, find an object, download the picture (PNG).
+- The tabs row scrolls sideways on a narrow screen instead of widening the page.
+
 ## 1.49.0 — 2026-11-11
 
 - **Events**: a new button in the top bar, next to 💬 Messages, lists what happened in
