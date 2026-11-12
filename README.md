@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.55.0
+cactusdb 1.56.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -309,9 +309,15 @@ what will happen first: which file is replaced and the command cactusdb restarts
 5. It starts the new version **with the options it was started with** (see below). The page
    waits for it and reloads itself.
 
-A page that is open while cactusdb is upgraded some other way (from another browser, or by
-replacing the program on the server) notices within about 20 seconds and reloads itself,
-or, while a dialog is open, offers **Reload**.
+**Every open page moves to the new version by itself.** A page that is open while cactusdb
+is upgraded (from another browser, or by replacing the program on the server) notices within
+about 10 seconds, also in a tab in the background, says so at the top and reloads itself. It
+keeps what the reload would lose: the query in the Data tab's editor, the tab, the saved
+query form when it is open (with changes not yet saved, still marked as changes), and the
+connection, which it opens again, since the restart ended the database session. A saved
+connection asks for its connection password again; a database file (SQLite, Access…) opens
+by itself; another connection that isn't saved is filled in again, all but its password.
+No password is kept for the reload.
 
 The options come from the connection database. Every time the web UI starts, cactusdb saves
 how it was started in the `startup_options` table of `cactus.conn.db`, one row per port:

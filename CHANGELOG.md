@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.56.0 — 2026-11-12
+
+- **After an upgrade every open page reloads into the new version by itself**, also with a
+  query typed, a form open or in a background tab (it used to only offer Reload then), within
+  about 10 seconds. It keeps the query in the editor, the tab, the saved query form with its
+  changes, and opens the connection again: a saved one asks for its connection password, a
+  database file opens by itself. No password is kept for the reload.
+
 ## 1.55.0 — 2026-11-12
 
 - The **saved query form** is no longer a pop-up: it opens in the main area in place of the

@@ -4825,6 +4825,7 @@ async function connect(extra = {}) {
     btn.disabled = false; btn.textContent = "Connect";
     if (!ok && $("status").textContent.startsWith("Connecting")) $("status").innerHTML = before;
   }
+  return ok;
 }
 $("connectBtn").addEventListener("click", () => connect());
 // Closing or reloading the page ends its session, so its database
@@ -7074,6 +7075,7 @@ async function waitForRestart(to) {
       if (info && info.version && (!to || info.version === to)) {
         upgMsg(`cactusdb ${info.version} is running. Reloading the page…`);
         toast(`cactusdb ${info.version} is installed and running`);
+        upgradeKeep(info.version);
         setTimeout(() => location.reload(), 1200);
         return;
       }
@@ -7155,26 +7157,75 @@ async function loadInfo() {
 }
 
 // watchVersion notices a cactusdb upgraded under this page, from another
-// browser or on the server itself, and reloads the page so it matches. With
-// something open (a dialog, a query being written) it asks first.
+// browser or on the server itself, and reloads every open page so it runs the
+// new version. What would be lost is kept for the reload (upgradeKeep): the
+// query in the editor, the saved query form with its changes, the tab and the
+// connection, which is opened again after it (upgradeRestore). The restart
+// ended the database session anyway.
+let upgReloading = false;
 async function watchVersion() {
-  if (!state.serverVersion || upg.busy || document.hidden) return;
+  if (!state.serverVersion || upg.busy || upgReloading) return;
   let info;
   try {
     const r = await fetch("/api/info?check=" + Date.now(), { cache: "no-store" });
     info = r.ok ? await r.json() : null;
   } catch (e) { return; } // restarting, or the network: look again later
   if (!info || !info.version || info.version === state.serverVersion) return;
-  const busy = document.querySelector("dialog[open]") || !$("sqDialog").hidden || $("sql").value.trim();
-  if (!busy) {
-    toast(`cactusdb ${info.version} is now running: reloading the page`);
-    setTimeout(() => location.reload(), 1500);
-    return;
-  }
-  $("verBannerText").textContent = `cactusdb ${info.version} is now running on the server (this page is ${state.serverVersion}). Reload the page to use it.`;
+  upgReloading = true;
+  $("verBannerText").textContent = `cactusdb ${info.version} is now installed (this page is ${state.serverVersion}): reloading the page in a moment, keeping your query and connection.`;
   $("verBanner").hidden = false;
+  toast(`cactusdb ${info.version} is installed: reloading the page`);
+  upgradeKeep(info.version);
+  setTimeout(() => location.reload(), 2500);
 }
-setInterval(watchVersion, 20000);
+setInterval(watchVersion, 10000);
+
+// upgradeKeep keeps, for the reload after an upgrade, what the page holds that
+// a reload would lose, in this tab's own storage. Never a password: a saved
+// connection asks for its connection password again, another is filled in
+// without its password (a database file opens by itself).
+const UPG_KEEP = "cactusdb.afterUpgrade";
+function upgradeKeep(version) {
+  const sq = !$("sqDialog").hidden ? { edit: sqEdit, form: sqForm(), orig: sqOrig } : null;
+  const conn = state.session ? (state.savedConn ? { savedId: state.savedConn, label: state.label } : { params: { ...formParams(), password: "" }, label: state.label }) : null;
+  try { sessionStorage.setItem(UPG_KEEP, JSON.stringify({ version, at: Date.now(), tab: state.tab, sql: $("sql").value, sq, conn })); } catch (e) { /* not kept */ }
+}
+async function upgradeRestore() {
+  let k = null;
+  try { k = JSON.parse(sessionStorage.getItem(UPG_KEEP) || "null"); sessionStorage.removeItem(UPG_KEEP); } catch (e) { return; }
+  if (!k || Date.now() - k.at > 15 * 60 * 1000) return;
+  toast(`Now running cactusdb ${k.version}` + (k.conn ? `: connecting again to ${k.conn.label}` : ""));
+  const after = () => {
+    if (k.sql) { $("sql").value = k.sql; qdSoon(); }
+    if (k.tab && k.tab !== "data" && !document.querySelector(`.tabs button[data-tab="${k.tab}"]`)?.hidden) showTab(k.tab);
+    if (k.sq && state.savedConn) {
+      const x = k.sq.edit ? (queries.list || []).find((q) => q.id === k.sq.edit) : null;
+      openQueryDialog(x || null);
+      sqEdit = k.sq.edit || 0; sqFill(k.sq.form); sqOrig = k.sq.orig || sqForm();
+      $("sqTitle").textContent = sqEdit ? "Edit saved query" : "Save query";
+    }
+  };
+  if (!k.conn) { after(); return; }
+  let ok = false;
+  if (k.conn.savedId) {
+    await loadSaved();
+    const c = (state.saved || []).find((x) => x.id === k.conn.savedId);
+    if (c) ok = await connect({ savedId: c.id, label: c.name }); // asks for its connection password
+  } else if (k.conn.params) {
+    const p = k.conn.params;
+    selectEngine(p.engine, true);
+    if (isFileEngine(p.engine)) { $("dbFile").value = p.database; ok = await connect(); }
+    else {
+      $("host").value = p.host; $("port").value = p.port || ""; $("user").value = p.username; $("dbName").value = p.database;
+      toast(`Enter the password of ${k.conn.label} and connect again`, true);
+      $("pass").focus();
+    }
+  }
+  if (ok) {
+    if (k.sq && state.savedConn) await loadQueries();
+    after();
+  } else if (k.sql) $("sql").value = k.sql;
+}
 
 // ---- who is using cactusdb, and what they change (presence.go) -------------
 // The page checks in every 5 seconds. The answer lists the open pages with
@@ -7638,6 +7689,7 @@ $("engines").addEventListener("click", (ev) => {
   loadInfo();
   renderHome();
   checkUpdate(false).catch(() => {}); // only shows a dot in the menu when a newer version exists
+  upgradeRestore(); // after the reload that follows an upgrade
   api("GET", "/api/drivers").then((list) => {
     $("driversSub").textContent = "· " + list.length + " built in";
     $("driverList").innerHTML = list.map((d) =>
