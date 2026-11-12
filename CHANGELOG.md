@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.54.1 — 2026-11-12
+
+- A new build of 1.54.0 for every platform, with no changes to what cactusdb does. It
+  includes everything since 1.52.0: the ER diagram arrangement, saved views and Export view
+  in DB Relationships, query suggestions with the query diagram in the Data tab, and
+  Execute in the saved query dialog.
+
 ## 1.54.0 — 2026-11-12
 
 - **Execute** in the Save / Edit saved query dialog (or Ctrl+Enter in its query): runs the
