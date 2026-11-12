@@ -252,7 +252,7 @@
   .qdesc { white-space: normal !important; color: var(--muted); font-size: 12px; }
   .qsql { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 380px !important; }
   .qacts { white-space: nowrap; width: 1%; }
-  .qacts .btn-group, .qacts .form-select { margin-left: 4px; vertical-align: middle; }
+  .qacts .btn-group, .qacts .form-select { margin-right: 4px; vertical-align: middle; }
   .qacts .form-select { display: inline-block; }
   .form-select.qexpsel { font-size: 12px; width: auto; }
   #qNote { margin: 0; }
@@ -655,6 +655,13 @@
   dialog.dlg.max[open], dialog.dlg.max > form { display: flex; flex-direction: column; min-height: 0; }
   dialog.dlg.max > form { flex: 1; }
   dialog.dlg.max .grow { flex: 1; min-height: 120px; resize: none; }
+  /* The saved query's form: in the main area, in place of the tab's page. */
+  #sqDialog { display: flex; flex-direction: column; min-height: 0; padding: 12px 16px; background: var(--panel); overflow: auto; }
+  #sqDialog[hidden] { display: none; }
+  #sqDialog > form { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #sqDialog .grow { flex: 1; min-height: 120px; resize: none; }
+  .sqhead { display: flex; align-items: center; gap: 10px; }
+  .sqhead h3 { margin: 0; font-size: 17px; font-weight: 600; }
   .sqvers { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin: 2px 0 4px; font-size: 13px; }
   .sqvers select { width: auto; max-width: 100%; }
   .qver { font-size: 11px; font-weight: 500; margin-left: 6px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 0 5px; }
@@ -1293,6 +1300,48 @@
       <div class="exportnote" id="qNote" hidden></div>
       <div class="ftable" id="qTable"></div>
     </div>
+    <section class="pane sqpane" id="sqDialog" hidden aria-labelledby="sqTitle">
+      <form id="sqForm">
+        <div class="sqhead">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="sqBack" title="Back to where you were (asks first when there are changes not saved)"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</button>
+          <h3 id="sqTitle">Save query</h3>
+        </div>
+        <div class="sqvers" id="sqVersRow" hidden>
+          <label for="sqVers"><i class="bi bi-clock-history" aria-hidden="true"></i> Version</label>
+          <select class="form-select form-select-sm" id="sqVers" title="Every save is kept: pick one to load it into the form, then Save to make it the current version"></select>
+          <span class="hint-inline" id="sqVersNote"></span>
+        </div>
+        <label class="form-label" for="sqName">Name</label>
+        <input class="form-control form-control-sm" id="sqName" maxlength="100" placeholder="e.g. Open orders" autocomplete="off">
+        <label class="form-label" for="sqDesc">Description</label>
+        <textarea class="form-control form-control-sm" id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
+        <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
+        <div class="sqlrow sqdrow">
+          <div class="sqlwrap sqqawrap">
+            <textarea id="sqSql" rows="8" spellcheck="false" autocomplete="off" aria-autocomplete="list" aria-controls="sqQaList" class="form-control form-control-sm mono grow"></textarea>
+            <div class="qalist" id="sqQaList" role="listbox" aria-label="Suggestions" hidden></div>
+          </div>
+          <aside class="qdiag" id="sqDiag" hidden aria-label="The tables of the query and how it joins them">
+            <div class="qdhead"><span><i class="bi bi-diagram-2" aria-hidden="true"></i> Tables of the query</span><span class="hint" id="sqDiagSum"></span></div>
+            <div class="qdbody" id="sqDiagBody"></div>
+          </aside>
+        </div>
+        <div id="sqResult" class="dresult alert alert-danger" hidden></div>
+        <div class="sqrowsbar" id="sqRowsBar" hidden>
+          <button type="button" class="btn btn-sm btn-link" id="sqRowsToggle" aria-expanded="true" aria-controls="sqRows"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span>Hide rows</span></button>
+          <span class="hint">Drag the query's bottom edge to give it more or less room</span>
+        </div>
+        <div class="sqrows" id="sqRows" hidden></div>
+        <div class="dactions">
+          <button class="btn btn-outline-secondary" type="button" id="sqCheck" title="Ask the database whether the query is valid, without running it"><i class="bi bi-check2-circle" aria-hidden="true"></i> Check syntax</button>
+          <label class="form-check form-switch qaswitch" title="Show or hide, beside the query, its tables and the columns it joins them by"><input class="form-check-input" type="checkbox" id="sqDiagOn" role="switch" checked> Query diagram</label>
+          <button class="btn btn-outline-primary" type="button" id="sqRun" title="Run the query as it is written here (read-only) and show its first 100 rows below, without saving it or leaving the form (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Execute</button>
+          <span class="spacer"></span>
+          <button class="btn btn-outline-secondary" type="button" id="sqCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="sqSave">Save</button>
+        </div>
+      </form>
+    </section>
     <div class="pane" id="filesPane" hidden>
       <div class="filesbar">
         <span class="flabel">Type</span>
@@ -2011,45 +2060,7 @@
   </form>
 </dialog>
 
-<dialog id="sqDialog" class="dlg max" aria-labelledby="sqTitle">
-  <form method="dialog" id="sqForm">
-    <h3 id="sqTitle">Save query</h3>
-    <div class="sqvers" id="sqVersRow" hidden>
-      <label for="sqVers"><i class="bi bi-clock-history" aria-hidden="true"></i> Version</label>
-      <select class="form-select form-select-sm" id="sqVers" title="Every save is kept: pick one to load it into the form, then Save to make it the current version"></select>
-      <span class="hint-inline" id="sqVersNote"></span>
-    </div>
-    <label class="form-label" for="sqName">Name</label>
-    <input class="form-control form-control-sm" id="sqName" maxlength="100" placeholder="e.g. Open orders" autocomplete="off">
-    <label class="form-label" for="sqDesc">Description</label>
-    <textarea class="form-control form-control-sm" id="sqDesc" rows="2" maxlength="1000" placeholder="What it shows, and when to use it"></textarea>
-    <label class="form-label" for="sqSql">Query <span class="hint-inline" id="sqSqlHint">read-only: SELECT, WITH, SHOW, EXPLAIN…</span></label>
-    <div class="sqlrow sqdrow">
-      <div class="sqlwrap sqqawrap">
-        <textarea id="sqSql" rows="8" spellcheck="false" autocomplete="off" aria-autocomplete="list" aria-controls="sqQaList" class="form-control form-control-sm mono grow"></textarea>
-        <div class="qalist" id="sqQaList" role="listbox" aria-label="Suggestions" hidden></div>
-      </div>
-      <aside class="qdiag" id="sqDiag" hidden aria-label="The tables of the query and how it joins them">
-        <div class="qdhead"><span><i class="bi bi-diagram-2" aria-hidden="true"></i> Tables of the query</span><span class="hint" id="sqDiagSum"></span></div>
-        <div class="qdbody" id="sqDiagBody"></div>
-      </aside>
-    </div>
-    <div id="sqResult" class="dresult alert alert-danger" hidden></div>
-    <div class="sqrowsbar" id="sqRowsBar" hidden>
-      <button type="button" class="btn btn-sm btn-link" id="sqRowsToggle" aria-expanded="true" aria-controls="sqRows"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span>Hide rows</span></button>
-      <span class="hint">Drag the query's bottom edge to give it more or less room</span>
-    </div>
-    <div class="sqrows" id="sqRows" hidden></div>
-    <div class="dactions">
-      <button class="btn btn-outline-secondary" type="button" id="sqCheck" title="Ask the database whether the query is valid, without running it"><i class="bi bi-check2-circle" aria-hidden="true"></i> Check syntax</button>
-      <label class="form-check form-switch qaswitch" title="Show or hide, beside the query, its tables and the columns it joins them by"><input class="form-check-input" type="checkbox" id="sqDiagOn" role="switch" checked> Query diagram</label>
-      <button class="btn btn-outline-primary" type="button" id="sqRun" title="Run the query as it is written here (read-only) and show its first 100 rows below, without saving it or leaving the form (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Execute</button>
-      <span class="spacer"></span>
-      <button class="btn btn-outline-secondary" type="button" id="sqCancel">Cancel</button>
-      <button type="submit" class="btn btn-primary" id="sqSave">Save</button>
-    </div>
-  </form>
-</dialog>
+
 
 <dialog id="sqAskDialog" class="dlg" aria-labelledby="sqAskTitle">
   <h3 id="sqAskTitle">Save your changes?</h3>
@@ -5041,13 +5052,13 @@ function renderQueries() {
       <p>Write a read-only query on the Data tab and press <b>💾 Save query</b>.</p></div></div>`;
     return;
   }
-  $("qTable").innerHTML = `<table class="table table-sm table-hover"><thead><tr><th>Name</th><th>Description</th><th>Query</th><th>Changed</th><th></th></tr></thead><tbody>` +
+  $("qTable").innerHTML = `<table class="table table-sm table-hover"><thead><tr><th></th><th>Name</th><th>Description</th><th>Query</th><th>Changed</th></tr></thead><tbody>` +
     (vis.length ? vis.map((x) => `<tr data-qid="${x.id}">
+      <td class="qacts"><span class="btn-group btn-group-sm" role="group" aria-label="${esc(x.name)}"><button class="btn btn-outline-primary" data-qact="run" title="Open in the editor and run" aria-label="Run ${esc(x.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" data-qact="edit" title="Edit the name, description or query" aria-label="Edit ${esc(x.name)}"><i class="bi bi-pencil" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" data-qact="versions" title="Versions: see the earlier versions and go back to one" aria-label="Versions of ${esc(x.name)}"><i class="bi bi-clock-history" aria-hidden="true"></i></button><button class="btn btn-outline-danger" data-qact="del" title="Delete (asks first)" aria-label="Delete ${esc(x.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></span><select class="form-select form-select-sm qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select></td>
       <td><b>${esc(x.name)}</b><span class="qver" title="Version ${x.version || 1}: every save is kept">v${x.version || 1}</span></td>
       <td class="qdesc">${esc(x.description || "")}</td>
       <td class="qsql" title="${esc(x.sql)}">${esc(x.sql.replace(/\s+/g, " "))}</td>
       <td class="fdate">${esc(fmtDate(x.updated))}</td>
-      <td class="qacts"><select class="form-select form-select-sm qexpsel" data-qexp title="Export the data of this query (every row, not the SQL) to the export folder" aria-label="Export the data of ${esc(x.name)}"><option value="">⤓ Export…</option>${Q_EXPORT_OPTS}</select><span class="btn-group btn-group-sm" role="group" aria-label="${esc(x.name)}"><button class="btn btn-outline-primary" data-qact="run" title="Open in the editor and run" aria-label="Run ${esc(x.name)}"><i class="bi bi-play-fill" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" data-qact="edit" title="Edit the name, description or query" aria-label="Edit ${esc(x.name)}"><i class="bi bi-pencil" aria-hidden="true"></i></button><button class="btn btn-outline-secondary" data-qact="versions" title="Versions: see the earlier versions and go back to one" aria-label="Versions of ${esc(x.name)}"><i class="bi bi-clock-history" aria-hidden="true"></i></button><button class="btn btn-outline-danger" data-qact="del" title="Delete (asks first)" aria-label="Delete ${esc(x.name)}"><i class="bi bi-trash" aria-hidden="true"></i></button></span></td>
     </tr>`).join("") : `<tr><td colspan="5" class="fnomatch">No saved query matches.</td></tr>`) + `</tbody></table>`;
 }
 $("qFilter").addEventListener("input", () => { queries.q = $("qFilter").value; renderQueries(); });
@@ -5123,6 +5134,18 @@ let sqEdit = 0, sqOrig = null, sqVersions = [];
 const sqForm = () => ({ name: $("sqName").value, description: $("sqDesc").value, sql: $("sqSql").value });
 const sqDirty = () => { const f = sqForm(); return !!sqOrig && (f.name !== sqOrig.name || f.description !== sqOrig.description || f.sql !== sqOrig.sql); };
 function sqFill(v) { $("sqName").value = v.name; $("sqDesc").value = v.description || ""; $("sqSql").value = v.sql; $("sqResult").hidden = true; qdSoon(QD_DLG); }
+// The form takes the main area in place of the tab's page, and gives it back
+// when it is closed (Back, Cancel, Esc, or another tab).
+function sqOpenPane() {
+  document.querySelectorAll("main > .pane").forEach((p) => { if (p !== $("sqDialog")) p.hidden = true; });
+  $("sqDialog").hidden = false;
+}
+function sqHidePane() {
+  if ($("sqDialog").hidden) return;
+  $("sqDialog").hidden = true;
+  qaClose();
+  showTab(state.tab);
+}
 function openQueryDialog(x, versions) {
   if (!state.savedConn) {
     toast("Queries can only be saved for a saved connection: save this connection first.", true);
@@ -5135,13 +5158,13 @@ function openQueryDialog(x, versions) {
   sqVersions = []; $("sqVersRow").hidden = true;
   $("sqRows").innerHTML = ""; sqRowsOpen(false); $("sqResult").hidden = true;
   if (x) loadQueryVersions(x, versions);
-  $("sqDialog").showModal();
+  sqOpenPane();
   $("sqName").focus();
 }
 async function loadQueryVersions(x, focus) {
   try {
     const res = await api("GET", `/api/queries/${x.id}/versions?` + new URLSearchParams({ session: state.session }));
-    if (sqEdit !== x.id || !$("sqDialog").open) return;
+    if (sqEdit !== x.id || $("sqDialog").hidden) return;
     sqVersions = res.versions;
     $("sqVers").innerHTML = sqVersions.map((v, i) => `<option value="${v.version}">v${v.version} · ${esc(fmtDate(v.saved))}${i ? "" : " · current"}</option>`).join("");
     $("sqVersNote").textContent = sqVersions.length > 1 ? `${sqVersions.length} versions` : "the first version: every save from now on is kept";
@@ -5159,7 +5182,7 @@ $("sqVers").addEventListener("change", () => {
 });
 // sqClose closes the dialog, first asking to save or discard any changes.
 function sqClose() {
-  if (!sqDirty()) { $("sqDialog").close(); return; }
+  if (!sqDirty()) { sqHidePane(); return; }
   const name = $("sqName").value.trim();
   $("sqAskText").textContent = (sqEdit ? `You changed the saved query “${name || "without a name"}”.` : `You haven't saved the query${name ? ` “${name}”` : ""}.`)
     + " Save it, or discard the changes?";
@@ -5169,9 +5192,11 @@ function sqClose() {
 $("saveQueryBtn").addEventListener("click", () => openQueryDialog(null));
 $("qNew").addEventListener("click", () => openQueryDialog(null));
 $("sqCancel").addEventListener("click", sqClose);
-$("sqDialog").addEventListener("cancel", (ev) => { ev.preventDefault(); sqClose(); }); // Esc
+$("sqBack").addEventListener("click", sqClose);
+// Esc goes back too (not while a list of suggestions is open: that closes first).
+$("sqDialog").addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !ev.defaultPrevented && !document.querySelector("dialog[open]")) { ev.preventDefault(); sqClose(); } });
 $("sqAskKeep").addEventListener("click", () => $("sqAskDialog").close());
-$("sqAskDiscard").addEventListener("click", () => { $("sqAskDialog").close(); sqOrig = null; $("sqDialog").close(); });
+$("sqAskDiscard").addEventListener("click", () => { $("sqAskDialog").close(); sqOrig = null; sqHidePane(); });
 $("sqAskSave").addEventListener("click", () => { $("sqAskDialog").close(); $("sqForm").requestSubmit(); });
 // sqShow shows a result under the query: kind is danger, success or busy.
 function sqShow(kind, text) {
@@ -5244,7 +5269,7 @@ $("sqForm").addEventListener("submit", async (ev) => {
     const first = !sqEdit;
     sqEdit = res.id; sqOrig = sqForm();
     $("sqTitle").textContent = "Edit saved query";
-    sqShow("success", `Saved “${body.name.trim()}” (version ${res.version})` + (res.checked ? "" : ": the database couldn't check the query in time") + ". The form stays open: Cancel closes it.");
+    sqShow("success", `Saved “${body.name.trim()}” (version ${res.version})` + (res.checked ? "" : ": the database couldn't check the query in time") + ". The form stays open: Back or Cancel closes it.");
     loadQueries();
     loadQueryVersions({ id: res.id, name: body.name.trim() }, false);
     if (first) toast(`Saved “${body.name.trim()}”`);
@@ -5852,6 +5877,11 @@ $("fNote").addEventListener("click", (ev) => { if (ev.target.closest("[data-act]
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
 function showTab(tab) {
+  // Leaving the saved query's form: first asked when it has changes not saved.
+  if (!$("sqDialog").hidden) {
+    if (sqDirty()) { sqClose(); return; }
+    $("sqDialog").hidden = true; qaClose();
+  }
   state.tab = tab;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   $("dataPane").hidden = tab !== "data";
@@ -7135,7 +7165,7 @@ async function watchVersion() {
     info = r.ok ? await r.json() : null;
   } catch (e) { return; } // restarting, or the network: look again later
   if (!info || !info.version || info.version === state.serverVersion) return;
-  const busy = document.querySelector("dialog[open]") || $("sql").value.trim();
+  const busy = document.querySelector("dialog[open]") || !$("sqDialog").hidden || $("sql").value.trim();
   if (!busy) {
     toast(`cactusdb ${info.version} is now running: reloading the page`);
     setTimeout(() => location.reload(), 1500);

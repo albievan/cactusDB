@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.55.0 — 2026-11-12
+
+- The **saved query form** is no longer a pop-up: it opens in the main area in place of the
+  tab's page, with **← Back** (and Cancel, Esc or another tab) to go back; changes not saved
+  are asked about first.
+- **Saved queries list**: the buttons (run, edit, versions, delete) and Export are now on the
+  left of each query's name.
+
 ## 1.54.4 — 2026-11-12
 
 - Saving a query no longer closes the dialog: it becomes *Edit saved query* with the new

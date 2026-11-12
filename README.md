@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.54.4
+cactusdb 1.55.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -375,32 +375,34 @@ page.
 
 <a id="saved-queries"></a>
 **Saved queries.** For a saved connection, write a query on the *Data* tab and click
-**💾 Save query**, then give it a **name** and a **description** (the dialog fills the window,
-and follows it as you resize it, so a long query has room). Only read-only queries can
+**💾 Save query**, then give it a **name** and a **description**. The form opens in the main
+area, in place of the tab's page (not as a pop-up: the tabs and objects stay as they are), and
+fills it, so a long query has room; **← Back**, **Cancel** or Esc goes back to where you were,
+and clicking another tab leaves it too. Only read-only queries can
 be saved: cactusdb checks it with the same rules as running a query, so `INSERT`,
 `UPDATE`, `DELETE`, schema changes and several statements at once are refused.
-**Check syntax**, in the same dialog, asks the database whether the query is valid (its
+**Check syntax**, in the same form, asks the database whether the query is valid (its
 syntax, and that its tables and columns exist) without running it: SQLite, PostgreSQL and
 its relatives, MySQL, MariaDB and Firebird prepare it, and SQL Server describes it. Other
 databases (Oracle among them) start it, read-only, and it is stopped as soon as its columns
 are known, before any row is read, or after 15 seconds. The database's own error is shown
 when it isn't valid. **Save** does the same check first: a query that isn't valid isn't
 saved (one the database couldn't check in time is saved, and the notice says so).
-**Execute** (or **Ctrl+Enter** in the query) runs the query as it is written in the dialog,
+**Execute** (or **Ctrl+Enter** in the query) runs the query as it is written in the form,
 read-only like any query, and shows its first 100 rows under it, without saving it or
-closing the dialog: edit, execute, look, and save when it's right. The rows are greyed out
+closing the form: edit, execute, look, and save when it's right. The rows are greyed out
 once the query is changed, until it is executed again. **Hide rows** / **Show rows** above
-them collapses and expands them (hidden, the query fills the dialog again). While they
+them collapses and expands them (hidden, the query fills the form again). While they
 show, drag the query's bottom edge to give it more or less room; it keeps that height
-when you execute again or show the rows again. The query in the dialog gets the same
+when you execute again or show the rows again. The query in the form gets the same
 **suggestions** as the Data tab's editor (columns after `t3.`, tables after FROM or JOIN,
-↑ ↓ Enter / Tab, Esc closes the list but not the dialog, Ctrl+Space asks), and the same
+↑ ↓ Enter / Tab, Esc closes the list but not the form, Ctrl+Space asks), and the same
 **query diagram** beside it (its own *Query diagram* switch hides or shows it, as the one
-under the Data tab's editor does there). **Save** keeps the dialog open as the saved
+under the Data tab's editor does there). **Save** keeps the form open as the saved
 query's (*Edit saved query*, the new version listed, *Saved … (version n)* under the
-query), so you can go on editing, executing and saving; **Cancel** closes it.
+query), so you can go on editing, executing and saving; **Back** or **Cancel** closes it.
 
-**Closing with changes.** **Cancel** or Esc after changing anything in the dialog asks
+**Closing with changes.** **Back**, **Cancel**, Esc or another tab after changing anything in the form asks
 whether to **Save** the changes, **Discard** them or **Keep editing**.
 
 **Versions.** Every save of a query is kept as a version (v1, v2, …, the newest 100), shown
