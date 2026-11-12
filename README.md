@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.50.0
+cactusdb 1.51.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -819,7 +819,10 @@ space. Without any, the top says *No potential issues found*.
 The **DB Relationships** tab (next to *Migrate* once connected) draws every object of the
 connected database (tables, views, triggers, procedures, functions, packages, generators /
 sequences, domains, exceptions, events, synonyms), each as a box in its type's colour, with
-lines between the ones that depend on each other:
+lines between the ones that depend on each other. Nothing is read when you connect or open
+the tab: click **Generate Relationships** (in the tab, and above the picture to read them
+again). Connecting again or refreshing the objects clears the picture until you click it
+again.
 
 | Line | Means |
 |---|---|
@@ -827,6 +830,7 @@ lines between the ones that depend on each other:
 | dashed orange → | a **trigger** fires on the table (or view) at the arrow |
 | solid blue → | **uses**: a view, procedure, function, trigger or package reads or calls what is at the arrow, a trigger uses a generator, a table a sequence or domain |
 | dotted blue → | **uses, found in the source**: the database keeps no record of it, so cactusdb found the object's name in the source (switch off *Found in the source* to hide these) |
+| dash-dot purple → | **assumed from column names**: for tables without foreign keys (switch off *Assumed from column names* to hide these). A table's key column found in other tables (`CLIENT_NO` in `CLIENT` and `INVOICE`); without a key, the table whose name the column starts with (`ITEM_CODE` → `ITEM`), or the table that has it as its first column (`INV_NO` → `INVOICE` rather than `INVOICE_LINE`); and a column named after a table and its key or id (`customer_id`, `CustomerID` → `customers.id`). Generic names (`id`, `name`, `code`, `status`, `created`…) never link tables on their own, and tables already joined by a foreign key get no assumed line |
 
 Linked objects are arranged together, each group beside the others. **Drag** an object to
 move it, drag the background to pan, the **wheel** or a pinch zooms; ⤢ shows everything.
@@ -836,7 +840,7 @@ go to it). **Only what is around it** draws just that object and what is up to t
 away, which is the way into a large database. A **double click** (or *Open*) shows the
 table's data or the object's definition. Above the picture: switch types on and off,
 **Find an object**, show the **objects without relationships**, **arrange** again,
-download the **picture** (PNG) and **read again**.
+download the **picture** (PNG) and **Generate Relationships** again.
 
 Where it comes from (only the catalog is read, never a row):
 

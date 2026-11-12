@@ -5,9 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -32,7 +34,7 @@ type relNode struct {
 type relEdge struct {
 	From  string `json:"from"` // the object that depends on…
 	To    string `json:"to"`   // …this one
-	Kind  string `json:"kind"` // fk, trigger or uses
+	Kind  string `json:"kind"` // fk, trigger, uses or assumed (from column names)
 	Label string `json:"label,omitempty"`
 	Guess bool   `json:"guess,omitempty"` // found by its name in the source
 }
@@ -450,6 +452,7 @@ func relationships(ctx context.Context, ss *session) (*relGraph, error) {
 	default:
 		g.notes = append(g.notes, fmt.Sprintf("The relationships of %s databases can't be read yet: the objects are drawn on their own.", engineName(ss.kind())))
 	}
+	g.assumeFromColumns(ctx, ss)
 	return g, nil
 }
 
@@ -554,4 +557,301 @@ func (s *server) handleRelationships(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]any{"label": ss.label, "engine": ss.kind(), "nodes": g.nodes,
 		"edges": edges, "labels": g.labels, "notes": g.notes, "ms": time.Since(start).Milliseconds()})
+}
+
+// ---- relationships assumed from column names ----
+//
+// Many databases keep no foreign keys at all (MyISAM, old Firebird and Access
+// designs, …): their tables are joined by columns of the same name. Those are
+// assumed here, drawn as their own kind of line ("assumed"), from one read of
+// every table's columns and single-column primary / unique keys:
+//
+//  1. A column that is the key of one table (CUSTOMER_NO in CUSTOMER) and is
+//     also in other tables: they refer to that table. Without a key, the table
+//     whose name the column starts with (CUSTOMER_NO in CUSTOMERS) is taken,
+//     or else the one table that has it as its first column (when the name
+//     looks like an identifier: …ID, …NO, …CODE, …KEY).
+//  2. A column named after a table and its key or id (customer_id, CustomerID)
+//     refers to that table.
+//
+// Generic names (id, name, code, status, created…) never link tables on their own.
+
+type relCol struct {
+	table, name string
+	pos         int
+	key         string // PRI, UNI (single-column keys only) or ""
+}
+
+var relGenericCols = map[string]bool{}
+
+func init() {
+	for _, n := range strings.Fields(`id code name no nr num number key guid uuid type kind status state description descr
+		remark remarks note notes comment comments created updated modified changed deleted date time timestamp active enabled
+		flag version seq sequence sort sortorder ordinal position value amount qty quantity price total title text data
+		createdby updatedby modifiedby created_at updated_at modified_at created_by updated_by modified_by user username email`) {
+		relGenericCols[n] = true
+	}
+}
+
+// relIDLike is whether a column name reads as an identifier of something.
+func relIDLike(n string) bool {
+	for _, suf := range []string{"id", "no", "nr", "num", "code", "key", "guid", "uuid", "ref"} {
+		if strings.HasSuffix(n, suf) && len(n) > len(suf) {
+			return true
+		}
+	}
+	return false
+}
+
+// relTableWords are the lower-case forms of a table's name a column may start
+// with: as is, without a tbl_ / t_ prefix, and singular.
+func relTableWords(table string) []string {
+	n := strings.ToLower(table)
+	if i := strings.LastIndexByte(n, '.'); i >= 0 {
+		n = n[i+1:]
+	}
+	out := []string{n}
+	for _, p := range []string{"tbl_", "tbl", "tb_", "t_"} {
+		if strings.HasPrefix(n, p) && len(n) > len(p)+2 {
+			out = append(out, n[len(p):])
+		}
+	}
+	for _, w := range slices.Clone(out) {
+		switch {
+		case strings.HasSuffix(w, "ies") && len(w) > 4:
+			out = append(out, w[:len(w)-3]+"y")
+		case strings.HasSuffix(w, "ses") || strings.HasSuffix(w, "xes") || strings.HasSuffix(w, "ches") || strings.HasSuffix(w, "shes"):
+			out = append(out, w[:len(w)-2])
+		case strings.HasSuffix(w, "s") && !strings.HasSuffix(w, "ss") && len(w) > 3:
+			out = append(out, w[:len(w)-1])
+		}
+	}
+	return slices.Compact(out)
+}
+
+// relStem is a column name without its identifier ending: inv for INV_NO.
+func relStem(n string) string {
+	for _, suf := range []string{"guid", "uuid", "code", "num", "key", "ref", "id", "no", "nr"} {
+		if s, ok := strings.CutSuffix(n, suf); ok && s != "" {
+			return strings.TrimRight(s, "_")
+		}
+	}
+	return n
+}
+
+// relShortestNamed picks, of several tables that start with a column, the one
+// whose name starts with the column's stem, the shortest one (INVOICE rather
+// than INVOICE_LINE for INV_NO); none when that doesn't settle it.
+func relShortestNamed(tables []string, stem string, words func(string) []string) []string {
+	var best []string
+	bestLen := 0
+	for _, t := range tables {
+		for _, w := range words(t) {
+			if len(stem) >= 2 && strings.HasPrefix(w, stem) {
+				if l := len(w); len(best) == 0 || l < bestLen {
+					best, bestLen = []string{t}, l
+				} else if l == bestLen && !slices.Contains(best, t) {
+					best = append(best, t)
+				}
+			}
+		}
+	}
+	if len(best) != 1 {
+		return nil
+	}
+	return best
+}
+
+// relStartsWith is whether column n is a table word followed by more (customer_no, customerno).
+func relStartsWith(n string, words []string) bool {
+	for _, w := range words {
+		if rest, ok := strings.CutPrefix(n, w); ok && rest != "" && (rest[0] == '_' || len(w) >= 3) {
+			return true
+		}
+	}
+	return false
+}
+
+// assume adds the relationships assumed from the columns of the tables.
+func (g *relGraph) assume(cols []relCol) int {
+	type tableInfo struct {
+		cols  map[string]string // lower-case → as named
+		first string
+		key   string // lower-case single-column key (PRI before UNI)
+		words []string
+	}
+	tables := map[string]*tableInfo{}
+	var names []string
+	for _, c := range cols {
+		t := tables[c.table]
+		if t == nil {
+			t = &tableInfo{cols: map[string]string{}, words: relTableWords(c.table)}
+			tables[c.table] = t
+			names = append(names, c.table)
+		}
+		lc := strings.ToLower(c.name)
+		t.cols[lc] = c.name
+		if c.pos == 1 {
+			t.first = lc
+		}
+		if c.key == "PRI" || c.key == "UNI" && t.key == "" {
+			t.key = lc
+		}
+	}
+	slices.Sort(names)
+	added := 0
+	link := func(from, to, label string) {
+		f, t := g.find(relOf(from, ObjTable)), g.find(relOf(to, ObjTable))
+		if f == "" || t == "" || f == t {
+			return
+		}
+		for _, k := range []string{f + "\x00" + t + "\x00fk", t + "\x00" + f + "\x00fk", f + "\x00" + t + "\x00assumed", t + "\x00" + f + "\x00assumed"} {
+			if g.edges[k] != nil {
+				return
+			}
+		}
+		g.link(f, t, "assumed", label, false)
+		added++
+	}
+	// 1. The same column in several tables: they refer to the table it defines.
+	holders := map[string][]string{}
+	for _, n := range names {
+		for lc := range tables[n].cols {
+			holders[lc] = append(holders[lc], n)
+		}
+	}
+	for _, lc := range slices.Sorted(maps.Keys(holders)) {
+		hs := holders[lc]
+		if len(hs) < 2 || relGenericCols[lc] {
+			continue
+		}
+		slices.Sort(hs)
+		var defs []string
+		for _, h := range hs {
+			if tables[h].key == lc {
+				defs = append(defs, h)
+			}
+		}
+		if len(defs) == 0 {
+			for _, h := range hs {
+				if relStartsWith(lc, tables[h].words) {
+					defs = append(defs, h)
+				}
+			}
+		}
+		if len(defs) == 0 && relIDLike(lc) {
+			for _, h := range hs {
+				if tables[h].first == lc {
+					defs = append(defs, h)
+				}
+			}
+			if len(defs) > 1 {
+				defs = relShortestNamed(defs, relStem(lc), func(h string) []string { return tables[h].words })
+			}
+		}
+		if len(defs) == 0 || len(defs) > 3 {
+			continue
+		}
+		for _, h := range hs {
+			if slices.Contains(defs, h) {
+				continue
+			}
+			for _, d := range defs {
+				name := tables[h].cols[lc]
+				link(h, d, name+" = "+tables[d].cols[lc])
+			}
+		}
+	}
+	// 2. customer_id / CustomerID → the table customer(s) and its key or id.
+	for _, n := range names {
+		for _, lc := range slices.Sorted(maps.Keys(tables[n].cols)) {
+			name := tables[n].cols[lc]
+			for _, tn := range names {
+				t := tables[tn]
+				if tn == n {
+					continue
+				}
+				for _, k := range slices.Compact([]string{t.key, "id"}) {
+					if k == "" || t.cols[k] == "" {
+						continue
+					}
+					for _, w := range t.words {
+						if lc == w+"_"+k || lc == w+k {
+							link(n, tn, name+" → "+t.cols[k])
+						}
+					}
+				}
+			}
+		}
+	}
+	return added
+}
+
+// relColumnsQuery reads every table's columns: table (as the sidebar names
+// it), column, position and PRI / UNI for a single-column key.
+func relColumnsQuery(engine string) string {
+	switch engine {
+	case EngineSQLite:
+		return `SELECT m.name, p.name, p.cid + 1, CASE WHEN p.pk = 1 AND (SELECT COUNT(*) FROM pragma_table_info(m.name) x WHERE x.pk > 0) = 1 THEN 'PRI'
+			WHEN EXISTS (SELECT 1 FROM pragma_index_list(m.name) il JOIN pragma_index_info(il.name) ii WHERE il."unique" = 1
+				AND ii.name = p.name AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1) THEN 'UNI' ELSE '' END
+			FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'`
+	case EngineMySQL, EngineMariaDB:
+		return `SELECT c.table_name, c.column_name, c.ordinal_position, CASE WHEN c.column_key IN ('PRI', 'UNI') AND (SELECT COUNT(*)
+				FROM information_schema.statistics s WHERE s.table_schema = c.table_schema AND s.table_name = c.table_name
+				AND s.index_name = (SELECT MIN(s2.index_name) FROM information_schema.statistics s2 WHERE s2.table_schema = c.table_schema
+					AND s2.table_name = c.table_name AND s2.column_name = c.column_name AND s2.non_unique = 0)) = 1 THEN c.column_key ELSE '' END
+			FROM information_schema.columns c JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+			WHERE c.table_schema = DATABASE() AND t.table_type IN ('BASE TABLE', 'SYSTEM VERSIONED')`
+	case EnginePostgres:
+		return `SELECT n.nspname || '.' || c.relname, a.attname, a.attnum, COALESCE((SELECT CASE WHEN i.indisprimary THEN 'PRI' ELSE 'UNI' END
+				FROM pg_index i WHERE i.indrelid = c.oid AND (i.indisprimary OR i.indisunique) AND i.indnatts = 1 AND i.indkey[0] = a.attnum
+				ORDER BY i.indisprimary DESC LIMIT 1), '')
+			FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+			WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\_%'`
+	case EngineMSSQL:
+		return `SELECT s.name + '.' + t.name, c.name, c.column_id, COALESCE((SELECT TOP 1 CASE WHEN i.is_primary_key = 1 THEN 'PRI' ELSE 'UNI' END
+				FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+				WHERE i.object_id = t.object_id AND (i.is_primary_key = 1 OR i.is_unique = 1) AND ic.column_id = c.column_id
+				AND (SELECT COUNT(*) FROM sys.index_columns x WHERE x.object_id = i.object_id AND x.index_id = i.index_id AND x.is_included_column = 0) = 1
+				ORDER BY i.is_primary_key DESC), '')
+			FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.columns c ON c.object_id = t.object_id WHERE t.is_ms_shipped = 0`
+	case EngineFirebird:
+		return `SELECT TRIM(f.RDB$RELATION_NAME), TRIM(f.RDB$FIELD_NAME), f.RDB$FIELD_POSITION + 1, COALESCE((SELECT FIRST 1
+				IIF(EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS rc WHERE rc.RDB$INDEX_NAME = i.RDB$INDEX_NAME AND rc.RDB$CONSTRAINT_TYPE = 'PRIMARY KEY'), 'PRI', 'UNI')
+				FROM RDB$INDICES i JOIN RDB$INDEX_SEGMENTS s ON s.RDB$INDEX_NAME = i.RDB$INDEX_NAME
+				WHERE i.RDB$RELATION_NAME = f.RDB$RELATION_NAME AND i.RDB$UNIQUE_FLAG = 1 AND i.RDB$SEGMENT_COUNT = 1 AND s.RDB$FIELD_NAME = f.RDB$FIELD_NAME
+				ORDER BY 1), '')
+			FROM RDB$RELATION_FIELDS f JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = f.RDB$RELATION_NAME
+			WHERE r.RDB$VIEW_BLR IS NULL AND COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0`
+	case EngineOracle:
+		return `SELECT c.owner || '.' || c.table_name, c.column_name, c.column_id, (SELECT MIN(DECODE(k.constraint_type, 'P', 'PRI', 'UNI'))
+				FROM all_constraints k JOIN all_cons_columns kc ON kc.owner = k.owner AND kc.constraint_name = k.constraint_name
+				WHERE k.owner = c.owner AND k.table_name = c.table_name AND k.constraint_type IN ('P', 'U') AND kc.column_name = c.column_name
+				AND (SELECT COUNT(*) FROM all_cons_columns x WHERE x.owner = k.owner AND x.constraint_name = k.constraint_name) = 1)
+			FROM all_tab_columns c JOIN all_tables t ON t.owner = c.owner AND t.table_name = c.table_name WHERE c.owner = :1`
+	}
+	return ""
+}
+
+// assumeFromColumns reads the columns and adds the assumed relationships.
+func (g *relGraph) assumeFromColumns(ctx context.Context, ss *session) {
+	q := relColumnsQuery(ss.engine)
+	if q == "" {
+		return
+	}
+	var args []any
+	if ss.engine == EngineOracle {
+		owner, err := oracleOwner(ctx, ss.db)
+		if err != nil {
+			return
+		}
+		args = append(args, owner)
+	}
+	var cols []relCol
+	g.relRows(ctx, ss.db, "columns", q, func(c []sql.NullString) {
+		pos, _ := strconv.Atoi(c[2].String)
+		cols = append(cols, relCol{table: c[0].String, name: c[1].String, pos: pos, key: c[3].String})
+	}, args...)
+	g.assume(cols)
 }

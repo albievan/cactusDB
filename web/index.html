@@ -742,12 +742,12 @@
   /* DB Relationships: every object, and the lines between them */
   #relPane { --t-table: #2f7d4f; --t-view: #2563eb; --t-matview: #0e7490; --t-trigger: #c2410c; --t-procedure: #7c3aed; --t-function: #c026d3;
     --t-package: #8a5a2b; --t-sequence: #dc2626; --t-domain: #64748b; --t-exception: #9f1239; --t-event: #a16207; --t-synonym: #475569;
-    --rel-fk: #5b6660; --rel-trigger: #c2410c; --rel-uses: #2563eb;
+    --rel-fk: #5b6660; --rel-trigger: #c2410c; --rel-uses: #2563eb; --rel-assumed: #9333ea;
     display: grid; grid-template-rows: auto auto 1fr; gap: 8px; padding: 12px 16px; background: var(--panel); min-height: 0; }
   @media (prefers-color-scheme: dark) {
     #relPane { --t-table: #4fb57a; --t-view: #6ea8fe; --t-matview: #22c3d6; --t-trigger: #fb923c; --t-procedure: #a78bfa; --t-function: #e879f9;
       --t-package: #d6a36b; --t-sequence: #f87171; --t-domain: #94a3b8; --t-exception: #fb7185; --t-event: #facc15; --t-synonym: #a1acbb;
-      --rel-fk: #a3ada7; --rel-trigger: #fb923c; --rel-uses: #6ea8fe; }
+      --rel-fk: #a3ada7; --rel-trigger: #fb923c; --rel-uses: #6ea8fe; --rel-assumed: #c084fc; }
   }
   #relPane[hidden] { display: none; }
   #relPane { grid-template-columns: minmax(0, 1fr); }
@@ -787,12 +787,15 @@
   .reledge.k-fk { stroke: var(--rel-fk); }
   .reledge.k-trigger { stroke: var(--rel-trigger); stroke-dasharray: 7 4; }
   .reledge.k-uses { stroke: var(--rel-uses); }
+  .reledge.k-assumed { stroke: var(--rel-assumed); stroke-dasharray: 10 3 2 3; }
   .reledge.guess { stroke-dasharray: 2 3; }
   .relworld.dim .reledge:not(.near) { opacity: .08; }
   .reledge.near { stroke-width: 2.4; }
-  .relarrow-fk { fill: var(--rel-fk); } .relarrow-trigger { fill: var(--rel-trigger); } .relarrow-uses { fill: var(--rel-uses); }
+  .relarrow-fk { fill: var(--rel-fk); } .relarrow-trigger { fill: var(--rel-trigger); } .relarrow-uses { fill: var(--rel-uses); } .relarrow-assumed { fill: var(--rel-assumed); }
   .relmsg { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
   .relmsg[hidden] { display: none; }
+  .relmsg p { margin: 0 0 12px; }
+  .relmsg .hint { margin: 12px 0 0; }
   .rellegend { position: absolute; left: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 4px 10px; font-size: 11px;
     color: var(--muted); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 6px; pointer-events: none; }
   .rellegend svg { vertical-align: middle; margin-right: 4px; }
@@ -1382,9 +1385,10 @@
         <datalist id="relNames"></datalist>
         <label class="form-check form-switch" title="Also the objects that have no relationships with any other"><input class="form-check-input" type="checkbox" id="relLonely" role="switch"> <span id="relLonelyText">Objects without relationships</span></label>
         <label class="form-check form-switch" title="Also the uses found by an object's name in a view's, procedure's, function's or trigger's source, where the database keeps no record of them"><input class="form-check-input" type="checkbox" id="relGuess" role="switch" checked> Found in the source</label>
+        <label class="form-check form-switch" title="Also the relationships assumed from columns of the same name, for tables without foreign keys: a table's key column in other tables (CUSTOMER_NO), or a column named after a table (customer_id → customers.id)"><input class="form-check-input" type="checkbox" id="relAssumed" role="switch" checked> Assumed from column names</label>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relRelayout" aria-label="Arrange again" title="Arrange the objects again"><i class="bi bi-shuffle" aria-hidden="true"></i></button>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" aria-label="Download the picture" title="Download the picture as it is arranged now (PNG)"><i class="bi bi-image" aria-hidden="true"></i></button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="relRefresh" aria-label="Read again" title="Read the relationships again"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-sm btn-primary" id="relRefresh" title="Read the objects and their relationships from the database's catalog now (only then are they read)"><i class="bi bi-diagram-3" aria-hidden="true"></i> Generate Relationships</button>
       </div>
       <div class="relbody">
         <div class="relcanvas" id="relCanvas">
@@ -1393,6 +1397,7 @@
               <marker id="relArrow-fk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-fk" d="M0 0L10 5L0 10z"/></marker>
               <marker id="relArrow-trigger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-trigger" d="M0 0L10 5L0 10z"/></marker>
               <marker id="relArrow-uses" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-uses" d="M0 0L10 5L0 10z"/></marker>
+              <marker id="relArrow-assumed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="relarrow-assumed" d="M0 0L10 5L0 10z"/></marker>
             </defs><g id="relEdges"></g></svg>
             <div id="relNodes"></div>
           </div>
@@ -1402,6 +1407,7 @@
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-trigger"/></svg>Trigger → its table</span>
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses"/></svg>Uses</span>
             <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-uses guess"/></svg>Found in the source</span>
+            <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="reledge k-assumed"/></svg>Assumed from column names</span>
           </div>
           <div class="relzoom">
             <button type="button" class="btn btn-sm btn-outline-secondary" id="relZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
@@ -2652,18 +2658,37 @@ const REL_MAX = 2500; // objects drawn at once
 const relLabel = (type) => (rel.data && rel.data.labels[type]) || type;
 const relOne = (type) => relLabel(type).replace(/ies$/, "y").replace(/s$/, "");
 
-// relReset follows a new connection (or none), or a refresh of its objects.
+// relReset follows a new connection (or none), or a refresh of its objects:
+// what was drawn goes, and nothing is read until Generate Relationships.
 function relReset() {
-  rel.seq++; rel.data = null; rel.sel = null; rel.focus = null; rel.hidden.clear();
+  rel.seq++; rel.data = null; rel.sel = null; rel.focus = null; rel.hidden.clear(); rel.drawn = false;
   $("relTab").hidden = !state.session;
   $("relNodes").innerHTML = ""; $("relEdges").innerHTML = ""; $("relSide").hidden = true; $("relTypes").innerHTML = ""; $("relSub").textContent = "";
-  if (state.tab === "relations") { if (state.session) relLoad(); else showTab("data"); }
+  $("relNames").innerHTML = ""; $("relFind").value = "";
+  relControls();
+  if (state.tab === "relations") { if (state.session) relOpen(); else showTab("data"); }
 }
-async function relLoad(force) {
+// relOpen shows the tab: what was generated, or the button to generate it.
+function relOpen() {
   if (!state.session) return;
   $("relLabel").textContent = state.label; $("relTitle").title = state.label;
-  if (rel.data && !force) { if (!rel.drawn) relBuild(); return; }
+  if (rel.data) { if (!rel.drawn) relBuild(); return; }
+  if (rel.loading) return;
+  relMsg(`<div><p>The relationships of <b>${esc(state.label)}</b> are read only when you ask for them.</p>` +
+    `<button type="button" class="btn btn-primary" data-relgen><i class="bi bi-diagram-3" aria-hidden="true"></i> Generate Relationships</button>` +
+    `<p class="hint">Reads the database's catalog (never any rows): its objects, foreign keys, triggers and what uses what.</p></div>`);
+}
+// The controls that work on a picture: only once one is generated.
+function relControls() {
+  const none = !rel.data;
+  ["relFind", "relLonely", "relGuess", "relAssumed", "relRelayout", "relPng", "relZoomIn", "relZoomOut", "relFit"].forEach((id) => { $(id).disabled = none; });
+  if (!none) $("relLonely").disabled = !!rel.focus;
+}
+async function relLoad() {
+  if (!state.session) return;
+  $("relLabel").textContent = state.label; $("relTitle").title = state.label;
   const seq = ++rel.seq;
+  rel.loading = true;
   relMsg(`<span><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Reading the relationships of ${esc(state.label)}…</span>`);
   $("relRefresh").disabled = true;
   try {
@@ -2672,10 +2697,11 @@ async function relLoad(force) {
     rel.data = d; rel.sel = null; rel.focus = null;
     $("relNames").innerHTML = d.nodes.map((n) => `<option value="${esc(n.name)}">${esc(relOne(n.type))}</option>`).join("");
     rel.drawn = false;
+    relControls();
     if (!$("relPane").hidden) relBuild(); // sizes are measured: only when shown
   } catch (e) {
-    if (seq === rel.seq) relMsg(`<span>✘ ${esc(e.message)}</span>`);
-  } finally { if (seq === rel.seq) $("relRefresh").disabled = false; }
+    if (seq === rel.seq) relMsg(`<div><p>✘ ${esc(e.message)}</p><button type="button" class="btn btn-outline-secondary" data-relgen>Try again</button></div>`);
+  } finally { if (seq === rel.seq) { rel.loading = false; $("relRefresh").disabled = false; } }
 }
 function relMsg(html) {
   $("relMsg").hidden = !html; $("relMsg").innerHTML = html || "";
@@ -2687,7 +2713,7 @@ function relMsg(html) {
 function relShown() {
   const d = rel.data;
   let ids = new Set(d.nodes.filter((n) => !rel.hidden.has(n.type)).map((n) => n.id));
-  let edges = d.edges.filter((e) => ids.has(e.from) && ids.has(e.to) && (!e.guess || $("relGuess").checked));
+  let edges = d.edges.filter((e) => ids.has(e.from) && ids.has(e.to) && (!e.guess || $("relGuess").checked) && (e.kind !== "assumed" || $("relAssumed").checked));
   const linked = new Set(edges.flatMap((e) => [e.from, e.to]));
   if (rel.focus && ids.has(rel.focus)) {
     const near = new Set([rel.focus]);
@@ -2719,7 +2745,8 @@ function relBuild(keepView) {
   $("relLonelyText").textContent = `Objects without relationships (${fmtInt(shown.lonely)})`;
   $("relLonely").disabled = !!rel.focus;
   const notes = (d.notes || []).map((n) => " · " + n).join("");
-  $("relSub").textContent = `${fmtInt(d.nodes.length)} objects · ${fmtInt(d.edges.length)} relationships` +
+  const assumed = d.edges.filter((e) => e.kind === "assumed").length;
+  $("relSub").textContent = `${fmtInt(d.nodes.length)} objects · ${fmtInt(d.edges.length)} relationships` + (assumed ? ` (${fmtInt(assumed)} assumed from column names)` : "") +
     (rel.focus ? ` · showing what is around ${rel.byId.get(rel.focus)?.name || d.nodes.find((n) => n.id === rel.focus)?.name}` : "") + notes;
   if (!d.nodes.length) return relMsg("<span>This database has no objects to draw.</span>");
   if (!shown.nodes.length) {
@@ -2867,7 +2894,8 @@ function relPath(e) {
   return bend ? `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}` : `M${x1} ${y1}L${x2} ${y2}`;
 }
 function relEdgeTitle(e) {
-  const what = { fk: "refers to (foreign key)", trigger: "fires on", uses: e.guess ? "uses (found in its source)" : "uses" }[e.kind];
+  const what = { fk: "refers to (foreign key)", trigger: "fires on", uses: e.guess ? "uses (found in its source)" : "uses",
+    assumed: "is assumed to refer to (same column name)" }[e.kind];
   return `${relOne(e.s.type)} ${e.s.name} ${what} ${relOne(e.t.type).toLowerCase()} ${e.t.name}` + (e.label ? `: ${e.label}` : "");
 }
 function relDrawEdges() {
@@ -2947,6 +2975,7 @@ function relSelect(id, center) {
   };
   const out = (k) => rel.data.edges.filter((e) => e.from === id && e.kind === k), inn = (k) => rel.data.edges.filter((e) => e.to === id && e.kind === k);
   const sections = list("Refers to (foreign keys)", out("fk"), (e) => e.to) + list("Referred to by (foreign keys)", inn("fk"), (e) => e.from) +
+    list("Assumed to refer to (column names)", out("assumed"), (e) => e.to) + list("Assumed referred to by (column names)", inn("assumed"), (e) => e.from) +
     list("Fires on", out("trigger"), (e) => e.to) + list("Triggers", inn("trigger"), (e) => e.from) +
     list("Uses", out("uses"), (e) => e.to) + list("Used by", inn("uses"), (e) => e.from);
   $("relSide").innerHTML = `<div class="relsidehead t-${node.type}"><h3><i class="bi bi-${ICONS[node.type] || "dot"}" aria-hidden="true"></i>${esc(node.name)}</h3>` +
@@ -2994,8 +3023,10 @@ $("relTypes").addEventListener("click", (ev) => {
 });
 $("relLonely").addEventListener("change", () => relBuild());
 $("relGuess").addEventListener("change", () => relBuild());
+$("relAssumed").addEventListener("change", () => relBuild());
 $("relRelayout").addEventListener("click", () => { rel.spin = Math.random() * 6.28; relBuild(); });
-$("relRefresh").addEventListener("click", () => relLoad(true));
+$("relRefresh").addEventListener("click", () => relLoad());
+$("relMsg").addEventListener("click", (ev) => { if (ev.target.closest("[data-relgen]")) relLoad(); });
 $("relZoomIn").addEventListener("click", () => relZoom(1.3));
 $("relZoomOut").addEventListener("click", () => relZoom(1 / 1.3));
 $("relFit").addEventListener("click", relFit);
@@ -3074,7 +3105,7 @@ $("relPng").addEventListener("click", () => {
   for (const e of rel.edges) {
     const color = v("--rel-" + e.kind);
     ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = 1.4;
-    ctx.setLineDash(e.guess ? [2, 3] : e.kind === "trigger" ? [7, 4] : []);
+    ctx.setLineDash(e.guess ? [2, 3] : { trigger: [7, 4], assumed: [10, 3, 2, 3] }[e.kind] || []);
     const p = new Path2D(relPath(e));
     ctx.stroke(p);
     // The arrow head, along the line's last stretch.
@@ -4851,7 +4882,7 @@ function showTab(tab) {
   $("dashPane").hidden = tab !== "dashboard";
   if (tab === "dashboard") dashLoad(); else dashPause();
   $("relPane").hidden = tab !== "relations";
-  if (tab === "relations") relLoad();
+  if (tab === "relations") relOpen();
 }
 
 async function loadDefinition() {

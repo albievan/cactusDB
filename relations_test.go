@@ -90,3 +90,56 @@ func TestRelationshipsSQLite(t *testing.T) {
 		t.Errorf("%d nodes, notes %v", len(g.nodes), g.notes)
 	}
 }
+
+// Without foreign keys, relationships are assumed from columns of the same
+// name: a key column in other tables, a column starting with a table's name,
+// customer_id → customers.id; generic names (name, status) link nothing.
+func TestRelationshipsAssumed(t *testing.T) {
+	ctx := context.Background()
+	src := filepath.Join(t.TempDir(), "legacy.db")
+	w, err := sql.Open("sqlite", sqliteURI(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Exec(`CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, status TEXT);
+		CREATE TABLE orders (id INTEGER PRIMARY KEY, CustomerID INT, name TEXT, status TEXT);
+		CREATE TABLE products (product_code TEXT PRIMARY KEY, name TEXT);
+		CREATE TABLE order_lines (order_id INT, product_code TEXT, qty INT);
+		CREATE TABLE CLIENT (CLIENT_NO INT, NAME TEXT);
+		CREATE TABLE INVOICE (INV_NO INT, CLIENT_NO INT, STATUS TEXT);
+		CREATE TABLE REMINDER (REM_NO INT, CLIENT_NO INT);
+		CREATE TABLE notes (note_id INTEGER PRIMARY KEY, name TEXT, status TEXT);
+		CREATE TABLE INVOICE_LINE (INV_NO INT, LINE INT);
+		CREATE TABLE PAYMENT (PAY_NO INT, INV_NO INT);`)
+	w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := openDB(ctx, ConnParams{Engine: EngineSQLite, Database: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	g, err := relationships(ctx, &session{engine: EngineSQLite, db: db})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, k := range g.order {
+		e := g.edges[k]
+		got = append(got, e.From+" "+e.Kind+" "+e.To+" ("+e.Label+")")
+	}
+	slices.Sort(got)
+	want := []string{
+		"table:INVOICE assumed table:CLIENT (CLIENT_NO = CLIENT_NO)",
+		"table:INVOICE_LINE assumed table:INVOICE (INV_NO = INV_NO)",
+		"table:PAYMENT assumed table:INVOICE (INV_NO = INV_NO)",
+		"table:REMINDER assumed table:CLIENT (CLIENT_NO = CLIENT_NO)",
+		"table:order_lines assumed table:orders (order_id → id)",
+		"table:order_lines assumed table:products (product_code = product_code)",
+		"table:orders assumed table:customers (CustomerID → id)",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("edges:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

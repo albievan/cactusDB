@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.51.0 — 2026-11-12
+
+- **DB Relationships** are read only when you click **Generate Relationships** in the tab,
+  never when you connect, open the tab, connect again or refresh the objects.
+- **Relationships assumed from column names**, for databases without foreign keys (MyISAM,
+  older designs): a table's key column found in other tables (`CLIENT_NO`), or, without
+  keys, the table whose name the column starts with or that has it first (`INV_NO` →
+  `INVOICE`), and `customer_id` / `CustomerID` → `customers.id`. Drawn dash-dot purple,
+  counted under the title, listed at the side, and switched off with *Assumed from column
+  names*. Generic names (`id`, `name`, `status`…) never link tables.
+
 ## 1.50.0 — 2026-11-12
 
 - **DB Relationships**: a new tab draws every object of the connected database (tables,
