@@ -37,7 +37,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.59.1"
+var version = "1.59.2"
 
 //go:embed web
 var webFS embed.FS
@@ -1338,9 +1338,6 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{"objects": objects}
-	if w := dottedSchemas(r.Context(), dialect(p.Engine), db); w != "" {
-		resp["warning"] = w
-	}
 	if req.Save && req.SavedID == 0 {
 		if strings.TrimSpace(req.Name) == "" {
 			req.Name = defaultConnName(p)
@@ -1382,32 +1379,6 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 // handleTestConn checks that a connection works, without saving it or
 // keeping it open: it connects, lists the tables and reports the server.
-// dottedSchemas warns about schemas with a dot in their name: objects are
-// named schema.name, so theirs are split at the wrong dot and can't be
-// opened, exported or copied correctly.
-func dottedSchemas(ctx context.Context, engine string, db *sql.DB) string {
-	var q string
-	switch {
-	case backendOf(db) != nil:
-		return ""
-	case engine == EnginePostgres:
-		q = `SELECT nspname FROM pg_namespace WHERE strpos(nspname, '.') > 0 ORDER BY 1`
-	case engine == EngineMSSQL:
-		q = `SELECT name FROM sys.schemas WHERE CHARINDEX('.', name) > 0 ORDER BY 1`
-	case engine == EngineOracle:
-		q = `SELECT username FROM all_users WHERE INSTR(username, '.') > 0 ORDER BY 1`
-	default:
-		return ""
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	names, err := queryStrings(ctx, db, q)
-	if err != nil || len(names) == 0 {
-		return ""
-	}
-	return fmt.Sprintf("the schema %s has a dot in its name: cactusdb names objects schema.name, so the objects of that schema can't be opened, exported or copied correctly (rename the schema, or connect as a user whose objects are elsewhere)", strings.Join(names, ", "))
-}
-
 // keepPassword fills p.Password from the saved connection KeepPasswordOf, but
 // only for the same server: a saved password is never sent to another host,
 // port or user (the database could be one that asks for it in clear text).

@@ -40,7 +40,7 @@ func oracleDSN(p ConnParams, opts map[string]string) string {
 
 // oracleSplit splits OWNER.NAME; owner "" means the current schema.
 func oracleSplit(name string) (owner, obj string) {
-	if o, n, ok := strings.Cut(name, "."); ok {
+	if o, n, ok := splitObject(name); ok {
 		return o, n
 	}
 	return "", name

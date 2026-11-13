@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.59.2 — 2026-11-13
+
+- **E-mail server:** a saved user name is shown like the saved password (`•••••••• saved`,
+  *Leave empty to keep it*) and is no longer sent to the page. *Send test e-mail* without an
+  address sends to the saved user name.
+- **Schemas with a dot in their name** (PostgreSQL, SQL Server, Oracle) work: cactusdb notes
+  them when it connects and splits `my.schema.orders` after the schema, so their tables open,
+  export, back up, compare and migrate; quoted names with a dot in queries are read whole for
+  the relationships.
+
 ## 1.59.1 — 2026-11-13
 
 - `setup.sh` and `setup.ps1` check the release signature of `dist/SHA256SUMS` where OpenSSL 3

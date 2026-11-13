@@ -1256,7 +1256,7 @@ func readSequences(ctx context.Context, engine string, db *sql.DB, names []strin
 				s.Next = cur + s.Incr
 			}
 		case EnginePostgres:
-			schema, name, _ := strings.Cut(n, ".")
+			schema, name, _ := splitObject(n)
 			var last, start, incr int64
 			var called bool
 			if err = db.QueryRowContext(ctx, `SELECT s.last_value IS NOT NULL, COALESCE(s.last_value, s.start_value), s.start_value, s.increment_by

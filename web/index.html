@@ -1903,7 +1903,7 @@
           <select class="form-select form-select-sm" id="emTls"><option value="starttls">STARTTLS</option><option value="tls">SSL/TLS</option><option value="none">None</option></select></div>
       </div>
       <div><label class="form-label" for="emUser">User name</label><input class="form-control form-control-sm" id="emUser" autocomplete="off" spellcheck="false">
-        <p class="hint">For Gmail: your full Gmail address.</p></div>
+        <p class="hint" id="emUserHint">For Gmail: your full Gmail address.</p></div>
       <div><label class="form-label" for="emPass">Password</label><input class="form-control form-control-sm" id="emPass" type="password" autocomplete="new-password">
         <p class="hint" id="emPassHint">Stored encrypted.</p></div>
       <div><label class="form-label" for="emFrom">Send as</label><input class="form-control form-control-sm" id="emFrom" spellcheck="false">
@@ -2644,7 +2644,7 @@ const EM_TROUBLE = [
   "<b>The test e-mail comes from your Gmail address:</b> Gmail sends as the signed-in account unless the Send as address is added under <b>Settings → Accounts → Send mail as</b> and verified. The provider decides the sender it shows.",
   "<b>The test e-mail does not arrive:</b> look in the spam folder, and check the Send as address is one the provider lets you use.",
 ];
-let emSaved = "", emPasswordSet = false;
+let emSaved = "", emPasswordSet = false, emUsernameSet = false;
 const emForm = () => ({ enabled: $("emEnabled").checked, host: $("emHost").value.trim(), port: +$("emPort").value || 0, tls: $("emTls").value,
   username: $("emUser").value.trim(), from: $("emFrom").value.trim(), linkBase: $("emLink").value.trim() });
 const emPreset = () => Object.keys(EM_PRESETS).find((k) => EM_PRESETS[k].host && EM_PRESETS[k].host === $("emHost").value.trim()) || "Custom";
@@ -2659,8 +2659,11 @@ function emRender() {
 }
 function emFill(v) {
   $("emEnabled").checked = v.enabled; $("emHost").value = v.host; $("emPort").value = v.port || ""; $("emTls").value = v.tls || "starttls";
-  $("emUser").value = v.username; $("emFrom").value = v.from; $("emLink").value = v.linkBase || location.origin; $("emPass").value = "";
-  emPasswordSet = v.passwordSet;
+  $("emUser").value = ""; $("emFrom").value = v.from; $("emLink").value = v.linkBase || location.origin; $("emPass").value = "";
+  emPasswordSet = v.passwordSet; emUsernameSet = v.usernameSet;
+  // A saved user name looks like a saved password: hidden, kept when left empty.
+  $("emUser").placeholder = v.usernameSet ? "•••••••• saved" : "";
+  $("emUserHint").textContent = v.usernameSet ? "A user name is saved. Leave empty to keep it." : "For Gmail: your full Gmail address.";
   $("emPass").placeholder = v.passwordSet ? "•••••••• saved" : "";
   $("emPassHint").textContent = v.passwordSet ? "A password is saved (encrypted). Leave empty to keep it." : "Stored encrypted.";
   $("emWarn").hidden = !v.warnings.length;
@@ -2688,7 +2691,8 @@ $("emForm").addEventListener("submit", async (ev) => {
   usShow("emResult", "busy", "Saving…");
   try {
     const pw = $("emPass").value;
-    emFill(await api("POST", "/api/email", { ...emForm(), password: pw === "" ? null : pw }));
+    const f = emForm();
+    emFill(await api("POST", "/api/email", { ...f, keepUsername: emUsernameSet && f.username === "", password: pw === "" ? null : pw }));
     usShow("emResult", "ok", "Saved.");
   } catch (e) { usShow("emResult", "bad", e.message); }
   finally { $("emSave").disabled = false; }
@@ -2696,7 +2700,7 @@ $("emForm").addEventListener("submit", async (ev) => {
 $("emTest").addEventListener("click", async () => {
   const to = $("emTestTo").value.trim() || $("emUser").value.trim();
   $("emTest").disabled = true;
-  usShow("emResult", "busy", `Sending a test e-mail to ${to}…`);
+  usShow("emResult", "busy", to ? `Sending a test e-mail to ${to}…` : "Sending a test e-mail to the saved user name…");
   try {
     const r = await api("POST", "/api/email/test", { to });
     usShow("emResult", r.warnings.length ? "busy" : "ok", r.warnings.length ? `Test e-mail sent — but: ${r.warnings.join(" ")}` : "Test e-mail sent — check the inbox.");
@@ -4840,7 +4844,6 @@ async function connect(extra = {}) {
     clearDef("Select an object on the left to see its definition.");
     setExportEnabled(false); $("tabTitle").textContent = ""; $("tabTitle").title = ""; $("exportNote").hidden = true;
     showTab("data");
-    if (res.warning) toast("Connected, but " + res.warning, true);
     if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
     else if (res.savedId) { toast("Connected and saved, protected by its connection password"); loadSaved(); }
     else toast("Connected");

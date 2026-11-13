@@ -405,7 +405,7 @@ func (m *migrator) targetName(src string) string {
 	if i := strings.Index(n, "("); i > 0 { // PostgreSQL routines: name(args)
 		n = n[:i]
 	}
-	if schema, obj, ok := strings.Cut(n, "."); ok && (m.srcEngine == EnginePostgres || m.srcEngine == EngineMSSQL || m.srcEngine == EngineOracle) {
+	if schema, obj, ok := splitObject(n); ok && (m.srcEngine == EnginePostgres || m.srcEngine == EngineMSSQL || m.srcEngine == EngineOracle) {
 		if strings.EqualFold(schema, "public") || strings.EqualFold(schema, "dbo") {
 			n = obj
 		} else {
@@ -603,7 +603,7 @@ func (m *migrator) migrate(ctx context.Context) error {
 		m.byName[strings.ToUpper(t.Src)] = t
 		x.names[t.Src] = t.Name
 		x.names[strings.ToUpper(t.Src)] = t.Name
-		if _, obj, ok := strings.Cut(t.Src, "."); ok {
+		if _, obj, ok := splitObject(t.Src); ok {
 			if _, dup := x.names[strings.ToUpper(obj)]; !dup {
 				x.names[strings.ToUpper(obj)] = t.Name
 			}
@@ -626,7 +626,7 @@ func (m *migrator) migrate(ctx context.Context) error {
 			if _, dup := x.names[strings.ToUpper(n)]; !dup {
 				x.names[strings.ToUpper(n)] = tn
 			}
-			if _, obj, ok := strings.Cut(strings.SplitN(n, "(", 2)[0], "."); ok {
+			if _, obj, ok := splitObject(strings.SplitN(n, "(", 2)[0]); ok {
 				if _, dup := x.names[strings.ToUpper(obj)]; !dup {
 					x.names[strings.ToUpper(obj)] = tn
 				}

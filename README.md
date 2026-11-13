@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.59.1
+cactusdb 1.59.2
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -818,7 +818,8 @@ a mail client's account setup:
   provider (for Gmail: an App password), and what to try if the test fails.
 - **SMTP host**, **Port**, **Security** (STARTTLS, SSL/TLS or None), **User name** and
   **Password**. The password is stored encrypted with cactusdb's key and never shown again;
-  leave it empty to keep it. *None* sends nothing encrypted, so it is only allowed without a
+  leave it empty to keep it. A saved user name is shown the same way (`•••••••• saved`):
+  leave it empty to keep it, or type another (which then needs the password again). *None* sends nothing encrypted, so it is only allowed without a
   user name (a test mail server on your own network).
 - **Send as**, e.g. `IT <it@example.com>` (the user name when empty). cactusdb warns when
   Gmail or Microsoft 365 is known not to send as that address.

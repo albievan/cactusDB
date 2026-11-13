@@ -373,7 +373,59 @@ func openDB(ctx context.Context, p ConnParams) (*sql.DB, error) {
 	if err == nil && p.Engine == EngineOracle && opts["schema"] != "" {
 		rememberFor(&oracleSchemas, db, strings.ToUpper(opts["schema"]))
 	}
+	if err == nil {
+		noteDottedSchemas(ctx, dialect(p.Engine), db)
+	}
 	return db, err
+}
+
+// dottedSchemaNames are the schemas seen with a dot in their name. Objects
+// are named "schema.name", so splitObject needs them to split at the right
+// dot: "my.schema.orders" is orders in the schema my.schema.
+var dottedSchemaNames sync.Map
+
+// dottedSchemaQuery lists such schemas, per engine.
+func dottedSchemaQuery(engine string) string {
+	switch engine {
+	case EnginePostgres:
+		return `SELECT nspname FROM pg_namespace WHERE strpos(nspname, '.') > 0 ORDER BY 1`
+	case EngineMSSQL:
+		return `SELECT name FROM sys.schemas WHERE CHARINDEX('.', name) > 0 ORDER BY 1`
+	case EngineOracle:
+		return `SELECT username FROM all_users WHERE INSTR(username, '.') > 0 ORDER BY 1`
+	}
+	return ""
+}
+
+// noteDottedSchemas remembers db's schemas that have a dot in their name.
+func noteDottedSchemas(ctx context.Context, engine string, db *sql.DB) []string {
+	q := dottedSchemaQuery(engine)
+	if q == "" || backendOf(db) != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	names, _ := queryStrings(ctx, db, q)
+	for _, n := range names {
+		dottedSchemaNames.Store(n, true)
+	}
+	return names
+}
+
+// splitObject splits "schema.name" into its schema and name, at the dot
+// after a known dotted schema (see dottedSchemaNames), else at the first.
+func splitObject(name string) (schema, obj string, ok bool) {
+	best := ""
+	dottedSchemaNames.Range(func(k, _ any) bool {
+		if s := k.(string); len(s) > len(best) && strings.HasPrefix(name, s+".") {
+			best = s
+		}
+		return true
+	})
+	if best != "" {
+		return best, name[len(best)+1:], true
+	}
+	return strings.Cut(name, ".")
 }
 
 // backendOpeners connects to the engines reached through a backend.
@@ -601,7 +653,7 @@ func buildSelect(ctx context.Context, engine string, db *sql.DB, table string) (
 // are listed as "schema.name" and quoted as [schema].[name] / "schema"."name".
 func quoteObject(engine, name string) string {
 	if engine == EngineMSSQL || engine == EnginePostgres || engine == EngineOracle {
-		if schema, obj, ok := strings.Cut(name, "."); ok {
+		if schema, obj, ok := splitObject(name); ok {
 			return quoteIdent(engine, schema) + "." + quoteIdent(engine, obj)
 		}
 	}

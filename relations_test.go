@@ -236,3 +236,25 @@ func TestAPIFullDDL(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 }
+
+// A schema with a dot in its name: the object is split after the schema.
+func TestSplitObjectDottedSchema(t *testing.T) {
+	dottedSchemaNames.Store("my.schema", true)
+	defer dottedSchemaNames.Delete("my.schema")
+	if s, o, ok := splitObject("my.schema.orders"); !ok || s != "my.schema" || o != "orders" {
+		t.Errorf("split: %q %q %v", s, o, ok)
+	}
+	if s, o, _ := splitObject("public.my.table"); s != "public" || o != "my.table" {
+		t.Errorf("plain schema: %q %q", s, o)
+	}
+	if q := quoteObject(EnginePostgres, "my.schema.orders"); q != `"my.schema"."orders"` {
+		t.Errorf("quoted: %s", q)
+	}
+	if q := quoteObject(EngineMSSQL, "my.schema.orders"); q != `[my.schema].[orders]` {
+		t.Errorf("quoted: %s", q)
+	}
+	got := sqlNames(`SELECT * FROM "my.schema".orders`)
+	if !slices.ContainsFunc(got, func(n []string) bool { return len(n) == 2 && n[0] == "my.schema" && n[1] == "orders" }) {
+		t.Errorf("sqlNames: %q", got)
+	}
+}

@@ -162,7 +162,8 @@ func (s *server) smtpView() (map[string]any, error) {
 	if !ok {
 		st.smtpSettings = gmailSMTP()
 	}
-	return map[string]any{"enabled": st.Enabled, "host": st.Host, "port": st.Port, "username": st.Username, "from": st.From,
+	// The saved user name is shown like the password: only that there is one.
+	return map[string]any{"enabled": st.Enabled, "host": st.Host, "port": st.Port, "username": "", "usernameSet": st.Username != "", "from": st.From,
 		"tls": st.TLS, "linkBase": st.LinkBase, "passwordSet": st.Password != "", "warnings": senderWarnings(st.smtpSettings), "saved": ok}, nil
 }
 
@@ -182,20 +183,24 @@ func (s *server) handleGetSMTP(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleSaveSMTP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		smtpSettings
-		Password *string `json:"password"`
+		Password     *string `json:"password"`
+		KeepUsername bool    `json:"keepUsername"` // the user name field was left empty: keep the saved one
 	}
 	if err := readJSON(r, &req); err != nil {
-		writeErr(w, 400, err)
-		return
-	}
-	st := req.smtpSettings
-	if err := st.validate(); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
 	old, _, err := s.store.loadSMTP()
 	if err != nil {
 		writeErr(w, 500, err)
+		return
+	}
+	st := req.smtpSettings
+	if req.KeepUsername && st.Username == "" {
+		st.Username = old.Username
+	}
+	if err := st.validate(); err != nil {
+		writeErr(w, 400, err)
 		return
 	}
 	pw := old.Password
@@ -241,11 +246,14 @@ func (s *server) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	to := strings.TrimSpace(req.To)
+	st, _, _ := s.store.loadSMTP()
+	if to == "" && validEmail(st.Username) { // the page no longer has the user name
+		to = st.Username
+	}
 	if !validEmail(to) {
 		writeErr(w, 400, errors.New("enter one e-mail address to send the test to"))
 		return
 	}
-	st, _, _ := s.store.loadSMTP()
 	if err := s.sendMail(r, to, "cactusdb test e-mail",
 		"This is a test e-mail from cactusdb. Your e-mail server settings work.\n\n"+linkLine(st.LinkBase)); err != nil {
 		logAction(r, "test e-mail to %s failed: %v", to, err)

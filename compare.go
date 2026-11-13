@@ -807,7 +807,7 @@ func dropExtra(engine, table, st string) string {
 			return "DROP INDEX " + m[1] + " ON " + m[2]
 		case EnginePostgres:
 			// The index is in its table's schema.
-			if schema, _, ok := strings.Cut(table, "."); ok && !strings.Contains(m[1], ".") {
+			if schema, _, ok := splitObject(table); ok && !strings.Contains(m[1], ".") {
 				return "DROP INDEX " + quoteIdent(engine, schema) + "." + m[1]
 			}
 		}

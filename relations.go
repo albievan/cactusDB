@@ -101,9 +101,9 @@ func newRelGraph(groups []ObjectGroup) *relGraph {
 			}
 			keys := []string{lower, bare}
 			if gr.Type != ObjTrigger { // schema.table.trigger: only its full name
-				if i := strings.LastIndexByte(bare, '.'); i >= 0 {
-					keys = append(keys, bare[i+1:])
-					g.schemas[bare[:i]] = true
+				if schema, obj, ok := splitObject(bare); ok {
+					keys = append(keys, obj)
+					g.schemas[schema] = true
 				}
 			}
 			for _, k := range slices.Compact(keys) {
@@ -220,7 +220,11 @@ func sqlNames(src string) [][]string {
 	flush := func() {
 		if key := strings.ToLower(strings.Join(parts, ".")); len(parts) > 0 && parts[0] != "" && !seen[key] {
 			seen[key] = true
-			out = append(out, strings.Split(key, "."))
+			name := strings.Split(key, ".")
+			for i := range name { // a dot inside a quoted part was kept as \x00
+				name[i] = strings.ReplaceAll(name[i], "\x00", ".")
+			}
+			out = append(out, name)
 		}
 		parts = parts[:0]
 	}
