@@ -14,3 +14,4 @@ cactus.conn.db.location
 *.old.exe
 *.download
 release/cactusdb-*
+*.key.backup
