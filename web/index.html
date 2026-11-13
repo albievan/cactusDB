@@ -4840,6 +4840,7 @@ async function connect(extra = {}) {
     clearDef("Select an object on the left to see its definition.");
     setExportEnabled(false); $("tabTitle").textContent = ""; $("tabTitle").title = ""; $("exportNote").hidden = true;
     showTab("data");
+    if (res.warning) toast("Connected, but " + res.warning, true);
     if (res.saveError) toast("Connected, but saving failed: " + res.saveError, true);
     else if (res.savedId) { toast("Connected and saved, protected by its connection password"); loadSaved(); }
     else toast("Connected");
@@ -4945,7 +4946,8 @@ document.addEventListener("change", (ev) => {
   const id = el.id || el.name || el.closest("[id]")?.id || el.type;
   if (el.type === "checkbox" || el.type === "radio") track(`set: ${id}`, el.checked ? "on" : "off");
   else if (el.tagName === "SELECT") track(`choose: ${id}`, el.selectedOptions[0]?.textContent || "");
-  else if (/filter|search/i.test(id) || el.type === "search" || el.type === "date") track(`filter: ${id}`, el.value.slice(0, 100));
+  else if (el.type === "date") track(`filter: ${id}`, el.value);
+  else if (/filter|search/i.test(id) || el.type === "search") track(`filter: ${id}`, el.value ? "set" : "cleared"); // not what was typed: it can be a name or a value from the data
   else track(`edit: ${id}`); // what was typed is never recorded
 }, { capture: true });
 

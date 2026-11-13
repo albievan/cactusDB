@@ -7,7 +7,8 @@ VERSION=${VERSION:-$(cat VERSION)}
 # The release key signs dist/SHA256SUMS; its public half is built into the
 # binaries, which install an update only when the signature checks out. It
 # lives outside the repository: keep a backup of it, as installed cactusdbs
-# refuse updates signed with any other key.
+# refuse updates signed with any other key. setup.sh and setup.ps1 carry the
+# same public key (as PEM): a new key must be put there too.
 KEY=${CACTUSDB_RELEASE_KEY:-$HOME/.config/cactusdb/release-ed25519.key}
 helper=$(mktemp -d)
 trap 'rm -rf "$helper"' EXIT

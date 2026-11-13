@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.59.0
+cactusdb 1.59.1
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -1658,7 +1658,8 @@ Two kinds of events are recorded:
   connection database (`cactus.conn.db`, or where it was moved to).
 - **`ui`**: what only happens in the page: tabs, menu items, buttons, sorting, check boxes,
   drop-downs, the filter. Of what you type only *which field* is recorded, never the
-  text (no SQL, passwords or connection details), except the filter boxes and day pickers.
+  text (no SQL, passwords or connection details); of a filter or search box only whether it
+  was set or cleared, and of a day picker the day.
   The page sends them in batches every few seconds and when it is closed.
 
 | Column | What it holds |
@@ -1791,7 +1792,7 @@ is sent and how to set it up. In short:
 - **Installing an update from the web UI** only ever downloads the file for this system
   from `dist/` of this repository on GitHub (over HTTPS), checks it against
   `dist/SHA256SUMS` (no checksum, no install) and runs it with `--version` before using it;
-  `setup.sh` and `setup.ps1` check the checksum too; it must be newer than the
+  `setup.sh` and `setup.ps1` check the checksum too, and the release signature where OpenSSL 3 is installed (they say when they can't); it must be newer than the
   running version. `SHA256SUMS` must carry the release signature (see *Updating*), so a
   change pushed to the repository by anyone without the release key isn't installed. Like
   Shutdown it only accepts a JSON request, so other websites can't start it. With a

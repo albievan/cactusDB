@@ -46,8 +46,22 @@ Write-Host "downloading $file ($ref) to $dest"
 try {
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp
     # Check it against the published checksums before running it.
-    $sums = (Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$repo/raw/$ref/dist/SHA256SUMS").Content
-    if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
+    $sumsFile = "$tmp.sums"
+    Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$repo/raw/$ref/dist/SHA256SUMS" -OutFile $sumsFile
+    $sums = [IO.File]::ReadAllText($sumsFile)
+    # The checksums are signed with the cactusdb release key (dist/SHA256SUMS.sig).
+    # Windows has no Ed25519 of its own: OpenSSL 3 (e.g. from Git for Windows) checks it.
+    $ossl = Get-Command openssl -ErrorAction SilentlyContinue
+    if ($ossl -and ((& openssl version) -match '^OpenSSL [3-9]')) {
+        Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$repo/raw/$ref/dist/SHA256SUMS.sig" -OutFile "$tmp.sig"
+        [IO.File]::WriteAllBytes("$tmp.sigbin", [Convert]::FromBase64String(([IO.File]::ReadAllText("$tmp.sig")).Trim()))
+        Set-Content -Path "$tmp.pem" -Value "-----BEGIN PUBLIC KEY-----`nMCowBQYDK2VwAyEAGDkn+i/onn7P5N3QN3Rb3EyJFH5FU5kLF40AR36lcn8=`n-----END PUBLIC KEY-----"
+        & openssl pkeyutl -verify -pubin -inkey "$tmp.pem" -rawin -in $sumsFile -sigfile "$tmp.sigbin" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "dist/SHA256SUMS isn't signed with the cactusdb release key: not installed" }
+        Write-Host "release signature checked"
+    } else {
+        Write-Host "note: the release signature isn't checked here (that needs OpenSSL 3); the checksum is"
+    }
     $want = ($sums -split "`n" | ForEach-Object { $f = -split $_; if ($f.Count -eq 2 -and $f[1].TrimStart('*') -eq $file) { $f[0] } } | Select-Object -First 1)
     if (-not $want) { throw "dist/SHA256SUMS has no checksum for $file" }
     if ((Get-FileHash -Algorithm SHA256 -Path $tmp).Hash -ne $want.ToUpper()) { throw "the download of $file is damaged: its SHA-256 isn't the one in SHA256SUMS" }
@@ -64,8 +78,10 @@ try {
         Remove-Item -Force $old -ErrorAction SilentlyContinue
     }
     Move-Item -Force $tmp $dest
+    Remove-Item -Force "$tmp.sums", "$tmp.sig", "$tmp.sigbin", "$tmp.pem" -ErrorAction SilentlyContinue
 } catch {
     Remove-Item -Force $tmp -ErrorAction SilentlyContinue
+    Remove-Item -Force "$tmp.sums", "$tmp.sig", "$tmp.sigbin", "$tmp.pem" -ErrorAction SilentlyContinue
     throw "setup: $($_.Exception.Message) ($url)"
 }
 

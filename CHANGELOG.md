@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.59.1 — 2026-11-13
+
+- `setup.sh` and `setup.ps1` check the release signature of `dist/SHA256SUMS` where OpenSSL 3
+  is installed (Linux, Homebrew, Git for Windows), and say so when they can't.
+- The usage log no longer records what is typed in filter and search boxes, only that one was
+  set or cleared.
+- Connecting to a PostgreSQL, SQL Server or Oracle database with a schema that has a dot in
+  its name warns that the objects of that schema can't be handled correctly (objects are
+  named schema.name), instead of failing on them later without saying why.
+
 ## 1.59.0 — 2026-11-13
 
 Security:
