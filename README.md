@@ -1996,6 +1996,8 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `build.sh`, `release.sh` | Build and sign the six binaries into `release/`; publish them as the GitHub release `v<VERSION>` |
 | `dist/` | Version 1.61.0, kept for cactusdb 1.60.0 and older, which update from there: they move to 1.61.0, which updates from GitHub releases. Not updated any more |
 | `.github/workflows/setup-scripts.yml` | Installs each published release with `setup.sh` (Linux, macOS) and `setup.ps1` (Windows PowerShell 5.1 and 7), with the signature checked |
+| `.github/workflows/relationships-types.yml`, `.github/ci/relationships-types.mjs` | On demand: DB Relationships' column types on SQL Server and Oracle, read in a browser |
+| `.github/workflows/pdf-acrobat.yml`, `.github/ci/export-pdf.mjs` | On demand: exports a DB Relationships PDF in a browser and opens it in Adobe Acrobat Reader on Windows (installing Reader accepts Adobe's licence on the runner); the screenshot is kept as an artifact |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 | `web/vendor/` | [Bootstrap 5.3.8](https://getbootstrap.com/) (its CSS and JavaScript bundle) and [Bootstrap Icons 1.13.2](https://icons.getbootstrap.com/), embedded too: the page loads nothing from the internet |
