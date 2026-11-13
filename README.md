@@ -1913,6 +1913,11 @@ go build -o cactusdb .   # build for this computer
 go test ./...            # unit tests
 ```
 
+Builds are **reproducible**: `build.sh` leaves the git state out of the binaries
+(`-buildvcs=false`), so building a release's tag again with the same Go version (`go version
+-m` on a binary shows it) gives the files of its `SHA256SUMS` byte for byte, which lets anyone
+check that a release was built from its source.
+
 `integration_test.go` checks the database-level read-only protection against real
 servers. Start test databases and set `CACTUSDB_IT=1`:
 

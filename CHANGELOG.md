@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.61.2 — 2026-11-13
+
+- **Reproducible builds:** `build.sh` no longer stamps the git commit and its "modified" flag
+  into the binaries (`-buildvcs=false`). Building a release's tag again with the same Go
+  version gives byte-identical files, so its `SHA256SUMS` can be checked against the source;
+  before, a binary built before the release commit could never be rebuilt identically.
+
 ## 1.61.1 — 2026-11-13
 
 - **DB Relationships on Oracle:** a `NUMBER(10)` column's type is shown as `number(10)`, no

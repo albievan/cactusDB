@@ -27,7 +27,7 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 wi
   out=release/cactusdb-$os-$arch
   [ "$os" = windows ] && out=$out.exe
   echo "building $out"
-  CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.releaseKey=$PUB" -o "$out" .
+  CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$VERSION -X main.releaseKey=$PUB" -o "$out" .
 done
 # Checksums: an upgrade from the web UI checks the downloaded binary with them.
 cd release
