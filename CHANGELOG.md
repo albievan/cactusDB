@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.61.1 — 2026-11-13
+
+- **DB Relationships on Oracle:** a `NUMBER(10)` column's type is shown as `number(10)`, no
+  longer `number(10,0)`.
+- Column types checked in a browser on all six engines: SQL Server and Oracle in a new GitHub
+  Actions workflow (*relationships column types*, run on demand), next to PostgreSQL,
+  MariaDB/MySQL and Firebird.
+- README: how to put the release key back from its copy in the login Keychain.
+
 ## 1.61.0 — 2026-11-13
 
 - **Binaries are published as GitHub releases** (tag `v<version>`) instead of being committed
