@@ -1,0 +1,56 @@
+# Opens a DB Relationships PDF export in Adobe Acrobat Reader on Windows and
+# keeps a screenshot of it. Installing Reader accepts Adobe's licence
+# agreement on the (throwaway) runner. Run it from Actions → Run workflow.
+name: pdf in acrobat
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acrobat:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: cactusdb and a test database
+        shell: pwsh
+        run: |
+          go build -o "$env:RUNNER_TEMP\cactusdb.exe" .
+          python -c "import sqlite3,os; c=sqlite3.connect(os.path.join(os.environ['RUNNER_TEMP'],'shop.db')); c.executescript('''CREATE TABLE customers (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL, credit NUMERIC(12,2), created DATETIME); CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id), total DECIMAL(10,3), note TEXT); CREATE TABLE lines (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders(id), qty INTEGER, price REAL);'''); c.close()"
+          Start-Process -FilePath "$env:RUNNER_TEMP\cactusdb.exe" -ArgumentList "--host","127.0.0.1","--port","18093","--conn-db","$env:RUNNER_TEMP\t.conn.db" -WorkingDirectory $env:RUNNER_TEMP
+          Start-Sleep 5
+      - name: Export the PDF in a browser
+        shell: pwsh
+        working-directory: .github/ci
+        run: |
+          npm install --no-save playwright@1.48.2
+          npx playwright install chromium
+          $env:DB_FILE = "$env:RUNNER_TEMP\shop.db"
+          node export-pdf.mjs
+      - name: Open it in Acrobat Reader
+        shell: pwsh
+        working-directory: .github/ci
+        run: |
+          choco install adobereader -y --no-progress | Select-Object -Last 3
+          $exe = @("C:\Program Files\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
+                   "C:\Program Files (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+                   "C:\Program Files\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw "Acrobat Reader isn't installed" }
+          (Get-Item $exe).VersionInfo | Format-List ProductName, ProductVersion
+          Start-Process -FilePath $exe -ArgumentList (Resolve-Path rel.pdf).Path
+          Start-Sleep 45
+          Get-Process | Where-Object { $_.MainWindowTitle } | Format-Table ProcessName, MainWindowTitle -AutoSize | Out-String -Width 300
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$PWD\acrobat.png")
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-in-acrobat
+          path: |
+            .github/ci/rel.pdf
+            .github/ci/acrobat.png
