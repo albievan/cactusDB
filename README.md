@@ -353,7 +353,9 @@ checks out with it. **Keep a backup of that key** (a password manager, or an enc
 drive): installed versions refuse updates signed with another one (install those with the
 command instead). On the release Mac a copy is in the login Keychain as *cactusdb release
 key*; to put it back: `security find-generic-password -s "cactusdb release key" -w >
-~/.config/cactusdb/release-ed25519.key && chmod 600 ~/.config/cactusdb/release-ed25519.key`.
+~/.config/cactusdb/release-ed25519.key && chmod 600 ~/.config/cactusdb/release-ed25519.key`. A copy
+named `*.key.backup` (e.g. in the project folder) is ignored by git, so it can't be committed
+by accident; it is still on the same disk, so keep one off this computer too.
 
 When **the cactusdb server can't reach GitHub** but your browser can, you download the file
 in your browser (the dialog links to it; GitHub doesn't let a page download it itself) and
