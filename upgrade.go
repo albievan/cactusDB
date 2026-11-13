@@ -248,6 +248,13 @@ func installable() (exe string, err error) {
 }
 
 // downloadBinary fetches name from dist/ into dst, reporting progress.
+// createFresh creates path as a new executable file. What is there (an old
+// download, or a link someone put there) is removed, never written through.
+func createFresh(path string) (*os.File, error) {
+	os.Remove(path)
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
+}
+
 func downloadBinary(ctx context.Context, name, dst string, progress func(done, total int64)) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", distURL+name, nil)
 	if err != nil {
@@ -263,7 +270,7 @@ func downloadBinary(ctx context.Context, name, dst string, progress func(done, t
 		return fmt.Errorf("GitHub answered %s for %s", resp.Status, distURL+name)
 	}
 	progress(0, resp.ContentLength)
-	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	f, err := createFresh(dst)
 	if err != nil {
 		return err
 	}
@@ -301,25 +308,43 @@ func (p *progressReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// expectedSum looks name up in dist/SHA256SUMS. "" means there is no such
-// file (releases before it), so only the --version check applies.
+// expectedSum looks name up in dist/SHA256SUMS, after checking the file's
+// signature (SHA256SUMS.sig) with the release key built into cactusdb.
 func expectedSum(ctx context.Context, name string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", distURL+"SHA256SUMS", nil)
+	sums, err := fetchDist(ctx, "SHA256SUMS")
 	if err != nil {
 		return "", err
 	}
+	if releaseKey != "" {
+		sig, err := fetchDist(ctx, "SHA256SUMS.sig")
+		if err != nil {
+			return "", fmt.Errorf("the update isn't signed: %w", err)
+		}
+		if err := verifyRelease(sums, sig); err != nil {
+			return "", err
+		}
+	}
+	return sumFor(string(sums), name)
+}
+
+// fetchDist downloads a small file of dist/ on GitHub. A release always has
+// SHA256SUMS (and its signature): a missing one is an error.
+func fetchDist(ctx context.Context, name string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", distURL+name, nil)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("cannot download the checksums: %w", err)
+		return nil, fmt.Errorf("cannot download %s: %w", name, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 { // a release always has SHA256SUMS: no checksum, no install
-		return "", fmt.Errorf("GitHub answered %s for %s", resp.Status, distURL+"SHA256SUMS")
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub answered %s for %s", resp.Status, distURL+name)
 	}
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	return sumFor(string(b), name)
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 }
 
 // sumFor finds name in the text of a SHA256SUMS file.
@@ -445,10 +470,37 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 415, errors.New("expected a JSON request"))
 		return
 	}
+	var req struct {
+		SuperPassword string `json:"superPassword"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
 	exe, err := installable()
 	if err != nil {
 		writeErr(w, 409, err)
 		return
+	}
+	// Installing restarts cactusdb for everyone: with a superuser password
+	// set, it takes that password, as installing an uploaded file does.
+	if s.store.SuperuserSet() {
+		if wait := s.throttle.wait(superThrottleID); wait > 0 {
+			writeErr(w, 429, fmt.Errorf("too many wrong passwords: try again in %d seconds", int(wait.Seconds())+1))
+			return
+		}
+		switch err := s.store.CheckSuperuser(req.SuperPassword); {
+		case errors.Is(err, errLockWrong):
+			s.throttle.failed(superThrottleID)
+			logAction(r, "upgrade REFUSED: wrong superuser password")
+			s.event(r, "signin-failed", true, "upgrade REFUSED: wrong superuser password")
+			writeJSON(w, 403, map[string]any{"error": "the superuser password is needed to install an update", "needSuper": true})
+			return
+		case err != nil:
+			writeErr(w, 500, err)
+			return
+		}
+		s.throttle.ok(superThrottleID)
 	}
 	opts, err := loadStartup(s.store, s.port)
 	if err != nil {
@@ -533,7 +585,7 @@ func (s *server) handleUpgradeUpload(w http.ResponseWriter, r *http.Request) {
 		j.set(func(j *upgradeJob) { j.State, j.Error = "failed", err.Error() })
 		writeErr(w, code, err)
 	}
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	f, err := createFresh(tmp)
 	if err != nil {
 		fail(500, err)
 		return

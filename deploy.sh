@@ -230,7 +230,7 @@ build_image() {
   for arch in "$@"; do
     root=$ctx/rootfs-$arch$APP
     mkdir -p "$root/conn" "$root/export"
-    chmod 0777 "$root/conn" "$root/export"
+    chmod 1777 "$root/conn" "$root/export" # sticky: whoever runs it can write, not remove others' files
     if [[ $FROM_SOURCE == yes ]]; then
       command -v go >/dev/null 2>&1 || die "--from-source needs Go installed"
       say "Compiling cactusdb $VERSION for linux/${arch}…"
@@ -428,7 +428,9 @@ eng_install() {
   if [[ -n $SUPERUSER_PW ]]; then export CACTUSDB_SUPERUSER_PASSWORD=$SUPERUSER_PW; args+=(-e CACTUSDB_SUPERUSER_PASSWORD); fi
   # Not as root, so the files in the data folders belong to a real user
   # (rootless podman maps root to you already).
-  [[ $RUNTIME == podman ]] || args+=(--user "$user")
+  # Rootless podman: root in the container is you (the image itself runs as
+  # an unprivileged user otherwise).
+  if [[ $RUNTIME == podman ]]; then args+=(--user 0); else args+=(--user "$user"); fi
   # host.docker.internal reaches the computer running Docker, and the database
   # containers that publish their ports on it: localhost inside the container
   # is the container itself. (Podman provides host.containers.internal.)

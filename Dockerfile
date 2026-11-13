@@ -5,7 +5,7 @@
 # Mac) build without emulation. By hand:
 #
 #   mkdir -p ctx/rootfs-amd64/opt/cactusdb/conn ctx/rootfs-amd64/opt/cactusdb/export
-#   chmod 0777 ctx/rootfs-amd64/opt/cactusdb/conn ctx/rootfs-amd64/opt/cactusdb/export
+#   chmod 1777 ctx/rootfs-amd64/opt/cactusdb/conn ctx/rootfs-amd64/opt/cactusdb/export
 #   cp dist/cactusdb-linux-amd64 ctx/rootfs-amd64/opt/cactusdb/cactusdb && cp Dockerfile ctx/
 #   docker build --platform linux/amd64 -t cactusdb ctx
 #
@@ -27,6 +27,9 @@ WORKDIR /opt/cactusdb
 # itself (use host.docker.internal for the computer that runs Docker).
 ENV CACTUSDB_PORT=8080 PATH=/opt/cactusdb:$PATH CACTUSDB_CONTAINER=1
 EXPOSE 8080
+# Not root: deploy.sh and Kubernetes pass the user to run as; started by
+# hand it is this unprivileged one.
+USER 65532:65532
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
   CMD wget -q -O /dev/null "http://127.0.0.1:${CACTUSDB_PORT}/api/info" || exit 1

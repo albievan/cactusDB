@@ -19,9 +19,9 @@ import (
 )
 
 // Azure Cosmos DB, NoSQL API, through its REST API with the account key:
-// containers (database.container), their stored procedures, functions and
+// containers (database/container), their stored procedures, functions and
 // triggers. Queries are Cosmos DB SQL, sent to one container: the one named
-// in a first line "-- container: database.container", else the one after
+// in a first line "-- container: database/container", else the one after
 // FROM. The query API only reads; a read-only key also works.
 
 func init() { backendOpeners[EngineCosmosDB] = openCosmos }
@@ -144,7 +144,7 @@ func (c *cosmosBackend) Objects(ctx context.Context) ([]ObjectGroup, error) {
 			return nil, err
 		}
 		for _, coll := range colls {
-			name := db + "." + coll.ID
+			name := db + "/" + coll.ID
 			groups[0].Items = append(groups[0].Items, name)
 			for i, s := range cosmosScripts {
 				var res map[string][]struct {
@@ -153,7 +153,7 @@ func (c *cosmosBackend) Objects(ctx context.Context) ([]ObjectGroup, error) {
 				link := "dbs/" + db + "/colls/" + coll.ID
 				if _, err := c.do(ctx, "GET", s.res, link, escapeLink(link)+"/"+s.res, nil, nil, &res); err == nil {
 					for _, x := range res[s.field] {
-						groups[i+1].Items = append(groups[i+1].Items, name+"."+x.ID)
+						groups[i+1].Items = append(groups[i+1].Items, name+"/"+x.ID)
 					}
 				}
 			}
@@ -174,8 +174,14 @@ func escapeLink(link string) string {
 	return strings.Join(parts, "/")
 }
 
-// splitContainer splits database.container[.script].
+// splitContainer splits database/container[/script]. Ids may hold dots but
+// never "/"; the older database.container form is still read.
 func (c *cosmosBackend) splitContainer(name string) (db, coll, rest string) {
+	if strings.Contains(name, "/") {
+		db, rest, _ = strings.Cut(name, "/")
+		coll, rest, _ = strings.Cut(rest, "/")
+		return db, coll, rest
+	}
 	db, rest, _ = strings.Cut(name, ".")
 	coll, rest, _ = strings.Cut(rest, ".")
 	return db, coll, rest
@@ -272,18 +278,21 @@ func (c *cosmosBackend) CheckReadOnly(q string) error {
 func (c *cosmosBackend) target(q string) (db, coll string, err error) {
 	if m := cosmosContainerLine.FindStringSubmatch(q); m != nil {
 		name := m[1]
+		if d, cl, ok := strings.Cut(name, "/"); ok {
+			return d, cl, nil
+		}
 		if d, cl, ok := strings.Cut(name, "."); ok {
 			return d, cl, nil
 		}
 		if c.db != "" {
 			return c.db, name, nil
 		}
-		return "", "", fmt.Errorf("write the container as database.container: -- container: mydb.%s", name)
+		return "", "", fmt.Errorf("write the container as database/container: -- container: mydb/%s", name)
 	}
 	if m := cosmosFrom.FindStringSubmatch(stripLineComments(q)); m != nil && c.db != "" && !strings.EqualFold(m[1], "c") && !strings.EqualFold(m[1], "root") {
 		return c.db, m[1], nil
 	}
-	return "", "", errors.New("name the container in a first line: -- container: database.container")
+	return "", "", errors.New("name the container in a first line: -- container: database/container")
 }
 
 // cosmosSystemFields are left out of the rows.

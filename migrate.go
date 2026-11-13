@@ -15,6 +15,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"database/sql"
 	"database/sql/driver"
@@ -790,6 +791,16 @@ func (m *migrator) migrate(ctx context.Context) error {
 // unlimited text on MySQL and SQL Server, and a MySQL row has room for
 // 65,535 bytes of VARCHAR.
 func (m *migrator) fitTable(t *mTable) {
+	// A decimal without a precision (PostgreSQL numeric, Oracle NUMBER) gets
+	// a fixed one on most targets: say so, as it rounds longer values.
+	for i := range t.Cols {
+		c := &t.Cols[i]
+		if c.Kind == kDecimal && c.Prec <= 0 {
+			if typ := colType(m.dst, c, m.fbMajor); strings.Contains(typ, "(") {
+				t.Notes = append(t.Notes, fmt.Sprintf("%s (%s, any precision) becomes %s: values with more digits are rounded or don't fit", c.Name, c.SrcType, typ))
+			}
+		}
+	}
 	if mysqlFamily(m.dst) || m.dst == EngineMSSQL {
 		keyLen := int64(255)
 		if m.dst == EngineMSSQL {
@@ -1267,6 +1278,11 @@ func (m *migrator) copyRows(ctx context.Context, t *mTable) (int64, error) {
 		for i := range t.Cols {
 			if i < len(raw) {
 				row[i] = convertValue(raw[i], &t.Cols[i], m.dst)
+				// MySQL's zero date (0000-00-00) arrives as year 1: it means
+				// "no date", which is NULL where the column allows one.
+				if tm, ok := raw[i].(time.Time); ok && tm.IsZero() && mysqlFamily(m.srcEngine) && t.Cols[i].Nullable {
+					row[i] = nil
+				}
 				if s, ok := row[i].(string); ok && m.dst == EngineFirebird && (t.Cols[i].Kind == kTime || t.Cols[i].Kind == kTimestamp || t.Cols[i].Kind == kTimestampTZ) {
 					row[i] = reSubSecond.ReplaceAllString(s, "$1") // Firebird keeps 1/10000 of a second
 				}
@@ -1324,6 +1340,52 @@ func valueSize(v any) int {
 // convertValue turns a value as the source's driver returns it into one
 // the target's driver writes into a column of kind c.Kind. Dates and times
 // are passed as text, so no time zone moves them.
+// bitString packs a PostgreSQL bit(n) value ("0101…", as the driver gives
+// it) into bytes, the first bit the highest.
+func bitString(s, srcType string) ([]byte, bool) {
+	if !strings.HasPrefix(strings.ToUpper(srcType), "BIT") || s == "" || strings.Trim(s, "01") != "" {
+		return nil, false
+	}
+	b := make([]byte, (len(s)+7)/8)
+	for i := 0; i < len(s); i++ {
+		if s[i] == '1' {
+			b[i/8] |= 0x80 >> (i % 8)
+		}
+	}
+	return b, true
+}
+
+// moneyNumber is a PostgreSQL money value ("$1,234.56", "-$5.00",
+// "($5.00)") as a plain number. The locale's decimal mark is the last . or ,
+// followed by up to two digits.
+func moneyNumber(s string) string {
+	neg := strings.Contains(s, "-") || strings.HasPrefix(strings.TrimSpace(s), "(")
+	var digits strings.Builder
+	dec := -1
+	for i, r := range s {
+		switch {
+		case r >= '0' && r <= '9':
+			digits.WriteRune(r)
+		case r == '.' || r == ',':
+			if rest := strings.TrimRightFunc(s[i+1:], func(r rune) bool { return r < '0' || r > '9' }); len(rest) <= 2 && !strings.ContainsAny(rest, ".,") {
+				dec = digits.Len()
+			}
+		}
+	}
+	d := digits.String()
+	if d == "" {
+		return s
+	}
+	out := d
+	if dec >= 0 {
+		out = cmp.Or(d[:dec], "0") + "." + d[dec:]
+	}
+	if neg {
+		out = "-" + out
+	}
+	return out
+}
+
 func convertValue(v any, c *mCol, dst string) any {
 	if vl, ok := v.(driver.Valuer); ok {
 		if x, err := vl.Value(); err == nil {
@@ -1354,9 +1416,16 @@ func convertValue(v any, c *mCol, dst string) any {
 	case string:
 		switch c.Kind {
 		case kBinary, kVarbinary, kBlob:
+			if b, ok := bitString(x, c.SrcType); ok {
+				return b
+			}
 			return []byte(x)
 		case kBool:
 			return parseBool(x)
+		case kDecimal:
+			if strings.Contains(strings.ToUpper(c.SrcType), "MONEY") {
+				return moneyNumber(x)
+			}
 		}
 		return x
 	case bool:
@@ -2051,7 +2120,7 @@ func createTarget(ctx context.Context, p ConnParams, engine, name string, pipesC
 		np = ConnParams{Engine: EngineSQLite, Database: name}
 		// Created here, only if it doesn't exist (O_EXCL): a file that
 		// appeared since the check is never written into.
-		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o644)
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 		if err != nil {
 			if errors.Is(err, fs.ErrExist) {
 				err = fmt.Errorf("%s already exists: cactusdb only migrates into a new database", name)

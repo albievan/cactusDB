@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -584,6 +585,7 @@ type tableDiff struct {
 	addCons, dropCons   []string
 	addExtra, dropExtra []string
 	tail                [2]string // the table options, when they differ
+	unlogged            [2]bool   // master's, other's: set when they differ (PostgreSQL UNLOGGED)
 }
 
 func diffTables(m, t *tableShape) *tableDiff {
@@ -620,7 +622,17 @@ func diffTables(m, t *tableShape) *tableDiff {
 	if defKey(m.tail) != defKey(t.tail) {
 		d.tail = [2]string{m.tail, t.tail}
 	}
+	mu, tu := headWord(m.head, "UNLOGGED"), headWord(t.head, "UNLOGGED")
+	if mu != tu {
+		d.unlogged = [2]bool{mu, tu}
+	}
 	return d
+}
+
+// headWord says whether the CREATE … TABLE head has word before TABLE.
+func headWord(head, word string) bool {
+	before, _, _ := strings.Cut(strings.ToUpper(head), "TABLE")
+	return slices.Contains(strings.Fields(before), word)
 }
 
 // setDiff returns the items only in a, and those only in b.
@@ -650,7 +662,7 @@ func setDiff(a, b []string) (onlyA, onlyB []string) {
 // (perhaps in another order).
 func (d *tableDiff) empty() bool {
 	return len(d.addCols)+len(d.dropCols)+len(d.changed)+len(d.addCons)+len(d.dropCons)+len(d.addExtra)+len(d.dropExtra) == 0 &&
-		d.tail[0] == "" && d.tail[1] == ""
+		d.tail[0] == "" && d.tail[1] == "" && d.unlogged[0] == d.unlogged[1]
 }
 
 // notes describes the differences for the page.
@@ -679,6 +691,9 @@ func (d *tableDiff) notes() []string {
 	}
 	for _, c := range d.dropExtra {
 		n = append(n, "not in the master: "+oneLine(c))
+	}
+	if d.unlogged[0] != d.unlogged[1] {
+		n = append(n, map[bool]string{true: "the master is UNLOGGED, this one isn't", false: "this one is UNLOGGED, the master isn't"}[d.unlogged[0]])
 	}
 	if d.tail[0] != "" || d.tail[1] != "" {
 		n = append(n, "table options differ: master "+oneLine(d.tail[0])+" / here "+oneLine(d.tail[1]))
@@ -1170,6 +1185,9 @@ func alterTable(w *scriptWriter, q, name string, d *tableDiff, drops bool) {
 	}
 	for _, x := range d.addExtra {
 		w.stmt(x)
+	}
+	if d.unlogged[0] != d.unlogged[1] {
+		w.stmt("ALTER TABLE " + q + map[bool]string{true: " SET UNLOGGED", false: " SET LOGGED"}[d.unlogged[0]])
 	}
 	if d.tail[0] != "" || d.tail[1] != "" {
 		w.comment("the table options differ, change them by hand: master %s / here %s", orNone(oneLine(d.tail[0])), orNone(oneLine(d.tail[1])))

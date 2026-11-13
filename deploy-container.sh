@@ -197,7 +197,7 @@ trap 'rm -rf "$CTX"' EXIT
 # (such as a cactus.conn.db or cactus.key) can end up in the image.
 ROOT=$CTX/rootfs-$ARCH/opt/cactusdb
 mkdir -p "$ROOT/conn" "$ROOT/export"
-chmod 0777 "$ROOT/conn" "$ROOT/export"
+chmod 1777 "$ROOT/conn" "$ROOT/export" # sticky: whoever runs it can write, not remove others' files
 if [[ $FROM_SOURCE == yes ]]; then
   command -v go >/dev/null 2>&1 || die "--from-source needs Go installed"
   VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$SCRIPT_DIR/main.go")
@@ -240,7 +240,7 @@ ENVS=(-e "CACTUSDB_PORT=$PORT")
 # Run as the calling user so exports and the connection files on the host
 # belong to you, not root. Rootless podman maps root to you already.
 USER_OPT=()
-if [[ $RUNTIME != podman ]]; then USER_OPT=(--user "$(id -u):$(id -g)"); fi
+if [[ $RUNTIME != podman ]]; then USER_OPT=(--user "$(id -u):$(id -g)"); else USER_OPT=(--user 0); fi # rootless podman: root is you
 
 # ---- up: (re)start the container ----------------------------------------
 if exists; then

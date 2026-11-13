@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.59.0 — 2026-11-13
+
+Security:
+- **Releases are signed.** `build.sh` signs `dist/SHA256SUMS` with an Ed25519 key kept outside
+  the repository; the binaries carry its public key and install an update from GitHub only
+  when `dist/SHA256SUMS.sig` checks out. (This version is the first to check; it installs
+  updates signed with the key it was built with.)
+- **Install and restart** asks for the superuser password when one is set.
+- **CSV exports** put a `'` before text that starts like a spreadsheet formula (`=`, `+`, `-`,
+  `@`, tab), so Excel shows it instead of running it; numbers stay as they are.
+- **Exported files** are readable only by the user cactusdb runs as (files 0600, folders 0700).
+- **The container image runs as an unprivileged user** (65532) when started by hand; deploy.sh
+  and Kubernetes keep passing the user to run as (rootless Podman runs as you). Its `conn/`
+  and `export/` folders are sticky, so one user can't remove another's files.
+- Update downloads are written to a new file, never through a link left in their place.
+- Redis `KEYS` is refused (it blocks the server): use `SCAN MATCH`.
+
+Fixes:
+- A connection renamed or deleted while one of its queries runs no longer races with it.
+- Cosmos DB containers are named `database/container` (ids may hold dots; `database.container`
+  still works); Couchbase buckets with dots in their names work; Couchbase index names with a
+  backtick are shown correctly.
+- PostgreSQL `UNLOGGED` tables show as such in definitions and DDL, and compare reports and
+  syncs (`SET LOGGED`/`SET UNLOGGED`) the difference.
+- Migrations: MySQL `TINYINT(1)` becomes a small integer, not a boolean (it holds -128..127);
+  MySQL and SQL Server spatial types are copied as binary; PostgreSQL `bit(n)` values are copied
+  as their bits and `money` values as numbers; a decimal without a precision (PostgreSQL
+  `numeric`, Oracle `NUMBER`) is kept unbounded where the target allows it and noted where
+  it gets a fixed one; MySQL zero dates become NULL where the column allows it.
+- A BigQuery query that is given up on (cancelled, timed out) is cancelled on BigQuery too.
+
 ## 1.58.1 — 2026-11-13
 
 - MongoDB: `.collation({locale: "en", strength: 2})` is applied (it was accepted and quietly

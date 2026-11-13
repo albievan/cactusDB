@@ -135,10 +135,13 @@ func classifyType(engine, raw string) (kind string, l, p, s int64) {
 		}
 		return kVarbinary, (arg(0, 1) + 7) / 8, 0, 0
 	case word == "TINYINT":
-		if mysqlFamily(engine) && len(args) == 1 && args[0] == 1 {
-			return kBool, 0, 0, 0
-		}
+		// MySQL's TINYINT(1) is often used as a flag, but holds -128..127: a
+		// BOOLEAN would turn 2 into TRUE. A small integer keeps every value.
 		return kInt16, 0, 0, 0
+	case (mysqlFamily(engine) || engine == EngineMSSQL) && spatialTypes[word]:
+		// Binary values (WKB, SQL Server's own format): as text they would
+		// be invalid UTF-8 and fail the copy.
+		return kBlob, 0, 0, 0
 	case word == "SMALLINT" || word == "INT2" || word == "SMALLSERIAL" || word == "YEAR":
 		if unsigned {
 			return kInt32, 0, 0, 0
@@ -157,9 +160,6 @@ func classifyType(engine, raw string) (kind string, l, p, s int64) {
 	case word == "INT128":
 		return kDecimal, 0, 38, 0
 	case word == "DECIMAL" || word == "NUMERIC" || word == "DEC" || word == "NUMBER":
-		if len(args) == 0 && word == "NUMBER" {
-			return kDecimal, 0, 38, 10
-		}
 		return kDecimal, 0, arg(0, 0), arg(1, 0)
 	case word == "MONEY":
 		return kDecimal, 0, 19, 4
@@ -240,6 +240,9 @@ func classifyType(engine, raw string) (kind string, l, p, s int64) {
 	}
 	return kText, 0, 0, 0 // intervals, geometry, network types…: as their text
 }
+
+var spatialTypes = map[string]bool{"GEOMETRY": true, "POINT": true, "LINESTRING": true, "POLYGON": true, "MULTIPOINT": true,
+	"MULTILINESTRING": true, "MULTIPOLYGON": true, "GEOMETRYCOLLECTION": true, "GEOMCOLLECTION": true, "GEOGRAPHY": true, "HIERARCHYID": true}
 
 func textKind(k string, n int64, octets bool) (string, int64, int64, int64) {
 	if octets {

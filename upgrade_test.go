@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -261,5 +263,42 @@ func TestUpgradeUploadNeedsSuperuser(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(exe); !strings.Contains(string(b), "99.2.0") {
 		t.Errorf("not installed: %s", b)
+	}
+}
+
+// A release's SHA256SUMS is signed by build.sh and checked before an update
+// is installed: a changed file or another key is refused.
+func TestReleaseSignature(t *testing.T) {
+	dir := t.TempDir()
+	key := filepath.Join(dir, "k")
+	if _, err := releaseCommand([]string{"release-keygen", key}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := releaseCommand([]string{"release-keygen", key}); err == nil {
+		t.Error("a second keygen replaced the key")
+	}
+	sums := filepath.Join(dir, "SHA256SUMS")
+	os.WriteFile(sums, []byte("abc  cactusdb-linux-amd64\n"), 0o644)
+	if _, err := releaseCommand([]string{"release-sign", key, sums}); err != nil {
+		t.Fatal(err)
+	}
+	priv, _ := readReleaseKey(key)
+	old := releaseKey
+	defer func() { releaseKey = old }()
+	releaseKey = base64.StdEncoding.EncodeToString(priv.Public().(ed25519.PublicKey))
+	b, _ := os.ReadFile(sums)
+	sig, _ := os.ReadFile(sums + ".sig")
+	if err := verifyRelease(b, sig); err != nil {
+		t.Errorf("good signature: %v", err)
+	}
+	if verifyRelease([]byte("def  cactusdb-linux-amd64\n"), sig) == nil {
+		t.Error("a changed SHA256SUMS passed")
+	}
+	other := filepath.Join(dir, "other")
+	releaseCommand([]string{"release-keygen", other})
+	releaseCommand([]string{"release-sign", other, sums})
+	sig2, _ := os.ReadFile(sums + ".sig")
+	if verifyRelease(b, sig2) == nil {
+		t.Error("another key's signature passed")
 	}
 }

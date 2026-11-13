@@ -178,6 +178,19 @@ func TestSQLBackendsReadOnly(t *testing.T) {
 	if db, coll, err := cs.target("SELECT * FROM orders o"); err != nil || db != "shop" || coll != "orders" {
 		t.Errorf("%s %s %v", db, coll, err)
 	}
+	// Ids with dots: database/container is unambiguous.
+	if db, coll, err := cs.target("-- container: shop.v2/orders.2026\nSELECT * FROM c"); err != nil || db != "shop.v2" || coll != "orders.2026" {
+		t.Errorf("%s %s %v", db, coll, err)
+	}
+	if db, coll, rest := cs.splitContainer("shop.v2/orders.2026/sp.x"); db != "shop.v2" || coll != "orders.2026" || rest != "sp.x" {
+		t.Errorf("split: %s %s %s", db, coll, rest)
+	}
+	if p := splitKeyspace("my.bucket.inventory.airline"); len(p) != 3 || p[0] != "my.bucket" || p[2] != "airline" {
+		t.Errorf("keyspace: %q", p)
+	}
+	if (&redisBackend{}).CheckReadOnly("KEYS *") == nil {
+		t.Error("KEYS accepted")
+	}
 	w := &weaviateBackend{}
 	if w.CheckReadOnly("{ Get { Article { title } } }") != nil || w.CheckReadOnly("mutation { x }") == nil {
 		t.Error("weaviate read-only")
@@ -350,15 +363,15 @@ func TestCosmosFake(t *testing.T) {
 	}
 	defer db.Close()
 	groups, err := listObjects(context.Background(), EngineCosmosDB, db)
-	if err != nil || groups[0].Items[0] != "shop.orders" || groups[1].Items[0] != "shop.orders.bulk" {
+	if err != nil || groups[0].Items[0] != "shop/orders" || groups[1].Items[0] != "shop/orders/bulk" {
 		t.Fatalf("%v %v", groups, err)
 	}
-	q, _ := buildSelect(context.Background(), EngineCosmosDB, db, "shop.orders")
+	q, _ := buildSelect(context.Background(), EngineCosmosDB, db, "shop/orders")
 	cols, rows := collect(t, EngineCosmosDB, db, q)
 	if strings.Join(cols, ",") != "id,cust,_ts,total" || len(rows) != 2 || pages != 2 {
 		t.Errorf("%v %v pages=%d", cols, rows, pages)
 	}
-	if n, _ := countRows(context.Background(), EngineCosmosDB, db, "shop.orders"); n != 42 {
+	if n, _ := countRows(context.Background(), EngineCosmosDB, db, "shop/orders"); n != 42 {
 		t.Errorf("count %d", n)
 	}
 }

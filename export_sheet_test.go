@@ -17,3 +17,20 @@ func TestSheetName(t *testing.T) {
 		}
 	}
 }
+
+// Text that a spreadsheet would run as a formula is marked as text in CSV.
+func TestCSVText(t *testing.T) {
+	for in, want := range map[string]string{
+		`=HYPERLINK("http://x")`: `'=HYPERLINK("http://x")`,
+		"+cmd|' /c calc'!A1":     "'+cmd|' /c calc'!A1",
+		"@SUM(A1)":               "'@SUM(A1)",
+		"-12.5":                  "-12.5",
+		"-x":                     "'-x",
+		"plain":                  "plain",
+		"":                       "",
+	} {
+		if got := csvText(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}

@@ -98,9 +98,21 @@ func (b *couchbaseBackend) Version(ctx context.Context) string {
 	return "Couchbase " + v[0]
 }
 
+// splitKeyspace splits bucket.scope.collection from the right: a bucket's
+// name may hold dots, a scope's or collection's can't. Fewer than three
+// parts are a bucket (Couchbase 6).
+func splitKeyspace(name string) []string {
+	parts := strings.Split(name, ".")
+	if len(parts) < 3 {
+		return []string{name}
+	}
+	n := len(parts)
+	return []string{strings.Join(parts[:n-2], "."), parts[n-2], parts[n-1]}
+}
+
 // keyspaceExpr quotes bucket.scope.collection for SQL++.
 func keyspaceExpr(name string) string {
-	parts := strings.Split(name, ".")
+	parts := splitKeyspace(name)
 	for i, p := range parts {
 		parts[i] = "`" + strings.ReplaceAll(p, "`", "``") + "`"
 	}
@@ -157,7 +169,7 @@ func (b *couchbaseBackend) Count(ctx context.Context, name string) (int64, error
 func (b *couchbaseBackend) Definition(ctx context.Context, typ, name string) (string, error) {
 	if typ == ObjIndex {
 		idx, ks, _ := strings.Cut(name, " on ")
-		parts := strings.Split(ks, ".")
+		parts := splitKeyspace(ks)
 		where := "i.name = " + sqlppString(idx) + " AND i.keyspace_id = " + sqlppString(parts[len(parts)-1])
 		if len(parts) == 3 {
 			where += " AND i.bucket_id = " + sqlppString(parts[0]) + " AND i.scope_id = " + sqlppString(parts[1])
@@ -176,13 +188,13 @@ func (b *couchbaseBackend) Definition(ctx context.Context, typ, name string) (st
 		primary, _ := d.get("is_primary")
 		var stmt string
 		if primary == true {
-			stmt = fmt.Sprintf("CREATE PRIMARY INDEX `%s` ON %s", idx, keyspaceExpr(ks))
+			stmt = fmt.Sprintf("CREATE PRIMARY INDEX `%s` ON %s", strings.ReplaceAll(idx, "`", "``"), keyspaceExpr(ks))
 		} else {
 			var ks2 []string
 			for _, k := range toAnySlice(keys) {
 				ks2 = append(ks2, fmt.Sprint(k))
 			}
-			stmt = fmt.Sprintf("CREATE INDEX `%s` ON %s(%s)", idx, keyspaceExpr(ks), strings.Join(ks2, ", "))
+			stmt = fmt.Sprintf("CREATE INDEX `%s` ON %s(%s)", strings.ReplaceAll(idx, "`", "``"), keyspaceExpr(ks), strings.Join(ks2, ", "))
 			if cond != nil {
 				stmt += " WHERE " + fmt.Sprint(cond)
 			}

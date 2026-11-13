@@ -88,7 +88,7 @@ func writeExportFile(dir, name, ext string, write func(io.Writer) (int, error)) 
 // writeExportFileAt creates <base>.<ext> in dir, or <base>_2.<ext> and so on
 // when that exists.
 func writeExportFileAt(dir, base, ext string, write func(io.Writer) (int, error)) (path string, n int, err error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil { // exports hold data: only for this user
 		return "", 0, err
 	}
 	path = filepath.Join(dir, base+"."+ext)
@@ -101,7 +101,8 @@ func writeExportFileAt(dir, base, ext string, write func(io.Writer) (int, error)
 		return "", 0, err
 	}
 	defer os.Remove(tmp.Name()) // no-op once renamed
-	tmp.Chmod(0o644)            // CreateTemp uses 0600; exports are ordinary files
+	// CreateTemp makes it 0600: an export holds a database's data, readable
+	// only by the user cactusdb runs as.
 	n, err = write(tmp)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
@@ -133,13 +134,21 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 		bw.WriteString("\xEF\xBB\xBF") // BOM so Excel detects UTF-8
 		cw := csv.NewWriter(bw)
 		err := streamQuery(ctx, engine, db, q, func(cols []string) error {
-			return cw.Write(cols)
+			head := make([]string, len(cols))
+			for i, c := range cols {
+				head[i] = csvText(c)
+			}
+			return cw.Write(head)
 		}, func(row []any) (bool, error) {
 			n++
 			progress(n)
 			rec := make([]string, len(row))
 			for i, v := range row {
-				rec[i] = cellString(v)
+				if s, ok := v.(string); ok {
+					rec[i] = csvText(s)
+				} else {
+					rec[i] = cellString(v)
+				}
 			}
 			return true, cw.Write(rec)
 		})
@@ -313,6 +322,17 @@ func marshalJSON(v any) ([]byte, error) {
 		return nil, err
 	}
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}
+
+// csvText is a text value for CSV. Text that starts like a formula (= + -
+// @, a tab or a line break) gets a ' in front, the way Excel marks text: a
+// spreadsheet would otherwise run =HYPERLINK(…) or =cmd|… from the data.
+// Numbers stored as text (-12.5) are left as they are.
+func csvText(s string) string {
+	if s == "" || !strings.ContainsRune("=+-@\t\r", rune(s[0])) || plainNumber.MatchString(s) {
+		return s
+	}
+	return "'" + s
 }
 
 func cellString(v any) string {

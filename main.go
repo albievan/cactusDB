@@ -37,7 +37,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.58.1"
+var version = "1.59.0"
 
 //go:embed web
 var webFS embed.FS
@@ -55,6 +55,9 @@ type session struct {
 
 	lastUsed time.Time // the last request, for closing forgotten sessions; guarded by server.mu
 }
+
+// A session's other fields never change once it is in server.sessions: a
+// rename or delete of its saved connection puts a changed copy in its place.
 
 // kind is the database type the session was opened as (e.g. cockroachdb).
 func (ss *session) kind() string { return cmp.Or(ss.flavor, ss.engine) }
@@ -139,6 +142,13 @@ type server struct {
 }
 
 func main() {
+	if ok, err := releaseCommand(os.Args[1:]); ok { // build.sh's signing helpers
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "cactusdb:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	port := flag.Int("port", 8080, "HTTP port to serve the web UI on")
 	host := flag.String("host", "", "web UI: address to listen on (default 0.0.0.0: every network interface; 127.0.0.1 = this computer only)\ncommand-line export: database server host (default localhost)")
 	web := flag.String("web", "", "yes: start the web UI (the default when no --dbtype is given)")
@@ -443,7 +453,7 @@ func main() {
 			exportDir = dir
 		}
 	}
-	if err := os.MkdirAll(exportDir, 0o755); err != nil {
+	if err := os.MkdirAll(exportDir, 0o700); err != nil {
 		log.Fatalf("cannot create export folder %s: %v", exportDir, err)
 	}
 	if err := startUsageLog(store); err != nil {
@@ -1982,13 +1992,17 @@ func (s *server) handleSaveConn(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Open sessions of this connection follow a new name or password.
+	// A changed session is a new copy in the map, never changed in place:
+	// requests running with the old one read it without a lock.
 	s.mu.Lock()
-	for _, ss := range s.sessions {
+	for sid, ss := range s.sessions {
 		if ss.savedID == id {
-			ss.connBox, ss.label = box, c.Name
+			cp := *ss
+			cp.connBox, cp.label = box, c.Name
 			if folderMoved {
-				ss.folder = connFolderName(c.Name)
+				cp.folder = connFolderName(c.Name)
 			}
+			s.sessions[sid] = &cp
 		}
 	}
 	s.mu.Unlock()
@@ -2036,9 +2050,11 @@ func (s *server) handleDeleteConn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	for _, ss := range s.sessions {
+	for sid, ss := range s.sessions {
 		if ss.savedID == id {
-			ss.savedID, ss.connBox = 0, nil
+			cp := *ss // a copy: see handleSaveConn
+			cp.savedID, cp.connBox = 0, nil
+			s.sessions[sid] = &cp
 		}
 	}
 	s.mu.Unlock()

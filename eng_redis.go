@@ -240,7 +240,7 @@ func redisTTL(d time.Duration) string {
 var redisReadCommands = map[string]bool{
 	"GET": true, "MGET": true, "STRLEN": true, "GETRANGE": true, "SUBSTR": true, "LCS": true,
 	"EXISTS": true, "TYPE": true, "TTL": true, "PTTL": true, "EXPIRETIME": true, "PEXPIRETIME": true,
-	"KEYS": true, "SCAN": true, "DBSIZE": true, "INFO": true, "TIME": true, "PING": true, "ECHO": true, "RANDOMKEY": true,
+	"SCAN": true, "DBSIZE": true, "INFO": true, "TIME": true, "PING": true, "ECHO": true, "RANDOMKEY": true,
 	"HGET": true, "HMGET": true, "HGETALL": true, "HKEYS": true, "HVALS": true, "HLEN": true, "HEXISTS": true,
 	"HSCAN": true, "HSTRLEN": true, "HRANDFIELD": true, "HTTL": true,
 	"LRANGE": true, "LLEN": true, "LINDEX": true, "LPOS": true,
@@ -277,6 +277,9 @@ func (r *redisBackend) CheckReadOnly(q string) error {
 		return errors.New("the command is empty")
 	}
 	cmd := strings.ToUpper(args[0])
+	if cmd == "KEYS" { // reads, but stops a busy server until every key is listed
+		return errors.New("KEYS blocks the Redis server while it walks every key: use SCAN MATCH pattern instead")
+	}
 	if !redisReadCommands[cmd] {
 		return fmt.Errorf("%w (%s writes or isn't supported)", errRedisReadOnly, cmd)
 	}

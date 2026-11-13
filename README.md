@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.58.1
+cactusdb 1.59.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -246,7 +246,10 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
    saved in the connection's folder, in a subfolder for its type:
    `<export folder>/<connection name>/json|csv|xlsx|xml/` (see
    [Where exports go](#where-exports-go)). A bar shows the full path with a **Download** link.
-   **Clear** removes that bar again.
+   **Clear** removes that bar again. In **CSV**, text that starts like a spreadsheet formula
+   (`=`, `+`, `-`, `@`, a tab) gets a `'` in front, so Excel shows it instead of running it;
+   numbers such as `-12.5` stay as they are. Exported files and folders are readable only by
+   the user cactusdb runs as.
 
 **Saved connections** appear under **Connections** in the menu, and in the sidebar while
 you're not connected, grouped by the type of database (Firebird, MariaDB, SQL Server…, each
@@ -339,6 +342,14 @@ manager (systemd, launchd). On Windows it starts as a new process; in a console 
 keeps that window. If the new version can't be started, cactusdb puts the previous one back
 and starts that. The usage log records *install update* and *upgrade installed* (with the
 versions and the command).
+
+With a [superuser password](#superuser) set, **Install** asks for it: installing restarts
+cactusdb for everyone using it. Releases are **signed**: `build.sh` signs `dist/SHA256SUMS`
+with a private Ed25519 key kept outside the repository (in
+`~/.config/cactusdb/release-ed25519.key`, or `$CACTUSDB_RELEASE_KEY`), its public key is built
+into the binaries, and an update from GitHub is only installed when `dist/SHA256SUMS.sig`
+checks out with it. Keep a backup of that key: installed versions refuse updates signed with
+another one (install those with the command instead).
 
 When **the cactusdb server can't reach GitHub** but your browser can, your browser
 downloads the file and sends it to the server. As the server then runs a file it didn't
@@ -1037,10 +1048,10 @@ tables**, **DDL**, saved queries and table sizes work the same:
 | Database | Objects | Query |
 |----------|---------|-------|
 | MongoDB | Collections and views (`database.collection` when no database is set) | `db.orders.find({ status: "open" }, { _id: 0 }).sort({ total: -1 }).limit(10)`, `.aggregate([…])`, `.countDocuments({…})`, `.distinct("field")`, `.getIndexes()`. Values as in the MongoDB shell: `ObjectId("…")`, `ISODate("…")`, `/regex/i`… |
-| Azure Cosmos DB | Containers, their stored procedures, functions and triggers | Cosmos DB SQL. The container is named in a first line: `-- container: shop.orders`, then `SELECT * FROM c WHERE c.status = 'open'` |
+| Azure Cosmos DB | Containers, their stored procedures, functions and triggers | Cosmos DB SQL. The container is named in a first line: `-- container: shop/orders` (`shop.orders` also works when the names have no dots), then `SELECT * FROM c WHERE c.status = 'open'` |
 | Couchbase | Collections (`bucket.scope.collection`) and indexes | SQL++ (N1QL): `SELECT META(c).id AS _id, c.* FROM `travel`.`inventory`.`airline` AS c` |
 | Apache Cassandra | Tables, materialized views, user types, functions, indexes (`keyspace.name`) | CQL `SELECT` |
-| Redis | Key groups by prefix (`user:*`, and `*` for every key) | `SCAN MATCH user:*` lists every matching key with its type, time to live and value; other read commands as typed: `GET`, `HGETALL`, `LRANGE`, `ZRANGE`, `XRANGE`, `INFO`… |
+| Redis | Key groups by prefix (`user:*`, and `*` for every key) | `SCAN MATCH user:*` lists every matching key with its type, time to live and value; other read commands as typed: `GET`, `HGETALL`, `LRANGE`, `ZRANGE`, `XRANGE`, `INFO`… (not `KEYS`, which stops the server while it walks every key: use `SCAN MATCH`). The listing shows the first 1,000 fields of a hash and 64 kB of a string. |
 | Neo4j | Node labels `(:Person)`, relationship types `[:KNOWS]`, indexes, constraints | Cypher: `MATCH (n:Person) RETURN n LIMIT 100`. Nodes and relationships are shown with one column per property. |
 | Weaviate | Collections | GraphQL `{ Get { Article { title _additional { id } } } }`; a `Get` without arguments pages through every object, so exports have them all. |
 | Microsoft Access | Tables, saved queries (their SQL), linked tables | `SELECT [TOP n] * \| columns FROM table [WHERE column = value AND …] [ORDER BY column [DESC]]`, with `=`, `<>`, `<`, `>`, `LIKE 'A*'`, `IS [NOT] NULL` and `#2024-01-31#` dates |
@@ -1781,9 +1792,11 @@ is sent and how to set it up. In short:
   from `dist/` of this repository on GitHub (over HTTPS), checks it against
   `dist/SHA256SUMS` (no checksum, no install) and runs it with `--version` before using it;
   `setup.sh` and `setup.ps1` check the checksum too; it must be newer than the
-  running version. Like Shutdown it only accepts a JSON request, so other websites can't
-  start it. A file sent from the browser (for a server without internet access) needs the
-  superuser password. `startup_options` holds the names of `CACTUSDB_…` variables, never
+  running version. `SHA256SUMS` must carry the release signature (see *Updating*), so a
+  change pushed to the repository by anyone without the release key isn't installed. Like
+  Shutdown it only accepts a JSON request, so other websites can't start it. With a
+  superuser password set it needs that password, as does a file sent from the browser (for
+  a server without internet access). `startup_options` holds the names of `CACTUSDB_…` variables, never
   their values.
 - **Deploying database containers** (☰ → DB container deployment) runs `docker` or
   `kubectl` on the cactusdb server, so deploying, starting, stopping, restarting, deleting,

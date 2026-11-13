@@ -18,7 +18,7 @@ func TestClassifyType(t *testing.T) {
 		{EngineFirebird, "BLOB SUB_TYPE BINARY", kBlob, 0, 0, 0},
 		{EngineFirebird, "FLOAT", kFloat32, 0, 0, 0},
 		{EngineFirebird, "TIMESTAMP WITH TIME ZONE", kTimestampTZ, 0, 0, 0},
-		{EngineMySQL, "tinyint(1)", kBool, 0, 0, 0},
+		{EngineMySQL, "tinyint(1)", kInt16, 0, 0, 0}, // not BOOLEAN: it holds -128..127
 		{EngineMySQL, "int(10) unsigned", kInt64, 0, 0, 0},
 		{EngineMySQL, "bigint(20) unsigned", kDecimal, 0, 20, 0},
 		{EngineMySQL, "enum('a','bb')", kVarchar, 0, 0, 0},
@@ -242,5 +242,23 @@ func TestParserEndsDontPanic(t *testing.T) {
 			}()
 			anyArrayPass(lexSQL(src, EnginePostgres))
 		}()
+	}
+}
+
+// Values whose plain copy lost data: money as text, bit strings as bytes.
+func TestMigrateValueEdges(t *testing.T) {
+	for in, want := range map[string]string{"$1,234.56": "1234.56", "-$5.00": "-5.00", "($5.00)": "-5.00", "1.234,56 €": "1234.56", "$1,234": "1234", "$0.07": "0.07"} {
+		if got := moneyNumber(in); got != want {
+			t.Errorf("money %q: %q, want %q", in, got, want)
+		}
+	}
+	if b, ok := bitString("101000001", "BIT(9)"); !ok || len(b) != 2 || b[0] != 0xA0 || b[1] != 0x80 {
+		t.Errorf("bits: %x %v", b, ok)
+	}
+	if k, _, _, _ := classifyType(EngineMySQL, "tinyint(1)"); k != kInt16 {
+		t.Errorf("tinyint(1) = %s", k)
+	}
+	if k, _, _, _ := classifyType(EngineMySQL, "geometry"); k != kBlob {
+		t.Errorf("geometry = %s", k)
 	}
 }

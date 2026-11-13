@@ -207,7 +207,7 @@ func checkExportDir(in, defaultDir string) (dir, saved string, err error) {
 			saved = dir
 		}
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", "", fmt.Errorf("cannot create %s: %w", dir, err)
 	}
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {

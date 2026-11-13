@@ -925,5 +925,11 @@ func postgresTableDDL(ctx context.Context, db *sql.DB, table string, fks bool) (
 	for _, c := range cons {
 		lines = append(lines, "  "+c)
 	}
-	return "CREATE TABLE " + quoteObject(EnginePostgres, table) + " (\n" + strings.Join(lines, ",\n") + "\n);\n", nil
+	kind := "TABLE"
+	var persistence string
+	if db.QueryRowContext(ctx, `SELECT c.relpersistence::text FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname || '.' || c.relname = $1`, table).Scan(&persistence) == nil && persistence == "u" {
+		kind = "UNLOGGED TABLE" // its rows aren't written to the WAL: a crash empties it
+	}
+	return "CREATE " + kind + " " + quoteObject(EnginePostgres, table) + " (\n" + strings.Join(lines, ",\n") + "\n);\n", nil
 }

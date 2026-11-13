@@ -7091,7 +7091,18 @@ $("upInstallBtn").addEventListener("click", async () => {
     if (u.via) await installFromBrowser(u);
     else {
       upgMsg("Starting…");
-      await api("POST", "/api/upgrade", {});
+      // With a superuser password set, installing takes it (it restarts cactusdb for everyone).
+      let started = false;
+      if (!updateInfo.superuserSet || superPw) {
+        try { await api("POST", "/api/upgrade", { superPassword: superPw || "" }); started = true; }
+        catch (e) { if (!(e.data && e.data.needSuper)) throw e; }
+      }
+      if (!started) {
+        const ok = await askPassword({ title: "Install the new version", superOnly: true, ok: "Install",
+          text: "Installing restarts cactusdb for everyone using it, so it needs the superuser password.",
+          check: async (a) => { await api("POST", "/api/upgrade", { superPassword: a.superPassword }); } });
+        if (!ok) { upg.busy = false; $("upInstallBtn").disabled = false; upgBar(null); upgMsg("Not installed."); return; }
+      }
       await pollUpgrade();
     }
   } catch (e) {

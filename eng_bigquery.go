@@ -559,6 +559,7 @@ func (b *bigqueryBackend) Query(ctx context.Context, q string) (resultSet, error
 	r := &bqRows{b: b, ctx: ctx, res: res}
 	for !r.res.JobComplete {
 		if err := r.fetch(); err != nil {
+			r.cancelJob() // given up (cancelled, timed out): the job would run on, and be billed
 			return nil, err
 		}
 	}
@@ -585,6 +586,21 @@ type bqRows struct {
 	res   bqResults
 	cols  []string
 	types []string
+}
+
+// cancelJob asks BigQuery to stop the query job.
+func (r *bqRows) cancelJob() {
+	id := r.res.JobReference.JobID
+	if id == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	path := r.b.projectPath() + "/jobs/" + url.PathEscape(id) + "/cancel"
+	if loc := r.res.JobReference.Location; loc != "" {
+		path += "?location=" + url.QueryEscape(loc)
+	}
+	r.b.do(ctx, "POST", path, nil, nil)
 }
 
 // fetch reads the next page of results (or waits for the job).
