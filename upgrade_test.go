@@ -70,7 +70,7 @@ func TestSumFor(t *testing.T) {
 	}
 }
 
-// fakeRelease serves VERSION, dist/<binary> and dist/SHA256SUMS like GitHub,
+// fakeRelease serves VERSION, and <binary> and SHA256SUMS of the release, like GitHub,
 // with a shell script standing in for the new cactusdb.
 func fakeRelease(t *testing.T, newVersion string, badSum bool) {
 	t.Helper()
@@ -87,18 +87,18 @@ func fakeRelease(t *testing.T, newVersion string, badSum bool) {
 		switch r.URL.Path {
 		case "/VERSION":
 			fmt.Fprintln(w, newVersion)
-		case "/dist/" + binaryName():
+		case "/download/v" + newVersion + "/" + binaryName():
 			w.Write(bin)
-		case "/dist/SHA256SUMS":
+		case "/download/v" + newVersion + "/SHA256SUMS":
 			fmt.Fprintf(w, "%s  %s\n", sumHex, binaryName())
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	t.Cleanup(ts.Close)
-	oldL, oldD := latestURL, distURL
-	latestURL, distURL = ts.URL+"/VERSION", ts.URL+"/dist/"
-	t.Cleanup(func() { latestURL, distURL = oldL, oldD; lastUpdate = updateCheck{} })
+	oldL, oldR := latestURL, releaseURL
+	latestURL, releaseURL = ts.URL+"/VERSION", ts.URL+"/download/"
+	t.Cleanup(func() { latestURL, releaseURL = oldL, oldR; lastUpdate = updateCheck{} })
 }
 
 // fakeExe is the "running program" an upgrade replaces.

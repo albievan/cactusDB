@@ -16,8 +16,9 @@ import (
 )
 
 // Checking for a newer cactusdb: the VERSION file on the main branch on
-// GitHub names the version of the binaries in dist/. The web UI shows it with
-// the command to download the binary for each system.
+// GitHub names the latest version, whose binaries are in its GitHub release
+// (tag v<version>). The web UI shows it with the command to download the
+// binary for each system.
 
 const (
 	repoURL         = "https://github.com/albievan/cactusDB"
@@ -27,6 +28,14 @@ const (
 )
 
 var latestURL = rawURL + "VERSION" // a variable so tests can serve it
+
+// releaseURL is where GitHub serves the files of releases (a variable so
+// tests can serve it).
+var releaseURL = repoURL + "/releases/download/"
+
+// releaseDir is where the binaries, SHA256SUMS and SHA256SUMS.sig of
+// version v are.
+func releaseDir(v string) string { return releaseURL + "v" + v + "/" }
 
 var versionRe = regexp.MustCompile(`^\d+(\.\d+)*$`)
 
@@ -109,7 +118,8 @@ func updateJSON(latest string, err error) map[string]any {
 	out := map[string]any{
 		"current": version, "os": runtime.GOOS, "arch": runtime.GOARCH,
 		"latest": latest, "newer": err == nil && newerVersion(latest, version),
-		"repo": repoURL, "raw": rawURL, "dist": repoURL + "/raw/main/dist/", "latestUrl": latestURL, "distRaw": distURL,
+		"repo": repoURL, "raw": rawURL, "dist": repoURL + "/releases/latest/download/", "latestUrl": latestURL,
+		"releases": releaseURL, "sums": rawURL + "release/",
 		"changelog": repoURL + "/blob/main/CHANGELOG.md",
 	}
 	if err != nil {

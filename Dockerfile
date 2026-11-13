@@ -6,7 +6,7 @@
 #
 #   mkdir -p ctx/rootfs-amd64/opt/cactusdb/conn ctx/rootfs-amd64/opt/cactusdb/export
 #   chmod 1777 ctx/rootfs-amd64/opt/cactusdb/conn ctx/rootfs-amd64/opt/cactusdb/export
-#   cp dist/cactusdb-linux-amd64 ctx/rootfs-amd64/opt/cactusdb/cactusdb && cp Dockerfile ctx/
+#   cp release/cactusdb-linux-amd64 ctx/rootfs-amd64/opt/cactusdb/cactusdb && cp Dockerfile ctx/
 #   docker build --platform linux/amd64 -t cactusdb ctx
 #
 # The alpine base brings the CA certificates (TLS database connections) and

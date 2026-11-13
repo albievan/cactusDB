@@ -7,12 +7,19 @@
 #
 # The folder to install into is the first argument, or $CACTUSDB_DIR, or the
 # current folder. cactusdb keeps its saved connections and exports next to
-# itself, so give it a folder of its own. $CACTUSDB_REF picks the branch or
-# tag to download from (default main). Running it again updates cactusdb.
+# itself, so give it a folder of its own. $CACTUSDB_VERSION picks the
+# version, e.g. 1.61.0 (default: the latest release). Running it again
+# updates cactusdb.
 set -eu
 
 repo=albievan/cactusDB
-ref=${CACTUSDB_REF:-main}
+ver=${CACTUSDB_VERSION:-}
+ver=${ver#v}
+case $ver in
+  '') base=https://github.com/$repo/releases/latest/download ; ref=latest ;;
+  *[!0-9.]*) echo "setup: CACTUSDB_VERSION=$ver isn't a version like 1.61.0" >&2; exit 1 ;;
+  *) base=https://github.com/$repo/releases/download/v$ver ; ref=$ver ;;
+esac
 dir=${1:-${CACTUSDB_DIR:-.}}
 
 fail() { echo "setup: $*" >&2; exit 1; }
@@ -34,7 +41,7 @@ if [ "$os" = darwin ] && [ "$arch" = amd64 ] && [ "$(sysctl -n hw.optional.arm64
 fi
 
 file=cactusdb-$os-$arch
-url=https://github.com/$repo/raw/$ref/dist/$file
+url=$base/$file
 mkdir -p "$dir"
 dir=$(cd "$dir" && pwd)
 dest=$dir/cactusdb
@@ -50,28 +57,28 @@ else
   fail "curl or wget is needed to download cactusdb"
 fi
 # Check it against the published checksums before running it, and the
-# checksums against the release signature (dist/SHA256SUMS.sig, made with the
+# checksums against the release signature (SHA256SUMS.sig, made with the
 # cactusdb release key: its public key is below).
 fetch() {
-  curl -fsSL -o "$2" "https://github.com/$repo/raw/$ref/dist/$1" 2>/dev/null ||
-    wget -qO "$2" "https://github.com/$repo/raw/$ref/dist/$1" 2>/dev/null
+  curl -fsSL -o "$2" "$base/$1" 2>/dev/null ||
+    wget -qO "$2" "$base/$1" 2>/dev/null
 }
-fetch SHA256SUMS "$tmp.sums" || fail "can't download dist/SHA256SUMS to check the file"
+fetch SHA256SUMS "$tmp.sums" || fail "can't download SHA256SUMS to check the file"
 if fetch SHA256SUMS.sig "$tmp.sig"; then
   if command -v openssl >/dev/null 2>&1 && openssl version 2>/dev/null | grep -q '^OpenSSL [3-9]'; then
     printf '%s\n' '-----BEGIN PUBLIC KEY-----' 'MCowBQYDK2VwAyEAGDkn+i/onn7P5N3QN3Rb3EyJFH5FU5kLF40AR36lcn8=' '-----END PUBLIC KEY-----' > "$tmp.pem"
     (base64 -d < "$tmp.sig" || base64 -D < "$tmp.sig") > "$tmp.sigbin" 2>/dev/null
     openssl pkeyutl -verify -pubin -inkey "$tmp.pem" -rawin -in "$tmp.sums" -sigfile "$tmp.sigbin" >/dev/null 2>&1 ||
-      fail "dist/SHA256SUMS isn't signed with the cactusdb release key: not installed"
+      fail "SHA256SUMS isn't signed with the cactusdb release key: not installed"
     echo "release signature checked"
   else
     echo "note: the release signature isn't checked here (that needs OpenSSL 3); the checksum is"
   fi
 elif [ "${CACTUSDB_REQUIRE_SIGNATURE:-}" = yes ]; then
-  fail "dist/SHA256SUMS.sig is missing ($ref): not installed"
+  fail "SHA256SUMS.sig is missing ($ref): not installed"
 fi
 want=$(awk -v f="$file" '$2 == f || $2 == "*" f { print $1 }' "$tmp.sums")
-[ -n "$want" ] || fail "dist/SHA256SUMS has no checksum for $file"
+[ -n "$want" ] || fail "SHA256SUMS has no checksum for $file"
 if command -v sha256sum >/dev/null 2>&1; then got=$(sha256sum "$tmp" | awk '{print $1}')
 else got=$(shasum -a 256 "$tmp" | awk '{print $1}'); fi
 [ "$got" = "$want" ] || fail "the download of $file is damaged: its SHA-256 isn't the one in SHA256SUMS"

@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.61.0 — 2026-11-13
+
+- **Binaries are published as GitHub releases** (tag `v<version>`) instead of being committed
+  to the repository, which had grown by about 310 MB with every version. *Install and
+  restart* downloads from the new version's release and checks its signed `SHA256SUMS`;
+  `setup.sh` and `setup.ps1` install the latest release, or the one in `CACTUSDB_VERSION`
+  (replacing `CACTUSDB_REF`). The download links in the README and in *Check for update* point
+  at the latest release.
+- **cactusdb 1.60.0 and older** update from `dist/`, which keeps version 1.61.0 for them:
+  they move to 1.61.0, and update from GitHub releases from then on.
+- **A server without internet access:** GitHub doesn't let a page download a release file
+  itself, so *Install and restart* links to the file and asks you to choose it once
+  downloaded; it is then sent to the server as before, with its checksum read from
+  `release/SHA256SUMS`.
+- `build.sh` builds into `release/` (only `SHA256SUMS` and its signature are committed);
+  `release.sh` publishes `v<version>` before `main` is pushed, so a running cactusdb never sees
+  a version whose files aren't there yet. `deploy.sh` and `deploy-container.sh` take the Linux
+  binary from `release/`.
+- A GitHub Actions workflow installs every published release with `setup.sh` on Linux and
+  macOS and `setup.ps1` on Windows (PowerShell 5.1 and 7), and fails unless the release
+  signature was checked.
+- Checked on real databases: the column types in *DB Relationships* on PostgreSQL,
+  MariaDB/MySQL and Firebird; the exported PDF in Chrome's viewer (PDFium, as in Edge) and in
+  pdf.js (as in Firefox).
+
 ## 1.60.0 — 2026-11-13
 
 - **DB Relationships:** an expanded table lists each column's **type** next to its name

@@ -60,22 +60,23 @@ irm https://raw.githubusercontent.com/albievan/cactusDB/main/setup.ps1 | iex
 
 - **Another folder:** pass it to the script (`… | sh -s -- /opt/cactusdb`, or
   `.\setup.ps1 C:\cactusdb`) or set `CACTUSDB_DIR`.
-- **Another branch or tag:** set `CACTUSDB_REF` (the default is `main`).
+- **Another version:** set `CACTUSDB_VERSION`, e.g. `CACTUSDB_VERSION=1.61.0` (the default is
+  the latest release).
 - **Updating:** run the script again. It replaces `cactusdb` in place. A cactusdb that is
   running keeps running, and the new version is used from its next start.
 - **macOS:** the script also clears the download quarantine, so you can skip the `xattr`
   step below.
 
-Or pick the file for your computer from the [`dist/`](dist) folder yourself:
+Or pick the file for your computer from the [latest release](https://github.com/albievan/cactusDB/releases/latest) yourself:
 
 | Your computer | Download |
 |---------------|----------|
-| Windows (most PCs) | [cactusdb-windows-amd64.exe](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-windows-amd64.exe) |
-| Windows on ARM (e.g. Surface Pro X, Snapdragon laptops) | [cactusdb-windows-arm64.exe](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-windows-arm64.exe) |
-| Mac with Apple Silicon (M1/M2/M3/M4…) | [cactusdb-darwin-arm64](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-darwin-arm64) |
-| Mac with Intel processor | [cactusdb-darwin-amd64](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-darwin-amd64) |
-| Linux (most PCs and servers) | [cactusdb-linux-amd64](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-linux-amd64) |
-| Linux on ARM (e.g. Raspberry Pi 4/5 64-bit, AWS Graviton) | [cactusdb-linux-arm64](https://github.com/albievan/cactusDB/raw/main/dist/cactusdb-linux-arm64) |
+| Windows (most PCs) | [cactusdb-windows-amd64.exe](https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-windows-amd64.exe) |
+| Windows on ARM (e.g. Surface Pro X, Snapdragon laptops) | [cactusdb-windows-arm64.exe](https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-windows-arm64.exe) |
+| Mac with Apple Silicon (M1/M2/M3/M4…) | [cactusdb-darwin-arm64](https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-darwin-arm64) |
+| Mac with Intel processor | [cactusdb-darwin-amd64](https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-darwin-amd64) |
+| Linux (most PCs and servers) | [cactusdb-linux-amd64](https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-linux-amd64) |
+| Linux on ARM (e.g. Raspberry Pi 4/5 64-bit, AWS Graviton) | [cactusdb-linux-arm64](https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-linux-arm64) |
 
 Put it in its own folder, e.g. `C:\cactusdb\` or `~/cactusdb/`. cactusdb keeps its saved
 connections and exports next to itself (see [Files cactusdb creates](#6-files-cactusdb-creates)).
@@ -301,9 +302,9 @@ cactusdb server has no internet access, your browser reads it instead.
 has **Install *x.y.z* and restart** (click it twice: the second click confirms). It shows
 what will happen first: which file is replaced and the command cactusdb restarts with.
 
-1. The cactusdb server downloads the binary for its own system from `dist/` on GitHub (the
-   bar shows the progress).
-2. It checks the file against [`dist/SHA256SUMS`](dist/SHA256SUMS), and runs it with
+1. The cactusdb server downloads the binary for its own system from the new version's
+   [GitHub release](https://github.com/albievan/cactusDB/releases) (the bar shows the progress).
+2. It checks the file against that release's `SHA256SUMS`, and runs it with
    `--version`: it must start on this computer and be a newer cactusdb.
 3. It puts it in place of the running program. The version you had is kept next to it as
    `cactusdb.old` (`cactusdb.old.exe` on Windows); to go back, stop cactusdb and rename it.
@@ -344,15 +345,18 @@ and starts that. The usage log records *install update* and *upgrade installed* 
 versions and the command).
 
 With a [superuser password](#superuser) set, **Install** asks for it: installing restarts
-cactusdb for everyone using it. Releases are **signed**: `build.sh` signs `dist/SHA256SUMS`
+cactusdb for everyone using it. Releases are **signed**: `build.sh` signs `release/SHA256SUMS`
 with a private Ed25519 key kept outside the repository (in
 `~/.config/cactusdb/release-ed25519.key`, or `$CACTUSDB_RELEASE_KEY`), its public key is built
-into the binaries, and an update from GitHub is only installed when `dist/SHA256SUMS.sig`
-checks out with it. Keep a backup of that key: installed versions refuse updates signed with
-another one (install those with the command instead).
+into the binaries, and an update from GitHub is only installed when `SHA256SUMS.sig`
+checks out with it. **Keep a backup of that key** (a password manager, or an encrypted
+drive): installed versions refuse updates signed with another one (install those with the
+command instead).
 
-When **the cactusdb server can't reach GitHub** but your browser can, your browser
-downloads the file and sends it to the server. As the server then runs a file it didn't
+When **the cactusdb server can't reach GitHub** but your browser can, you download the file
+in your browser (the dialog links to it; GitHub doesn't let a page download it itself) and
+choose it, and it is sent to the server. Its checksum is read from
+[`release/SHA256SUMS`](release/SHA256SUMS) on GitHub. As the server then runs a file it didn't
 download itself, this asks for the [superuser password](#superuser) (wrong guesses are slowed
 down like everywhere else); without a superuser, use the commands instead.
 
@@ -1545,7 +1549,7 @@ folders are then on the server, `/srv/cactusdb` by default:
 ```
 
 `deploy-container.sh` builds a small Docker (or Podman) image from the Linux binary in
-`dist/` and runs cactusdb in it, listening on every address. The port is published on the
+`release/` (made by `./build.sh`) and runs cactusdb in it, listening on every address. The port is published on the
 host, and the export folder and the saved-connections folder are stored on the host, so
 they survive upgrades and re-creating the container.
 
@@ -1574,7 +1578,7 @@ cactusdb 1.31.0 is running in container cactusdb
 | `--tz` | `$TZ` | Time zone for log and file-name times, e.g. `Europe/Amsterdam` |
 | `--name`, `--image` | `cactusdb` | Container and image name |
 | `--runtime` | docker, else podman | Container engine to use |
-| `--from-source` | | Compile the binary with Go first instead of using `dist/` |
+| `--from-source` | | Compile the binary with Go first instead of using `release/` |
 | `--remote` | | `user@server`: deploy to Docker CE on that Linux server over SSH (via `deploy.sh --docker ce`) |
 | `--install-docker` | | With `--remote`: install Docker CE on the server first if it's missing |
 
@@ -1795,8 +1799,8 @@ is sent and how to set it up. In short:
   all, however many are sent at once. A sign-in with an unknown user name doesn't log the
   name (it is often a password typed in the wrong box).
 - **Installing an update from the web UI** only ever downloads the file for this system
-  from `dist/` of this repository on GitHub (over HTTPS), checks it against
-  `dist/SHA256SUMS` (no checksum, no install) and runs it with `--version` before using it;
+  from the GitHub release of this repository (over HTTPS), checks it against the
+  release's `SHA256SUMS` (no checksum, no install) and runs it with `--version` before using it;
   `setup.sh` and `setup.ps1` check the checksum too, and the release signature where OpenSSL 3 is installed (they say when they can't); it must be newer than the
   running version. `SHA256SUMS` must carry the release signature (see *Updating*), so a
   change pushed to the repository by anyone without the release key isn't installed. Like
@@ -1902,7 +1906,8 @@ cactusdb is written in Go and uses pure-Go drivers, so no CGO or C compiler is n
 
 ```sh
 go build -o cactusdb .   # build for this computer
-./build.sh               # build all six binaries into dist/, as the version in VERSION
+./build.sh               # build all six binaries into release/, as the version in VERSION
+./release.sh             # publish them as the GitHub release v<VERSION> (before pushing main)
 go test ./...            # unit tests
 ```
 
@@ -1979,8 +1984,11 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `usage.go` | The usage log: every function used, in the `usage_events` table of `cactus.conn.db` |
 | `logs.go`, `logrotate.go` | The Logs tab (live, any day, crash log, .zip of every log); a new log file every day |
 | `termlog.go` | Logging to the terminal without ever holding up a request |
-| `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the version of the binaries in `dist/` |
-| `upgrade.go`, `dist/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written by `build.sh`) |
+| `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the latest release |
+| `upgrade.go`, `release/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written and signed by `build.sh`; the binaries themselves are in the GitHub release, not in git) |
+| `build.sh`, `release.sh` | Build and sign the six binaries into `release/`; publish them as the GitHub release `v<VERSION>` |
+| `dist/` | Version 1.61.0, kept for cactusdb 1.60.0 and older, which update from there: they move to 1.61.0, which updates from GitHub releases. Not updated any more |
+| `.github/workflows/setup-scripts.yml` | Installs each published release with `setup.sh` (Linux, macOS) and `setup.ps1` (Windows PowerShell 5.1 and 7), with the signature checked |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 | `web/vendor/` | [Bootstrap 5.3.8](https://getbootstrap.com/) (its CSS and JavaScript bundle) and [Bootstrap Icons 1.13.2](https://icons.getbootstrap.com/), embedded too: the page loads nothing from the internet |

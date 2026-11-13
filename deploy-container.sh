@@ -65,7 +65,7 @@ Options:
   --install-docker   with --remote (or on this Linux machine with --remote
                      localhost): install Docker CE first if it's missing
                      (Docker's get.docker.com script; needs sudo)
-  --from-source      compile the binary with Go first instead of using dist/
+  --from-source      compile the binary with Go first instead of using release/
   -h, --help         show this help
 
 Environment:
@@ -193,7 +193,7 @@ esac
 CTX=$(mktemp -d)
 trap 'rm -rf "$CTX"' EXIT
 # The context holds only the Dockerfile and rootfs-<arch>/opt/cactusdb with
-# the binary and the empty conn/ and export/ folders: nothing else from dist/
+# the binary and the empty conn/ and export/ folders: nothing else from release/
 # (such as a cactus.conn.db or cactus.key) can end up in the image.
 ROOT=$CTX/rootfs-$ARCH/opt/cactusdb
 mkdir -p "$ROOT/conn" "$ROOT/export"
@@ -205,7 +205,7 @@ if [[ $FROM_SOURCE == yes ]]; then
   (cd "$SCRIPT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -trimpath \
     -ldflags "-s -w -X main.version=$VERSION" -o "$ROOT/cactusdb" .)
 else
-  BIN=$SCRIPT_DIR/dist/cactusdb-linux-$ARCH
+  BIN=$SCRIPT_DIR/release/cactusdb-linux-$ARCH
   [[ -f $BIN ]] || die "$BIN not found: run ./build.sh first, or use --from-source"
   cp "$BIN" "$ROOT/cactusdb"
 fi

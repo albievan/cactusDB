@@ -23,8 +23,8 @@ import (
 )
 
 // Installing a newer cactusdb from the web UI (☰ → Check for update →
-// Install). The server downloads the binary for its own system from dist/ on
-// GitHub, checks it against dist/SHA256SUMS and by running it with
+// Install). The server downloads the binary for its own system from the GitHub
+// release of the new version, checks it against that release's SHA256SUMS and by running it with
 // --version, puts it in place of the running program (which is kept as
 // <program>.old), stops like Shutdown does, and starts the new version with
 // the options the running one was started with.
@@ -168,14 +168,12 @@ func restartArgs(o startupOptions, inBackground bool) []string {
 
 // ---- download and install ---------------------------------------------------
 
-var distURL = rawURL + "dist/" // a variable so tests can serve it
-
 const (
 	maxBinarySize   = 256 << 20
 	downloadTimeout = 10 * time.Minute
 )
 
-// binaryName is the file in dist/ for this system.
+// binaryName is the file of a release for this system.
 func binaryName() string {
 	n := "cactusdb-" + runtime.GOOS + "-" + runtime.GOARCH
 	if runtime.GOOS == "windows" {
@@ -247,7 +245,6 @@ func installable() (exe string, err error) {
 	return exe, nil
 }
 
-// downloadBinary fetches name from dist/ into dst, reporting progress.
 // createFresh creates path as a new executable file. What is there (an old
 // download, or a link someone put there) is removed, never written through.
 func createFresh(path string) (*os.File, error) {
@@ -255,19 +252,21 @@ func createFresh(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
 }
 
-func downloadBinary(ctx context.Context, name, dst string, progress func(done, total int64)) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", distURL+name, nil)
+// downloadBinary fetches name from the release folder dir into dst,
+// reporting progress.
+func downloadBinary(ctx context.Context, dir, name, dst string, progress func(done, total int64)) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", dir+name, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("User-Agent", "cactusdb/"+version)
 	resp, err := (&http.Client{Timeout: downloadTimeout}).Do(req)
 	if err != nil {
-		return fmt.Errorf("cannot download %s: %w", distURL+name, err)
+		return fmt.Errorf("cannot download %s: %w", dir+name, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("GitHub answered %s for %s", resp.Status, distURL+name)
+		return fmt.Errorf("GitHub answered %s for %s", resp.Status, dir+name)
 	}
 	progress(0, resp.ContentLength)
 	f, err := createFresh(dst)
@@ -308,17 +307,18 @@ func (p *progressReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// expectedSum looks name up in dist/SHA256SUMS, after checking the file's
-// signature (SHA256SUMS.sig) with the release key built into cactusdb.
-func expectedSum(ctx context.Context, name string) (string, error) {
+// expectedSum looks name up in the SHA256SUMS of the release folder dir,
+// after checking the file's signature (SHA256SUMS.sig) with the release key
+// built into cactusdb.
+func expectedSum(ctx context.Context, dir, name string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	sums, err := fetchDist(ctx, "SHA256SUMS")
+	sums, err := fetchDist(ctx, dir, "SHA256SUMS")
 	if err != nil {
 		return "", err
 	}
 	if releaseKey != "" {
-		sig, err := fetchDist(ctx, "SHA256SUMS.sig")
+		sig, err := fetchDist(ctx, dir, "SHA256SUMS.sig")
 		if err != nil {
 			return "", fmt.Errorf("the update isn't signed: %w", err)
 		}
@@ -329,10 +329,10 @@ func expectedSum(ctx context.Context, name string) (string, error) {
 	return sumFor(string(sums), name)
 }
 
-// fetchDist downloads a small file of dist/ on GitHub. A release always has
-// SHA256SUMS (and its signature): a missing one is an error.
-func fetchDist(ctx context.Context, name string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", distURL+name, nil)
+// fetchDist downloads a small file of the release folder dir on GitHub. A
+// release always has SHA256SUMS (and its signature): a missing one is an error.
+func fetchDist(ctx context.Context, dir, name string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", dir+name, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func fetchDist(ctx context.Context, name string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GitHub answered %s for %s", resp.Status, distURL+name)
+		return nil, fmt.Errorf("GitHub answered %s for %s", resp.Status, dir+name)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 }
@@ -522,8 +522,8 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	j.set(func(j *upgradeJob) { j.Command = opts.Command })
-	logAction(r, "upgrade to cactusdb %s started: downloading %s", latest, distURL+binaryName())
-	s.event(r, "server", false, "upgrade to cactusdb %s started: downloading %s", latest, distURL+binaryName())
+	logAction(r, "upgrade to cactusdb %s started: downloading %s", latest, releaseDir(latest)+binaryName())
+	s.event(r, "server", false, "upgrade to cactusdb %s started: downloading %s", latest, releaseDir(latest)+binaryName())
 	s.notify(r, "upgrade", 0, "started updating cactusdb from %s to %s: it restarts once installed, and this page reloads", version, latest)
 	go s.runUpgrade(j, exe, opts, latest, nil)
 	writeJSON(w, 200, j.snapshot())
@@ -632,11 +632,12 @@ func (s *server) runUpgrade(j *upgradeJob, exe string, opts startupOptions, late
 	if fetch == nil {
 		fetch = func(ctx context.Context, progress func(int64, int64)) (string, error) {
 			tmp := exe + ".download"
-			want, err := expectedSum(ctx, binaryName())
+			dir := releaseDir(latest)
+			want, err := expectedSum(ctx, dir, binaryName())
 			if err != nil {
 				return "", err
 			}
-			if err := downloadBinary(ctx, binaryName(), tmp, progress); err != nil {
+			if err := downloadBinary(ctx, dir, binaryName(), tmp, progress); err != nil {
 				os.Remove(tmp)
 				return "", err
 			}

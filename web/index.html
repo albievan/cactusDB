@@ -693,6 +693,9 @@
   .upinstall .bar { flex: 1 1 160px; --bs-progress-height: 7px; --bs-progress-border-radius: 4px; }
   .upinstall .upmsg { font-size: 12px; color: var(--muted); }
   .upinstall .upmsg.bad { color: var(--danger); }
+  .upinstall .uppick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; font-size: 13px; }
+  .upinstall .uppick label { display: flex; align-items: center; gap: 8px; margin: 0; }
+  .upinstall .uppick input { width: auto; max-width: 100%; }
   .updot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 1px; }
   .updot[hidden] { display: none; }
   .spinner-border-sm { --bs-spinner-width: 11px; --bs-spinner-height: 11px; --bs-spinner-border-width: 2px; color: var(--accent); vertical-align: -1px; }
@@ -2013,6 +2016,11 @@
         <button type="button" class="btn btn-primary" id="upInstallBtn" data-primary="1">Install and restart</button>
         <span class="progress bar" id="upBarWrap" hidden><span class="progress-bar" id="upBar"></span></span>
         <span class="upmsg" id="upMsg" role="status"></span>
+      </div>
+      <div class="uppick" id="upPick" hidden>
+        <span>1. Download <a id="upPickLink" target="_blank" rel="noopener"></a> from GitHub.</span>
+        <label>2. Choose the downloaded file: <input type="file" id="upPickFile" class="form-control form-control-sm"></label>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="upPickCancel">Cancel</button>
       </div>
     </div>
     <p class="hint">Or update by hand: run one command on the computer cactusdb runs on, in the folder it's in, then restart
@@ -7187,11 +7195,11 @@ function renderInstall(u) {
   if (!u.canInstall) {
     text = `cactusdb can't install it itself here: ${esc(u.installError || "")}`;
   } else if (offline && !u.superuserSet) {
-    text = `The cactusdb server can't reach GitHub, so this browser would download the new version and send it to the server, ` +
+    text = `The cactusdb server can't reach GitHub, so the new version would be downloaded in this browser and sent to the server, ` +
       `which needs the superuser password; none is set (<code>cactusdb --superuser set</code> on the server). Use the command below instead.`;
   } else {
     text = (offline
-      ? `The cactusdb server can't reach GitHub, so this browser downloads <code>${esc(u.binary)}</code> and sends it to the server (with the superuser password). `
+      ? `The cactusdb server can't reach GitHub, so you download <code>${esc(u.binary)}</code> in this browser and it is sent to the server (with the superuser password). `
       : `The server downloads <code>${esc(u.binary)}</code> from GitHub. `) +
       `cactusdb checks it, puts it in place of <code>${esc(u.executable)}</code> (this version is kept as <code>${esc(u.backup)}</code>) ` +
       `and restarts with the options it was started with: ${cmd}. Everyone using cactusdb is disconnected for a moment, and running exports stop.`;
@@ -7263,25 +7271,32 @@ async function pollUpgrade() {
   }
 }
 
-// installFromBrowser downloads the binary here and sends it to the server.
+// pickDownload shows the link to the new version and a file chooser, and
+// gives the chosen file (null for Cancel).
+function pickDownload(url, name) {
+  const box = $("upPick");
+  $("upPickLink").href = url; $("upPickLink").textContent = name;
+  $("upPickFile").value = "";
+  box.hidden = false; upgBar(null);
+  upgMsg(`Download ${name}, then choose the downloaded file.`);
+  return new Promise((resolve) => {
+    const done = (f) => { box.hidden = true; $("upPickFile").onchange = $("upPickCancel").onclick = null; resolve(f); };
+    $("upPickFile").onchange = () => { const f = $("upPickFile").files[0]; if (f) done(f); };
+    $("upPickCancel").onclick = () => done(null);
+  });
+}
+
+// installFromBrowser sends the new version to the server. GitHub doesn't let a
+// page read its release downloads, so the person downloads the file with a
+// link and picks it here; the checksum comes from release/SHA256SUMS on the
+// main branch, which a page may read.
 async function installFromBrowser(u) {
-  const dist = u.distRaw || u.raw + "dist/", url = dist + u.binary;
-  upgMsg("Downloading in this browser…"); upgBar(0);
-  const res = await fetch(url, { cache: "no-store" }).catch((e) => { throw new Error(`this browser can't download ${url}: ${e.message}`); });
-  if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${url}`);
-  const total = +res.headers.get("Content-Length") || 0, parts = [];
-  let done = 0;
-  const reader = res.body.getReader();
-  for (;;) {
-    const { done: end, value } = await reader.read();
-    if (end) break;
-    parts.push(value); done += value.length;
-    upgBar(total ? done / total : 0); upgMsg(`Downloading in this browser: ${mb(done)}` + (total ? ` of ${mb(total)}` : ""));
-  }
-  const file = new Blob(parts, { type: "application/octet-stream" });
+  const url = (u.releases || u.repo + "/releases/download/") + "v" + u.latest + "/" + u.binary;
+  const file = await pickDownload(url, u.binary);
+  if (!file) { upg.busy = false; $("upInstallBtn").disabled = false; upgBar(null); upgMsg("Not installed."); return; }
   let sum = "";
   try {
-    const r = await fetch(dist + "SHA256SUMS", { cache: "no-store" });
+    const r = await fetch((u.sums || u.raw + "release/") + "SHA256SUMS", { cache: "no-store" });
     if (r.ok) {
       const line = (await r.text()).split("\n").map((l) => l.trim().split(/\s+/)).find((f) => f.length === 2 && f[1].replace(/^\*/, "") === u.binary);
       if (line) sum = line[0];

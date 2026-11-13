@@ -39,7 +39,7 @@ Options:
                  volumes (k3s/k8s PVCs). Asks first unless --yes is given.
                  Host folders are never deleted.
   --yes          don't ask for confirmation
-  --from-source  compile cactusdb with Go instead of using the binaries in dist/
+  --from-source  compile cactusdb with Go instead of using the binaries in release/
   -h, --help     show this help
 EOF
 }
@@ -237,13 +237,13 @@ build_image() {
       (cd "$SCRIPT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath \
         -ldflags "-s -w -X main.version=$VERSION" -o "$root/cactusdb" .)
     else
-      local bin=$SCRIPT_DIR/dist/cactusdb-linux-$arch
+      local bin=$SCRIPT_DIR/release/cactusdb-linux-$arch
       [[ -f $bin ]] || die "$bin not found: run ./build.sh first, or use --from-source"
       cp "$bin" "$root/cactusdb"
     fi
     chmod 0755 "$root/cactusdb"
   done
-  # Only the binaries and the Dockerfile: nothing else from dist/ (such as a
+  # Only the binaries and the Dockerfile: nothing else from release/ (such as a
   # cactus.conn.db or cactus.key) can end up in the image.
   cp "$SCRIPT_DIR/Dockerfile" "$ctx/Dockerfile"
   if [[ $# -gt 1 ]]; then

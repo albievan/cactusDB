@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Releases are signed: build.sh signs dist/SHA256SUMS with a private
+// Releases are signed: build.sh signs release/SHA256SUMS with a private
 // Ed25519 key kept outside the repository, and the public key is built into
 // the binaries (releaseKey, set with -ldflags). An update from GitHub is only
 // installed when SHA256SUMS carries a valid signature by that key, so a

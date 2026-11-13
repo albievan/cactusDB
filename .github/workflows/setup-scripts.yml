@@ -1,0 +1,58 @@
+# Installs the published release with setup.sh (Linux, macOS) and setup.ps1
+# (Windows PowerShell 5.1 and PowerShell 7), checking the release signature,
+# whenever a release is published, and on demand (Actions → Run workflow).
+name: setup scripts
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to install (empty for the latest release)
+        required: false
+permissions:
+  contents: read
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup.sh
+        env:
+          CACTUSDB_VERSION: ${{ inputs.version || github.event.release.tag_name }}
+          CACTUSDB_REQUIRE_SIGNATURE: "yes"
+        run: |
+          # macOS has LibreSSL as openssl: use Homebrew's OpenSSL 3 for the signature.
+          if [ "$RUNNER_OS" = macOS ]; then export PATH="$(brew --prefix openssl@3)/bin:$PATH"; fi
+          sh setup.sh "$RUNNER_TEMP/cdb" | tee out.txt
+          grep -q "release signature checked" out.txt
+          "$RUNNER_TEMP/cdb/cactusdb" --version
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup.ps1 (Windows PowerShell 5.1)
+        shell: powershell
+        env:
+          CACTUSDB_VERSION: ${{ inputs.version || github.event.release.tag_name }}
+        run: |
+          # OpenSSL 3 of Git for Windows checks the signature.
+          $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
+          $out = powershell -ExecutionPolicy Bypass -File setup.ps1 "$env:RUNNER_TEMP\cdb51" *>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch "release signature checked") { throw "the signature wasn't checked" }
+          & "$env:RUNNER_TEMP\cdb51\cactusdb.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "cactusdb.exe doesn't run" }
+      - name: setup.ps1 (PowerShell 7, run again over the first install)
+        shell: pwsh
+        env:
+          CACTUSDB_VERSION: ${{ inputs.version || github.event.release.tag_name }}
+        run: |
+          $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
+          ./setup.ps1 "$env:RUNNER_TEMP\cdb51" *>&1 | Tee-Object -Variable out
+          if (($out | Out-String) -notmatch "release signature checked") { throw "the signature wasn't checked" }
+          & "$env:RUNNER_TEMP\cdb51\cactusdb.exe" --version
