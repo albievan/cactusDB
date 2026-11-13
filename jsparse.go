@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf16"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -306,8 +307,18 @@ func (p *jsParser) str() (string, error) {
 			case 'u':
 				if p.pos+4 < len(p.s) {
 					if r, err := strconv.ParseUint(p.s[p.pos+1:p.pos+5], 16, 32); err == nil {
-						b.WriteRune(rune(r))
 						p.pos += 4
+						// A character beyond U+FFFF comes as two: \uD83D\uDE00.
+						if utf16.IsSurrogate(rune(r)) && p.pos+6 < len(p.s) && p.s[p.pos+1] == '\\' && p.s[p.pos+2] == 'u' {
+							if r2, err := strconv.ParseUint(p.s[p.pos+3:p.pos+7], 16, 32); err == nil {
+								if c := utf16.DecodeRune(rune(r), rune(r2)); c != unicode.ReplacementChar {
+									b.WriteRune(c)
+									p.pos += 6
+									break
+								}
+							}
+						}
+						b.WriteRune(rune(r))
 						break
 					}
 				}
@@ -326,10 +337,16 @@ func (p *jsParser) str() (string, error) {
 func (p *jsParser) regex() (any, error) {
 	p.pos++ // /
 	var b strings.Builder
-	for p.pos < len(p.s) && p.s[p.pos] != '/' {
-		if p.s[p.pos] == '\\' && p.pos+1 < len(p.s) {
+	inClass := false // a / inside [...] doesn't end the expression
+	for p.pos < len(p.s) && (p.s[p.pos] != '/' || inClass) {
+		switch c := p.s[p.pos]; {
+		case c == '\\' && p.pos+1 < len(p.s):
 			b.WriteByte('\\')
 			p.pos++
+		case c == '[':
+			inClass = true
+		case c == ']':
+			inClass = false
 		}
 		b.WriteByte(p.s[p.pos])
 		p.pos++

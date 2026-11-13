@@ -13,12 +13,14 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
+	"weak"
 
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -366,10 +368,10 @@ func openDB(ctx context.Context, p ConnParams) (*sql.DB, error) {
 	}
 	db, err := openAndPing(ctx, driver, dsn, maxConns)
 	if err == nil && p.Engine != dialect(p.Engine) {
-		dbFlavors.Store(db, p.Engine)
+		rememberFor(&dbFlavors, db, p.Engine)
 	}
 	if err == nil && p.Engine == EngineOracle && opts["schema"] != "" {
-		oracleSchemas.Store(db, strings.ToUpper(opts["schema"]))
+		rememberFor(&oracleSchemas, db, strings.ToUpper(opts["schema"]))
 	}
 	return db, err
 }
@@ -381,9 +383,17 @@ var backendOpeners = map[string]func(ctx context.Context, p ConnParams, opts map
 // dialect (e.g. Redshift with PostgreSQL's), for the few differences.
 var dbFlavors sync.Map
 
+// rememberFor stores v for db in m, by a weak key: the entry goes once db is
+// closed and dropped, instead of keeping every database ever opened.
+func rememberFor(m *sync.Map, db *sql.DB, v any) {
+	k := weak.Make(db)
+	m.Store(k, v)
+	runtime.AddCleanup(db, func(k weak.Pointer[sql.DB]) { m.Delete(k) }, k)
+}
+
 // flavorOf returns the engine db was opened for ("" when it is its dialect).
 func flavorOf(db *sql.DB) string {
-	if v, ok := dbFlavors.Load(db); ok {
+	if v, ok := dbFlavors.Load(weak.Make(db)); ok {
 		return v.(string)
 	}
 	return ""

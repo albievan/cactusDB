@@ -728,3 +728,30 @@ func TestNormalizeEdges(t *testing.T) {
 		}
 	}
 }
+
+// Shell values: a / inside a regex class, an emoji as a surrogate pair,
+// new Date(0), and a collation that is applied.
+func TestShellQueryEdges(t *testing.T) {
+	sq, err := parseShellQuery(`db.t.find({ p: /^a[/]b$/i, e: "😀", d: new Date(0) }).collation({ locale: "en", strength: 2 })`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := sq.calls[0].args[0].(bson.D)
+	m := map[string]any{}
+	for _, e := range d {
+		m[e.Key] = e.Value
+	}
+	if re, _ := m["p"].(bson.Regex); re.Pattern != "^a[/]b$" || re.Options != "i" {
+		t.Errorf("regex = %#v", m["p"])
+	}
+	if m["e"] != "😀" {
+		t.Errorf("emoji = %q", m["e"])
+	}
+	if tm, _ := m["d"].(time.Time); !tm.Equal(time.UnixMilli(0)) {
+		t.Errorf("date = %v", m["d"])
+	}
+	c, err := mongoCollation(sq.calls[1].args[0])
+	if err != nil || c.Locale != "en" || c.Strength != 2 {
+		t.Errorf("collation = %+v %v", c, err)
+	}
+}

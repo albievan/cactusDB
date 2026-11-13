@@ -18,6 +18,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -723,14 +724,32 @@ func purgeableDir(dir string) error {
 		keep = append(keep, filepath.Dir(exe))
 	}
 	sep := string(filepath.Separator)
+	// Windows and macOS disks don't tell C:\Users\Bob from c:\users\bob.
+	fold := func(s string) string {
+		if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+			return strings.ToLower(s)
+		}
+		return s
+	}
+	for _, sys := range systemDirs {
+		if fold(clean) == fold(filepath.Clean(filepath.FromSlash(sys))) {
+			return fmt.Errorf("%s is a system folder: cactusdb won't delete it", clean)
+		}
+	}
 	for _, k := range keep {
 		k = filepath.Clean(k)
-		if clean == k || strings.HasPrefix(k+sep, clean+sep) {
+		if fold(clean) == fold(k) || strings.HasPrefix(fold(k+sep), fold(clean+sep)) {
 			return fmt.Errorf("%s holds %s: cactusdb won't delete it", clean, k)
 		}
 	}
 	return nil
 }
+
+// systemDirs are folders two levels down that hold far more than a
+// database (a data folder that was one of them is not purged).
+var systemDirs = []string{"/var/lib", "/var/log", "/var/run", "/var/cache", "/var/opt", "/usr/local", "/usr/lib", "/usr/bin",
+	"/usr/share", "/usr/sbin", "/opt/homebrew", "/etc/init.d", "/Library/Application Support", "/System/Library",
+	"/private/var", "/private/etc"}
 
 // removeDataDir deletes the data folder. The database's files belong to its
 // user, so what cactusdb can't delete itself is deleted from a container of

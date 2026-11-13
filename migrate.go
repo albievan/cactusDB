@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/fs"
 	"log"
 	"math"
 	"net/http"
@@ -37,6 +38,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -388,7 +390,11 @@ func (m *migrator) limit(n string) string {
 	}
 	h := fnv.New32a()
 	h.Write([]byte(n))
-	return n[:max-7] + "_" + hex.EncodeToString(h.Sum(nil))[:6]
+	cut := max - 7
+	for cut > 0 && !utf8.RuneStart(n[cut]) { // whole characters: a name must stay valid UTF-8
+		cut--
+	}
+	return n[:cut] + "_" + hex.EncodeToString(h.Sum(nil))[:6]
 }
 
 // targetName is the target's name of a source object: the default schema
@@ -2043,14 +2049,23 @@ func createTarget(ctx context.Context, p ConnParams, engine, name string, pipesC
 		return db, np, info, err
 	case EngineSQLite:
 		np = ConnParams{Engine: EngineSQLite, Database: name}
-		if fileExists(name) {
-			return nil, np, info, fmt.Errorf("%s already exists: cactusdb only migrates into a new database", name)
+		// Created here, only if it doesn't exist (O_EXCL): a file that
+		// appeared since the check is never written into.
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o644)
+		if err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				err = fmt.Errorf("%s already exists: cactusdb only migrates into a new database", name)
+			}
+			return nil, np, info, err
 		}
+		f.Close()
 		db, err := openAndPing(ctx, "sqlite", sqliteURI(name)+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)", 1)
-		if err == nil {
-			db.QueryRowContext(ctx, `SELECT 'SQLite ' || sqlite_version()`).Scan(&info.version)
+		if err != nil {
+			os.Remove(name) // the empty file just made, so trying again isn't refused
+			return nil, np, info, err
 		}
-		return db, np, info, err
+		db.QueryRowContext(ctx, `SELECT 'SQLite ' || sqlite_version()`).Scan(&info.version)
+		return db, np, info, nil
 	case EngineFirebird:
 		path := name
 		if !strings.HasPrefix(path, "/") {

@@ -589,28 +589,38 @@ func (j *ctrJob) stream(cmd *exec.Cmd, stdin []byte) error {
 const ctrLabel = "com.cactusdb.managed"
 
 // prepareDataDir creates the data folder; a database that doesn't run as
-// root must be able to write in it.
-func prepareDataDir(j *ctrJob, dir string, uid int) error {
+// root must be able to write in it. needChown: cactusdb (not root) couldn't
+// give it to the database's user, which a root container then does.
+func prepareDataDir(j *ctrJob, dir string, uid int) (needChown bool, err error) {
 	if fi, err := os.Stat(dir); err == nil {
 		if !fi.IsDir() {
-			return fmt.Errorf("%s is a file, not a folder", dir)
+			return false, fmt.Errorf("%s is a file, not a folder", dir)
 		}
 		j.log("data folder %s exists: its files are used", dir)
-		return nil
+		return false, nil
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("can't create the data folder: %w", err)
+		return false, fmt.Errorf("can't create the data folder: %w", err)
 	}
 	j.log("created data folder %s", dir)
 	if uid > 0 && runtime.GOOS == "linux" {
-		if err := os.Chown(dir, uid, uid); err != nil {
-			// Not root: let the database's user write anyway.
-			if err := os.Chmod(dir, 0o777); err != nil {
-				return fmt.Errorf("can't let the database write in the data folder: %w", err)
-			}
-			j.log("made the data folder writable for everyone (the database runs as user %d)", uid)
-		}
+		return os.Chown(dir, uid, uid) != nil, nil
 	}
+	return false, nil
+}
+
+// chownDataDir gives dir to uid from a short-lived root container of the
+// database's image; only if that fails is the folder opened to everyone.
+func chownDataDir(ctx context.Context, j *ctrJob, rt *ctrRuntime, dir, image string, uid int) error {
+	id := strconv.Itoa(uid)
+	if _, err := runTool(ctx, toolCmd(ctx, rt.tool, "run", "--rm", "--user", "0", "--entrypoint", "chown", "-v", dir+":/data", image, id+":"+id, "/data"), nil); err == nil {
+		j.log("gave the data folder to the database's user %d", uid)
+		return nil
+	}
+	if err := os.Chmod(dir, 0o777); err != nil {
+		return fmt.Errorf("can't let the database write in the data folder: %w", err)
+	}
+	j.log("made the data folder writable for everyone (the database runs as user %d)", uid)
 	return nil
 }
 
@@ -649,9 +659,11 @@ func secretEnv(sp containerSpec, d deployReq) []string {
 }
 
 func deployDocker(ctx context.Context, j *ctrJob, rt *ctrRuntime, sp containerSpec, d deployReq) error {
+	needChown := false
 	if d.DataDir != "" {
 		j.step("preparing the data folder")
-		if err := prepareDataDir(j, d.DataDir, sp.UID); err != nil {
+		var err error
+		if needChown, err = prepareDataDir(j, d.DataDir, sp.UID); err != nil {
 			return err
 		}
 	} else {
@@ -664,6 +676,11 @@ func deployDocker(ctx context.Context, j *ctrJob, rt *ctrRuntime, sp containerSp
 		j.step("downloading " + d.Image)
 		if err := j.stream(toolCmd(ctx, rt.tool, "pull", d.Image), nil); err != nil {
 			return fmt.Errorf("downloading %s failed: %w", d.Image, err)
+		}
+	}
+	if needChown {
+		if err := chownDataDir(ctx, j, rt, d.DataDir, d.Image, sp.UID); err != nil {
+			return err
 		}
 	}
 	newVolume := false

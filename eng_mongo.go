@@ -292,6 +292,56 @@ func argDoc(args []any, i int) (any, error) {
 	return nil, fmt.Errorf("argument %d must be an object { … }", i+1)
 }
 
+// mongoCollation reads .collation({locale: "en", strength: 2}): ignoring it
+// would quietly give other results (case-sensitive instead of not).
+func mongoCollation(v any) (*options.Collation, error) {
+	b, err := bson.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("collation: %w", err)
+	}
+	var m map[string]any
+	if err := bson.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("collation: %w", err)
+	}
+	c := &options.Collation{}
+	str := func(x any) string { s, _ := x.(string); return s }
+	for k, x := range m {
+		switch strings.ToLower(k) {
+		case "locale":
+			c.Locale = str(x)
+		case "caselevel":
+			c.CaseLevel, _ = x.(bool)
+		case "casefirst":
+			c.CaseFirst = str(x)
+		case "strength":
+			switch n := x.(type) {
+			case int32:
+				c.Strength = int(n)
+			case int64:
+				c.Strength = int(n)
+			case float64:
+				c.Strength = int(n)
+			}
+		case "numericordering":
+			c.NumericOrdering, _ = x.(bool)
+		case "alternate":
+			c.Alternate = str(x)
+		case "maxvariable":
+			c.MaxVariable = str(x)
+		case "normalization":
+			c.Normalization, _ = x.(bool)
+		case "backwards":
+			c.Backwards, _ = x.(bool)
+		default:
+			return nil, fmt.Errorf("collation: unknown option %q", k)
+		}
+	}
+	if c.Locale == "" {
+		return nil, errors.New("collation: locale is required, e.g. {locale: \"en\", strength: 2}")
+	}
+	return c, nil
+}
+
 func argInt(args []any) (int64, error) {
 	if len(args) == 0 {
 		return 0, errors.New("a number is missing")
@@ -373,6 +423,12 @@ func runShellQuery(ctx context.Context, db *mongo.Database, sq *shellQuery) (res
 					fo.SetProjection(d)
 				case "hint":
 					fo.SetHint(d)
+				case "collation":
+					c, err := mongoCollation(d)
+					if err != nil {
+						return nil, err
+					}
+					fo.SetCollation(c)
 				}
 			case "limit", "skip", "batchSize":
 				n, err := argInt(cm.args)

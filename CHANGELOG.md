@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.58.1 — 2026-11-13
+
+- MongoDB: `.collation({locale: "en", strength: 2})` is applied (it was accepted and quietly
+  ignored, so case-insensitive finds returned other rows). `/a[/]b/` regular expressions and
+  `\uD83D\uDE00` (characters beyond U+FFFF) in queries are read correctly.
+- Redis: key groups of keys with `[ ] * ? \` in their names list the right keys.
+- Migrations: a PostgreSQL index's `INCLUDE` columns are no longer made key columns (which
+  weakened a unique index); MySQL zero-date defaults (`'0000-00-00 …'`) are left out with a
+  note instead of failing the table; a SQLite foreign key to a composite primary key maps
+  each column to the right key column; long names are shortened at a whole character; a new
+  SQLite database file is created only if it doesn't exist at that moment.
+- Database containers: a new data folder cactusdb can't give to the database's user is given
+  to it from a short-lived root container, and opened to everyone only if that fails.
+  *Purge* refuses well-known system folders (`/var/lib`, `/usr/local`…) and compares folders
+  without regard to case on Windows and macOS.
+- Memory: the details cactusdb keeps per open database are dropped when it is closed.
+
 ## 1.58.0 — 2026-11-12
 
 Security:

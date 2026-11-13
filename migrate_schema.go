@@ -520,6 +520,11 @@ func neutralDefault(engine, def string, kind string) string {
 	}
 	d = reDefaultCast.ReplaceAllString(d, "") // PostgreSQL: 'x'::character varying
 	u := strings.ToUpper(d)
+	// MySQL's zero date is no date any other database takes: the default is
+	// left out (with a note) rather than failing the whole table.
+	if strings.HasPrefix(u, "'0000-00-00") {
+		return ""
+	}
 	switch u {
 	case "", "NULL":
 		return ""
@@ -838,7 +843,9 @@ func postgresTable(ctx context.Context, db *sql.DB, t *mTable) error {
 	}
 	return scanRows(ctx, db, `SELECT i.relname, ix.indisunique, ix.indpred IS NOT NULL,
 			COALESCE((SELECT string_agg(CASE WHEN k.attnum = 0 THEN '' ELSE a.attname END || CASE WHEN ix.indoption[k.n - 1] & 1 = 1 THEN ' DESC' ELSE '' END, E'\t' ORDER BY k.n)
-			  FROM unnest(ix.indkey) WITH ORDINALITY k(attnum, n) LEFT JOIN pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = k.attnum), '')
+			  FROM unnest(ix.indkey) WITH ORDINALITY k(attnum, n) LEFT JOIN pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
+			  -- the key columns only: INCLUDE columns (PostgreSQL 11+) made keys would weaken a UNIQUE index
+			  WHERE k.n <= COALESCE((to_jsonb(ix)->>'indnkeyatts')::int, ix.indnatts)), '')
 		FROM pg_index ix JOIN pg_class i ON i.oid = ix.indexrelid
 		WHERE ix.indrelid = $1::regclass AND NOT ix.indisprimary
 		  AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = ix.indexrelid AND c.conrelid = ix.indrelid)
@@ -1178,16 +1185,16 @@ func sqliteTable(ctx context.Context, db *sql.DB, t *mTable) error {
 		}
 		t.Indexes = append(t.Indexes, mIndex{Name: name, Cols: cols, Unique: x.unique, Cons: x.origin == "u"})
 	}
-	return scanRows(ctx, db, `SELECT id, "table", "from", COALESCE("to", ''), on_delete, on_update FROM pragma_foreign_key_list(?) ORDER BY id, seq`,
+	return scanRows(ctx, db, `SELECT id, seq, "table", "from", COALESCE("to", ''), on_delete, on_update FROM pragma_foreign_key_list(?) ORDER BY id, seq`,
 		[]any{t.Src}, func(scan func(...any) error) error {
-			var id int
+			var id, seq int
 			var rt, col, rc, del, upd string
-			if err := scan(&id, &rt, &col, &rc, &del, &upd); err != nil {
+			if err := scan(&id, &seq, &rt, &col, &rc, &del, &upd); err != nil {
 				return err
 			}
-			if rc == "" { // the referenced table's primary key
-				if keys, _ := queryStringsArgs(ctx, db, `SELECT name FROM pragma_table_info(?) WHERE pk > 0 ORDER BY pk`, rt); len(keys) > 0 {
-					rc = keys[0]
+			if rc == "" { // the referenced table's primary key: its seq-th column
+				if keys, _ := queryStringsArgs(ctx, db, `SELECT name FROM pragma_table_info(?) WHERE pk > 0 ORDER BY pk`, rt); seq < len(keys) {
+					rc = keys[seq]
 				}
 			}
 			addFK(t, fmt.Sprintf("fk_%s_%d", t.Src, id), col, rt, rc, del, upd)

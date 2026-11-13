@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"weak"
 
 	go_ora "github.com/sijms/go-ora/v2"
 )
@@ -47,7 +48,7 @@ func oracleSplit(name string) (owner, obj string) {
 
 // oracleOwner returns the schema of db's objects.
 func oracleOwner(ctx context.Context, db *sql.DB) (string, error) {
-	if v, ok := oracleSchemas.Load(db); ok {
+	if v, ok := oracleSchemas.Load(weak.Make(db)); ok {
 		return v.(string), nil
 	}
 	var s string

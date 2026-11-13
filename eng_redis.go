@@ -104,11 +104,14 @@ func (r *redisBackend) scanKeys(ctx context.Context, pattern, typ string, limit 
 	}
 }
 
+// redisGlobEscape escapes the characters MATCH patterns give a meaning.
+var redisGlobEscape = strings.NewReplacer(`\`, `\\`, `*`, `\*`, `?`, `\?`, `[`, `\[`, `]`, `\]`)
+
 // keyGroup is the sidebar group of a key: "user:*" for "user:42".
 func keyGroup(key string) string {
 	for _, sep := range []string{":", "."} {
 		if i := strings.Index(key, sep); i > 0 {
-			return key[:i+1] + "*"
+			return redisGlobEscape.Replace(key[:i+1]) + "*" // a[1]:x is the group a\[1\]:*
 		}
 	}
 	return ""
