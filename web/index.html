@@ -855,6 +855,8 @@
   .relcols li span { overflow: hidden; text-overflow: ellipsis; }
   .relcols li i { width: 11px; font-size: 10px; flex: none; }
   .relcols li .bi-dot { opacity: .5; }
+  .relcols li .relct { flex: none; margin-left: auto; padding-left: 12px; font-style: normal; font-weight: 400; opacity: .7; }
+  .relnode.open { max-width: 440px; }
   .relcols li.on { color: var(--text); font-weight: 600; }
   .relcols li.on i, .relcols li .bi-key-fill, .relcols li .bi-key { color: var(--c); }
   .rellbl text { font-size: 10px; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
@@ -1575,7 +1577,8 @@
           <option value="free">Free (by attraction)</option>
         </select>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="relRelayout" title="Arrange the objects again: as an ER diagram, the tables referred to above the tables that refer to them, in rows and columns with the lines at right angles (objects you moved go back in place)"><i class="bi bi-grid-1x2" aria-hidden="true"></i> Rearrange</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" title="Download the view drawn now as a picture (PNG): only the objects of the view chosen, as they are arranged"><i class="bi bi-image" aria-hidden="true"></i> Export view</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relPng" title="Download the view drawn now as a picture (PNG) with its legend: only the objects of the view chosen, as they are arranged"><i class="bi bi-image" aria-hidden="true"></i> Export view</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="relPdf" title="Download the view drawn now as a PDF with its legend: one page, at full sharpness"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> PDF</button>
       </div>
       <div class="relbar">
         <div class="reltypes" id="relTypes" role="group" aria-label="Types of objects shown"></div>
@@ -2899,7 +2902,7 @@ function relOpen() {
 // The controls that work on a picture: only once one is generated.
 function relControls() {
   const none = !rel.data;
-  ["relFind", "relLonely", "relGuess", "relAssumed", "relColsOn", "relCard", "relPick", "relOpenAll", "relRelayout", "relPng", "relZoomIn", "relZoomOut", "relFit",
+  ["relFind", "relLonely", "relGuess", "relAssumed", "relColsOn", "relCard", "relPick", "relOpenAll", "relRelayout", "relPng", "relPdf", "relZoomIn", "relZoomOut", "relFit",
     "relViewSel", "relViewSave", "relArrange"].forEach((id) => { $(id).disabled = none; });
   $("relViewDel").disabled = none || !$("relViewSel").value;
   if (!none) $("relLonely").disabled = !!rel.focus || rel.chosen.size > 0;
@@ -2976,8 +2979,9 @@ function relNodeHtml(n, joined) {
     `<i class="bi bi-chevron-${open ? "down" : "right"}" aria-hidden="true"></i></button>` : "";
   const list = open ? `<ul class="relcols">` + cols.map((c) => {
     const on = joined && joined.has(c.n);
-    return `<li data-col="${esc(c.n)}" class="${on ? "on" : ""}" title="${esc(c.n)}${c.k === "PRI" ? " (primary key)" : c.k === "UNI" ? " (unique)" : ""}${on ? ", joined by a line" : ""}">` +
-      `<i class="bi bi-${c.k === "PRI" ? "key-fill" : c.k === "UNI" ? "key" : on ? "link-45deg" : "dot"}" aria-hidden="true"></i><span>${esc(c.n)}</span></li>`;
+    return `<li data-col="${esc(c.n)}" class="${on ? "on" : ""}" title="${esc(c.n)}${c.t ? " " + esc(c.t) : ""}${c.k === "PRI" ? " (primary key)" : c.k === "UNI" ? " (unique)" : ""}${c.o ? ", may be empty" : ""}${on ? ", joined by a line" : ""}">` +
+      `<i class="bi bi-${c.k === "PRI" ? "key-fill" : c.k === "UNI" ? "key" : on ? "link-45deg" : "dot"}" aria-hidden="true"></i><span>${esc(c.n)}</span>` +
+      (c.t ? `<em class="relct">${esc(c.t.toLowerCase())}</em>` : "") + `</li>`;
   }).join("") + `</ul>` : "";
   const jn = rel.junction.get(n.id), named = (id) => rel.data.nodes.find((x) => x.id === id)?.name || id;
   const badge = jn ? `<b class="relbadge" title="${jn.length === 1 ? `A junction table: ${esc(named(jn[0]))} many to many with itself` : `A junction table: many to many between ${esc(jn.map(named).join(" and "))}`}">N:M</b>` : "";
@@ -3905,22 +3909,28 @@ const relUp = (ev) => {
 relCanvas.addEventListener("pointerup", relUp);
 relCanvas.addEventListener("pointercancel", relUp);
 
-// The picture: drawn again on a canvas, twice as sharp where it fits.
-$("relPng").addEventListener("click", () => {
+// relPicture draws the view again on a canvas, with the legend under it, at
+// up to scale times (as sharp as maxPx pixels allow). null: nothing drawn.
+function relPicture(want = 2, maxPx = 120e6) {
   const b = relBounds();
-  if (!b) return toast("There is nothing drawn to make a picture of", true);
+  if (!b) return null;
   // What is written on the lines may reach past the objects.
   try {
     const l = $("relLabels").getBBox(), e = $("relEdges").getBBox();
     for (const r of [l, e]) if (r.width || r.height) { b.x0 = Math.min(b.x0, r.x); b.y0 = Math.min(b.y0, r.y); b.x1 = Math.max(b.x1, r.x + r.width); b.y1 = Math.max(b.y1, r.y + r.height); }
   } catch (err) { /* the objects' bounds */ }
-  const pad = 30, w = b.x1 - b.x0 + pad * 2, h = b.y1 - b.y0 + pad * 2;
-  const scale = Math.min(2, 16000 / w, 16000 / h, Math.sqrt(120e6 / (w * h)));
+  const pad = 30, dw = b.x1 - b.x0 + pad * 2, dh = b.y1 - b.y0 + pad * 2;
+  const font = getComputedStyle(document.body).fontFamily;
+  // The legend goes under the drawing, as wide as it (at least 640).
+  const w = Math.max(dw, 640), leg = relLegend(null, w - pad * 2, font), h = dh + leg + pad;
+  const scale = Math.min(want, 16000 / w, 16000 / h, Math.sqrt(maxPx / (w * h)));
   const cv = document.createElement("canvas");
   cv.width = Math.ceil(w * scale); cv.height = Math.ceil(h * scale);
   const ctx = cv.getContext("2d"), css = getComputedStyle($("relPane")), v = (n) => css.getPropertyValue(n).trim();
-  ctx.scale(scale, scale); ctx.translate(pad - b.x0, pad - b.y0);
-  ctx.fillStyle = v("--bg"); ctx.fillRect(b.x0 - pad, b.y0 - pad, w, h);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = v("--bg"); ctx.fillRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(pad - b.x0, pad - b.y0);
   for (const e of rel.edges) {
     const color = v("--rel-" + e.kind);
     ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = 1.4;
@@ -3935,7 +3945,6 @@ $("relPng").addEventListener("click", () => {
     ctx.lineTo(x2 - 8 * Math.cos(a - 0.4), y2 - 8 * Math.sin(a - 0.4)); ctx.lineTo(x2 - 8 * Math.cos(a + 0.4), y2 - 8 * Math.sin(a + 0.4));
     ctx.closePath(); ctx.fill();
   }
-  const font = getComputedStyle(document.body).fontFamily;
   ctx.textBaseline = "middle"; ctx.font = `600 12px ${font}`; ctx.fillStyle = v("--muted");
   for (const lbl of $("relNodes").querySelectorAll(".rellabel")) {
     const t = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(lbl.style.transform);
@@ -3959,8 +3968,14 @@ $("relPng").addEventListener("click", () => {
       for (const li of list.children) {
         const ly = li.offsetTop - list.scrollTop;
         if (ly < list.offsetTop - 2 || ly + li.offsetHeight > list.offsetTop + list.clientHeight + 2) continue;
+        const cy = y + ly + li.offsetHeight / 2, typ = li.querySelector(".relct");
         ctx.fillStyle = li.classList.contains("on") || li.querySelector(".bi-key-fill, .bi-key") ? text : v("--muted");
-        ctx.fillText((li.querySelector(".bi-key-fill") ? "🔑 " : li.classList.contains("on") ? "⇄ " : "  ") + li.textContent, x + 10, y + ly + li.offsetHeight / 2);
+        ctx.fillText((li.querySelector(".bi-key-fill") ? "🔑 " : li.classList.contains("on") ? "⇄ " : "  ") + li.querySelector("span").textContent, x + 10, cy);
+        if (typ) { // its type, at the right as on screen
+          ctx.fillStyle = v("--muted"); ctx.textAlign = "right";
+          ctx.fillText(typ.textContent, x + n.w - 10, cy);
+          ctx.textAlign = "left";
+        }
       }
       ctx.font = `12px ${font}`;
     }
@@ -3985,16 +4000,126 @@ $("relPng").addEventListener("click", () => {
     });
   }
   ctx.textAlign = "left";
-  cv.toBlob((blob) => {
+  ctx.restore();
+  // The legend: a line under the drawing, then its keys.
+  ctx.strokeStyle = v("--border") || "#ccc"; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(pad, dh); ctx.lineTo(w - pad, dh); ctx.stroke();
+  ctx.save(); ctx.translate(pad, dh + 12);
+  relLegend(ctx, w - pad * 2, font);
+  ctx.restore();
+  return { cv, w, h, scale };
+}
+
+// relLegend lays the on-screen legend out in width: its line samples, crow's
+// feet, badges and words, drawn when ctx is given. It returns the height.
+function relLegend(ctx, width, font) {
+  const legend = document.querySelector("#relPane .rellegend");
+  if (!legend) return 0;
+  const css = getComputedStyle($("relPane")), v = (n) => css.getPropertyValue(n).trim();
+  const lineH = 20, gap = 16;
+  let x = 0, y = lineH / 2;
+  const meas = document.createElement("canvas").getContext("2d");
+  const c = ctx || meas;
+  c.font = `11px ${font}`; c.textBaseline = "middle";
+  const place = (wd) => { if (x > 0 && x + wd > width) { x = 0; y += lineH; } const at = x; x += wd; return at; };
+  for (const item of legend.children) {
+    if (x > 0) x += gap;
+    for (const part of item.childNodes) {
+      if (part.nodeType === 3) { // words
+        for (const word of part.textContent.split(/(\s+)/)) {
+          if (!word) continue;
+          if (/^\s+$/.test(word)) { x += c.measureText(" ").width; continue; }
+          const wd = c.measureText(word).width, at = place(wd);
+          if (ctx) { ctx.fillStyle = v("--muted"); ctx.fillText(word, at, y); }
+        }
+      } else if (part.tagName === "svg") { // a line sample or a crow's foot
+        const sw = +part.getAttribute("width"), sh = +part.getAttribute("height"), at = place(sw + 4);
+        if (!ctx) continue;
+        ctx.save(); ctx.translate(at, y - sh / 2);
+        for (const shape of part.children) {
+          const st = getComputedStyle(shape);
+          ctx.strokeStyle = st.stroke; ctx.lineWidth = parseFloat(st.strokeWidth) || 1.4; ctx.lineCap = "round";
+          const dash = st.strokeDasharray && st.strokeDasharray !== "none" ? st.strokeDasharray.split(/[ ,]+/).map(parseFloat) : [];
+          ctx.setLineDash(dash);
+          let p;
+          if (shape.tagName === "line") { p = new Path2D(); p.moveTo(+shape.getAttribute("x1"), +shape.getAttribute("y1")); p.lineTo(+shape.getAttribute("x2"), +shape.getAttribute("y2")); }
+          else if (shape.tagName === "circle") { p = new Path2D(); p.arc(+shape.getAttribute("cx"), +shape.getAttribute("cy"), +shape.getAttribute("r"), 0, Math.PI * 2); ctx.fillStyle = v("--bg"); ctx.fill(p); }
+          else p = new Path2D(shape.getAttribute("d"));
+          ctx.stroke(p);
+        }
+        ctx.restore(); ctx.setLineDash([]);
+      } else if (part.tagName === "B") { // the N:M badge
+        c.font = `700 10px ${font}`;
+        const wd = c.measureText(part.textContent).width + 10, at = place(wd + 4);
+        if (ctx) {
+          ctx.strokeStyle = ctx.fillStyle = v("--rel-fk"); ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.roundRect(at, y - 8, wd, 16, 4); ctx.stroke();
+          ctx.fillText(part.textContent, at + 5, y + 0.5);
+        }
+        c.font = `11px ${font}`;
+      }
+    }
+  }
+  return y + lineH / 2 + 12;
+}
+
+// relFileName is the export's file name: the connection, the view, the kind.
+function relFileName(ext) {
+  const view = relViews.list.find((x) => String(x.id) === $("relViewSel").value);
+  return `${[state.label, view && view.name].filter(Boolean).join("-").replace(/[^\w.-]+/g, "_")}-relationships.${ext}`;
+}
+function relDownload(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+// The picture: twice as sharp where it fits.
+$("relPng").addEventListener("click", () => {
+  const p = relPicture();
+  if (!p) return toast("There is nothing drawn to make a picture of", true);
+  p.cv.toBlob((blob) => {
     if (!blob) return toast("The picture is too large to make", true);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    const view = relViews.list.find((x) => String(x.id) === $("relViewSel").value);
-    a.download = `${[state.label, view && view.name].filter(Boolean).join("-").replace(/[^\w.-]+/g, "_")}-relationships.png`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    relDownload(blob, relFileName("png"));
   }, "image/png");
 });
+
+// The PDF: one page the size of the drawing (scaled down to fit PDF's
+// largest page), holding the picture losslessly (Flate, as PNG does) at up
+// to three times the screen's sharpness, so it prints and zooms sharp.
+$("relPdf").addEventListener("click", async () => {
+  const p = relPicture(3, 80e6);
+  if (!p) return toast("There is nothing drawn to make a PDF of", true);
+  const btn = $("relPdf"); btn.disabled = true;
+  try { relDownload(await relPdfOf(p), relFileName("pdf")); }
+  catch (e) { toast("The PDF couldn't be made: " + e.message, true); }
+  finally { btn.disabled = false; }
+});
+
+async function relPdfOf({ cv, w, h }) {
+  const pw = cv.width, ph = cv.height;
+  const px = cv.getContext("2d").getImageData(0, 0, pw, ph).data;
+  const rgb = new Uint8Array(pw * ph * 3);
+  for (let i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
+  const data = new Uint8Array(await new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+  // The page in points, the drawing's size at 96 dpi, at most 200 inches a side.
+  const k = Math.min(0.75, 14400 / w, 14400 / h), W = +(w * k).toFixed(2), H = +(h * k).toFixed(2);
+  const enc = new TextEncoder(), parts = [], offsets = [];
+  let len = 0;
+  const put = (x) => { const b = typeof x === "string" ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (n, body) => { offsets[n] = len; put(`${n} 0 obj\n`); body(); put("\nendobj\n"); };
+  const content = `q ${W} 0 0 ${H} 0 0 cm /Im1 Do Q`;
+  put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  obj(1, () => put("<< /Type /Catalog /Pages 2 0 R >>"));
+  obj(2, () => put("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
+  obj(3, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>`));
+  obj(4, () => { put(`<< /Type /XObject /Subtype /Image /Width ${pw} /Height ${ph} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${data.length} >>\nstream\n`); put(data); put("\nendstream"); });
+  obj(5, () => put(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  const xref = len;
+  put(`xref\n0 6\n0000000000 65535 f \n` + [1, 2, 3, 4, 5].map((n) => String(offsets[n]).padStart(10, "0") + " 00000 n \n").join(""));
+  put(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts, { type: "application/pdf" });
+}
 
 // ---- saved views ----
 // A view is what is drawn: the objects chosen (and what they link to), the

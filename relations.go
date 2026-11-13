@@ -48,6 +48,7 @@ type relColumn struct {
 	Name string `json:"n"`
 	Key  string `json:"k,omitempty"` // PRI or UNI: a single-column key
 	Null bool   `json:"o,omitempty"` // it may be empty (NULL): a relationship by it is optional
+	Type string `json:"t,omitempty"` // its type as the database writes it: varchar(100), numeric(12,2)
 }
 
 // relObj is an object as the catalog queries name it: its sidebar name and
@@ -690,6 +691,7 @@ type relCol struct {
 	pos         int
 	key         string // PRI, UNI (single-column keys only) or ""
 	null        bool   // it may be NULL
+	typ         string // its type, as the database writes it
 }
 
 var relGenericCols = map[string]bool{}
@@ -917,20 +919,20 @@ func relColumnsQuery(engine string) string {
 		return `SELECT m.name, p.name, p.cid + 1, CASE WHEN p.pk = 1 AND (SELECT COUNT(*) FROM pragma_table_info(m.name) x WHERE x.pk > 0) = 1 THEN 'PRI'
 			WHEN EXISTS (SELECT 1 FROM pragma_index_list(m.name) il JOIN pragma_index_info(il.name) ii WHERE il."unique" = 1
 				AND ii.name = p.name AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1) THEN 'UNI' ELSE '' END,
-			CASE WHEN p."notnull" = 1 OR p.pk > 0 THEN 'N' ELSE 'Y' END
+			CASE WHEN p."notnull" = 1 OR p.pk > 0 THEN 'N' ELSE 'Y' END, p.type
 			FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type IN ('table', 'view') AND m.name NOT LIKE 'sqlite_%'`
 	case EngineMySQL, EngineMariaDB:
 		return `SELECT c.table_name, c.column_name, c.ordinal_position, CASE WHEN c.column_key IN ('PRI', 'UNI') AND (SELECT COUNT(*)
 				FROM information_schema.statistics s WHERE s.table_schema = c.table_schema AND s.table_name = c.table_name
 				AND s.index_name = (SELECT MIN(s2.index_name) FROM information_schema.statistics s2 WHERE s2.table_schema = c.table_schema
 					AND s2.table_name = c.table_name AND s2.column_name = c.column_name AND s2.non_unique = 0)) = 1 THEN c.column_key ELSE '' END,
-			CASE WHEN c.is_nullable = 'YES' THEN 'Y' ELSE 'N' END
+			CASE WHEN c.is_nullable = 'YES' THEN 'Y' ELSE 'N' END, c.column_type
 			FROM information_schema.columns c JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
 			WHERE c.table_schema = DATABASE() AND t.table_type IN ('BASE TABLE', 'SYSTEM VERSIONED', 'VIEW')`
 	case EnginePostgres:
 		return `SELECT n.nspname || '.' || c.relname, a.attname, a.attnum, COALESCE((SELECT CASE WHEN i.indisprimary THEN 'PRI' ELSE 'UNI' END
 				FROM pg_index i WHERE i.indrelid = c.oid AND (i.indisprimary OR i.indisunique) AND i.indnatts = 1 AND i.indkey[0] = a.attnum
-				ORDER BY i.indisprimary DESC LIMIT 1), ''), CASE WHEN a.attnotnull THEN 'N' ELSE 'Y' END
+				ORDER BY i.indisprimary DESC LIMIT 1), ''), CASE WHEN a.attnotnull THEN 'N' ELSE 'Y' END, format_type(a.atttypid, a.atttypmod)
 			FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
 			WHERE c.relkind IN ('r', 'p', 'v', 'm') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\_%'`
 	case EngineMSSQL:
@@ -938,7 +940,13 @@ func relColumnsQuery(engine string) string {
 				FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
 				WHERE i.object_id = t.object_id AND (i.is_primary_key = 1 OR i.is_unique = 1) AND ic.column_id = c.column_id
 				AND (SELECT COUNT(*) FROM sys.index_columns x WHERE x.object_id = i.object_id AND x.index_id = i.index_id AND x.is_included_column = 0) = 1
-				ORDER BY i.is_primary_key DESC), ''), CASE WHEN c.is_nullable = 1 THEN 'Y' ELSE 'N' END
+				ORDER BY i.is_primary_key DESC), ''), CASE WHEN c.is_nullable = 1 THEN 'Y' ELSE 'N' END,
+			TYPE_NAME(c.user_type_id) + CASE
+				WHEN TYPE_NAME(c.system_type_id) IN ('varchar', 'char', 'varbinary', 'binary') THEN '(' + CASE WHEN c.max_length = -1 THEN 'max' ELSE CAST(c.max_length AS varchar(10)) END + ')'
+				WHEN TYPE_NAME(c.system_type_id) IN ('nvarchar', 'nchar') THEN '(' + CASE WHEN c.max_length = -1 THEN 'max' ELSE CAST(c.max_length / 2 AS varchar(10)) END + ')'
+				WHEN TYPE_NAME(c.system_type_id) IN ('decimal', 'numeric') THEN '(' + CAST(c.precision AS varchar(5)) + ',' + CAST(c.scale AS varchar(5)) + ')'
+				WHEN TYPE_NAME(c.system_type_id) IN ('datetime2', 'time', 'datetimeoffset') AND c.scale <> 7 THEN '(' + CAST(c.scale AS varchar(5)) + ')'
+				ELSE '' END
 			FROM sys.objects t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.columns c ON c.object_id = t.object_id
 			WHERE t.type IN ('U', 'V') AND t.is_ms_shipped = 0`
 	case EngineFirebird:
@@ -946,7 +954,18 @@ func relColumnsQuery(engine string) string {
 				IIF(EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS rc WHERE rc.RDB$INDEX_NAME = i.RDB$INDEX_NAME AND rc.RDB$CONSTRAINT_TYPE = 'PRIMARY KEY'), 'PRI', 'UNI')
 				FROM RDB$INDICES i JOIN RDB$INDEX_SEGMENTS s ON s.RDB$INDEX_NAME = i.RDB$INDEX_NAME
 				WHERE i.RDB$RELATION_NAME = f.RDB$RELATION_NAME AND i.RDB$UNIQUE_FLAG = 1 AND i.RDB$SEGMENT_COUNT = 1 AND s.RDB$FIELD_NAME = f.RDB$FIELD_NAME
-				ORDER BY 1), ''), IIF(COALESCE(f.RDB$NULL_FLAG, (SELECT d.RDB$NULL_FLAG FROM RDB$FIELDS d WHERE d.RDB$FIELD_NAME = f.RDB$FIELD_SOURCE), 0) = 1, 'N', 'Y')
+				ORDER BY 1), ''), IIF(COALESCE(f.RDB$NULL_FLAG, (SELECT d.RDB$NULL_FLAG FROM RDB$FIELDS d WHERE d.RDB$FIELD_NAME = f.RDB$FIELD_SOURCE), 0) = 1, 'N', 'Y'),
+			(SELECT CASE
+				WHEN d.RDB$FIELD_TYPE IN (7, 8, 16, 26) AND COALESCE(d.RDB$FIELD_SCALE, 0) < 0
+					THEN IIF(d.RDB$FIELD_SUB_TYPE = 2, 'DECIMAL(', 'NUMERIC(') || COALESCE(d.RDB$FIELD_PRECISION, 18) || ',' || (-d.RDB$FIELD_SCALE) || ')'
+				WHEN d.RDB$FIELD_TYPE = 7 THEN 'SMALLINT' WHEN d.RDB$FIELD_TYPE = 8 THEN 'INTEGER' WHEN d.RDB$FIELD_TYPE = 16 THEN 'BIGINT'
+				WHEN d.RDB$FIELD_TYPE = 26 THEN 'INT128' WHEN d.RDB$FIELD_TYPE = 10 THEN 'FLOAT' WHEN d.RDB$FIELD_TYPE = 27 THEN 'DOUBLE PRECISION'
+				WHEN d.RDB$FIELD_TYPE = 12 THEN 'DATE' WHEN d.RDB$FIELD_TYPE IN (13, 28) THEN 'TIME' WHEN d.RDB$FIELD_TYPE IN (35, 29) THEN 'TIMESTAMP'
+				WHEN d.RDB$FIELD_TYPE = 23 THEN 'BOOLEAN'
+				WHEN d.RDB$FIELD_TYPE = 14 THEN 'CHAR(' || COALESCE(d.RDB$CHARACTER_LENGTH, d.RDB$FIELD_LENGTH) || ')'
+				WHEN d.RDB$FIELD_TYPE = 37 THEN 'VARCHAR(' || COALESCE(d.RDB$CHARACTER_LENGTH, d.RDB$FIELD_LENGTH) || ')'
+				WHEN d.RDB$FIELD_TYPE = 261 THEN IIF(d.RDB$FIELD_SUB_TYPE = 1, 'BLOB SUB_TYPE TEXT', 'BLOB')
+				ELSE '' END FROM RDB$FIELDS d WHERE d.RDB$FIELD_NAME = f.RDB$FIELD_SOURCE)
 			FROM RDB$RELATION_FIELDS f JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = f.RDB$RELATION_NAME
 			WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0`
 	case EngineOracle:
@@ -954,7 +973,10 @@ func relColumnsQuery(engine string) string {
 				FROM all_constraints k JOIN all_cons_columns kc ON kc.owner = k.owner AND kc.constraint_name = k.constraint_name
 				WHERE k.owner = c.owner AND k.table_name = c.table_name AND k.constraint_type IN ('P', 'U') AND kc.column_name = c.column_name
 				AND (SELECT COUNT(*) FROM all_cons_columns x WHERE x.owner = k.owner AND x.constraint_name = k.constraint_name) = 1),
-			DECODE(c.nullable, 'N', 'N', 'Y')
+			DECODE(c.nullable, 'N', 'N', 'Y'),
+			c.data_type || CASE WHEN c.data_type IN ('VARCHAR2', 'NVARCHAR2', 'CHAR', 'NCHAR') THEN '(' || c.char_length || ')'
+				WHEN c.data_type = 'RAW' THEN '(' || c.data_length || ')'
+				WHEN c.data_type = 'NUMBER' AND c.data_precision IS NOT NULL THEN '(' || c.data_precision || ',' || c.data_scale || ')' END
 			FROM all_tab_columns c WHERE c.owner = :1 AND c.table_name NOT LIKE 'BIN$%'`
 	}
 	return ""
@@ -1022,7 +1044,11 @@ func (g *relGraph) readColumns(ctx context.Context, ss *session) (map[string]str
 	var cols []relCol
 	add := func(c []sql.NullString) {
 		pos, _ := strconv.Atoi(c[2].String)
-		cols = append(cols, relCol{table: c[0].String, name: c[1].String, pos: pos, key: c[3].String, null: c[4].String == "Y"})
+		col := relCol{table: c[0].String, name: c[1].String, pos: pos, key: c[3].String, null: c[4].String == "Y"}
+		if len(c) > 5 {
+			col.typ = strings.TrimSpace(c[5].String)
+		}
+		cols = append(cols, col)
 	}
 	if ss.engine == EngineSQLite {
 		g.sqliteColumns(ctx, ss.db, q, add)
@@ -1033,7 +1059,7 @@ func (g *relGraph) readColumns(ctx context.Context, ss *session) (map[string]str
 	var tableCols []relCol
 	for _, c := range cols {
 		if id := g.find(relOf(c.table, ObjTable, ObjView, ObjMatView)); id != "" {
-			g.columns[id] = append(g.columns[id], relColumn{Name: c.name, Key: c.key, Null: c.null})
+			g.columns[id] = append(g.columns[id], relColumn{Name: c.name, Key: c.key, Null: c.null, Type: c.typ})
 			if c.key == "PRI" {
 				keys[id] = c.name
 			}

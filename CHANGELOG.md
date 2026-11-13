@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.60.0 — 2026-11-13
+
+- **DB Relationships:** an expanded table lists each column's **type** next to its name
+  (`varchar(100)`, `numeric(12,2)`, `timestamp with time zone`…), on SQLite, MySQL/MariaDB,
+  PostgreSQL, SQL Server, Firebird and Oracle.
+- **Export as PDF:** next to *Export view*, **PDF** downloads the view as a PDF of one page,
+  with the picture in it lossless at three times the screen's sharpness.
+- The **legend** (line kinds, crow's feet, the N:M badge) is part of the exported picture and
+  PDF, under the drawing; expanded tables are exported with their columns' types.
+
 ## 1.59.2 — 2026-11-13
 
 - **E-mail server:** a saved user name is shown like the saved password (`•••••••• saved`,

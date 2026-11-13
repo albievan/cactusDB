@@ -112,7 +112,7 @@ The Linux builds are fully static, so they run on any distribution, including Al
 
 ### What you'll see
 ```
-cactusdb 1.59.2
+cactusdb 1.60.0
   driver SQLite          modernc.org/sqlite v1.61.0 (bundled)
   driver MySQL, MariaDB  github.com/go-sql-driver/mysql v1.10.1 (bundled)
   driver Firebird        github.com/nakagami/firebirdsql v0.9.23 (bundled)
@@ -889,8 +889,9 @@ are unique: a primary or unique key (and what a foreign key refers to) is; other
 are checked in the database with `SELECT … GROUP BY … HAVING COUNT(*) > 1` (a read, never
 a change; 20 seconds at most each, else **?**).
 
-**Expand a table** (▸ on its box, or **Columns** for all) to list its columns, the key
-marked 🔑 and the joined ones in bold; the lines then join the rows of their columns. Views
+**Expand a table** (▸ on its box, or **Columns** for all) to list its columns with their
+types (`varchar(100)`, `numeric(12,2)`), the key marked 🔑 and the joined ones in bold; the
+lines then join the rows of their columns. Views
 can be expanded too. **Choose tables** draws only the objects you tick (filter to find
 them), with **And what they link to** also the ones a step away; *Choose* at the side adds
 or removes the selected one.
@@ -930,7 +931,10 @@ deletes it (click twice). *Everything* draws all again. A saved connection keeps
 on the server, sealed with its saved queries by the connection password, for everyone who
 opens it. A connection that isn't saved keeps them in this browser. **Export view**
 downloads the view drawn, and only that, as a PNG named after the connection and the view
-(`library-Catalogue-relationships.png`).
+(`library-Catalogue-relationships.png`); **PDF** downloads it as a PDF of one page the size
+of the drawing, the picture in it lossless and three times as sharp as on screen, so it
+prints and zooms sharp. Both have the legend under the drawing, and expanded tables with
+their columns and types.
 
 Linked objects are arranged together, each group beside the others. **Drag** an object to
 move it, drag the background to pan, the **wheel** or a pinch zooms; ⤢ shows everything.
