@@ -1,0 +1,79 @@
+# Checks in a browser that DB Relationships shows each column's type on SQL
+# Server and Oracle (too large to run next to everything else on the
+# development machine). Run it from Actions → Run workflow.
+name: relationships column types
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  types:
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Rel#Pass12345
+        ports: ["21433:1433"]
+      oracle:
+        image: gvenzl/oracle-free:23-slim
+        env:
+          ORACLE_PASSWORD: relpass1
+          APP_USER: shop
+          APP_USER_PASSWORD: relpass1
+        ports: ["21521:1521"]
+        options: --health-cmd healthcheck.sh --health-interval 10s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test databases
+        run: |
+          for i in $(seq 1 60); do
+            docker exec ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Rel#Pass12345' -Q "SELECT 1" >/dev/null 2>&1 && break
+            sleep 3
+          done
+          docker exec -i ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P 'Rel#Pass12345' <<'SQL'
+          CREATE DATABASE shop;
+          GO
+          USE shop;
+          CREATE TABLE customers (id INT PRIMARY KEY, name NVARCHAR(100) NOT NULL, credit DECIMAL(12,2), created DATETIME2(3), active BIT, notes NVARCHAR(MAX));
+          CREATE TABLE orders (id BIGINT PRIMARY KEY, customer_id INT NOT NULL REFERENCES customers(id), total NUMERIC(10,3), code CHAR(4), bin VARBINARY(16));
+          GO
+          SQL
+          docker exec -i ${{ job.services.oracle.id }} sqlplus -s shop/relpass1@FREEPDB1 <<'SQL'
+          WHENEVER SQLERROR EXIT FAILURE
+          CREATE TABLE customers (id NUMBER(10) PRIMARY KEY, name VARCHAR2(100 CHAR) NOT NULL, credit NUMBER(12,2), created TIMESTAMP, notes CLOB);
+          CREATE TABLE orders (id NUMBER(19) PRIMARY KEY, customer_id NUMBER(10) NOT NULL REFERENCES customers(id), total NUMBER(10,3), code CHAR(4), amount NUMBER, made DATE);
+          EXIT;
+          SQL
+      - name: cactusdb
+        run: |
+          go build -o "$RUNNER_TEMP/cactusdb" .
+          cd "$RUNNER_TEMP" && nohup ./cactusdb --host 127.0.0.1 --port 18093 --conn-db "$RUNNER_TEMP/t.conn.db" > cactusdb.log 2>&1 &
+          sleep 3
+      - name: Column types in the browser
+        working-directory: .github/ci
+        env:
+          DBS: >-
+            [{"engine":"mssql","port":21433,"user":"sa","pass":"Rel#Pass12345","db":"shop"},
+             {"engine":"oracle","port":21521,"user":"shop","pass":"relpass1","db":"FREEPDB1"}]
+          WANT: >-
+            {"mssql":{"name":"nvarchar(100)","credit":"decimal(12,2)","created":"datetime2(3)","active":"bit",
+                      "notes":"nvarchar(max)","total":"numeric(10,3)","code":"char(4)","bin":"varbinary(16)"},
+             "oracle":{"name":"varchar2(100)","credit":"number(12,2)","created":"timestamp(6)","notes":"clob",
+                       "total":"number(10,3)","code":"char(4)","amount":"number","made":"date","customer_id":"number(10)"}}
+        run: |
+          npm install --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+          node relationships-types.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relationships-types
+          path: |
+            .github/ci/rel-*.png
+            .github/ci/rel-types.json
+            ${{ runner.temp }}/cactusdb.log

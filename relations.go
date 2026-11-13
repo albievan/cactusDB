@@ -976,7 +976,7 @@ func relColumnsQuery(engine string) string {
 			DECODE(c.nullable, 'N', 'N', 'Y'),
 			c.data_type || CASE WHEN c.data_type IN ('VARCHAR2', 'NVARCHAR2', 'CHAR', 'NCHAR') THEN '(' || c.char_length || ')'
 				WHEN c.data_type = 'RAW' THEN '(' || c.data_length || ')'
-				WHEN c.data_type = 'NUMBER' AND c.data_precision IS NOT NULL THEN '(' || c.data_precision || ',' || c.data_scale || ')' END
+				WHEN c.data_type = 'NUMBER' AND c.data_precision IS NOT NULL THEN '(' || c.data_precision || CASE WHEN c.data_scale <> 0 THEN ',' || c.data_scale END || ')' END
 			FROM all_tab_columns c WHERE c.owner = :1 AND c.table_name NOT LIKE 'BIN$%'`
 	}
 	return ""
