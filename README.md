@@ -946,7 +946,8 @@ opens it. A connection that isn't saved keeps them in this browser. **Export vie
 downloads the view drawn, and only that, as a PNG named after the connection and the view
 (`library-Catalogue-relationships.png`); **PDF** downloads it as a PDF of one page the size
 of the drawing, the picture in it lossless and three times as sharp as on screen, so it
-prints and zooms sharp. Both have the legend under the drawing, and expanded tables with
+prints and zooms sharp (in Safari before 16.4 and Firefox before 113 the picture is a JPEG of
+quality 0.95 instead, as those browsers can't compress it losslessly). Both have the legend under the drawing, and expanded tables with
 their columns and types.
 
 Linked objects are arranged together, each group beside the others. **Drag** an object to
@@ -1921,9 +1922,10 @@ go test ./...            # unit tests
 ```
 
 Builds are **reproducible**: `build.sh` leaves the git state out of the binaries
-(`-buildvcs=false`), so building a release's tag again with the same Go version (`go version
--m` on a binary shows it) gives the files of its `SHA256SUMS` byte for byte, which lets anyone
-check that a release was built from its source.
+(`-buildvcs=false`) and always builds with Go 1.26.0 (`GOTOOLCHAIN`; Go downloads and
+verifies it when another version is installed), so building a release's tag again gives the
+files of its `SHA256SUMS` byte for byte, which lets anyone check that a release was built from
+its source.
 
 `integration_test.go` checks the database-level read-only protection against real
 servers. Start test databases and set `CACTUSDB_IT=1`:
@@ -2002,8 +2004,8 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `upgrade.go`, `release/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written and signed by `build.sh`; the binaries themselves are in the GitHub release, not in git) |
 | `build.sh`, `release.sh` | Build and sign the six binaries into `release/`; publish them as the GitHub release `v<VERSION>` |
 | `.github/workflows/setup-scripts.yml` | Installs each published release with `setup.sh` (Linux, macOS) and `setup.ps1` (Windows PowerShell 5.1 and 7), with the signature checked |
-| `.github/workflows/relationships-types.yml`, `.github/ci/relationships-types.mjs` | On demand: DB Relationships' column types on SQL Server and Oracle, read in a browser |
-| `.github/workflows/pdf-acrobat.yml`, `.github/ci/export-pdf.mjs` | On demand: exports a DB Relationships PDF in a browser and opens it in Adobe Acrobat Reader on Windows (installing Reader accepts Adobe's licence on the runner); the screenshot is kept as an artifact |
+| `.github/workflows/relationships-types.yml`, `.github/ci/relationships-types.mjs` | For every published release, and on demand: DB Relationships' column types on SQL Server and Oracle, read in a browser |
+| `.github/workflows/pdf-acrobat.yml`, `.github/ci/export-pdf.mjs` | For every published release, and on demand: exports a DB Relationships PDF in a browser and opens it in Adobe Acrobat Reader on Windows (installing Reader accepts Adobe's licence on the runner); fails unless Reader shows it, and keeps a screenshot as an artifact |
 | `setup.sh`, `setup.ps1` | Download the right binary for this computer as `cactusdb` / `cactusdb.exe` |
 | `web/index.html`, `web/cactusdb.svg` | The browser interface and icon, embedded into the binary |
 | `web/vendor/` | [Bootstrap 5.3.8](https://getbootstrap.com/) (its CSS and JavaScript bundle) and [Bootstrap Icons 1.13.2](https://icons.getbootstrap.com/), embedded too: the page loads nothing from the internet |

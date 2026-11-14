@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.61.3 — 2026-11-14
+
+- **`setup.ps1` checks the release signature itself**, in PowerShell (Ed25519, RFC 8032),
+  so Windows no longer needs OpenSSL 3 for it; a changed `SHA256SUMS` or signature isn't
+  installed.
+- **PDF export on older browsers** (Safari before 16.4, Firefox before 113, which lack
+  `CompressionStream`): the picture in the PDF is a JPEG of quality 0.95 instead of failing.
+  Other browsers keep the lossless picture.
+- **Builds always use Go 1.26.0** (`GOTOOLCHAIN` in `build.sh`), so a release rebuilds byte for
+  byte whatever Go is installed.
+- The SQL Server/Oracle column-type check and the Acrobat check run for **every published
+  release**, next to the install check; the Acrobat check fails unless Reader shows the PDF.
+- The git history no longer holds the 1.61.0 binaries that were in `dist/` (about 60 MB).
+
 ## 1.61.2 — 2026-11-13
 
 - **Reproducible builds:** `build.sh` no longer stamps the git commit and its "modified" flag

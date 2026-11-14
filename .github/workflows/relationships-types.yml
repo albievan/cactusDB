@@ -1,8 +1,10 @@
 # Checks in a browser that DB Relationships shows each column's type on SQL
 # Server and Oracle (too large to run next to everything else on the
-# development machine). Run it from Actions → Run workflow.
+# development machine). Runs for every published release, and on demand (Actions → Run workflow).
 name: relationships column types
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 permissions:
   contents: read

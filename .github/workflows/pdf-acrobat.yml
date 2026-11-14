@@ -1,8 +1,10 @@
 # Opens a DB Relationships PDF export in Adobe Acrobat Reader on Windows and
 # keeps a screenshot of it. Installing Reader accepts Adobe's licence
-# agreement on the (throwaway) runner. Run it from Actions → Run workflow.
+# agreement on the (throwaway) runner. Runs for every published release, and on demand (Actions → Run workflow).
 name: pdf in acrobat
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 permissions:
   contents: read
@@ -42,11 +44,13 @@ jobs:
           Start-Process -FilePath $exe -ArgumentList (Resolve-Path rel.pdf).Path
           Start-Sleep 45
           Get-Process | Where-Object { $_.MainWindowTitle } | Format-Table ProcessName, MainWindowTitle -AutoSize | Out-String -Width 300
+          $win = Get-Process | Where-Object { $_.MainWindowTitle -like "rel.pdf - Adobe Acrobat*" }
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
           [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
           $bmp.Save("$PWD\acrobat.png")
+          if (-not $win) { throw "Acrobat has no window showing rel.pdf (an error, or it didn't open it)" }
       - if: always()
         uses: actions/upload-artifact@v4
         with:

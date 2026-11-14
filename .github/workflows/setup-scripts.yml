@@ -40,8 +40,8 @@ jobs:
         env:
           CACTUSDB_VERSION: ${{ inputs.version || github.event.release.tag_name }}
         run: |
-          # OpenSSL 3 of Git for Windows checks the signature.
-          $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
+          # No OpenSSL on the path: setup.ps1 checks the signature itself.
+          $env:PATH = ($env:PATH -split ";" | Where-Object { $_ -and -not (Test-Path (Join-Path $_ "openssl.exe")) }) -join ";"
           $out = powershell -ExecutionPolicy Bypass -File setup.ps1 "$env:RUNNER_TEMP\cdb51" *>&1 | Out-String
           Write-Host $out
           if ($out -notmatch "release signature checked") { throw "the signature wasn't checked" }
@@ -52,7 +52,7 @@ jobs:
         env:
           CACTUSDB_VERSION: ${{ inputs.version || github.event.release.tag_name }}
         run: |
-          $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
+          $env:PATH = ($env:PATH -split ";" | Where-Object { $_ -and -not (Test-Path (Join-Path $_ "openssl.exe")) }) -join ";"
           ./setup.ps1 "$env:RUNNER_TEMP\cdb51" *>&1 | Tee-Object -Variable out
           if (($out | Out-String) -notmatch "release signature checked") { throw "the signature wasn't checked" }
           & "$env:RUNNER_TEMP\cdb51\cactusdb.exe" --version

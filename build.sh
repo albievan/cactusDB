@@ -7,11 +7,14 @@
 set -e
 # The version is in the VERSION file, which running cactusdbs check for updates.
 VERSION=${VERSION:-$(cat VERSION)}
+# Releases are built with this exact Go, so building a release's tag again gives
+# byte-identical binaries; Go downloads (and verifies) it if another is installed.
+export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.0}
 # The release key signs release/SHA256SUMS; its public half is built into the
 # binaries, which install an update only when the signature checks out. It
 # lives outside the repository: keep a backup of it, as installed cactusdbs
-# refuse updates signed with any other key. setup.sh and setup.ps1 carry the
-# same public key (as PEM): a new key must be put there too.
+# refuse updates signed with any other key. setup.sh (as PEM) and setup.ps1
+# (as base64) carry the same public key: a new key must be put there too.
 KEY=${CACTUSDB_RELEASE_KEY:-$HOME/.config/cactusdb/release-ed25519.key}
 helper=$(mktemp -d)
 trap 'rm -rf "$helper"' EXIT

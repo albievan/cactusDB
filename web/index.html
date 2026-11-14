@@ -4106,10 +4106,21 @@ $("relPdf").addEventListener("click", async () => {
 
 async function relPdfOf({ cv, w, h }) {
   const pw = cv.width, ph = cv.height;
-  const px = cv.getContext("2d").getImageData(0, 0, pw, ph).data;
-  const rgb = new Uint8Array(pw * ph * 3);
-  for (let i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
-  const data = new Uint8Array(await new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+  // Lossless (the pixels deflated) where the browser has CompressionStream;
+  // older browsers (Safari before 16.4, Firefox before 113) embed a JPEG of
+  // quality 0.95, which every PDF reader shows too.
+  let data, filter;
+  if (typeof CompressionStream === "function") {
+    const px = cv.getContext("2d").getImageData(0, 0, pw, ph).data;
+    const rgb = new Uint8Array(pw * ph * 3);
+    for (let i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
+    data = new Uint8Array(await new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+    filter = "/FlateDecode";
+  } else {
+    const jpg = await new Promise((ok, bad) => cv.toBlob((b) => b ? ok(b) : bad(new Error("this browser can't make the picture")), "image/jpeg", 0.95));
+    data = new Uint8Array(await jpg.arrayBuffer());
+    filter = "/DCTDecode";
+  }
   // The page in points, the drawing's size at 96 dpi, at most 200 inches a side.
   const k = Math.min(0.75, 14400 / w, 14400 / h), W = +(w * k).toFixed(2), H = +(h * k).toFixed(2);
   const enc = new TextEncoder(), parts = [], offsets = [];
@@ -4121,7 +4132,7 @@ async function relPdfOf({ cv, w, h }) {
   obj(1, () => put("<< /Type /Catalog /Pages 2 0 R >>"));
   obj(2, () => put("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
   obj(3, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>`));
-  obj(4, () => { put(`<< /Type /XObject /Subtype /Image /Width ${pw} /Height ${ph} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${data.length} >>\nstream\n`); put(data); put("\nendstream"); });
+  obj(4, () => { put(`<< /Type /XObject /Subtype /Image /Width ${pw} /Height ${ph} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ${filter} /Length ${data.length} >>\nstream\n`); put(data); put("\nendstream"); });
   obj(5, () => put(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
   const xref = len;
   put(`xref\n0 6\n0000000000 65535 f \n` + [1, 2, 3, 4, 5].map((n) => String(offsets[n]).padStart(10, "0") + " 00000 n \n").join(""));
