@@ -24,8 +24,10 @@
   `setup.sh` and `setup.ps1` install the latest release, or the one in `CACTUSDB_VERSION`
   (replacing `CACTUSDB_REF`). The download links in the README and in *Check for update* point
   at the latest release.
-- **cactusdb 1.60.0 and older** update from `dist/`, which keeps version 1.61.0 for them:
-  they move to 1.61.0, and update from GitHub releases from then on.
+- **cactusdb 1.60.0 and older** update from `dist/`, which kept version 1.61.0 for them.
+  *Correction:* they only install a file of exactly the version in `VERSION`, so this worked
+  only while 1.61.0 was the latest; `dist/` no longer holds binaries. Update them once with
+  `setup.sh` / `setup.ps1` and restart them (see *Install* in the README).
 - **A server without internet access:** GitHub doesn't let a page download a release file
   itself, so *Install and restart* links to the file and asks you to choose it once
   downloaded; it is then sent to the server as before, with its checksum read from

@@ -62,6 +62,11 @@ irm https://raw.githubusercontent.com/albievan/cactusDB/main/setup.ps1 | iex
   `.\setup.ps1 C:\cactusdb`) or set `CACTUSDB_DIR`.
 - **Another version:** set `CACTUSDB_VERSION`, e.g. `CACTUSDB_VERSION=1.61.0` (the default is
   the latest release).
+- **Updating from cactusdb 1.60.0 or older:** run the script once on that computer and
+  restart cactusdb. Those versions downloaded updates from a `dist/` folder of this
+  repository, which no longer holds binaries, so their *Install and restart* fails (*GitHub
+  says the latest version is …, but the file is …*, or a 404). From 1.61.0 on, *Install and
+  restart* downloads from GitHub releases.
 - **Updating:** run the script again. It replaces `cactusdb` in place. A cactusdb that is
   running keeps running, and the new version is used from its next start.
 - **macOS:** the script also clears the download quarantine, so you can skip the `xattr`
@@ -1996,7 +2001,6 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the latest release |
 | `upgrade.go`, `release/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written and signed by `build.sh`; the binaries themselves are in the GitHub release, not in git) |
 | `build.sh`, `release.sh` | Build and sign the six binaries into `release/`; publish them as the GitHub release `v<VERSION>` |
-| `dist/` | Version 1.61.0, kept for cactusdb 1.60.0 and older, which update from there: they move to 1.61.0, which updates from GitHub releases. Not updated any more |
 | `.github/workflows/setup-scripts.yml` | Installs each published release with `setup.sh` (Linux, macOS) and `setup.ps1` (Windows PowerShell 5.1 and 7), with the signature checked |
 | `.github/workflows/relationships-types.yml`, `.github/ci/relationships-types.mjs` | On demand: DB Relationships' column types on SQL Server and Oracle, read in a browser |
 | `.github/workflows/pdf-acrobat.yml`, `.github/ci/export-pdf.mjs` | On demand: exports a DB Relationships PDF in a browser and opens it in Adobe Acrobat Reader on Windows (installing Reader accepts Adobe's licence on the runner); the screenshot is kept as an artifact |
