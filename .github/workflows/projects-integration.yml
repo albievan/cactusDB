@@ -1,0 +1,82 @@
+# Projects against real servers: a query joining MariaDB, PostgreSQL, SQL
+# Server and Firebird, and write attempts through a project that must change
+# nothing (TestProjectCrossDatabase, CACTUSDB_IT=1). For every published
+# release, pushes to feature branches, and on demand.
+name: projects integration
+on:
+  release:
+    types: [published]
+  push:
+    branches: ["feature/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  it:
+    runs-on: ubuntu-latest
+    services:
+      maria:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: secret
+          MARIADB_DATABASE: shop
+        ports: ["13307:3306"]
+        options: --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-retries 40
+      pg:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: "pg p@ss:/w"
+          POSTGRES_DB: shop
+        ports: ["15432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 40
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Cactus#Pass123
+        ports: ["11433:1433"]
+      fb:
+        image: jacobalberty/firebird:latest
+        env:
+          ISC_PASSWORD: masterkey
+          FIREBIRD_DATABASE: test.fdb
+        ports: ["13050:3050"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test tables (two customers in each)
+        run: |
+          docker exec -i ${{ job.services.maria.id }} mariadb -uroot -psecret shop <<'SQL'
+          CREATE TABLE customers (id INT PRIMARY KEY, name VARCHAR(50));
+          INSERT INTO customers VALUES (1, 'Ann'), (2, 'Bob');
+          SQL
+          docker exec -i ${{ job.services.pg.id }} psql -U postgres shop <<'SQL'
+          CREATE TABLE customers (id INT PRIMARY KEY, name VARCHAR(50));
+          INSERT INTO customers VALUES (1, 'Ann'), (2, 'Bob');
+          SQL
+          for i in $(seq 1 60); do
+            docker exec ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Cactus#Pass123' -Q "SELECT 1" >/dev/null 2>&1 && break
+            sleep 3
+          done
+          docker exec -i ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P 'Cactus#Pass123' <<'SQL'
+          CREATE DATABASE shop;
+          GO
+          USE shop;
+          CREATE TABLE dbo.customers (id INT PRIMARY KEY, name NVARCHAR(50));
+          INSERT INTO dbo.customers VALUES (1, 'Ann'), (2, 'Bob');
+          GO
+          SQL
+          for i in $(seq 1 60); do docker exec ${{ job.services.fb.id }} test -f /firebird/data/test.fdb && break; sleep 2; done
+          sleep 5
+          docker exec -i ${{ job.services.fb.id }} /usr/local/firebird/bin/isql -user SYSDBA -password masterkey /firebird/data/test.fdb <<'SQL'
+          CREATE TABLE CUSTOMER (ID INTEGER NOT NULL PRIMARY KEY, NAME VARCHAR(50));
+          INSERT INTO CUSTOMER VALUES (1, 'Ann');
+          INSERT INTO CUSTOMER VALUES (2, 'Bob');
+          COMMIT;
+          SQL
+      - name: Cross-database join and the read-only guarantee
+        env:
+          CACTUSDB_IT: "1"
+        run: go test -count=1 -v -run 'TestProjectCrossDatabase' .

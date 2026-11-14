@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -204,5 +205,60 @@ func TestStageValues(t *testing.T) {
 	}
 	if got := stageValue(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), &mCol{Kind: kTimestamp}, false); got != "2026-01-02 03:04:05" {
 		t.Errorf("timestamp: %#v", got)
+	}
+}
+
+// With one linked database down, the project opens, says which one, and
+// queries on the others run; a query that needs it names it.
+func TestProjectWithADatabaseDown(t *testing.T) {
+	s := newTestServer(t)
+	up := newSQLiteDB(t, "up.db", `CREATE TABLE t (id INTEGER)`, `INSERT INTO t VALUES (1), (2)`)
+	down := filepath.Join(t.TempDir(), "gone", "down.db") // a file that isn't there
+	idA, _ := s.store.SaveUnlocked(SavedConn{Name: "up", ConnParams: ConnParams{Engine: EngineSQLite, Database: up}})
+	idB, _ := s.store.SaveUnlocked(SavedConn{Name: "down", ConnParams: ConnParams{Engine: EngineSQLite, Database: down}})
+	d := projectData{Links: []projectLink{{idA, "a"}, {idB, "b"}}, Tables: []projectTable{{Alias: "a", Source: "t", Name: "t"}, {Alias: "b", Source: "t", Name: "t"}}}
+	checkProjectData(&d)
+	pid, _, err := s.store.CreateProject("Half", d, map[int64]*secretBox{idA: nil, idB: nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	s.projectRoutes(mux)
+	call := func(method, path string, body any, want int) map[string]any {
+		t.Helper()
+		b, _ := json.Marshal(body)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, jsonReq(method, path, bytes.NewReader(b)))
+		var out map[string]any
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		if rec.Code != want {
+			t.Fatalf("%s %s: %d (want %d): %s", method, path, rec.Code, want, rec.Body.String())
+		}
+		return out
+	}
+	open := call("POST", "/api/projects/"+strconv.FormatInt(pid, 10)+"/open", map[string]any{}, 200)
+	states := map[string]any{}
+	for _, l := range open["links"].([]any) {
+		m := l.(map[string]any)
+		states[m["alias"].(string)] = m["state"]
+	}
+	if states["a"] != "connected" || states["b"] != "failed" {
+		t.Fatalf("states: %v", states)
+	}
+	ps := open["project"].(string)
+	call("POST", "/api/project/run", map[string]any{"project": ps, "sql": "SELECT COUNT(*) FROM a.t"}, 200)
+	var st map[string]any
+	for i := 0; i < 100; i++ {
+		if st = call("GET", "/api/project/run?project="+ps, nil, 200); st["state"] == "done" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if toJSON(st["result"].(map[string]any)["rows"]) != "[[2]]" {
+		t.Errorf("the other database: %v", st)
+	}
+	miss := call("POST", "/api/project/run", map[string]any{"project": ps, "sql": "SELECT * FROM a.t JOIN b.t x ON x.id = t.id"}, 400)
+	if miss["errorKind"] != "source" || !strings.Contains(miss["error"].(string), "the database b isn't connected") {
+		t.Errorf("the missing database: %v", miss)
 	}
 }

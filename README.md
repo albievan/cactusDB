@@ -975,6 +975,105 @@ Databases that don't speak SQL have no relationships: their objects are drawn on
 A part the connection may not read is noted under the title; the rest is still drawn.
 
 <a id="browsing-objects"></a>
+<a id="projects"></a>
+### Projects: several databases in one query
+
+**☰ → Projects** links several saved connections, of different types (a Firebird, a
+MariaDB and a SQL Server, say), into a **project**, and queries them together with **one
+SELECT** that joins their tables. It only ever reads them.
+
+1. **New project**: give it a name. Projects are kept in `cactus.conn.db`, sealed (see
+   below), and never hold a password: they refer to your saved connections.
+2. **Link** a saved connection under a short **alias** (`fb`, `maria`, `ms`: letters,
+   digits and `_`). A project links up to **10** databases (the most SQLite can attach at
+   once) of the types that speak SQL: SQLite, MySQL, MariaDB, PostgreSQL and its flavours
+   (CockroachDB, Redshift, Azure Database for PostgreSQL, HorizonDB, pgvector), Firebird,
+   SQL Server, Azure SQL, Oracle, Informix, Access, Athena and BigQuery. NoSQL and vector
+   databases can't be linked yet.
+3. **Tables**: tick the tables and views of each database the project uses. Each gets a
+   name in the project (its own; `schema_table` when two schemas hold one of that name).
+4. **Query** them as `alias.table`:
+
+   ```sql
+   SELECT c.name, o.order_date, i.amount
+   FROM   fb.customer c
+   JOIN   maria.orders o   ON o.customer_id = c.id
+   LEFT JOIN ms.invoices i ON i.order_id = o.id
+   WHERE  o.order_date >= '2026-01-01'
+   ORDER BY c.name
+   ```
+
+**How a query runs.** cactusdb reads, from each database, only the tables and columns
+the query uses, copies those rows into a private SQLite database (one file per alias, in
+a folder of the system's temporary folder that only cactusdb can read), and runs the
+query there. So the query is **SQLite's SQL**: its functions, dates (ISO 8601 text) and
+comparisons apply, not those of the source databases. Text of MySQL, MariaDB, SQL Server
+and Access is compared case-insensitively as there; Firebird's `CHAR` padding is
+removed; names match whatever their case. Exact decimals stay exact (as text when wider
+than 15 digits).
+
+- **Filters at the source.** A condition like `o.order_date >= '2026-01-01'` or
+  `c.id = 7` in the WHERE is also sent to that table's database, so fewer rows are read
+  (shown under the query). Only conditions that can't drop a row are sent: never under an
+  `OR`, on the optional side of an outer join, on text ranges, or to Access, Athena,
+  BigQuery and Informix; numbers and dates get a margin. The condition always runs on the
+  copy too.
+- **Limits** (the project's *Limits*): 1,000,000 rows per table, 2 GB of copies, 10
+  minutes per run. A query that would need more **stops, naming the table**: you never
+  get a result built from part of a table.
+- **Progress and Cancel**: the rows read per table are shown while loading; *Cancel*
+  stops the reads and deletes the copies.
+- Each run reads afresh. The copies of the last run stay until the next run or until the
+  project closes, so the grid, *Show n rows* and the **exports** (Excel, CSV, XML, JSON,
+  *All formats*) hold exactly the rows shown, all of them. Exports go to
+  `<export folder>/projects/<project>/xlsx|csv|xml|json/` and appear under *Exported
+  files*.
+
+**The query designer.** Beside the SQL, the diagram and the SQL are two views of one
+query: typing redraws the diagram, and every change in the diagram rewrites the SQL (one
+clause per line).
+- Drag a table from the left (or *Add table*) onto it; tables are coloured per database.
+- **Join** by dragging a column onto another table's column (again for more column pairs);
+  click a join line for its type (INNER, LEFT, RIGHT, FULL, CROSS), operator and columns,
+  or use *Link tables*. Joins from foreign keys and from names like `customer_id` →
+  `customer.id` are offered when a table is added, never applied without a click.
+- Tick columns for the output; the grid under the diagram sets their names, totals
+  (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
+  ANDed, the *or* rows ORed), with DISTINCT and LIMIT.
+- A join of a text column with a number (or a date with a number) is shown in red, as
+  is a table joined to nothing or one that isn't in the project.
+- SQL the designer can't hold (a subquery, `WITH`, `UNION`, a window function) makes it
+  **read-only**: it shows the tables and never changes that SQL. Expressions it doesn't
+  model (`upper(c.name)`, a `HAVING`) are kept as written.
+- Ctrl+Z / Ctrl+Shift+Z undo and redo diagram and text edits alike; *Arrange*, zoom and
+  *Fit*; every action works from the keyboard too (Tab to a table: arrows move it,
+  Delete removes it, Enter opens its joins). The *Query diagram* switch hides it.
+
+**Saved queries** of a project work like a connection's: name, description, every
+version kept, *Execute* (the first 100 rows), and the diagram's layout saved with them.
+
+**One at a time.** Opening a project disconnects the database you're connected to, and
+connecting to a database closes the open project (both ask about unsaved changes first).
+Opening a project connects every linked database; one that can't be reached is shown
+*not connected* with **Retry**, and the others work. A saved connection that a project
+uses is only deleted after a warning naming the projects; their link then shows as
+broken until you re-point it.
+
+**Passwords.** Opening a project needs the password of every password-protected
+connection it links (or the superuser password): its tables and queries name all of
+them, so one connection's password must not show the others'. The project's data is
+sealed with a key of its own, split into one share per linked connection, each sealed with
+that connection's key; changing a connection's password re-seals only its share.
+
+**Read-only, three times over.** A project never changes a linked database:
+1. The query must be one `SELECT` (or `WITH … SELECT`); `ATTACH`, `PRAGMA`, `VACUUM`,
+   `load_extension`, `readfile`/`writefile` and more than one statement are refused.
+2. The only SQL sent to a linked database is cactusdb's own `SELECT` of the columns it
+   needs, with quoted names and bound values, through the same read-only sessions and
+   transactions as any query (below). Your text is never sent to a source database.
+3. The copies are the only thing written, and your query runs on a connection that
+   attaches them read-only and is itself `query_only`.
+
 ### Browsing objects: views, stored procedures, generators…
 
 The **Objects** section has one tab per object type that exists in the database, each with
@@ -1294,6 +1393,9 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
    - MongoDB takes only `find`, `aggregate` (without `$out` or `$merge`), `countDocuments`,
      `distinct` and `getIndexes`; Redis only the commands that read; Cassandra and Athena
      only `SELECT`.
+
+[Projects](#projects) add nothing to this: a project query runs on private copies of the
+rows it needs, read through the paths above, and writes nothing anywhere else.
 
 The one exception is [migrating a database](#migrate): cactusdb then writes to a **new**
 database it creates for it (and refuses one that already exists), and only for the
@@ -1765,6 +1867,14 @@ is sent and how to set it up. In short:
   even someone with `cactus.conn.db` *and* `cactus.key` can't read them without that
   password. Wrong guesses are slowed down. The connection's exported files are only served
   to someone who gives its password. See [Connection passwords](#connection-passwords).
+- **Projects** are sealed with a key of their own (AES-256-GCM), split into one share per
+  linked connection (XOR: every share is needed), each share sealed with that
+  connection's key. Opening a project, and so reading its tables and queries, needs the
+  password of every password-protected connection it links, or the superuser password.
+  Its exports are protected like those of its first password-protected connection. A
+  project query's copies of rows live in a private temporary folder (0700) and are
+  deleted when the run is replaced, the project closes or cactusdb stops. See
+  [Projects](#projects).
 - **Who is using cactusdb** (the people button) shows every open page's client IP and
   browser to everyone who can open cactusdb, and the notices name who changed what by client
   IP. They never contain a password, a query or a query's name.
@@ -1981,6 +2091,11 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `relations.go` | The DB Relationships tab: every object and its foreign keys, triggers and dependencies from each database's catalog or found in the source, relationships assumed from the joins in views and routines and from column names, every table's columns (`/api/relationships`), and the uniqueness check for 1:N / N:M (`/api/relationships/unique`) |
 | `relations.go` (`handleColumns`) | Every table's and view's columns for the query editor's suggestions (`/api/columns`) |
 | `relviews.go` | The saved views of DB Relationships, sealed with the saved connection like its queries (`/api/relviews`) |
+| `projects.go`, `projects_store.go` | Projects: storage (`projects`, `project_links` tables; the project key split over the linked connections), opening (every linked connection unlocked and connected), linking, tables (`/api/projects`, `/api/project/…`) |
+| `projectsql.go` | A project query read just enough: the tables and columns it uses, the conditions that can go to the source (pushdown), and the stricter read-only check |
+| `projectrun.go` | Running a project query: the staging (a SQLite file per alias, attached read-only), type mapping, limits, progress, cancel, exports to `projects/<project>/` |
+| `projects_queries.go` | A project's saved queries and versions (`project_queries`, `project_query_versions`), columns and keys for the designer, join suggestions |
+| `.github/ci/pq-roundtrip.mjs`, `.github/workflows/checks.yml`, `.github/workflows/projects-integration.yml` | The designer's SQL ↔ model round trips (on every push); a project joining MariaDB, PostgreSQL, SQL Server and Firebird, and the read-only guarantee against them (per release) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |

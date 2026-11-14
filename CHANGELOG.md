@@ -1,7 +1,31 @@
 # Changelog
 
-## Unreleased (setup.sh only, no new binaries) — 2026-11-14
+## 1.62.0 — 2026-11-14
 
+- **Projects** (☰ → Projects): link several saved connections of different types (e.g.
+  Firebird, MariaDB and SQL Server) under aliases, choose their tables, and query them
+  together with **one SELECT** that joins tables of different databases (`alias.table`).
+  - The rows a query needs are read from each database (only the columns used, simple
+    conditions also applied at the source), copied into private SQLite files and the
+    query runs there, in SQLite's SQL. Limits per table, in all and in time stop a query
+    with a message naming the table; progress per table and *Cancel*.
+  - Results in the grid; exports to Excel, CSV, XML, JSON or all four hold every row of
+    the run shown, in `<export folder>/projects/<project>/`.
+  - **Query designer**: the diagram and the SQL stay in step both ways. Drag tables from
+    the left, drag a column onto another to join, a join dialog (type, operator, columns),
+    join suggestions from keys and names, output columns, filters (AND/OR), sorting,
+    grouping, totals, DISTINCT and LIMIT; read-only for SQL it can't hold; undo/redo;
+    arrange, zoom, fit; keyboard access; suggestions in the editor.
+  - Saved queries per project, with versions and their diagram layout.
+  - A project opens with every password-protected linked connection's password (or the
+    superuser's); its data is sealed with its own key, split over those connections.
+  - Read-only, three times over: one SELECT only (no ATTACH, PRAGMA…), cactusdb's own
+    SELECTs to the sources through the read-only paths, and a read-only, `query_only`
+    connection to the copies. Integration tests run it against MariaDB, PostgreSQL, SQL
+    Server and Firebird for every release.
+  - Opening a project disconnects the connected database and connecting closes the
+    project, asking about unsaved changes first.
+- Deleting a saved connection that projects use warns first, naming them.
 - **`setup.sh` checks the release signature without OpenSSL 3** too: with Perl (Ed25519,
   RFC 8032, using Perl's own modules), which macOS (whose `openssl` is LibreSSL) and most
   Linux systems have. Only a system with neither still checks just the checksum, and says so.
