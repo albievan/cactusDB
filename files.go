@@ -59,13 +59,31 @@ func (s *server) protectedFolders() map[string]int64 {
 	if err != nil {
 		return out
 	}
+	locked := map[int64]bool{}
 	for _, c := range list {
 		if c.Lock != "" {
 			out[connFolderName(c.Name)] = c.ID
+			locked[c.ID] = true
+		}
+	}
+	// A project's exports are protected like those of the first
+	// password-protected connection it links.
+	if projects, err := s.store.Projects(); err == nil {
+		for _, p := range projects {
+			for _, id := range p.ConnIDs {
+				if locked[id] {
+					out[projectsSubdir+"/"+connFolderName(p.Name)] = id
+					break
+				}
+			}
 		}
 	}
 	return out
 }
+
+// projectsSubdir is the folder of the export folder that projects export
+// to, a subfolder per project: projects/<project>/<type>/.
+const projectsSubdir = "projects"
 
 // fileUnlock is how a request from the page opens protected files: the
 // connection password per connection folder, or the superuser password.
@@ -152,6 +170,15 @@ func (s *server) listExportedFiles() []exportedFile {
 		conns := []string{""}
 		if entries, err := os.ReadDir(dir); err == nil {
 			for _, e := range entries {
+				if e.IsDir() && e.Name() == projectsSubdir { // a folder per project: projects/<project>
+					subs, _ := os.ReadDir(filepath.Join(dir, projectsSubdir))
+					for _, p := range subs {
+						if p.IsDir() && validFileName(p.Name()) {
+							conns = append(conns, projectsSubdir+"/"+p.Name())
+						}
+					}
+					continue
+				}
 				if e.IsDir() && !exportSubdirs[e.Name()] && validFileName(e.Name()) {
 					conns = append(conns, e.Name())
 				}

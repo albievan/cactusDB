@@ -420,6 +420,21 @@
   .prjobjs li .src { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .prjobjs li .kind { color: var(--muted); font-size: 11px; margin-left: 4px; }
   .prjobjs li input[type=text] { font-size: 12px; padding: 1px 6px; }
+  #prjWork { display: flex; flex-direction: column; min-height: 100%; }
+  .prjsetup { border-bottom: 1px solid var(--border); }
+  .prjsetup > summary { padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .prjsetup > summary .cnt { color: var(--muted); font-weight: 400; }
+  .prjquery { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 8px 12px; gap: 6px; }
+  .prjqbar, .prjresbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .prjqbar select { width: auto; }
+  .prjdialect { font-size: 12px; color: var(--muted); }
+  .prjsql { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; min-height: 120px; height: 160px; resize: vertical; }
+  .prjprog { font-size: 12px; display: grid; gap: 2px; }
+  .prjprog .bad { color: var(--danger, #c0392b); white-space: pre-wrap; }
+  .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
+  .prjresbar .info { font-size: 12px; color: var(--muted); }
+  .prjexpnote { font-size: 12px; }
+  .prjgrid { flex: 1; overflow: auto; min-height: 160px; border: 1px solid var(--border); border-radius: 6px; }
   @media (max-width: 900px) { .prjbody { grid-template-columns: minmax(0, 1fr); } .prjsec + .prjsec { border-left: 0; border-top: 1px solid var(--border); } }
   #comparePane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
   #comparePane[hidden] { display: none; }
@@ -1459,6 +1474,8 @@
           <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)"><i class="bi bi-trash" aria-hidden="true"></i> Delete</button>
           <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases"><i class="bi bi-x-lg" aria-hidden="true"></i> Close</button>
         </div>
+        <details class="prjsetup" id="prjSetupWrap" open>
+        <summary>Databases and tables <span class="cnt" id="prjSetupSum"></span></summary>
         <div class="prjbody" id="prjSetup">
           <section class="prjsec">
             <h4>Linked databases <span class="cnt" id="prjLinkCnt"></span></h4>
@@ -1490,6 +1507,34 @@
             </div>
             <ul class="list prjobjs" id="prjObjs"></ul>
           </section>
+        </div>
+        </details>
+        <div class="prjquery">
+          <div class="prjqbar">
+            <span class="flabel">Query</span>
+            <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
+            <span class="spacer"></span>
+            <label class="flabel" for="prjLimit">Show</label>
+            <select class="form-select form-select-sm" id="prjLimit" title="How many rows the grid shows (exports always hold every row)"><option>100</option><option selected>1000</option><option>10000</option><option>100000</option></select>
+            <button class="btn btn-sm btn-primary" id="prjRun" title="Read the rows the query needs from each database, then run it (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button>
+            <button class="btn btn-sm btn-outline-danger" id="prjCancel" hidden title="Stop reading and remove the copies"><i class="bi bi-stop-fill" aria-hidden="true"></i> Cancel</button>
+          </div>
+          <textarea class="form-control prjsql" id="prjSql" spellcheck="false" autocomplete="off" aria-label="Project query" placeholder="SELECT c.name, o.order_date&#10;FROM   fb.customer c&#10;JOIN   maria.orders o ON o.customer_id = c.id"></textarea>
+          <div class="prjprog" id="prjProg" hidden></div>
+          <div class="prjres">
+            <div class="prjresbar">
+              <span class="info" id="prjInfo"></span>
+              <span class="spacer"></span>
+              <span class="flabel">Export</span>
+              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="xlsx" disabled title="Every row of the result as an Excel workbook">Excel</button>
+              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="csv" disabled title="Every row as CSV">CSV</button>
+              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="xml" disabled title="Every row as XML">XML</button>
+              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="json" disabled title="Every row as JSON">JSON</button>
+              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="all" disabled title="Every row in all four formats at once">All formats</button>
+            </div>
+            <div class="prjexpnote" id="prjExpNote" hidden></div>
+            <div class="prjgrid" id="prjGrid"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -4728,6 +4773,11 @@ async function prjOpen(id) {
   if (down.length) toast(`Not connected: ${down.map((l) => l.alias).join(", ")} (see Linked databases)`, true);
 }
 function prjSet(res) {
+  if (!prj.open || prj.open.id !== res.id) { // another project: nothing of the last one stays
+    prj.result = null; prj.ran = ""; prj.queryName = ""; prj.poll++;
+    $("prjSql").value = ""; $("prjGrid").innerHTML = ""; $("prjProg").hidden = true; $("prjExpNote").hidden = true; $("prjInfo").textContent = "";
+    $("prjSetupWrap").open = !res.tables.length;
+  }
   prj.open = res; prj.orig = prjEditable(); prj.objs = {};
   if (!res.links.some((l) => l.alias === prj.alias)) prj.alias = (res.links.find((l) => l.state === "connected") || res.links[0] || {}).alias || "";
 }
@@ -4776,6 +4826,7 @@ function prjRenderLinks() {
   const o = prj.open;
   $("prjChips").innerHTML = o.links.map((l) => `<span class="prjchip ${l.state}" title="${esc((l.name || "deleted connection") + " · " + prjStateWords[l.state] + (l.error ? ": " + l.error : ""))}"><span class="dot"></span>${esc(l.alias)}</span>`).join("");
   $("prjLinkCnt").textContent = `· ${o.links.length} of at most ${prj.maxLinks}`;
+  $("prjSetupSum").textContent = `· ${o.links.length} database${o.links.length === 1 ? "" : "s"}, ${o.tables.length} table${o.tables.length === 1 ? "" : "s"}`;
   const linked = new Set(o.links.map((l) => l.connId));
   const saved = [...(state.saved || [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   $("prjAddConn").innerHTML = `<option value="">Saved connection to link…</option>` + saved.map((c) => {
@@ -4974,6 +5025,103 @@ window.addEventListener("pagehide", () => {
 });
 // A changed project isn't lost by closing the page unasked.
 window.addEventListener("beforeunload", (ev) => { if (prjDirty()) { ev.preventDefault(); ev.returnValue = ""; } });
+
+// ---- running a project query ---------------------------------------------------
+// The server reads the rows the query needs from each database into private
+// copies and runs it there (projectrun.go); the page follows the loading and
+// shows the result in the grid. Exports hold every row of the last run.
+Object.assign(prj, { result: null, sort: null, shown: 0, ran: "", running: false, poll: 0 });
+
+function prjSetExport() {
+  const ok = !!prj.result && !prj.running && prj.ran === $("prjSql").value.trim().replace(/;\s*$/, "").trim();
+  document.querySelectorAll(".pexp").forEach((b) => (b.disabled = !ok));
+}
+function prjRenderGrid() {
+  const res = prj.result;
+  $("prjGrid").innerHTML = !res ? "" : res.columns.length ? gridHtml(res, prj.sort, prj.shown) : `<div class="emptymsg"><p>No columns.</p></div>`;
+}
+function prjProgress(st) {
+  const p = $("prjProg");
+  const rows = (st.tables || []).map((t) => `<div>${t.done ? "✓" : "…"} <b>${esc(t.alias)}.${esc(t.name)}</b>: ${t.rows.toLocaleString()} row${t.rows === 1 ? "" : "s"} read, ${t.columns} column${t.columns === 1 ? "" : "s"}` +
+    (t.pushed && t.pushed.length ? ` · filtered at the source: <code>${esc(t.pushed.join(" AND "))}</code>` : "") + `</div>`);
+  const what = st.state === "loading" ? "Reading the rows the query needs…" : st.state === "querying" ? "Running the query on the copies…"
+    : st.state === "done" ? `Read in ${(st.elapsedMs / 1000).toFixed(1)} s` : st.state === "cancelled" ? "Cancelled" : "";
+  const err = st.error ? `<div class="bad">${esc(st.errorKind === "source" ? "A database failed: " : st.errorKind === "limit" ? "Stopped at a limit: " : "The query is wrong: ")}${esc(st.error)}` +
+    (st.addTable ? ` <button type="button" class="btn btn-sm btn-outline-primary" id="prjAddMissing">Add ${esc(st.addTable.alias)}.${esc(st.addTable.table)} to the project</button>` : "") + `</div>` : "";
+  p.innerHTML = (what ? `<div>${esc(what)}</div>` : "") + rows.join("") + err;
+  p.hidden = !p.innerHTML;
+}
+async function prjRun() {
+  if (!prj.open || prj.running) return;
+  const sql = $("prjSql").value.trim();
+  if (!sql) { toast("Write a query first", true); return; }
+  if (prjDirty()) { toast("Save the project first: the query runs on its saved tables", true); return; }
+  prj.running = true; $("prjRun").disabled = true; $("prjCancel").hidden = false; prjSetExport();
+  $("prjExpNote").hidden = true; $("prjInfo").textContent = "";
+  let st;
+  try {
+    st = await api("POST", "/api/project/run", { project: prj.open.project, sql, limit: +$("prjLimit").value });
+    const seq = ++prj.poll;
+    while (st.state === "loading" || st.state === "querying") {
+      prjProgress(st);
+      await new Promise((r) => setTimeout(r, 300));
+      if (seq !== prj.poll || !prj.open) return;
+      st = await api("GET", "/api/project/run?" + new URLSearchParams({ project: prj.open.project }));
+    }
+  } catch (e) { st = { state: "failed", error: e.message, errorKind: e.data && e.data.errorKind, addTable: e.data && e.data.addTable }; }
+  finally { prj.running = false; $("prjRun").disabled = false; $("prjCancel").hidden = true; }
+  prjProgress(st);
+  if (st.state === "done") {
+    const res = st.result;
+    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; prj.ran = res.sql;
+    const n = res.rows.length;
+    $("prjInfo").textContent = `${n.toLocaleString()} row${n === 1 ? "" : "s"}` + (res.truncated ? ` shown (limited to ${res.limit.toLocaleString()} – exports hold every row)` : "") +
+      ` · ${res.columns.length} columns · query ${res.elapsedMs} ms`;
+    prjRenderGrid();
+  } else if (st.state !== "cancelled") { prj.result = null; prj.ran = ""; prjRenderGrid(); }
+  prjSetExport();
+}
+$("prjRun").addEventListener("click", prjRun);
+$("prjSql").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); prjRun(); } });
+$("prjSql").addEventListener("input", () => { prjSetExport(); prjMark(); });
+$("prjCancel").addEventListener("click", async () => {
+  prj.poll++;
+  try { await api("POST", "/api/project/cancel", { project: prj.open.project }); } catch (e) { toast(e.message, true); }
+  prj.running = false; $("prjRun").disabled = false; $("prjCancel").hidden = true;
+  prjProgress({ state: "cancelled" }); prj.result = null; prj.ran = ""; prjRenderGrid(); prjSetExport();
+});
+$("prjProg").addEventListener("click", async (ev) => {
+  if (ev.target.id !== "prjAddMissing") return;
+  const m = $("prjProg").querySelector("#prjAddMissing").textContent.match(/^Add (\w+)\.(.+) to the project$/);
+  if (!m) return;
+  const [, alias, name] = m;
+  let items = [];
+  try { items = await prjObjects(alias); } catch (e) { toast(e.message, true); return; }
+  const it = items.find((x) => x.source.toLowerCase() === name.toLowerCase() || x.source.toLowerCase().endsWith("." + name.toLowerCase()));
+  if (!it) { toast(`${alias} has no table or view named ${name}`, true); return; }
+  const keep = prj.alias; prj.alias = alias; prjToggleTable(it, true); prj.alias = keep;
+  if (await prjSave()) prjRun();
+});
+$("prjGrid").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-act=more-rows]")) { prj.shown += GRID_PAGE; prjRenderGrid(); return; }
+  const th = ev.target.closest("th[data-col]");
+  if (!th || !prj.result) return;
+  const col = +th.dataset.col;
+  prj.sort = prj.sort && prj.sort.col === col ? (prj.sort.dir > 0 ? { col, dir: -1 } : null) : { col, dir: 1 };
+  prjRenderGrid();
+});
+document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", async () => {
+  const fmt = b.dataset.pfmt;
+  document.querySelectorAll(".pexp").forEach((x) => (x.disabled = true));
+  const note = $("prjExpNote");
+  note.hidden = false; note.textContent = fmt === "all" ? "Exporting in all formats…" : `Exporting as ${b.textContent}…`;
+  try {
+    const res = await api("POST", "/api/project/export", { project: prj.open.project, sql: prj.ran, format: fmt, name: prj.queryName || "" });
+    note.innerHTML = res.files.map((f) => `<div><i class="bi bi-file-earmark-check" aria-hidden="true"></i> ${f.rows.toLocaleString()} row${f.rows === 1 ? "" : "s"} → <code>${esc(f.path)}</code>
+      <a href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download>Download</a></div>`).join("");
+  } catch (e) { note.textContent = "Export failed: " + e.message; }
+  finally { prjSetExport(); }
+}));
 
 // ---- saved connections ---------------------------------------------------
 async function loadSaved() {
@@ -7290,14 +7438,19 @@ const GRID_PAGE = 2000;
 function renderGrid() {
   const res = state.result;
   if (!res.columns.length) { clearGrid("Statement executed. No result set returned."); return; }
+  $("grid").innerHTML = gridHtml(res, state.sort, state.gridShown || GRID_PAGE);
+}
+// gridHtml is the table of a result, sorted, with its first shown rows and a
+// button for more (the Data tab's grid and the Projects pane's).
+function gridHtml(res, sort, shown) {
   let rows = res.rows.map((r, i) => [i, r]);
-  if (state.sort) {
-    const { col, dir } = state.sort;
+  if (sort) {
+    const { col, dir } = sort;
     rows.sort((a, b) => cmp(a[1][col], b[1][col]) * dir);
   }
   const head = `<tr><th class="n">#</th>` + res.columns.map((c, i) =>
-    `<th data-col="${i}" title="${esc(c)} – click to sort">${esc(c)}${state.sort && state.sort.col === i ? `<span class="dir">${state.sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
-  const shown = state.gridShown || GRID_PAGE, more = rows.length - shown;
+    `<th data-col="${i}" title="${esc(c)} – click to sort">${esc(c)}${sort && sort.col === i ? `<span class="dir">${sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
+  const more = rows.length - shown;
   if (more > 0) rows = rows.slice(0, shown);
   const body = rows.map(([i, r]) => `<tr><td class="n">${i + 1}</td>` + r.map((v) => {
     if (v === null) return `<td class="null">NULL</td>`;
@@ -7306,7 +7459,7 @@ function renderGrid() {
     return `<td${cls} title="${s.length > 40 ? esc(s.slice(0, 2000)) : ""}">${esc(s.length > 500 ? s.slice(0, 500) + "…" : s)}</td>`;
   }).join("") + `</tr>`).join("") +
     (more > 0 ? `<tr><td class="n"></td><td colspan="${res.columns.length}"><button class="btn btn-sm btn-outline-secondary" data-act="more-rows">Show ${Math.min(more, GRID_PAGE).toLocaleString()} more of ${more.toLocaleString()} rows not shown</button></td></tr>` : "");
-  $("grid").innerHTML = `<table class="table table-sm table-striped table-hover datagrid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  return `<table class="table table-sm table-striped table-hover datagrid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
 function cmp(a, b) {

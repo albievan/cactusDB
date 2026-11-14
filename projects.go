@@ -39,7 +39,8 @@ type projectSession struct {
 	failed   map[string]string    // by alias: why it isn't connected
 	broken   map[string]bool      // by alias: its saved connection was deleted
 	lastUsed time.Time
-	run      *projectRun // the last run (projectrun.go)
+	run      *projectRun        // the last run (projectrun.go)
+	cols     map[string]*mTable // each table's columns, read once (until Refresh)
 }
 
 // linkable says whether a database type can be linked into a project: the
@@ -291,6 +292,7 @@ func (s *server) projectRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/project/close", s.handleCloseProject)
 	mux.HandleFunc("POST /api/project/delete", s.handleDeleteProject)
 	mux.HandleFunc("GET /api/project/objects", s.handleProjectObjects)
+	s.projectRunRoutes(mux)
 }
 
 func (s *server) handleListProjects(w http.ResponseWriter, r *http.Request) {

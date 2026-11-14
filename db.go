@@ -715,6 +715,12 @@ func streamQuery(ctx context.Context, engine string, db *sql.DB, q string, heade
 // streamRows is streamQuery with the values as the driver returns them, and
 // the upper-case database type name of each column. raw is reused per row.
 func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header func(cols, types []string) error, fn func(raw []any) (bool, error)) error {
+	return streamRowsArgs(ctx, engine, db, q, nil, header, fn)
+}
+
+// streamRowsArgs is streamRows with bound values for q's placeholders (see
+// placeholderFor), in the same read-only transaction.
+func streamRowsArgs(ctx context.Context, engine string, db *sql.DB, q string, args []any, header func(cols, types []string) error, fn func(raw []any) (bool, error)) error {
 	if err := checkReadOnly(engine, q); err != nil {
 		return err
 	}
@@ -726,7 +732,7 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 	case engine == EngineSQLite || backendOf(db) != nil:
 		// The SQLite connection itself is opened read-only (mode=ro,
 		// query_only); a backend only reads.
-		rows, err = db.QueryContext(ctx, q)
+		rows, err = db.QueryContext(ctx, q, args...)
 	case engine == EngineOracle:
 		// go-ora refuses TxOptions.ReadOnly: the transaction is made read-only
 		// with its first statement, and rolled back like the others.
@@ -738,7 +744,7 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 		if _, err = tx.ExecContext(ctx, "SET TRANSACTION READ ONLY"); err != nil {
 			return err
 		}
-		rows, err = tx.QueryContext(ctx, q)
+		rows, err = tx.QueryContext(ctx, q, args...)
 	default:
 		// SQL Server has no READ ONLY transactions, but its DML and DDL are
 		// transactional, so the unconditional rollback below undoes them.
@@ -749,7 +755,7 @@ func streamRows(ctx context.Context, engine string, db *sql.DB, q string, header
 			return err
 		}
 		defer tx.Rollback()
-		rows, err = tx.QueryContext(ctx, q)
+		rows, err = tx.QueryContext(ctx, q, args...)
 	}
 	if err != nil {
 		return err

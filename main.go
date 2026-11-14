@@ -1802,6 +1802,10 @@ func (s *server) handleExportDDL(w http.ResponseWriter, r *http.Request) {
 // /api/exports/<connection>/<type>/<file>.
 func downloadURL(path string) string {
 	kindDir := filepath.Dir(path)
+	if projDir := filepath.Dir(kindDir); filepath.Base(filepath.Dir(projDir)) == projectsSubdir { // projects/<project>/<type>/<file>
+		return "/api/exports/" + projectsSubdir + "/" + url.PathEscape(filepath.Base(projDir)) + "/" +
+			url.PathEscape(filepath.Base(kindDir)) + "/" + url.PathEscape(filepath.Base(path))
+	}
 	if dayDir := kindDir; filepath.Base(filepath.Dir(dayDir)) == queriesSubdir { // <conn>/queries/<day>/<file>
 		connDir := filepath.Dir(filepath.Dir(dayDir))
 		return "/api/exports/" + url.PathEscape(filepath.Base(connDir)) + "/" + queriesSubdir + "/" +
@@ -1817,6 +1821,28 @@ func downloadURL(path string) string {
 func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(r.PathValue("path"), "/")
 	conn, day := "", ""
+	if len(parts) == 4 && parts[0] == projectsSubdir { // projects/<project>/<type>/<file>
+		if !validFileName(parts[1]) || parts[1] != connFolderName(parts[1]) {
+			writeErr(w, 400, errors.New("bad file name"))
+			return
+		}
+		project := parts[1]
+		if _, ok := s.protectedFolders()[projectsSubdir+"/"+project]; ok {
+			s.mu.Lock()
+			ps := s.projectMap()[r.URL.Query().Get("project")]
+			s.mu.Unlock()
+			if ps == nil || connFolderName(ps.name) != project {
+				writeErr(w, 403, errors.New("this project's files are protected: download them from the project, or from Exported files with a linked connection's password"))
+				return
+			}
+		}
+		if path := s.findProjectExport(project, parts[2], parts[3]); path != "" {
+			serveExport(w, r, path)
+			return
+		}
+		writeErr(w, 404, errors.New("export not found"))
+		return
+	}
 	if len(parts) == 4 && parts[1] == queriesSubdir {
 		conn, day, parts = parts[0], parts[2], []string{queriesSubdir, parts[3]}
 	} else if len(parts) == 3 {
