@@ -293,6 +293,7 @@ func (s *server) projectRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/project/delete", s.handleDeleteProject)
 	mux.HandleFunc("GET /api/project/objects", s.handleProjectObjects)
 	s.projectRunRoutes(mux)
+	s.projectQueryRoutes(mux)
 }
 
 func (s *server) handleListProjects(w http.ResponseWriter, r *http.Request) {

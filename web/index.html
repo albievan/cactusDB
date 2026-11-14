@@ -428,7 +428,69 @@
   .prjqbar, .prjresbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .prjqbar select { width: auto; }
   .prjdialect { font-size: 12px; color: var(--muted); }
-  .prjsql { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; min-height: 120px; height: 160px; resize: vertical; }
+  .prjsql { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; min-height: 140px; height: 100%; resize: none; }
+  .prjqmeta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .prjqmeta #prjQName { width: 220px; } .prjqmeta #prjQDesc { flex: 1; min-width: 160px; }
+  .prjqbar #prjQSel { width: auto; max-width: 260px; } .prjqbar #prjQVers { width: auto; max-width: 220px; }
+  .prjsplit { display: grid; grid-template-columns: minmax(200px, var(--prjsplit, 1fr)) 6px minmax(260px, 1.3fr); height: 330px; resize: vertical; overflow: hidden; min-height: 180px; }
+  .prjsplit.nodiag { grid-template-columns: minmax(0, 1fr); }
+  .prjsplit.nodiag .prjsplitter, .prjsplit.nodiag .prjdiag { display: none; }
+  .prjedwrap { position: relative; min-width: 0; min-height: 0; }
+  .prjsplitter { cursor: col-resize; background: transparent; border-left: 1px solid var(--border); margin-left: 2px; }
+  .prjsplitter:hover, .prjsplitter:focus { background: var(--row-hover); outline: none; }
+  .prjsug { position: absolute; z-index: 20; margin: 0; padding: 2px; list-style: none; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.15); max-height: 220px; overflow: auto; min-width: 180px; font-size: 12px; }
+  .prjsug li { padding: 2px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+  .prjsug li.on, .prjsug li:hover { background: var(--accent, #2f6f4f); color: #fff; }
+  .prjsug li small { opacity: .7; margin-left: 6px; }
+  .prjdiag { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  .prjdbar { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px; border-bottom: 1px solid var(--border); }
+  .prjdbar select { width: auto; max-width: 200px; }
+  .prjlegend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; margin-left: auto; }
+  .prjlegend span { display: inline-flex; align-items: center; gap: 3px; }
+  .prjlegend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .prjdnote { font-size: 12px; padding: 3px 8px; background: var(--row-hover); }
+  .prjdnote.bad { color: var(--danger, #c0392b); }
+  .prjsuggest { font-size: 12px; padding: 3px 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); }
+  .prjdbody { flex: 1; overflow: auto; min-height: 0; position: relative; outline: none; }
+  .prjdbody.drop { background: var(--row-hover); }
+  .prjdbody svg { display: block; }
+  .pq-box { fill: var(--panel); stroke: var(--border); }
+  .pq-node:focus { outline: none; } .pq-node:focus .pq-box, .pq-node.sel .pq-box { stroke: var(--accent, #2f6f4f); stroke-width: 2; }
+  .pq-node.cross .pq-box { stroke: var(--danger, #c0392b); stroke-dasharray: 4 3; }
+  .pq-node.unknown .pq-box { stroke: var(--danger, #c0392b); }
+  .pq-head { cursor: move; }
+  .pq-title { font: 600 12px var(--sans, system-ui); fill: var(--text, #222); }
+  .pq-db { font: 10px var(--sans, system-ui); fill: var(--muted, #666); }
+  .pq-col { font: 11px var(--mono, ui-monospace, monospace); fill: var(--text, #222); cursor: crosshair; }
+  .pq-col.on { font-weight: 700; }
+  .pq-colbg { fill: transparent; } .pq-colbg:hover { fill: var(--row-hover); }
+  .pq-check { cursor: pointer; }
+  .pq-x { cursor: pointer; font: 12px var(--sans, system-ui); fill: var(--muted, #666); }
+  .pq-line { fill: none; stroke: var(--muted, #888); stroke-width: 1.6; cursor: pointer; }
+  .pq-line.bad { stroke: var(--danger, #c0392b); stroke-dasharray: 5 3; }
+  .pq-line:hover, .pq-edge:focus .pq-line { stroke: var(--accent, #2f6f4f); stroke-width: 2.6; }
+  .pq-edge:focus { outline: none; }
+  .pq-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; }
+  .pq-lbl { font: 10px var(--sans, system-ui); fill: var(--muted, #555); paint-order: stroke; stroke: var(--bg, #fff); stroke-width: 3px; }
+  .pq-drag { stroke: var(--accent, #2f6f4f); stroke-width: 2; stroke-dasharray: 4 3; fill: none; pointer-events: none; }
+  .prjdesign { overflow: auto; max-height: 230px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
+  .prjdesign[hidden] { display: none; }
+  .prjdesign table { border-collapse: collapse; width: 100%; }
+  .prjdesign th, .prjdesign td { padding: 2px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+  .prjdesign th { position: sticky; top: 0; background: var(--panel); font-weight: 600; z-index: 1; }
+  .prjdesign input[type=text], .prjdesign select { font-size: 12px; padding: 0 4px; height: 24px; width: auto; display: inline-block; vertical-align: middle; }
+  .prjdesign select.form-select { padding-right: 22px; background-position: right 4px center; }
+  .prjdesign td input[data-k=val] { margin-left: 3px; }
+  .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
+  .prjdesign .ro { color: var(--muted); padding: 6px; }
+  .prjjrow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; margin-bottom: 8px; }
+  #prjJPairs .pr { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; margin-bottom: 4px; }
+  #prjJWarn { color: var(--danger, #c0392b); }
+  #prjSide .prjsidetitle { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  #prjSideList .grp { font-size: 12px; font-weight: 600; margin: 8px 0 2px; display: flex; align-items: center; gap: 6px; }
+  #prjSideList .grp i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  #prjSideList .tb { font-size: 13px; padding: 2px 8px; border-radius: 4px; cursor: grab; user-select: none; }
+  #prjSideList .tb:hover, #prjSideList .tb:focus { background: var(--row-hover); outline: none; }
   .prjprog { font-size: 12px; display: grid; gap: 2px; }
   .prjprog .bad { color: var(--danger, #c0392b); white-space: pre-wrap; }
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
@@ -1217,6 +1279,11 @@
       <div class="objstats" id="objStats" hidden></div>
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators: open <b>☰ Connections</b> below.</p></div>
     </section>
+    <section class="box" id="prjSide" hidden aria-label="Tables of the project">
+      <h2><span class="prjsidetitle">Project tables</span><span id="prjSideCount"></span></h2>
+      <p class="hint">Drag a table onto the query designer, or double-click it.</p>
+      <div id="prjSideList"></div>
+    </section>
     <!-- Connections and settings live in a pop-up menu, opened from the bar at
          the bottom, so the sidebar shows only the database's objects. -->
     <div class="navmenu card shadow-lg" id="navMenu" hidden role="dialog" aria-label="Menu">
@@ -1512,14 +1579,48 @@
         <div class="prjquery">
           <div class="prjqbar">
             <span class="flabel">Query</span>
-            <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
+            <select class="form-select form-select-sm" id="prjQSel" aria-label="Saved query of the project" title="The project's saved queries"><option value="">New query (not saved)</option></select>
+            <select class="form-select form-select-sm" id="prjQVers" hidden aria-label="Version" title="Every save of the query is kept: pick one to put it in the editor"></select>
+            <button class="btn btn-sm btn-outline-secondary" id="prjQSave" title="Save the query (and its diagram) in the project">Save</button>
+            <button class="btn btn-sm btn-outline-secondary" id="prjQSaveAs" title="Save as a new saved query">Save as…</button>
+            <button class="btn btn-sm btn-outline-secondary" id="prjQExec" hidden title="Run the saved query and show its first 100 rows">Execute</button>
+            <button class="btn btn-sm btn-outline-danger" id="prjQDel" hidden title="Delete the saved query (asks first)">Delete</button>
             <span class="spacer"></span>
+            <label class="form-check form-switch" title="Show the query designer: the diagram of the tables and the grid of columns, filters and sorting"><input class="form-check-input" type="checkbox" id="prjQdOn" role="switch" checked> Query diagram</label>
             <label class="flabel" for="prjLimit">Show</label>
             <select class="form-select form-select-sm" id="prjLimit" title="How many rows the grid shows (exports always hold every row)"><option>100</option><option selected>1000</option><option>10000</option><option>100000</option></select>
             <button class="btn btn-sm btn-primary" id="prjRun" title="Read the rows the query needs from each database, then run it (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button>
             <button class="btn btn-sm btn-outline-danger" id="prjCancel" hidden title="Stop reading and remove the copies"><i class="bi bi-stop-fill" aria-hidden="true"></i> Cancel</button>
           </div>
-          <textarea class="form-control prjsql" id="prjSql" spellcheck="false" autocomplete="off" aria-label="Project query" placeholder="SELECT c.name, o.order_date&#10;FROM   fb.customer c&#10;JOIN   maria.orders o ON o.customer_id = c.id"></textarea>
+          <div class="prjqmeta">
+            <input class="form-control form-control-sm" id="prjQName" maxlength="100" placeholder="Name (to save it)" spellcheck="false" autocomplete="off" aria-label="Name of the query">
+            <input class="form-control form-control-sm" id="prjQDesc" maxlength="1000" placeholder="Description" aria-label="Description of the query">
+            <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
+          </div>
+          <div class="prjsplit" id="prjSplit">
+            <div class="prjedwrap">
+              <textarea class="form-control prjsql" id="prjSql" spellcheck="false" autocomplete="off" aria-label="Project query" aria-autocomplete="list" aria-controls="prjSug" placeholder="SELECT c.name, o.order_date&#10;FROM   fb.customer c&#10;JOIN   maria.orders o ON o.customer_id = c.id"></textarea>
+              <ul class="prjsug" id="prjSug" hidden role="listbox" aria-label="Suggestions"></ul>
+            </div>
+            <div class="prjsplitter" id="prjSplitter" role="separator" aria-orientation="vertical" aria-label="Resize the editor and the diagram" tabindex="0" title="Drag to share the width between the SQL and the diagram (arrow keys too)"></div>
+            <div class="prjdiag" id="prjDiag">
+              <div class="prjdbar">
+                <select class="form-select form-select-sm" id="prjAddTbl" aria-label="Add a table to the query"><option value="">Add table…</option></select>
+                <button class="btn btn-sm btn-outline-secondary" id="prjLinkBtn" title="Join two tables: choose them, the columns and the type of join (or drag a column onto another table's column)">Link tables</button>
+                <button class="btn btn-sm btn-outline-secondary" id="prjArrange" title="Arrange the tables automatically">Arrange</button>
+                <button class="btn btn-sm btn-outline-secondary" id="prjZoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+                <button class="btn btn-sm btn-outline-secondary" id="prjZoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+                <button class="btn btn-sm btn-outline-secondary" id="prjFit" title="Fit the diagram to the window">Fit</button>
+                <button class="btn btn-sm btn-outline-secondary" id="prjUndo" title="Undo (Ctrl+Z): diagram and text alike" aria-label="Undo"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" id="prjRedo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+                <span class="prjlegend" id="prjLegend"></span>
+              </div>
+              <div class="prjdnote" id="prjDiagNote" hidden></div>
+              <div class="prjsuggest" id="prjSuggest" hidden></div>
+              <div class="prjdbody" id="prjDiagBody" tabindex="-1" aria-label="Query diagram: Tab to a table or join; arrow keys move a table, Delete removes it, Enter opens its joins"></div>
+            </div>
+          </div>
+          <div class="prjdesign" id="prjDesign"></div>
           <div class="prjprog" id="prjProg" hidden></div>
           <div class="prjres">
             <div class="prjresbar">
@@ -2241,6 +2342,27 @@
     <button class="btn btn-outline-danger" type="button" id="prjAskDiscard">Discard</button>
     <button class="btn btn-primary" type="button" id="prjAskSave">Save</button>
   </div>
+</dialog>
+
+<dialog id="prjJoinDialog" class="dlg wide" aria-labelledby="prjJoinTitle">
+  <form method="dialog" id="prjJoinForm">
+    <h3 id="prjJoinTitle">Join tables</h3>
+    <div class="prjjrow">
+      <select class="form-select form-select-sm" id="prjJA" aria-label="First table"></select>
+      <select class="form-select form-select-sm" id="prjJType" aria-label="Type of join" title="INNER: rows with a match in both · LEFT: every row of the first · RIGHT: every row of the second · FULL: every row of both · CROSS: every pair">
+        <option>INNER</option><option>LEFT</option><option>RIGHT</option><option>FULL</option><option>CROSS</option></select>
+      <select class="form-select form-select-sm" id="prjJB" aria-label="Second table"></select>
+    </div>
+    <div id="prjJPairs"></div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="prjJAdd">+ Column pair</button>
+    <p class="hint" id="prjJWarn"></p>
+    <div class="dactions">
+      <button class="btn btn-outline-danger" type="button" id="prjJDel">Delete join</button>
+      <span class="spacer"></span>
+      <button class="btn btn-outline-secondary" type="button" id="prjJCancel">Cancel</button>
+      <button class="btn btn-primary" type="submit">OK</button>
+    </div>
+  </form>
 </dialog>
 
 <dialog id="prjNameDialog" class="dlg" aria-labelledby="prjNameTitle">
@@ -4703,7 +4825,7 @@ const prj = { list: [], linkable: [], maxLinks: 10, open: null, orig: "", alias:
 
 const prjEditable = () => { const o = prj.open; return o ? JSON.stringify({ n: o.name, d: o.description || "", l: o.links.map((l) => [l.connId, l.alias]), t: o.tables, m: o.limits }) : ""; };
 const prjDirty = () => !!prj.open && prjEditable() !== prj.orig;
-function prjMark() { if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() ? " ●" : "") : ""; }
+function prjMark() { if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() || prjQDirty() ? " ●" : "") : ""; }
 
 async function prjShow() {
   $("prjHome").hidden = !!prj.open; $("prjWork").hidden = !prj.open;
@@ -4768,7 +4890,9 @@ async function prjOpen(id) {
   const res = await prjWithPasswords((b) => api("POST", `/api/projects/${id}/open`, b), `Open the project “${p.name}”`).catch((e) => { toast(e.message, true); return null; });
   if (!res) return;
   prjSet(res);
+  pq.cols = {}; prj.qid = 0; $("prjQName").value = ""; $("prjQDesc").value = ""; pqReset("", null); prj.qOrig = prjQState();
   if (state.tab !== "projects") showTab("projects"); else prjShow();
+  prjQLoadList(0); pqLoadCols();
   const down = res.links.filter((l) => l.state !== "connected");
   if (down.length) toast(`Not connected: ${down.map((l) => l.alias).join(", ")} (see Linked databases)`, true);
 }
@@ -4802,19 +4926,22 @@ function prjAsk(title, text, { save = "Save", discard = "Discard", danger = fals
 // false when the user chose to stay.
 async function prjCloseAsk() {
   if (!prj.open) return true;
+  if (!(await prjQAskSave())) return false;
   if (prjDirty()) {
     const a = await prjAsk("Save your changes?", `You changed the project “${prj.open.name}”. Save the changes, or discard them?`);
     if (a === "cancel") return false;
     if (a === "save" && !(await prjSave())) return false;
   }
   const id = prj.open.project;
-  prj.open = null; prj.orig = ""; prj.objs = {};
+  prj.open = null; prj.orig = ""; prj.objs = {}; prj.qid = 0; prj.qOrig = "";
+  pqSide();
   await api("POST", "/api/project/close", { project: id }).catch(() => {});
   if (state.tab === "projects") prjShow();
   return true;
 }
 
 function prjRender() {
+  setTimeout(pqDraw, 0);
   const o = prj.open;
   $("prjName").value = o.name; $("prjDesc").value = o.description || "";
   $("prjMaxRows").value = o.limits.maxRows; $("prjMaxMB").value = o.limits.maxMB; $("prjTimeout").value = o.limits.timeoutSec;
@@ -4896,11 +5023,28 @@ async function prjSave(dupName) {
     .catch((e) => { toast(e.message, true); return null; });
   if (!res) return false;
   if (dupName) { toast(`Saved a copy of the project as “${dupName}”`); return true; }
-  const objs = prj.objs;
+  const objs = prj.objs, before = JSON.parse(prj.orig || "{}").l || [];
   prjSet(res);
   for (const l of res.links) if (objs[l.alias] && l.state === "connected") prj.objs[l.alias] = objs[l.alias];
   prjRender();
   toast(`Saved the project “${res.name}”`);
+  pqLoadCols();
+  // Renamed aliases: the saved queries that use the old one can follow.
+  const renames = before.map(([id, old]) => [old, (res.links.find((l) => l.connId === id) || {}).alias]).filter(([old, now]) => now && old !== now);
+  for (const [old, now] of renames) {
+    const uses = prjQUses(old);
+    if (!uses.length) continue;
+    const a = await prjAsk(`Update the saved queries?`, `${uses.length} saved quer${uses.length === 1 ? "y uses" : "ies use"} the alias “${old}”, now “${now}”: ${uses.map((q) => q.name).join(", ")}. Write “${now}” in ${uses.length === 1 ? "it" : "them"}?`, { save: "Update", discard: "Leave them" });
+    if (a !== "save") continue;
+    const re = new RegExp(`(^|[^\\w."])${old.replace(/\W/g, "\\$&")}(\\s*\\.)`, "gi");
+    for (const q of uses) {
+      try { await api("POST", "/api/project/queries", { project: res.project, id: q.id, name: q.name, description: q.description, sql: q.sql.replace(re, `$1${now}$2`), layout: q.layout }); }
+      catch (e) { toast(`${q.name}: ${e.message}`, true); }
+    }
+    if (re.test($("prjSql").value)) { re.lastIndex = 0; $("prjSql").value = $("prjSql").value.replace(re, `$1${now}$2`); pqFromText(); }
+    await prjQLoadList();
+    if (prj.qid) { const q = prj.queries.find((x) => x.id === prj.qid); if (q) prj.qOrig = prjQState(); }
+  }
   return true;
 }
 
@@ -4972,7 +5116,9 @@ $("prjLinks").addEventListener("click", async (ev) => {
     catch (e) { toast(e.message, true); }
   } else if (b.dataset.prjunlink !== undefined) {
     const l = o.links[+b.dataset.prjunlink], n = o.tables.filter((t) => t.alias === l.alias).length;
-    const a = await prjAsk(`Remove “${l.alias}”?`, `Remove ${l.name || "the deleted connection"} (${l.alias}) from the project${n ? `, with its ${n} table${n > 1 ? "s" : ""}` : ""}? It takes effect when you save the project.`, { save: "Remove", discard: "", danger: true });
+    const uses = prjQUses(l.alias);
+    const a = await prjAsk(`Remove “${l.alias}”?`, `Remove ${l.name || "the deleted connection"} (${l.alias}) from the project${n ? `, with its ${n} table${n > 1 ? "s" : ""}` : ""}?` +
+      (uses.length ? ` ${uses.length} saved quer${uses.length === 1 ? "y uses" : "ies use"} it and won't run any more: ${uses.map((q) => q.name).join(", ")}.` : "") + ` It takes effect when you save the project.`, { save: "Remove", discard: "", danger: true });
     if (a !== "save") return;
     o.links.splice(+b.dataset.prjunlink, 1);
     o.tables = o.tables.filter((t) => t.alias !== l.alias);
@@ -5051,7 +5197,7 @@ function prjProgress(st) {
   p.innerHTML = (what ? `<div>${esc(what)}</div>` : "") + rows.join("") + err;
   p.hidden = !p.innerHTML;
 }
-async function prjRun() {
+async function prjRun(limit) {
   if (!prj.open || prj.running) return;
   const sql = $("prjSql").value.trim();
   if (!sql) { toast("Write a query first", true); return; }
@@ -5060,7 +5206,7 @@ async function prjRun() {
   $("prjExpNote").hidden = true; $("prjInfo").textContent = "";
   let st;
   try {
-    st = await api("POST", "/api/project/run", { project: prj.open.project, sql, limit: +$("prjLimit").value });
+    st = await api("POST", "/api/project/run", { project: prj.open.project, sql, limit: typeof limit === "number" ? limit : +$("prjLimit").value });
     const seq = ++prj.poll;
     while (st.state === "loading" || st.state === "querying") {
       prjProgress(st);
@@ -5081,7 +5227,7 @@ async function prjRun() {
   } else if (st.state !== "cancelled") { prj.result = null; prj.ran = ""; prjRenderGrid(); }
   prjSetExport();
 }
-$("prjRun").addEventListener("click", prjRun);
+$("prjRun").addEventListener("click", () => prjRun());
 $("prjSql").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); prjRun(); } });
 $("prjSql").addEventListener("input", () => { prjSetExport(); prjMark(); });
 $("prjCancel").addEventListener("click", async () => {
@@ -5123,6 +5269,914 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
   finally { prjSetExport(); }
 }));
 
+
+// ---- the project query designer: model ----------------------------------------
+// The SQL and the diagram are two views of one query. pqParse reads the SQL
+// into a model (tables, joins, output columns, filters, grouping, sorting);
+// pqSql writes the model back as SQL, one clause per line. SQL the model
+// can't hold (subqueries, WITH, UNION, window functions) makes the diagram
+// read-only; parts it doesn't model but can keep (an expression in the
+// select list, a HAVING) are kept as written.
+const PQ_AGGS = ["COUNT", "SUM", "AVG", "MIN", "MAX"];
+const PQ_OPS = ["=", "<>", "<", "<=", ">", ">=", "LIKE", "NOT LIKE", "IS NULL", "IS NOT NULL"];
+const PQ_JOIN_OPS = ["=", "<>", "<", "<=", ">", ">="];
+const pqKeyword = new Set(("select from where group by having order limit offset join left right full inner outer cross natural on using and or not " +
+  "as asc desc distinct all union intersect except with case when then else end is null like in between exists").split(" "));
+// pqIdent writes a name as SQL: plain when it can be, else "quoted".
+const pqIdent = (s) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(s) && !pqKeyword.has(s.toLowerCase()) ? s : `"${String(s).replace(/"/g, '""')}"`;
+const pqEmpty = () => ({ distinct: false, tables: [], joins: {}, fields: [], star: false, whereExtra: "", groupExtra: [], having: "", orderExtra: [], limit: "", offset: "", readOnly: "" });
+
+function pqParse(src) {
+  const m = pqEmpty();
+  const tk = qaTokens(src);
+  if (!tk.length) return m;
+  const text = (a, b) => src.slice(tk[a].at, tk[b - 1].end).trim();
+  // What the designer can't hold.
+  let depth = 0;
+  for (let i = 0; i < tk.length; i++) {
+    const t = tk[i];
+    if (t.t === "(") { depth++; if (tk[i + 1] && (tk[i + 1].l === "select" || tk[i + 1].l === "with")) return { ...m, readOnly: "it has a subquery" }; }
+    else if (t.t === ")") depth--;
+    else if (t.kind === "word" && depth === 0 && ["union", "intersect", "except"].includes(t.l)) return { ...m, readOnly: `it combines queries (${t.t.toUpperCase()})` };
+    else if (t.kind === "word" && t.l === "over" && tk[i + 1] && tk[i + 1].t === "(") return { ...m, readOnly: "it has a window function (OVER)" };
+    if (t.t === ";" && i < tk.length - 1) return { ...m, readOnly: "it has more than one statement" };
+  }
+  if (tk[0].l === "with") return { ...m, readOnly: "it uses WITH" };
+  if (tk[0].l !== "select") return { ...m, readOnly: "it isn't a SELECT" };
+  // The clauses, at depth 0.
+  const at = {};
+  depth = 0;
+  for (let i = 0; i < tk.length; i++) {
+    const t = tk[i];
+    if (t.t === "(") depth++; else if (t.t === ")") depth--;
+    else if (depth === 0 && t.kind === "word") {
+      const two = tk[i + 1] && tk[i + 1].l === "by";
+      if (t.l === "from" && at.from === undefined) at.from = i;
+      else if (t.l === "where" && at.where === undefined) at.where = i;
+      else if (t.l === "group" && two) at.group = i;
+      else if (t.l === "having") at.having = i;
+      else if (t.l === "order" && two) at.order = i;
+      else if (t.l === "limit") at.limit = i;
+    }
+  }
+  const end = tk.length - (tk[tk.length - 1].t === ";" ? 1 : 0);
+  const order = ["from", "where", "group", "having", "order", "limit"].filter((k) => at[k] !== undefined);
+  const stop = (k) => { const later = order.filter((x) => at[x] > at[k]).map((x) => at[x]); return later.length ? Math.min(...later) : end; };
+  const selEnd = at.from !== undefined ? at.from : order.length ? at[order[0]] : end;
+  if (at.from === undefined) return { ...m, readOnly: "it has no FROM" };
+  // Commas at depth 0 split a list.
+  const split = (a, b, word) => {
+    const parts = []; let d = 0, s = a;
+    for (let i = a; i < b; i++) {
+      if (tk[i].t === "(") d++; else if (tk[i].t === ")") d--;
+      else if (d === 0 && (word ? tk[i].l === word : tk[i].t === ",")) { parts.push([s, i]); s = i + 1; }
+    }
+    parts.push([s, b]);
+    return parts.filter(([x, y]) => y > x);
+  };
+  const name = (t) => t && (t.kind === "id" || t.kind === "word");
+  // a.b at i (adjacent dots)
+  const qual = (i) => name(tk[i]) && tk[i + 1] && tk[i + 1].t === "." && tk[i + 2] && (name(tk[i + 2]) || tk[i + 2].t === "*") ? [tk[i].v, tk[i + 2].v] : null;
+
+  // FROM: db.table [AS] alias, then joins.
+  let i = at.from + 1;
+  const fromEnd = stop("from");
+  const readItem = () => {
+    if (!(name(tk[i]) && tk[i + 1] && tk[i + 1].t === "." && name(tk[i + 2]))) return null;
+    const item = { db: tk[i].v, name: tk[i + 2].v, alias: tk[i + 2].v };
+    i += 3;
+    if (tk[i] && tk[i].l === "as") i++;
+    if (i < fromEnd && name(tk[i]) && !pqKeyword.has(tk[i].l)) { item.alias = tk[i].v; i++; }
+    return item;
+  };
+  const first = readItem();
+  if (!first) return { ...m, readOnly: "a table in FROM isn't written as alias.table" };
+  m.tables.push(first);
+  while (i < fromEnd) {
+    let type = "INNER";
+    if (tk[i].t === ",") { type = "CROSS"; i++; }
+    else {
+      const words = [];
+      while (i < fromEnd && ["left", "right", "full", "inner", "outer", "cross", "natural"].includes(tk[i].l)) words.push(tk[i++].l);
+      if (!tk[i] || tk[i].l !== "join") return { ...m, readOnly: "its FROM has something the designer can't show" };
+      i++;
+      if (words.includes("natural")) return { ...m, readOnly: "it uses a NATURAL JOIN" };
+      type = words.includes("left") ? "LEFT" : words.includes("right") ? "RIGHT" : words.includes("full") ? "FULL" : words.includes("cross") ? "CROSS" : "INNER";
+    }
+    const item = readItem();
+    if (!item) return { ...m, readOnly: "a table in FROM isn't written as alias.table" };
+    if (m.tables.some((t) => t.alias.toLowerCase() === item.alias.toLowerCase())) return { ...m, readOnly: `two tables have the alias ${item.alias}` };
+    m.tables.push(item);
+    const j = { type, on: [], extra: [] };
+    m.joins[item.alias.toLowerCase()] = j;
+    if (tk[i] && tk[i].l === "using") return { ...m, readOnly: "it uses JOIN … USING" };
+    if (tk[i] && tk[i].l === "on") {
+      i++;
+      let s = i, d = 0;
+      while (i < fromEnd && !(d === 0 && (tk[i].t === "," || tk[i].l === "join" || ["left", "right", "full", "inner", "cross", "natural"].includes(tk[i].l)))) {
+        if (tk[i].t === "(") d++; else if (tk[i].t === ")") d--;
+        i++;
+      }
+      for (const [a, b] of split(s, i, "and")) {
+        const p = qual(a), q = b - a === 7 && qual(a + 4);
+        if (b - a === 7 && p && q && PQ_JOIN_OPS.includes(tk[a + 3].t)) j.on.push({ a: p[0], ac: p[1], op: tk[a + 3].t, b: q[0], bc: q[1] });
+        else j.extra.push(text(a, b));
+      }
+      if (j.type === "INNER" && !j.on.length && !j.extra.length) j.type = "CROSS";
+    } else if (j.type === "INNER") j.type = "CROSS";
+  }
+  const fieldOf = (table, col) => {
+    let f = m.fields.find((x) => !x.expr && x.table.toLowerCase() === table.toLowerCase() && x.col.toLowerCase() === col.toLowerCase() && !x.agg);
+    if (!f) { f = { table, col, show: false, alias: "", agg: "", group: false, sort: "", sortPos: 0, crit: [] }; m.fields.push(f); }
+    return f;
+  };
+  // SELECT list.
+  let si = 1;
+  if (tk[si] && (tk[si].l === "distinct" || tk[si].l === "all")) { m.distinct = tk[si].l === "distinct"; si++; }
+  for (const [a, b] of split(si, selEnd)) {
+    let e = b, alias = "";
+    if (b - a >= 2 && name(tk[b - 1]) && !pqKeyword.has(tk[b - 1].l) && (tk[b - 2].l === "as" || (tk[b - 2].kind !== "op" || tk[b - 2].t === ")"))) {
+      alias = tk[b - 1].v; e = tk[b - 2].l === "as" ? b - 2 : b - 1;
+      if (e === a) { e = b; alias = ""; }
+    }
+    const n = e - a, p = qual(a);
+    if (n === 1 && tk[a].t === "*") { m.star = true; continue; }
+    if (n === 3 && p && p[1] === "*") { m.fields.push({ table: p[0], col: "*", show: true, alias: "", agg: "", group: false, sort: "", sortPos: 0, crit: [] }); continue; }
+    if (n === 3 && p) { const f = fieldOf(p[0], p[1]); if (f.show) { m.fields.push({ ...f, crit: [], alias }); } else { f.show = true; f.alias = alias; } continue; }
+    if (n >= 4 && tk[a].kind === "word" && PQ_AGGS.includes(tk[a].t.toUpperCase()) && tk[a + 1].t === "(" && tk[e - 1].t === ")") {
+      const inner = e - a - 3, q = qual(a + 2);
+      if ((inner === 1 && tk[a + 2].t === "*") || (inner === 3 && q)) {
+        m.fields.push({ table: q ? q[0] : "", col: q ? q[1] : "*", show: true, alias, agg: tk[a].t.toUpperCase(), group: false, sort: "", sortPos: 0, crit: [] });
+        continue;
+      }
+    }
+    m.fields.push({ expr: text(a, e), table: "", col: "", show: true, alias, agg: "", group: false, sort: "", sortPos: 0, crit: [] });
+  }
+  // WHERE: OR of AND-chains of column op value, else kept as written.
+  if (at.where !== undefined) {
+    const a = at.where + 1, b = stop("where");
+    const rows = split(a, b, "or");
+    const conds = [];
+    let ok = true;
+    rows.forEach(([ra, rb], row) => {
+      if (tk[ra].t === "(" && tk[rb - 1].t === ")" && rows.length > 1) { ra++; rb--; }
+      for (const [ca, cb] of split(ra, rb, "and")) {
+        const p = qual(ca);
+        if (!p || p[1] === "*") { ok = false; return; }
+        const rest = tk.slice(ca + 3, cb).map((x) => x.t.toUpperCase()).join(" ");
+        let op = "", value = "";
+        if (rest === "IS NULL" || rest === "IS NOT NULL") op = rest;
+        else {
+          const two = tk[ca + 3] && tk[ca + 4] && `${tk[ca + 3].t} ${tk[ca + 4].t}`.toUpperCase();
+          const k = two === "NOT LIKE" ? 2 : 1;
+          op = k === 2 ? "NOT LIKE" : tk[ca + 3] ? tk[ca + 3].t.toUpperCase() : "";
+          if (!PQ_OPS.includes(op) || ca + 3 + k >= cb) { ok = false; return; }
+          value = text(ca + 3 + k, cb);
+        }
+        conds.push({ table: p[0], col: p[1], op, value, row });
+      }
+    });
+    if (ok && conds.length) for (const c of conds) fieldOf(c.table, c.col).crit.push({ op: c.op, value: c.value, row: c.row });
+    else m.whereExtra = text(a, b);
+  }
+  if (at.group !== undefined) for (const [a, b] of split(at.group + 2, stop("group"))) {
+    const p = qual(a);
+    if (b - a === 3 && p) fieldOf(p[0], p[1]).group = true; else m.groupExtra.push(text(a, b));
+  }
+  if (at.having !== undefined) m.having = text(at.having + 1, stop("having"));
+  if (at.order !== undefined) split(at.order + 2, stop("order")).forEach(([a, b], k) => {
+    let e = b, dir = "ASC";
+    if (["asc", "desc"].includes(tk[b - 1].l)) { dir = tk[b - 1].t.toUpperCase(); e = b - 1; }
+    const p = qual(a);
+    if (e - a === 3 && p) { const f = fieldOf(p[0], p[1]); f.sort = dir; f.sortPos = k + 1; } else m.orderExtra.push(text(a, b));
+  });
+  if (at.limit !== undefined) {
+    const parts = split(at.limit + 1, end, "offset");
+    m.limit = text(parts[0][0], parts[0][1]);
+    if (parts[1]) m.offset = text(parts[1][0], parts[1][1]);
+  }
+  return m;
+}
+
+// pqSql writes the model as SQL.
+function pqSql(m) {
+  const col = (f) => `${pqIdent(f.table)}.${f.col === "*" ? "*" : pqIdent(f.col)}`;
+  const out = [];
+  const sel = m.fields.filter((f) => f.show).map((f) => {
+    const e = f.expr ? f.expr : f.agg ? `${f.agg}(${f.col === "*" && !f.table ? "*" : col(f)})` : col(f);
+    return e + (f.alias ? ` AS ${pqIdent(f.alias)}` : "");
+  });
+  if (m.star || !sel.length) sel.unshift("*");
+  out.push("SELECT " + (m.distinct ? "DISTINCT " : "") + sel.join(",\n       "));
+  m.tables.forEach((t, k) => {
+    const item = `${pqIdent(t.db)}.${pqIdent(t.name)}` + (t.alias !== t.name ? " " + pqIdent(t.alias) : "");
+    if (!k) { out.push("FROM   " + item); return; }
+    const j = m.joins[t.alias.toLowerCase()] || { type: "CROSS", on: [], extra: [] };
+    const conds = [...j.on.map((c) => `${pqIdent(c.a)}.${pqIdent(c.ac)} ${c.op} ${pqIdent(c.b)}.${pqIdent(c.bc)}`), ...j.extra];
+    const type = j.type === "CROSS" && conds.length ? "INNER" : j.type;
+    out.push((type === "INNER" ? "JOIN" : type + " JOIN").padEnd(6) + " " + item + (conds.length && type !== "CROSS" ? " ON " + conds.join(" AND ") : ""));
+  });
+  const rows = [];
+  for (const f of m.fields) for (const c of f.crit) (rows[c.row] = rows[c.row] || []).push(`${col(f)} ${c.op}${c.op.startsWith("IS") ? "" : " " + c.value}`);
+  const ors = rows.filter((r) => r && r.length);
+  let where = ors.length > 1 ? ors.map((r) => "(" + r.join(" AND ") + ")").join(" OR ") : ors.length ? ors[0].join("\n  AND  ") : "";
+  if (m.whereExtra) where = where ? `(${m.whereExtra})\n  AND  ${ors.length > 1 ? "(" + where + ")" : where}` : m.whereExtra;
+  if (where) out.push("WHERE  " + where);
+  const group = [...m.fields.filter((f) => f.group && !f.expr).map(col), ...m.groupExtra];
+  if (group.length) out.push("GROUP BY " + group.join(", "));
+  if (m.having) out.push("HAVING " + m.having);
+  const sorted = m.fields.filter((f) => f.sort && !f.expr).sort((a, b) => a.sortPos - b.sortPos).map((f) => col(f) + (f.sort === "DESC" ? " DESC" : ""));
+  const ord = [...sorted, ...m.orderExtra];
+  if (ord.length) out.push("ORDER BY " + ord.join(", "));
+  if (m.limit) out.push("LIMIT " + m.limit + (m.offset ? " OFFSET " + m.offset : ""));
+  return out.join("\n");
+}
+
+// ---- the project query designer: diagram, grid, history ----------------------
+const pq = { model: pqEmpty(), layout: {}, zoom: 1, cols: {}, hist: [], hpos: -1, timer: 0, htimer: 0, sel: "", sug: [], sugAt: 0 };
+const PQ_COLORS = ["#2f6fb0", "#c0632b", "#2e8b57", "#8e44ad", "#b8860b", "#c0392b", "#16a085", "#7f8c8d", "#d35400", "#2c3e50"];
+const pqColor = (db) => { const i = prj.open ? prj.open.links.findIndex((l) => l.alias.toLowerCase() === String(db).toLowerCase()) : -1; return i < 0 ? "#999" : PQ_COLORS[i % PQ_COLORS.length]; };
+const pqKey = (s) => String(s).toLowerCase();
+const pqColsOf = (t) => pq.cols[pqKey(t.db + "." + t.name)];
+const pqInProject = (t) => prj.open && prj.open.tables.some((x) => pqKey(x.alias) === pqKey(t.db) && pqKey(x.name) === pqKey(t.name));
+const pqKind = (alias, col) => { const t = pq.model.tables.find((x) => pqKey(x.alias) === pqKey(alias)); const c = t && (pqColsOf(t) || []).find((x) => pqKey(x.name) === pqKey(col)); return c ? c.kind : ""; };
+function pqComparable(a, b) {
+  const g = (k) => ["int16", "int32", "int64", "decimal", "float32", "float64", "bool"].includes(k) ? "number" : ["char", "varchar", "text", "uuid", "json"].includes(k) ? "text"
+    : ["date", "timestamp", "timestamptz"].includes(k) ? "date" : k === "time" ? "time" : ["binary", "varbinary", "blob"].includes(k) ? "binary" : "";
+  const x = g(a), y = g(b);
+  return !x || !y || x === y;
+}
+
+async function pqLoadCols() {
+  if (!prj.open) return;
+  try {
+    const res = await api("GET", "/api/project/columns?" + new URLSearchParams({ project: prj.open.project }));
+    pq.cols = {};
+    for (const [k, v] of Object.entries(res.tables)) if (v.columns) pq.cols[pqKey(k)] = v.columns;
+  } catch (e) { /* drawn without columns */ }
+  pqDraw();
+}
+
+// pqFromText reads the editor into the model (the text is never rewritten).
+function pqFromText() {
+  pq.model = pqParse($("prjSql").value);
+  pqDraw();
+}
+// pqCommit writes the model as SQL into the editor, as one step of the history.
+function pqCommit() {
+  $("prjSql").value = pqSql(pq.model);
+  pqPush();
+  pqDraw(); prjSetExport(); prjMark();
+}
+// The history: the SQL and the layout, for diagram and text edits alike.
+function pqPush() {
+  const snap = { sql: $("prjSql").value, layout: JSON.stringify(pq.layout) };
+  const cur = pq.hist[pq.hpos];
+  if (cur && cur.sql === snap.sql && cur.layout === snap.layout) return;
+  pq.hist = pq.hist.slice(0, pq.hpos + 1); pq.hist.push(snap);
+  if (pq.hist.length > 200) pq.hist.shift();
+  pq.hpos = pq.hist.length - 1;
+  pqUndoButtons();
+}
+function pqUndo(step) {
+  clearTimeout(pq.htimer); pqPush();
+  const n = pq.hpos + step;
+  if (n < 0 || n >= pq.hist.length) return;
+  pq.hpos = n;
+  const s = pq.hist[n];
+  $("prjSql").value = s.sql; pq.layout = JSON.parse(s.layout);
+  pqFromText(); prjSetExport(); prjMark(); pqUndoButtons();
+}
+function pqUndoButtons() { $("prjUndo").disabled = pq.hpos <= 0; $("prjRedo").disabled = pq.hpos >= pq.hist.length - 1; }
+function pqReset(sql, layout) {
+  $("prjSql").value = sql || "";
+  pq.layout = layout && typeof layout === "object" ? (layout.tables || layout) : {}; pq.zoom = layout && layout.zoom || 1;
+  pq.hist = []; pq.hpos = -1; pq.sel = "";
+  pq.model = pqParse($("prjSql").value); pqPush(); pqDraw();
+}
+
+function pqUniqueAlias(name) {
+  let base = name.replace(/[^A-Za-z0-9_]/g, "_").replace(/^[0-9]/, "t$&").toLowerCase().slice(0, 12) || "t";
+  if (prj.open.links.some((l) => pqKey(l.alias) === base)) base += "_t";
+  let a = base;
+  for (let i = 2; pq.model.tables.some((t) => pqKey(t.alias) === a); i++) a = base + i;
+  return a;
+}
+async function pqAddTable(db, name, x, y) {
+  if (pq.model.readOnly) { toast("The diagram is read-only for this query: " + pq.model.readOnly, true); return; }
+  const others = [...pq.model.tables];
+  const alias = pqUniqueAlias(name);
+  pq.model.tables.push({ db, name, alias });
+  if (others.length) pq.model.joins[pqKey(alias)] = { type: "CROSS", on: [], extra: [] };
+  pq.layout[pqKey(alias)] = x === undefined ? pqFreeSpot() : { x, y };
+  pq.sel = pqKey(alias);
+  pqCommit();
+  // Joins worth offering, from keys and names (never applied without a click).
+  const sugs = [];
+  for (const o of others) {
+    try {
+      const res = await api("POST", "/api/project/joins", { project: prj.open.project, a: { alias: o.db, name: o.name }, b: { alias: db, name } });
+      for (const s of res.suggestions) sugs.push({ ...s, a: o.alias, b: alias });
+    } catch (e) { /* none */ }
+  }
+  pqSuggest(sugs);
+}
+function pqSuggest(sugs) {
+  const box = $("prjSuggest");
+  pq.sug = sugs.slice(0, 6);
+  box.hidden = !pq.sug.length;
+  box.innerHTML = pq.sug.length ? `<span>Join?</span>` + pq.sug.map((s, i) => `<button type="button" class="btn btn-sm btn-outline-primary" data-pqsug="${i}" title="${esc(s.why)}">${esc(s.pairs.map((p) => `${s.a}.${p[0]} = ${s.b}.${p[1]}`).join(" AND "))}</button>`).join("") +
+    `<button type="button" class="btn btn-sm btn-link" data-pqsug="-1">No thanks</button>` : "";
+}
+$("prjSuggest").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-pqsug]");
+  if (!b) return;
+  const s = pq.sug[+b.dataset.pqsug];
+  if (s) { for (const p of s.pairs) pqAddCond(s.b, p[1], s.a, p[0], "=", true); pqCommit(); }
+  pqSuggest([]);
+});
+function pqFreeSpot() {
+  let x = 10, y = 10;
+  const used = Object.values(pq.layout);
+  while (used.some((p) => Math.abs(p.x - x) < 150 && Math.abs(p.y - y) < 60)) { x += 190; if (x > 760) { x = 10; y += 140; } }
+  return { x, y };
+}
+function pqRemoveTable(alias) {
+  const m = pq.model, k = pqKey(alias), i = m.tables.findIndex((t) => pqKey(t.alias) === k);
+  if (i < 0) return;
+  m.tables.splice(i, 1);
+  delete m.joins[k]; delete pq.layout[k];
+  if (i === 0 && m.tables[0]) delete m.joins[pqKey(m.tables[0].alias)];
+  for (const j of Object.values(m.joins)) {
+    j.on = j.on.filter((c) => pqKey(c.a) !== k && pqKey(c.b) !== k);
+    if (!j.on.length && !j.extra.length) j.type = "CROSS";
+  }
+  m.fields = m.fields.filter((f) => f.expr || pqKey(f.table) !== k);
+  pqCommit();
+}
+// pqAddCond joins a.ac to b.bc, in the join of whichever of the two comes later.
+function pqAddCond(a, ac, b, bc, op = "=", quiet = false) {
+  const m = pq.model, ia = m.tables.findIndex((t) => pqKey(t.alias) === pqKey(a)), ib = m.tables.findIndex((t) => pqKey(t.alias) === pqKey(b));
+  if (ia < 0 || ib < 0 || ia === ib) return;
+  const later = m.tables[Math.max(ia, ib)], j = m.joins[pqKey(later.alias)];
+  if (j.on.some((c) => (pqKey(c.a) === pqKey(a) && pqKey(c.ac) === pqKey(ac) && pqKey(c.b) === pqKey(b) && pqKey(c.bc) === pqKey(bc)) ||
+    (pqKey(c.a) === pqKey(b) && pqKey(c.ac) === pqKey(bc) && pqKey(c.b) === pqKey(a) && pqKey(c.bc) === pqKey(ac)))) return;
+  j.on.push({ a, ac, op, b, bc });
+  if (j.type === "CROSS") j.type = "INNER";
+  if (!pqComparable(pqKind(a, ac), pqKind(b, bc)) && !quiet) toast(`${a}.${ac} and ${b}.${bc} hold different kinds of values (${pqKind(a, ac)} and ${pqKind(b, bc)}): the join may find nothing`, true);
+}
+function pqToggleCol(alias, col) {
+  const m = pq.model;
+  let f = m.fields.find((x) => !x.expr && !x.agg && pqKey(x.table) === pqKey(alias) && pqKey(x.col) === pqKey(col));
+  if (!f) m.fields.push({ table: alias, col, show: true, alias: "", agg: "", group: false, sort: "", sortPos: 0, crit: [] });
+  else {
+    f.show = !f.show;
+    if (!f.show && !f.crit.length && !f.group && !f.sort) m.fields.splice(m.fields.indexOf(f), 1);
+  }
+  pqCommit();
+}
+
+// pqDisplay is what the diagram shows: the model, or for SQL it can't hold
+// the tables and joins found in it (read-only).
+function pqDisplay() {
+  const m = pq.model;
+  if (!m.readOnly) return m;
+  const p = qaParse($("prjSql").value), aliases = new Set((prj.open ? prj.open.links : []).map((l) => pqKey(l.alias)));
+  const d = pqEmpty(); d.readOnly = m.readOnly;
+  for (const t of p.tables) {
+    const parts = t.name.split(".");
+    if (parts.length !== 2 || !aliases.has(pqKey(parts[0]))) continue;
+    const alias = t.alias || parts[1];
+    if (d.tables.some((x) => pqKey(x.alias) === pqKey(alias))) continue;
+    d.tables.push({ db: parts[0], name: parts[1], alias });
+    if (d.tables.length > 1) d.joins[pqKey(alias)] = { type: t.how === "left" || t.how === "right" || t.how === "full" ? t.how.toUpperCase() : "INNER", on: [], extra: [] };
+  }
+  for (const j of p.joins) {
+    const later = d.tables.find((t) => pqKey(t.alias) === pqKey(j.a) || pqKey(t.alias) === pqKey(j.b));
+    const ix = (q) => d.tables.findIndex((t) => pqKey(t.alias) === pqKey(q));
+    if (ix(j.a) < 0 || ix(j.b) < 0 || !later) continue;
+    const l = d.tables[Math.max(ix(j.a), ix(j.b))];
+    (d.joins[pqKey(l.alias)] || { on: [] }).on.push({ a: j.a, ac: j.ac, op: "=", b: j.b, bc: j.bc });
+  }
+  return d;
+}
+
+const pqMeasure = (s, bold) => { const c = pqMeasure.ctx || (pqMeasure.ctx = document.createElement("canvas").getContext("2d")); c.font = `${bold ? "600 12px" : "11px"} ui-monospace, monospace`; return c.measureText(s).width; };
+function pqDraw() {
+  if (!prj.open) return;
+  const on = $("prjQdOn").checked;
+  $("prjSplit").classList.toggle("nodiag", !on); $("prjDesign").hidden = !on;
+  pqSide();
+  if (!on) return;
+  const m = pqDisplay(), ro = !!m.readOnly;
+  if (pq.sug.length && pq.sug.every((s) => pqJoined(pq.model, s.a, s.b) || !m.tables.some((t) => pqKey(t.alias) === pqKey(s.b)))) pqSuggest([]);
+  // Legend: one colour per linked database.
+  $("prjLegend").innerHTML = prj.open.links.map((l) => `<span title="${esc(l.name || "")}"><i style="background:${pqColor(l.alias)}"></i>${esc(l.alias)}</span>`).join("");
+  $("prjAddTbl").innerHTML = `<option value="">Add table…</option>` + prj.open.links.map((l) => `<optgroup label="${esc(l.alias)}">` +
+    prj.open.tables.filter((t) => t.alias === l.alias).map((t) => `<option value="${esc(JSON.stringify([t.alias, t.name]))}">${esc(t.alias)}.${esc(t.name)}</option>`).join("") + `</optgroup>`).join("");
+  for (const id of ["prjAddTbl", "prjLinkBtn", "prjArrange"]) $(id).disabled = ro;
+  const note = $("prjDiagNote");
+  const cross = m.tables.length > 1 ? m.tables.filter((t, k) => !m.tables.some((o) => o !== t && pqJoined(m, t.alias, o.alias))) : [];
+  const unknown = m.tables.filter((t) => !pqInProject(t));
+  const bad = [];
+  for (const j of Object.values(m.joins)) for (const c of j.on) if (!pqComparable(pqKind(c.a, c.ac), pqKind(c.b, c.bc))) bad.push(`${c.a}.${c.ac} = ${c.b}.${c.bc}`);
+  const notes = [];
+  if (ro) notes.push(`Read-only: ${m.readOnly}. The diagram shows its tables; the SQL is never changed by it.`);
+  if (unknown.length) notes.push(`Not tables of the project: ${unknown.map((t) => t.db + "." + t.name).join(", ")}`);
+  if (cross.length) notes.push(`Joined to nothing: ${cross.map((t) => t.alias).join(", ")} (every row pairs with every row of the others)`);
+  if (bad.length) notes.push(`Joins of different kinds of values: ${bad.join(", ")}`);
+  note.hidden = !notes.length; note.className = "prjdnote" + (unknown.length || cross.length || bad.length ? " bad" : "");
+  note.textContent = notes.join(" · ");
+  if (!m.tables.length) {
+    $("prjDiagBody").innerHTML = `<div class="emptymsg"><p>${ro ? "No project tables found in the query." : "Drag a table here from the left, or choose one in Add table."}</p></div>`;
+    pqDesign(); return;
+  }
+  // Boxes.
+  const nodes = m.tables.map((t) => {
+    const k = pqKey(t.alias), cols = pqColsOf(t) || [], pos = pq.layout[k] || (pq.layout[k] = pqFreeSpot());
+    const used = new Set(m.fields.filter((f) => !f.expr && pqKey(f.table) === k && f.show && !f.agg).map((f) => pqKey(f.col)));
+    const joined = new Set(Object.values(m.joins).flatMap((j) => j.on.flatMap((c) => [pqKey(c.a) === k ? pqKey(c.ac) : null, pqKey(c.b) === k ? pqKey(c.bc) : null])).filter(Boolean));
+    const shown = pos.collapsed ? [] : cols.slice(0, 60);
+    const title = `${t.name}${pqKey(t.alias) !== pqKey(t.name) ? " " + t.alias : ""}`;
+    const w = Math.max(150, pqMeasure(title, true) + 50, ...shown.map((c) => pqMeasure(c.name) + 40));
+    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0), cols: shown, used, joined, title, more: pos.collapsed ? 0 : Math.max(0, cols.length - 60) };
+  });
+  const byK = Object.fromEntries(nodes.map((n) => [n.k, n]));
+  const rowY = (n, col) => { const i = n.cols.findIndex((c) => pqKey(c.name) === pqKey(col)); return i < 0 ? n.y + 16 : n.y + 34 + i * 16 + 8; };
+  let svg = "";
+  for (const t of m.tables) {
+    const j = m.joins[pqKey(t.alias)];
+    if (!j) continue;
+    j.on.forEach((c, ci) => {
+      const A = byK[pqKey(c.a)], B = byK[pqKey(c.b)];
+      if (!A || !B) return;
+      let [n1, c1, n2, c2] = A.x <= B.x ? [A, c.ac, B, c.bc] : [B, c.bc, A, c.ac];
+      const y1 = rowY(n1, c1), y2 = rowY(n2, c2);
+      let d;
+      if (n1.x + n1.w + 20 < n2.x) { const mx = (n1.x + n1.w + n2.x) / 2; d = `M${n1.x + n1.w} ${y1}C${mx} ${y1} ${mx} ${y2} ${n2.x} ${y2}`; }
+      else { const xr = Math.max(n1.x + n1.w, n2.x + n2.w) + 30; d = `M${n1.x + n1.w} ${y1}C${xr} ${y1} ${xr} ${y2} ${n2.x + n2.w} ${y2}`; }
+      const badc = !pqComparable(pqKind(c.a, c.ac), pqKind(c.b, c.bc));
+      const lbl = (ci === 0 && j.type !== "INNER" ? j.type + " " : "") + (c.op !== "=" ? c.op : "");
+      svg += `<g class="pq-edge" tabindex="${ro ? -1 : 0}" data-ja="${esc(c.a)}" data-jb="${esc(c.b)}" data-ci="${ci}" data-jt="${esc(t.alias)}" role="button" aria-label="Join ${esc(c.a)}.${esc(c.ac)} ${esc(c.op)} ${esc(c.b)}.${esc(c.bc)}">` +
+        `<title>${esc(`${j.type} JOIN: ${c.a}.${c.ac} ${c.op} ${c.b}.${c.bc}`)}${badc ? " — different kinds of values" : ""}${ro ? "" : " (click to change, Delete removes)"}</title>` +
+        `<path class="pq-hit" d="${d}"/><path class="pq-line${badc ? " bad" : ""}" d="${d}"/>` +
+        (lbl ? `<text class="pq-lbl" x="${(n1.x + n1.w + n2.x) / 2}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${esc(lbl)}</text>` : "") + `</g>`;
+    });
+  }
+  for (const n of nodes) {
+    const isCross = cross.includes(n.t), unk = !pqInProject(n.t), col = pqColor(n.t.db);
+    svg += `<g class="pq-node${isCross ? " cross" : ""}${unk ? " unknown" : ""}${pq.sel === n.k ? " sel" : ""}" data-k="${esc(n.k)}" tabindex="0" role="group" aria-label="${esc(n.t.db + "." + n.t.name + " as " + n.t.alias)}">` +
+      `<title>${esc(`${n.t.db}.${n.t.name} as ${n.t.alias}`)}${unk ? " — not a table of the project" : ""}${isCross ? " — joined to no other table" : ""}</title>` +
+      `<rect class="pq-box" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6"/>` +
+      `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="5" rx="2" fill="${col}"/>` +
+      `<rect class="pq-head" data-head="${esc(n.k)}" x="${n.x}" y="${n.y}" width="${n.w}" height="32" fill="transparent"/>` +
+      `<text class="pq-db" x="${n.x + 8}" y="${n.y + 16}" fill="${col}">${esc(n.t.db)}</text>` +
+      `<text class="pq-title" x="${n.x + 8}" y="${n.y + 28}">${esc(n.t.name)}${pqKey(n.t.alias) !== pqKey(n.t.name) ? `<tspan class="pq-db"> ${esc(n.t.alias)}</tspan>` : ""}</text>` +
+      (ro ? "" : `<text class="pq-x" data-collapse="${esc(n.k)}" x="${n.x + n.w - 30}" y="${n.y + 16}" role="button"><title>${pq.layout[n.k].collapsed ? "Show the columns" : "Hide the columns"}</title>${pq.layout[n.k].collapsed ? "▸" : "▾"}</text>` +
+        `<text class="pq-x" data-remove="${esc(n.k)}" x="${n.x + n.w - 14}" y="${n.y + 16}" role="button"><title>Remove the table from the query</title>×</text>`) +
+      n.cols.map((c, i) => {
+        const y = n.y + 34 + i * 16, on = n.used.has(pqKey(c.name));
+        return `<g data-col="${esc(c.name)}" data-k="${esc(n.k)}"><rect class="pq-colbg" x="${n.x + 1}" y="${y}" width="${n.w - 2}" height="16"/>` +
+          `<rect class="pq-check" data-check="${esc(c.name)}" x="${n.x + 8}" y="${y + 3}" width="10" height="10" rx="2" fill="${on ? col : "none"}" stroke="${on ? col : "#999"}" pointer-events="all"><title>${on ? "Remove from" : "Add to"} the output</title></rect>` +
+          `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}<title>${esc(c.name + " · " + (c.type || c.kind) + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
+      }).join("") +
+      (n.more ? `<text class="pq-db" x="${n.x + 8}" y="${n.y + n.h - 2}">+${n.more} more</text>` : "") + `</g>`;
+  }
+  const W = Math.max(...nodes.map((n) => n.x + n.w)) + 60, H = Math.max(...nodes.map((n) => n.y + n.h)) + 30;
+  $("prjDiagBody").innerHTML = `<svg id="pqSvg" width="${Math.ceil(W * pq.zoom)}" height="${Math.ceil(H * pq.zoom)}" viewBox="0 0 ${W} ${H}" data-ro="${ro ? 1 : 0}">${svg}</svg>`;
+  pqDesign();
+}
+const pqJoined = (m, a, b) => Object.values(m.joins).some((j) => j.on.some((c) => (pqKey(c.a) === pqKey(a) && pqKey(c.b) === pqKey(b)) || (pqKey(c.a) === pqKey(b) && pqKey(c.b) === pqKey(a))) || j.extra.length);
+
+// Pointer: move a table by its head, drag a column onto another to join.
+let pqDrag = null;
+const pqPoint = (ev) => { const r = $("pqSvg").getBoundingClientRect(); return { x: (ev.clientX - r.left) / pq.zoom, y: (ev.clientY - r.top) / pq.zoom }; };
+$("prjDiagBody").addEventListener("pointerdown", (ev) => {
+  const svg = $("pqSvg");
+  if (!svg || svg.dataset.ro === "1" || ev.button !== 0) return;
+  const head = ev.target.closest("[data-head]"), colg = ev.target.closest("g[data-col]");
+  if (ev.target.closest("[data-check],[data-remove],[data-collapse]")) return;
+  if (head) {
+    const k = head.dataset.head, p = pqPoint(ev), pos = pq.layout[k];
+    pqDrag = { kind: "move", k, dx: p.x - pos.x, dy: p.y - pos.y, moved: false };
+    pq.sel = k;
+  } else if (colg) {
+    const p = pqPoint(ev);
+    pqDrag = { kind: "join", k: colg.dataset.k, col: colg.dataset.col, x0: p.x, y0: p.y };
+  } else return;
+  ev.preventDefault();
+  $("prjDiagBody").setPointerCapture(ev.pointerId);
+});
+$("prjDiagBody").addEventListener("pointermove", (ev) => {
+  if (!pqDrag) return;
+  const p = pqPoint(ev);
+  if (pqDrag.kind === "move") {
+    pq.layout[pqDrag.k] = { ...pq.layout[pqDrag.k], x: Math.max(0, Math.round(p.x - pqDrag.dx)), y: Math.max(0, Math.round(p.y - pqDrag.dy)) };
+    pqDrag.moved = true; pqDraw();
+  } else {
+    let l = $("pqSvg").querySelector(".pq-drag");
+    if (!l) { l = document.createElementNS("http://www.w3.org/2000/svg", "line"); l.setAttribute("class", "pq-drag"); $("pqSvg").appendChild(l); }
+    l.setAttribute("x1", pqDrag.x0); l.setAttribute("y1", pqDrag.y0); l.setAttribute("x2", p.x); l.setAttribute("y2", p.y);
+  }
+});
+$("prjDiagBody").addEventListener("pointerup", (ev) => {
+  if (!pqDrag) return;
+  const d = pqDrag; pqDrag = null;
+  if (d.kind === "move") { if (d.moved) { pqPush(); prjMark(); } else pqDraw(); return; }
+  const el = document.elementFromPoint(ev.clientX, ev.clientY), g = el && el.closest && el.closest("g[data-col]");
+  if (g && g.dataset.k !== d.k) {
+    const a = pq.model.tables.find((t) => pqKey(t.alias) === d.k), b = pq.model.tables.find((t) => pqKey(t.alias) === g.dataset.k);
+    pqAddCond(a.alias, d.col, b.alias, g.dataset.col); pqCommit();
+  } else pqDraw();
+});
+$("prjDiagBody").addEventListener("click", (ev) => {
+  const t = ev.target;
+  const chk = t.closest("[data-check]"), rm = t.closest("[data-remove]"), col = t.closest("[data-collapse]"), edge = t.closest(".pq-edge");
+  if ($("pqSvg") && $("pqSvg").dataset.ro === "1") return;
+  if (chk) { const g = chk.closest("g[data-col]"); const tb = pq.model.tables.find((x) => pqKey(x.alias) === g.dataset.k); pqToggleCol(tb.alias, g.dataset.col); }
+  else if (rm) pqRemoveTable(rm.dataset.remove);
+  else if (col) { const p = pq.layout[col.dataset.collapse]; p.collapsed = !p.collapsed; pqPush(); pqDraw(); prjMark(); }
+  else if (edge) pqJoinDialog(edge.dataset.ja, edge.dataset.jb);
+});
+// Keyboard: arrows move the focused table, Delete removes it (or the
+// focused join), Enter opens its joins.
+$("prjDiagBody").addEventListener("keydown", (ev) => {
+  if ($("pqSvg") && $("pqSvg").dataset.ro === "1") return;
+  const node = ev.target.closest && ev.target.closest(".pq-node"), edge = ev.target.closest && ev.target.closest(".pq-edge");
+  if (node) {
+    const k = node.dataset.k, p = pq.layout[k], step = ev.shiftKey ? 50 : 10;
+    const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[ev.key];
+    if (mv) { ev.preventDefault(); p.x = Math.max(0, p.x + mv[0]); p.y = Math.max(0, p.y + mv[1]); pq.sel = k; pqDraw(); pqPush(); prjMark(); $("prjDiagBody").querySelector(`.pq-node[data-k="${CSS.escape(k)}"]`)?.focus(); }
+    else if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); pqRemoveTable(k); }
+    else if (ev.key === "Enter") { ev.preventDefault(); const t = pq.model.tables.find((x) => pqKey(x.alias) === k); const o = pq.model.tables.find((x) => pqKey(x.alias) !== k); pqJoinDialog(t.alias, o ? o.alias : t.alias); }
+  } else if (edge) {
+    if (ev.key === "Enter") { ev.preventDefault(); pqJoinDialog(edge.dataset.ja, edge.dataset.jb); }
+    else if (ev.key === "Delete" || ev.key === "Backspace") {
+      ev.preventDefault();
+      const j = pq.model.joins[pqKey(edge.dataset.jt)];
+      j.on.splice(+edge.dataset.ci, 1);
+      if (!j.on.length && !j.extra.length) j.type = "CROSS";
+      pqCommit();
+    }
+  }
+});
+// Tables dragged from the sidebar.
+$("prjDiagBody").addEventListener("dragover", (ev) => { if (ev.dataTransfer.types.includes("text/x-pqtable")) { ev.preventDefault(); $("prjDiagBody").classList.add("drop"); } });
+$("prjDiagBody").addEventListener("dragleave", () => $("prjDiagBody").classList.remove("drop"));
+$("prjDiagBody").addEventListener("drop", (ev) => {
+  $("prjDiagBody").classList.remove("drop");
+  const d = ev.dataTransfer.getData("text/x-pqtable");
+  if (!d) return;
+  ev.preventDefault();
+  const [db, name] = d.split("\u0000"), r = $("prjDiagBody").getBoundingClientRect();
+  pqAddTable(db, name, Math.max(0, Math.round((ev.clientX - r.left + $("prjDiagBody").scrollLeft) / pq.zoom - 60)), Math.max(0, Math.round((ev.clientY - r.top + $("prjDiagBody").scrollTop) / pq.zoom - 10)));
+});
+$("prjAddTbl").addEventListener("change", () => { const v = $("prjAddTbl").value; $("prjAddTbl").value = ""; if (v) { const [db, name] = JSON.parse(v); pqAddTable(db, name); } });
+$("prjZoomIn").addEventListener("click", () => { pq.zoom = Math.min(3, pq.zoom * 1.2); pqDraw(); });
+$("prjZoomOut").addEventListener("click", () => { pq.zoom = Math.max(0.3, pq.zoom / 1.2); pqDraw(); });
+$("prjFit").addEventListener("click", () => {
+  const svg = $("pqSvg");
+  if (!svg) return;
+  const [, , w, h] = svg.getAttribute("viewBox").split(" ").map(Number), box = $("prjDiagBody");
+  pq.zoom = Math.max(0.3, Math.min(2, (box.clientWidth - 10) / w, (box.clientHeight - 10) / h)); pqDraw();
+});
+// Arrange: the first table, then what is joined to it, column by column.
+$("prjArrange").addEventListener("click", () => {
+  const m = pq.model;
+  if (!m.tables.length) return;
+  const depth = new Map([[pqKey(m.tables[0].alias), 0]]), queue = [pqKey(m.tables[0].alias)];
+  while (queue.length) { const k = queue.shift(); for (const t of m.tables) { const o = pqKey(t.alias); if (!depth.has(o) && pqJoined(m, k, o)) { depth.set(o, depth.get(k) + 1); queue.push(o); } } }
+  let max = Math.max(...depth.values());
+  for (const t of m.tables) if (!depth.has(pqKey(t.alias))) depth.set(pqKey(t.alias), ++max);
+  const rows = {};
+  for (const t of m.tables) {
+    const k = pqKey(t.alias), d = depth.get(k), cols = (pqColsOf(t) || []).length;
+    rows[d] = rows[d] || 0;
+    pq.layout[k] = { ...pq.layout[k], x: 10 + d * 230, y: 10 + rows[d] };
+    rows[d] += (pq.layout[k].collapsed ? 40 : 40 + Math.min(cols, 60) * 16) + 20;
+  }
+  pqPush(); pqDraw(); prjMark();
+});
+$("prjUndo").addEventListener("click", () => pqUndo(-1));
+$("prjRedo").addEventListener("click", () => pqUndo(1));
+$("prjQdOn").addEventListener("change", pqDraw);
+$("projPane").addEventListener("keydown", (ev) => {
+  if (!(ev.ctrlKey || ev.metaKey) || !prj.open || document.querySelector("dialog[open]")) return;
+  const k = ev.key.toLowerCase();
+  if (k === "z" && !ev.shiftKey) { ev.preventDefault(); pqUndo(-1); }
+  else if ((k === "z" && ev.shiftKey) || k === "y") { ev.preventDefault(); pqUndo(1); }
+});
+// The editor: typing redraws the diagram (it never rewrites the text).
+$("prjSql").addEventListener("input", () => {
+  clearTimeout(pq.timer); pq.timer = setTimeout(pqFromText, 250);
+  clearTimeout(pq.htimer); pq.htimer = setTimeout(pqPush, 700);
+  pqSugUpdate();
+});
+// The splitter between the editor and the diagram.
+(() => {
+  const sp = $("prjSplitter"), box = $("prjSplit");
+  const set = (px) => box.style.setProperty("--prjsplit", Math.max(200, Math.min(px, box.clientWidth - 266)) + "px");
+  sp.addEventListener("pointerdown", (ev) => {
+    sp.setPointerCapture(ev.pointerId);
+    const move = (e) => set(e.clientX - box.getBoundingClientRect().left);
+    const up = () => { sp.removeEventListener("pointermove", move); sp.removeEventListener("pointerup", up); };
+    sp.addEventListener("pointermove", move); sp.addEventListener("pointerup", up);
+  });
+  sp.addEventListener("keydown", (ev) => {
+    const cur = $("prjSql").parentElement.getBoundingClientRect().width;
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); set(cur - 30); } else if (ev.key === "ArrowRight") { ev.preventDefault(); set(cur + 30); }
+  });
+})();
+
+// ---- join dialog ----
+function pqJoinDialog(a, b) {
+  const m = pq.model, d = $("prjJoinDialog");
+  if (m.tables.length < 2) { toast("Add at least two tables to join them", true); return; }
+  const opts = (sel) => m.tables.map((t) => `<option value="${esc(t.alias)}"${pqKey(t.alias) === pqKey(sel) ? " selected" : ""}>${esc(t.db)}.${esc(t.name)} ${esc(t.alias)}</option>`).join("");
+  const ix = (q) => m.tables.findIndex((t) => pqKey(t.alias) === pqKey(q));
+  if (ix(a) > ix(b)) [a, b] = [b, a];
+  if (pqKey(a) === pqKey(b)) b = m.tables.find((t) => pqKey(t.alias) !== pqKey(a)).alias;
+  $("prjJA").innerHTML = opts(a); $("prjJB").innerHTML = opts(b);
+  const load = () => {
+    const A = $("prjJA").value, B = $("prjJB").value, later = m.tables[Math.max(ix(A), ix(B))], j = later && m.joins[pqKey(later.alias)];
+    const pairs = j ? j.on.filter((c) => (pqKey(c.a) === pqKey(A) && pqKey(c.b) === pqKey(B)) || (pqKey(c.a) === pqKey(B) && pqKey(c.b) === pqKey(A)))
+      .map((c) => pqKey(c.a) === pqKey(A) ? { ac: c.ac, op: c.op, bc: c.bc } : { ac: c.bc, op: c.op === "<" ? ">" : c.op === ">" ? "<" : c.op === "<=" ? ">=" : c.op === ">=" ? "<=" : c.op, bc: c.ac }) : [];
+    $("prjJType").value = j ? (j.type === "CROSS" && pairs.length ? "INNER" : j.type) : "INNER";
+    pqJoinPairs(pairs.length ? pairs : [{ ac: "", op: "=", bc: "" }]);
+  };
+  pq.joinLoad = load;
+  load();
+  d.showModal();
+}
+function pqJoinPairs(pairs) {
+  const m = pq.model, A = m.tables.find((t) => pqKey(t.alias) === pqKey($("prjJA").value)), B = m.tables.find((t) => pqKey(t.alias) === pqKey($("prjJB").value));
+  const cols = (t, sel) => `<option value="">column…</option>` + (pqColsOf(t) || []).map((c) => `<option${pqKey(c.name) === pqKey(sel) ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+  $("prjJPairs").innerHTML = pairs.map((p, i) => `<div class="pr" data-i="${i}"><select class="form-select form-select-sm" data-f="ac" aria-label="Column of ${esc(A.alias)}">${cols(A, p.ac)}</select>
+    <select class="form-select form-select-sm" data-f="op" aria-label="Operator">${PQ_JOIN_OPS.map((o) => `<option${o === p.op ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>
+    <select class="form-select form-select-sm" data-f="bc" aria-label="Column of ${esc(B.alias)}">${cols(B, p.bc)}</select>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rm="${i}" aria-label="Remove this pair">×</button></div>`).join("");
+  pqJoinWarn();
+}
+const pqJoinRead = () => [...$("prjJPairs").querySelectorAll(".pr")].map((r) => ({ ac: r.querySelector("[data-f=ac]").value, op: r.querySelector("[data-f=op]").value, bc: r.querySelector("[data-f=bc]").value }));
+function pqJoinWarn() {
+  const A = $("prjJA").value, B = $("prjJB").value;
+  const bad = pqJoinRead().filter((p) => p.ac && p.bc && !pqComparable(pqKind(A, p.ac), pqKind(B, p.bc)));
+  $("prjJWarn").textContent = A === B ? "Choose two different tables." : bad.length ? `Different kinds of values: ${bad.map((p) => `${p.ac} (${pqKind(A, p.ac)}) and ${p.bc} (${pqKind(B, p.bc)})`).join(", ")}` : "";
+}
+$("prjJA").addEventListener("change", () => pq.joinLoad());
+$("prjJB").addEventListener("change", () => pq.joinLoad());
+$("prjJPairs").addEventListener("change", pqJoinWarn);
+$("prjJPairs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-rm]"); if (b) { const p = pqJoinRead(); p.splice(+b.dataset.rm, 1); pqJoinPairs(p.length ? p : [{ ac: "", op: "=", bc: "" }]); } });
+$("prjJAdd").addEventListener("click", () => pqJoinPairs([...pqJoinRead(), { ac: "", op: "=", bc: "" }]));
+$("prjJCancel").addEventListener("click", () => $("prjJoinDialog").close());
+function pqJoinApply(pairs, type) {
+  const m = pq.model, A = $("prjJA").value, B = $("prjJB").value;
+  if (pqKey(A) === pqKey(B)) { toast("Choose two different tables", true); return false; }
+  const ix = (q) => m.tables.findIndex((t) => pqKey(t.alias) === pqKey(q));
+  const later = m.tables[Math.max(ix(A), ix(B))], j = m.joins[pqKey(later.alias)];
+  j.on = j.on.filter((c) => !((pqKey(c.a) === pqKey(A) && pqKey(c.b) === pqKey(B)) || (pqKey(c.a) === pqKey(B) && pqKey(c.b) === pqKey(A))));
+  for (const p of pairs) j.on.push({ a: A, ac: p.ac, op: p.op, b: B, bc: p.bc });
+  j.type = type === "CROSS" ? (j.on.length ? "INNER" : "CROSS") : (j.on.length || j.extra.length ? type : "CROSS");
+  if (type === "CROSS" && pairs.length) toast("A CROSS join has no columns: the pairs make it an INNER join");
+  return true;
+}
+$("prjJoinForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const pairs = pqJoinRead().filter((p) => p.ac && p.bc);
+  if (pqJoinApply(pairs, $("prjJType").value)) { $("prjJoinDialog").close(); pqCommit(); }
+});
+$("prjJDel").addEventListener("click", () => { if (pqJoinApply([], "CROSS")) { $("prjJoinDialog").close(); pqCommit(); } });
+$("prjLinkBtn").addEventListener("click", () => {
+  const m = pq.model, sel = pq.sel && m.tables.find((t) => pqKey(t.alias) === pq.sel);
+  const a = sel || m.tables[0], b = m.tables.find((t) => t !== a);
+  if (!a || !b) { toast("Add at least two tables to join them", true); return; }
+  pqJoinDialog(a.alias, b.alias);
+});
+
+// ---- the grid of columns: output, alias, aggregate, group, sort, filters ----
+function pqDesign() {
+  const box = $("prjDesign"), m = pq.model;
+  if (m.readOnly) { box.innerHTML = `<div class="ro">The grid is read-only for this query: ${esc(m.readOnly)}.</div>`; return; }
+  const rows = Math.max(1, ...m.fields.flatMap((f) => f.crit.map((c) => c.row + 2)));
+  const allCols = m.tables.flatMap((t) => (pqColsOf(t) || []).map((c) => [t.alias, c.name]));
+  const fname = (f) => f.expr ? f.expr : (f.agg ? f.agg + "(" : "") + (f.table ? f.table + "." : "") + f.col + (f.agg ? ")" : "");
+  const head = `<tr><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th>Total</th><th>Group</th><th>Sort</th>` +
+    Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}</th>`).join("") + `<th></th></tr>`;
+  const body = m.fields.map((f, i) => {
+    if (f.col === "*" && !f.agg) return `<tr data-f="${i}"><td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${4 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
+    const ex = !!f.expr;
+    const crit = Array.from({ length: rows }, (_, r) => {
+      const c = f.crit.find((x) => x.row === r) || { op: "", value: "" };
+      return `<td>${ex ? "" : `<select class="form-select form-select-sm" data-k="op" data-r="${r}" aria-label="Filter operator"><option value=""></option>${PQ_OPS.map((o) => `<option${o === c.op ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>` +
+        `<input type="text" class="form-control form-control-sm" data-k="val" data-r="${r}" value="${esc(c.value)}" size="10" aria-label="Filter value" title="A value as SQL: 42, 'text', '2026-01-01'"${c.op.startsWith("IS") ? " disabled" : ""}>`}</td>`;
+    }).join("");
+    return `<tr data-f="${i}"><td title="${esc(fname(f))}">${esc(fname(f).slice(0, 60))}</td>
+      <td><input type="checkbox" data-k="show"${f.show ? " checked" : ""} aria-label="Show ${esc(fname(f))}"></td>
+      <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
+      <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="agg" aria-label="Total"><option value=""></option>${PQ_AGGS.map((a) => `<option${a === f.agg ? " selected" : ""}>${a}</option>`).join("")}</select>`}</td>
+      <td>${ex || f.agg ? "" : `<input type="checkbox" data-k="group"${f.group ? " checked" : ""} aria-label="Group by">`}</td>
+      <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="sort" aria-label="Sort"><option value=""></option><option${f.sort === "ASC" ? " selected" : ""}>ASC</option><option${f.sort === "DESC" ? " selected" : ""}>DESC</option></select>`}</td>
+      ${crit}<td><button type="button" class="btn btn-sm btn-link" data-k="up" aria-label="Move up" title="Move up">↑</button><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td></tr>`;
+  }).join("");
+  box.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>
+    <div class="dfoot">
+      <select class="form-select form-select-sm" id="pqAddField" aria-label="Add a column" style="width:auto"><option value="">Add column…</option>${allCols.map(([a, c]) => `<option value="${esc(JSON.stringify([a, c]))}">${esc(a)}.${esc(c)}</option>`).join("")}</select>
+      <label class="form-check"><input type="checkbox" class="form-check-input" id="pqStar"${m.star ? " checked" : ""}> All columns (*)</label>
+      <label class="form-check"><input type="checkbox" class="form-check-input" id="pqDistinct"${m.distinct ? " checked" : ""}> Distinct rows</label>
+      <label>Limit <input type="text" class="form-control form-control-sm d-inline-block" id="pqLimit" value="${esc(m.limit)}" size="6" aria-label="Limit"></label>
+      ${m.whereExtra ? `<span class="hint">Kept as written: WHERE ${esc(m.whereExtra.slice(0, 80))}</span>` : ""}${m.having ? `<span class="hint">HAVING ${esc(m.having.slice(0, 60))}</span>` : ""}
+    </div>`;
+}
+$("prjDesign").addEventListener("change", (ev) => {
+  const m = pq.model, t = ev.target;
+  if (t.id === "pqAddField") { const [a, c] = t.value ? JSON.parse(t.value) : []; if (a) { m.fields.push({ table: a, col: c, show: true, alias: "", agg: "", group: false, sort: "", sortPos: 0, crit: [] }); pqCommit(); } return; }
+  if (t.id === "pqStar") { m.star = t.checked; pqCommit(); return; }
+  if (t.id === "pqDistinct") { m.distinct = t.checked; pqCommit(); return; }
+  if (t.id === "pqLimit") { const v = t.value.trim(); if (v && !/^\d+$/.test(v)) { toast("The limit is a number of rows", true); return; } m.limit = v; pqCommit(); return; }
+  const tr = t.closest("tr[data-f]");
+  if (!tr) return;
+  const f = m.fields[+tr.dataset.f], k = t.dataset.k;
+  if (k === "show") f.show = t.checked;
+  else if (k === "alias") f.alias = t.value.trim();
+  else if (k === "agg") { f.agg = t.value; if (f.agg) f.group = false; }
+  else if (k === "group") f.group = t.checked;
+  else if (k === "sort") { f.sort = t.value; f.sortPos = f.sort ? Math.max(0, ...m.fields.map((x) => x.sortPos)) + 1 : 0; }
+  else if (k === "op" || k === "val") {
+    const r = +t.dataset.r, op = tr.querySelector(`[data-k=op][data-r="${r}"]`).value, val = tr.querySelector(`[data-k=val][data-r="${r}"]`).value.trim();
+    // An operator chosen before its value waits for the value (the row isn't redrawn).
+    if (k === "op" && op && !op.startsWith("IS") && !val) { tr.querySelector(`[data-k=val][data-r="${r}"]`).disabled = false; tr.querySelector(`[data-k=val][data-r="${r}"]`).focus(); return; }
+    f.crit = f.crit.filter((c) => c.row !== r);
+    if (op && (op.startsWith("IS") || val)) f.crit.push({ op, value: op.startsWith("IS") ? "" : val, row: r });
+    f.crit.sort((a, b) => a.row - b.row);
+  }
+  pqCommit();
+});
+$("prjDesign").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-k]"), tr = b && b.closest("tr[data-f]");
+  if (!tr) return;
+  const m = pq.model, i = +tr.dataset.f;
+  if (b.dataset.k === "rm") m.fields.splice(i, 1);
+  else if (b.dataset.k === "up" && i > 0) [m.fields[i - 1], m.fields[i]] = [m.fields[i], m.fields[i - 1]];
+  else return;
+  pqCommit();
+});
+
+// ---- the sidebar: the project's tables, to drag onto the diagram ----
+function pqSide() {
+  const open = !!prj.open && state.tab === "projects";
+  $("prjSide").hidden = !open; $("objectsBox").hidden = open;
+  if (!open) return;
+  const o = prj.open;
+  $("prjSideCount").textContent = ` ${o.tables.length}`;
+  $("prjSideList").innerHTML = o.links.map((l) => `<div class="grp"><i style="background:${pqColor(l.alias)}"></i>${esc(l.alias)} <small class="hint">${esc(l.name || "")}</small></div>` +
+    o.tables.filter((t) => t.alias === l.alias).map((t) => `<div class="tb" draggable="true" tabindex="0" data-db="${esc(t.alias)}" data-name="${esc(t.name)}" title="${esc(t.source)} — drag onto the diagram, or double-click / Enter to add">${esc(t.name)}</div>`).join("")).join("");
+}
+$("prjSideList").addEventListener("dragstart", (ev) => { const t = ev.target.closest(".tb"); if (t) ev.dataTransfer.setData("text/x-pqtable", t.dataset.db + "\u0000" + t.dataset.name); });
+$("prjSideList").addEventListener("dblclick", (ev) => { const t = ev.target.closest(".tb"); if (t) pqAddTable(t.dataset.db, t.dataset.name); });
+$("prjSideList").addEventListener("keydown", (ev) => { const t = ev.target.closest(".tb"); if (t && ev.key === "Enter") { ev.preventDefault(); pqAddTable(t.dataset.db, t.dataset.name); } });
+
+// ---- suggestions in the editor: aliases, tables, columns ----
+function pqSugUpdate() {
+  const ta = $("prjSql"), ul = $("prjSug");
+  if (!prj.open) return;
+  const before = ta.value.slice(0, ta.selectionStart);
+  let items = [], from = before.length;
+  const q = before.match(/([A-Za-z_][\w$]*)\.([A-Za-z_]\w*)?$/);
+  if (q) {
+    const [, head, part = ""] = q, low = part.toLowerCase();
+    from = before.length - part.length;
+    const link = prj.open.links.find((l) => pqKey(l.alias) === pqKey(head));
+    if (link) items = prj.open.tables.filter((t) => t.alias === link.alias && t.name.toLowerCase().startsWith(low)).map((t) => ({ v: pqIdent(t.name), hint: t.source }));
+    else {
+      const m = pqParse(ta.value), t = (m.readOnly ? pqDisplay() : m).tables.find((x) => pqKey(x.alias) === pqKey(head));
+      if (t) items = (pqColsOf(t) || []).filter((c) => c.name.toLowerCase().startsWith(low)).map((c) => ({ v: pqIdent(c.name), hint: c.type || c.kind }));
+    }
+  } else {
+    const w = before.match(/\b(from|join)\s+([A-Za-z_]\w*)?$/i);
+    if (w) {
+      const part = (w[2] || "").toLowerCase();
+      from = before.length - part.length;
+      items = prj.open.links.filter((l) => l.alias.toLowerCase().startsWith(part)).map((l) => ({ v: l.alias + ".", hint: l.name || "" }));
+    }
+  }
+  pq.sugItems = items.slice(0, 50); pq.sugFrom = from; pq.sugOn = 0;
+  if (!pq.sugItems.length) { ul.hidden = true; return; }
+  ul.innerHTML = pq.sugItems.map((it, i) => `<li role="option" data-i="${i}" class="${i ? "" : "on"}">${esc(it.v)}<small>${esc(it.hint)}</small></li>`).join("");
+  // Under the caret, roughly: monospace lines and characters.
+  const lines = before.split("\n"), cs = getComputedStyle(ta), lh = parseFloat(cs.lineHeight) || 18, cw = pqMeasure("M") * 13 / 11;
+  ul.style.top = Math.min(ta.clientHeight - 20, 8 + lines.length * lh - ta.scrollTop) + "px";
+  ul.style.left = Math.min(ta.clientWidth - 180, 10 + lines[lines.length - 1].length * cw - ta.scrollLeft) + "px";
+  ul.hidden = false;
+}
+function pqSugAccept(i) {
+  const it = pq.sugItems[i], ta = $("prjSql");
+  if (!it) return;
+  const end = ta.selectionStart;
+  ta.setRangeText(it.v, pq.sugFrom, end, "end");
+  $("prjSug").hidden = true;
+  ta.dispatchEvent(new Event("input"));
+  if (!it.v.endsWith(".")) $("prjSug").hidden = true;
+}
+$("prjSql").addEventListener("keydown", (ev) => {
+  const ul = $("prjSug");
+  if (ul.hidden) return;
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    ev.preventDefault();
+    pq.sugOn = (pq.sugOn + (ev.key === "ArrowDown" ? 1 : -1) + pq.sugItems.length) % pq.sugItems.length;
+    ul.querySelectorAll("li").forEach((li, i) => li.classList.toggle("on", i === pq.sugOn));
+    ul.querySelector("li.on")?.scrollIntoView({ block: "nearest" });
+  } else if (ev.key === "Enter" || ev.key === "Tab") { ev.preventDefault(); pqSugAccept(pq.sugOn); }
+  else if (ev.key === "Escape") { ev.preventDefault(); ul.hidden = true; }
+});
+$("prjSql").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("prjSql")) $("prjSug").hidden = true; }, 150));
+$("prjSug").addEventListener("mousedown", (ev) => { const li = ev.target.closest("li"); if (li) { ev.preventDefault(); pqSugAccept(+li.dataset.i); } });
+
+// ---- saved queries of the project ---------------------------------------------
+Object.assign(prj, { queries: [], qid: 0, qOrig: "" });
+const prjQState = () => JSON.stringify({ n: $("prjQName").value.trim(), d: $("prjQDesc").value.trim(), s: $("prjSql").value.trim() });
+const prjQDirty = () => !!prj.open && !!prj.qid && prjQState() !== prj.qOrig;
+const prjQUses = (alias) => prj.queries.filter((q) => new RegExp(`(^|[^\\w."])${alias.replace(/\W/g, "\\$&")}\\s*\\.`, "i").test(q.sql));
+
+async function prjQLoadList(select = prj.qid) {
+  if (!prj.open) return;
+  try { prj.queries = (await api("GET", "/api/project/queries?" + new URLSearchParams({ project: prj.open.project }))).queries; }
+  catch (e) { toast(e.message, true); }
+  $("prjQSel").innerHTML = `<option value="0">New query (not saved)</option>` +
+    prj.queries.map((q) => `<option value="${q.id}">${esc(q.name)} · v${q.version}</option>`).join("");
+  $("prjQSel").value = String(select || 0);
+  $("prjQDel").hidden = $("prjQExec").hidden = !prj.qid;
+}
+// prjQAskSave asks to save an edited saved query: false when the user stays.
+async function prjQAskSave() {
+  if (!prjQDirty()) return true;
+  const a = await prjAsk("Save the query?", `You changed the saved query “${$("prjQName").value.trim() || "without a name"}”. Save it, or discard the changes?`);
+  if (a === "cancel") return false;
+  return a === "save" ? prjQSave(false) : true;
+}
+async function prjQOpen(id) {
+  if (!(await prjQAskSave())) { $("prjQSel").value = String(prj.qid); return; }
+  const q = prj.queries.find((x) => x.id === id);
+  prj.qid = q ? q.id : 0;
+  $("prjQName").value = q ? q.name : ""; $("prjQDesc").value = q ? q.description : "";
+  pqReset(q ? q.sql : "", q ? q.layout : null);
+  prj.qOrig = prjQState(); prj.queryName = q ? q.name : "";
+  prj.result = null; prj.ran = ""; prjRenderGrid(); prjSetExport(); $("prjProg").hidden = true; $("prjInfo").textContent = ""; $("prjExpNote").hidden = true;
+  $("prjQVers").hidden = true;
+  $("prjQDel").hidden = $("prjQExec").hidden = !q;
+  $("prjQSel").value = String(prj.qid);
+  if (q) prjQVersions(q.id);
+  prjMark();
+}
+async function prjQVersions(id) {
+  try {
+    const vs = (await api("GET", `/api/project/queries/${id}/versions?` + new URLSearchParams({ project: prj.open.project }))).versions;
+    if (prj.qid !== id) return;
+    prj.versions = vs;
+    $("prjQVers").innerHTML = vs.map((v, i) => `<option value="${v.version}">v${v.version} · ${esc(fmtDate(v.saved))}${i ? "" : " · current"}</option>`).join("");
+    $("prjQVers").hidden = vs.length < 2;
+  } catch (e) { /* no versions shown */ }
+}
+$("prjQVers").addEventListener("change", () => {
+  const v = (prj.versions || []).find((x) => x.version === +$("prjQVers").value);
+  if (!v) return;
+  $("prjQName").value = v.name; $("prjQDesc").value = v.description;
+  pqReset(v.sql, v.layout); prjSetExport(); prjMark();
+  if (v !== prj.versions[0]) toast(`Version ${v.version} is in the editor: Save to make it the current version`);
+});
+async function prjQSave(asNew) {
+  let name = $("prjQName").value.trim();
+  if (asNew || !name) {
+    name = await prjNamePrompt(asNew ? "Save as a new query" : "Save the query", "Its name in the project.", asNew && name ? name + " (copy)" : name);
+    if (!name) return false;
+  }
+  const sql = $("prjSql").value.trim();
+  if (!sql) { toast("Write a query first", true); return false; }
+  try {
+    const r = await api("POST", "/api/project/queries", { project: prj.open.project, id: asNew ? 0 : prj.qid, name, description: $("prjQDesc").value.trim(),
+      sql, layout: { tables: pq.layout, zoom: pq.zoom } });
+    prj.qid = r.id; $("prjQName").value = name; prj.qOrig = prjQState(); prj.queryName = name;
+    await prjQLoadList(r.id); prjQVersions(r.id); prjMark();
+    toast(`Saved the query “${name}” (version ${r.version})`);
+    return true;
+  } catch (e) { toast(e.message, true); return false; }
+}
+$("prjQSel").addEventListener("change", () => prjQOpen(+$("prjQSel").value));
+$("prjQSave").addEventListener("click", () => prjQSave(false));
+$("prjQSaveAs").addEventListener("click", () => prjQSave(true));
+$("prjQExec").addEventListener("click", () => prjRun(100));
+for (const id of ["prjQName", "prjQDesc"]) $(id).addEventListener("input", prjMark);
+$("prjQDel").addEventListener("click", async () => {
+  const name = $("prjQName").value.trim();
+  const a = await prjAsk(`Delete “${name}”?`, `Delete the saved query “${name}” and its versions? This can't be undone.`, { save: "Delete", discard: "", danger: true });
+  if (a !== "save") return;
+  try {
+    await api("POST", `/api/project/queries/${prj.qid}/delete`, { project: prj.open.project });
+    toast(`Deleted the query “${name}”`);
+    prj.qid = 0; prj.qOrig = "";
+    await prjQLoadList(0);
+    prjQOpen(0);
+  } catch (e) { toast(e.message, true); }
+});
 // ---- saved connections ---------------------------------------------------
 async function loadSaved() {
   try {
@@ -6684,6 +7738,7 @@ function showTab(tab) {
   if (tab === "compare") openCompare();
   $("projPane").hidden = tab !== "projects";
   if (tab === "projects") prjShow();
+  pqSide();
   if (tab === "logs") openLogs(); else stopLive();
   $("queriesPane").hidden = tab !== "queries";
   if (tab === "queries") loadQueries();

@@ -275,7 +275,10 @@ func (pq *projectQuery) use(pt *projectTable, c string) {
 	pq.columns[pt][strings.ToLower(c)] = true
 }
 
-func (pq *projectQuery) markAll(pt *projectTable) { pq.columns[pt] = nil; pq.allOf = append(pq.allOf, pt) }
+func (pq *projectQuery) markAll(pt *projectTable) {
+	pq.columns[pt] = nil
+	pq.allOf = append(pq.allOf, pt)
+}
 
 func (pq *projectQuery) all(b bool) { pq.star = b }
 
