@@ -1811,7 +1811,7 @@ is sent and how to set it up. In short:
 - **Installing an update from the web UI** only ever downloads the file for this system
   from the GitHub release of this repository (over HTTPS), checks it against the
   release's `SHA256SUMS` (no checksum, no install) and runs it with `--version` before using it;
-  `setup.sh` and `setup.ps1` check the checksum too, and the release signature where OpenSSL 3 is installed (they say when they can't); it must be newer than the
+  `setup.sh` and `setup.ps1` check the checksum too, and the release signature: `setup.ps1` itself (in PowerShell, nothing to install), `setup.sh` with OpenSSL 3, or else with Perl (macOS and most Linux systems have it; it says when it has neither); it must be newer than the
   running version. `SHA256SUMS` must carry the release signature (see *Updating*), so a
   change pushed to the repository by anyone without the release key isn't installed. Like
   Shutdown it only accepts a JSON request, so other websites can't start it. With a

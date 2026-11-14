@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased (setup.sh only, no new binaries) — 2026-11-14
+
+- **`setup.sh` checks the release signature without OpenSSL 3** too: with Perl (Ed25519,
+  RFC 8032, using Perl's own modules), which macOS (whose `openssl` is LibreSSL) and most
+  Linux systems have. Only a system with neither still checks just the checksum, and says so.
+- README: the security notes said `setup.ps1` needs OpenSSL 3 to check the signature; it
+  checks it itself since 1.61.3.
+
 ## 1.61.3 — 2026-11-14
 
 - **`setup.ps1` checks the release signature itself**, in PowerShell (Ed25519, RFC 8032),

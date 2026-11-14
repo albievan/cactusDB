@@ -26,8 +26,9 @@ jobs:
           CACTUSDB_VERSION: ${{ inputs.version || github.event.release.tag_name }}
           CACTUSDB_REQUIRE_SIGNATURE: "yes"
         run: |
-          # macOS has LibreSSL as openssl: use Homebrew's OpenSSL 3 for the signature.
-          if [ "$RUNNER_OS" = macOS ]; then export PATH="$(brew --prefix openssl@3)/bin:$PATH"; fi
+          # Linux checks the signature with OpenSSL 3; macOS, which has LibreSSL, with
+          # its own Perl (no Homebrew tools on the path).
+          if [ "$RUNNER_OS" = macOS ]; then export PATH=/usr/bin:/bin:/usr/sbin:/sbin; fi
           sh setup.sh "$RUNNER_TEMP/cdb" | tee out.txt
           grep -q "release signature checked" out.txt
           "$RUNNER_TEMP/cdb/cactusdb" --version

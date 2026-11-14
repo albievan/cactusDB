@@ -46,7 +46,7 @@ mkdir -p "$dir"
 dir=$(cd "$dir" && pwd)
 dest=$dir/cactusdb
 tmp=$dir/.cactusdb.download.$$
-trap 'rm -f "$tmp" "$tmp.sums" "$tmp.sig" "$tmp.sigbin" "$tmp.pem"' EXIT INT TERM
+trap 'rm -f "$tmp" "$tmp.sums" "$tmp.sig" "$tmp.sigbin" "$tmp.pem" "$tmp.pl"' EXIT INT TERM
 
 echo "downloading $file ($ref) to $dest"
 if command -v curl >/dev/null 2>&1; then
@@ -71,8 +71,66 @@ if fetch SHA256SUMS.sig "$tmp.sig"; then
     openssl pkeyutl -verify -pubin -inkey "$tmp.pem" -rawin -in "$tmp.sums" -sigfile "$tmp.sigbin" >/dev/null 2>&1 ||
       fail "SHA256SUMS isn't signed with the cactusdb release key: not installed"
     echo "release signature checked"
+  elif command -v perl >/dev/null 2>&1 && perl -MMath::BigInt -MDigest::SHA -MMIME::Base64 -e1 2>/dev/null; then
+    # No OpenSSL 3 (macOS has LibreSSL): Perl, which macOS and most Linux
+    # systems have, checks it instead.
+    cat > "$tmp.pl" <<'PERL'
+# Ed25519 signature check (RFC 8032): exits 0 when $ARGV[1] (base64) is the
+# signature of file $ARGV[0] by the public key $ARGV[2] (base64), 1 otherwise.
+use strict; use warnings;
+use Math::BigInt try => 'GMP,FastCalc';
+use Digest::SHA qw(sha512); use MIME::Base64 qw(decode_base64);
+my ($mf, $sf, $pk) = @ARGV;
+open(my $fh, '<:raw', $mf) or exit 1; my $m = do { local $/; <$fh> }; close $fh;
+open($fh, '<', $sf) or exit 1; my $sig = decode_base64(do { local $/; <$fh> }); close $fh;
+my $pub = decode_base64($pk);
+exit 1 unless length($sig) == 64 && length($pub) == 32;
+my $p = Math::BigInt->new(2)->bpow(255) - 19;
+my $L = Math::BigInt->new(2)->bpow(252) + Math::BigInt->new('27742317777372353535851937790883648493');
+sub inv { $_[0]->copy->bmodpow($p - 2, $p) }
+sub num { Math::BigInt->from_hex('0x' . (unpack('H*', scalar reverse $_[0]) || '0')) }
+my $d = (Math::BigInt->new(-121665) * inv(Math::BigInt->new(121666))) % $p;
+my $d2 = (2 * $d) % $p;
+my $I = Math::BigInt->new(2)->bmodpow(($p - 1) / 4, $p);
+sub add {
+    my ($P, $Q) = @_;
+    my $A = (($P->[1] - $P->[0]) * ($Q->[1] - $Q->[0])) % $p; my $B = (($P->[1] + $P->[0]) * ($Q->[1] + $Q->[0])) % $p;
+    my $C = ($P->[3] * $d2 * $Q->[3]) % $p; my $D = (2 * $P->[2] * $Q->[2]) % $p;
+    my ($E, $F, $G, $H) = ($B - $A, $D - $C, $D + $C, $B + $A);
+    return [($E * $F) % $p, ($G * $H) % $p, ($F * $G) % $p, ($E * $H) % $p];
+}
+sub mul {
+    my ($s, $P) = @_;
+    my $Q = [Math::BigInt->new(0), Math::BigInt->new(1), Math::BigInt->new(1), Math::BigInt->new(0)];
+    for my $bit (split //, substr($s->as_bin, 2)) { $Q = add($Q, $Q); $Q = add($Q, $P) if $bit }
+    return $Q;
+}
+sub point { # from y and the sign of x; undef when not on the curve
+    my ($y, $sign) = @_;
+    return undef if $y >= $p;
+    my $u = ($y * $y - 1) % $p; my $v = ($d * $y * $y + 1) % $p;
+    my $x = (($u * inv($v)) % $p)->bmodpow(($p + 3) / 8, $p);
+    $x = ($x * $I) % $p if ($v * $x * $x - $u) % $p != 0;
+    return undef if ($v * $x * $x - $u) % $p != 0;
+    return undef if $x->is_zero && $sign;
+    $x = $p - $x if ($x % 2) != $sign;
+    return [$x, $y, Math::BigInt->new(1), ($x * $y) % $p];
+}
+sub decode { my $b = $_[0]; my $sign = (ord(substr($b, 31, 1)) >> 7) & 1; substr($b, 31, 1) = chr(ord(substr($b, 31, 1)) & 0x7f); point(num($b), $sign) }
+my $A = decode($pub); my $R = decode(substr($sig, 0, 32));
+exit 1 unless $A && $R;
+my $S = num(substr($sig, 32, 32));
+exit 1 unless $S < $L;
+my $h = num(sha512(substr($sig, 0, 32) . $pub . $m)) % $L;
+my $Bp = point((4 * inv(Math::BigInt->new(5))) % $p, 0);
+my $l = mul($S, $Bp); my $r = add($R, mul($h, $A));
+exit((($l->[0] * $r->[2] - $r->[0] * $l->[2]) % $p == 0 && ($l->[1] * $r->[2] - $r->[1] * $l->[2]) % $p == 0) ? 0 : 1);
+PERL
+    perl "$tmp.pl" "$tmp.sums" "$tmp.sig" 'GDkn+i/onn7P5N3QN3Rb3EyJFH5FU5kLF40AR36lcn8=' ||
+      fail "SHA256SUMS isn't signed with the cactusdb release key: not installed"
+    echo "release signature checked"
   else
-    echo "note: the release signature isn't checked here (that needs OpenSSL 3); the checksum is"
+    echo "note: the release signature isn't checked here (that needs OpenSSL 3 or Perl); the checksum is"
   fi
 elif [ "${CACTUSDB_REQUIRE_SIGNATURE:-}" = yes ]; then
   fail "SHA256SUMS.sig is missing ($ref): not installed"
