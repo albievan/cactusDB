@@ -534,7 +534,8 @@ func (s *Store) resealQueries(tx *sql.Tx, connID int64, oldBox, newBox *secretBo
 			return err
 		}
 	}
-	return nil
+	// Its share of the key of every project that links it (see projects_store.go).
+	return s.reshareProjects(tx, connID, oldBox, newBox, false)
 }
 
 func (s *Store) resealTable(tx *sql.Tx, table, purpose string, connID int64, oldBox, newBox *secretBox) error {

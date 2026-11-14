@@ -84,7 +84,7 @@ func TestConnectionPasswordProtectsCredentialsAndQueries(t *testing.T) {
 		t.Errorf("SaveUnlocked over a protected connection: %v", err)
 	}
 	// Deleting the connection deletes its queries.
-	st.Delete(id)
+	st.Delete(id, nil)
 	var n int
 	st.DB().QueryRow(`SELECT COUNT(*) FROM queries`).Scan(&n)
 	if n != 0 {

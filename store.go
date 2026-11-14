@@ -86,6 +86,9 @@ func (s *Store) init(path, keyFile string) error {
 	if err := s.migrateLocks(); err != nil {
 		return err
 	}
+	if err := s.migrateProjects(); err != nil {
+		return err
+	}
 	if err := s.migrateSuperuser(); err != nil {
 		return err
 	}
@@ -289,13 +292,26 @@ func (s *Store) Save(c SavedConn) (int64, error) {
 	return id, err
 }
 
-// Delete deletes a saved connection, its saved queries and relationship views.
-func (s *Store) Delete(id int64) error {
+// Delete deletes a saved connection, its saved queries and relationship
+// views. box (its key, nil without a password) opens its share of the key of
+// the projects that link it: they keep it, so they stay readable, with that
+// link shown broken.
+func (s *Store) Delete(id int64, box *secretBox) error {
+	tx, err := s.DB().Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	for _, table := range []string{"queries", "query_versions", "rel_views"} {
-		if _, err := s.DB().Exec(`DELETE FROM `+table+` WHERE conn_id = ?`, id); err != nil {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE conn_id = ?`, id); err != nil {
 			return err
 		}
 	}
-	_, err := s.DB().Exec(`DELETE FROM connections WHERE id = ?`, id)
-	return err
+	if err := s.reshareProjects(tx, id, box, nil, true); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM connections WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

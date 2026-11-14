@@ -60,7 +60,7 @@ func TestRelViewsSealedWithConnection(t *testing.T) {
 	if err := st.DeleteRelView(id, other); err == nil {
 		t.Error("deleted a view twice")
 	}
-	st.Delete(id)
+	st.Delete(id, nil)
 	var n int
 	st.DB().QueryRow(`SELECT COUNT(*) FROM rel_views`).Scan(&n)
 	if n != 0 {

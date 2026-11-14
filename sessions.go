@@ -19,6 +19,7 @@ func (s *server) expireSessions() {
 	for range time.Tick(time.Minute) {
 		if m := s.idleMinutes(); m > 0 {
 			s.closeIdleSessions(time.Duration(m)*time.Minute + serverIdleGrace)
+			s.closeIdleProjects(time.Duration(m)*time.Minute + serverIdleGrace)
 		}
 	}
 }

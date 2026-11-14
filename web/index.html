@@ -382,6 +382,45 @@
   /* ☰ → Compare databases */
   :root { --c-miss: #b3261e; --c-miss-bg: #fbe9e7; --c-extra: #1d5fa8; --c-extra-bg: #e3edf9; --c-diff: #8a5a00; --c-diff-bg: #fdf1d6; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-miss: #f2867c; --c-miss-bg: #3a1f1d; --c-extra: #8ab8f0; --c-extra-bg: #1c2a3b; --c-diff: #f0c060; --c-diff-bg: #3a3018; } }
+  #projPane { display: grid; grid-template-rows: minmax(0, 1fr); background: var(--panel); min-height: 0; overflow: auto; }
+  #projPane[hidden] { display: none; }
+  #prjNewName { width: 240px; }
+  .ronly { font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--accent, #2f6f4f); border: 1px solid currentColor; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  ul.list.prjlist li { display: flex; align-items: center; gap: 10px; }
+  ul.list.prjlist li .btn, ul.list.prjlinks li .btn { display: inline-block; }
+  .prjlist .pn { font-weight: 600; }
+  .prjlist .pd { color: var(--muted); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prjbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .prjname { width: 220px; font-weight: 600; }
+  .prjchips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .prjchip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; background: var(--bg); }
+  .prjchip .dot { width: 8px; height: 8px; border-radius: 50%; background: #999; }
+  .prjchip.connected .dot { background: #2e9d5b; } .prjchip.failed .dot, .prjchip.broken .dot { background: #d9534f; } .prjchip.connecting .dot { background: #e0a800; }
+  .prjbody { display: grid; grid-template-columns: minmax(300px, 2fr) minmax(320px, 3fr); gap: 0; min-height: 0; }
+  .prjsec { padding: 10px 12px; min-width: 0; }
+  .prjsec + .prjsec { border-left: 1px solid var(--border); }
+  .prjsec h4 { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+  .prjsec .cnt { color: var(--muted); font-weight: 400; }
+  .prjadd { display: flex; gap: 6px; margin-bottom: 8px; }
+  .prjadd select { flex: 1; min-width: 0; }
+  .prjadd input { width: 110px; }
+  ul.list.prjlinks li { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .prjlinks .ln { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .prjlinks .ln small { color: var(--muted); display: block; }
+  .prjlinks .lerr { grid-column: 1 / -1; color: var(--danger, #c0392b); font-size: 12px; }
+  .prjlimits { margin-top: 10px; font-size: 13px; }
+  .prjlim { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .prjlim label { font-size: 12px; } .prjlim input { width: 130px; }
+  .prjtabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .prjtabs button.on { background: var(--accent, #2f6f4f); color: #fff; border-color: transparent; }
+  .prjtabs button.on .cnt { color: inherit; opacity: .8; }
+  .prjtblbar { display: flex; gap: 6px; margin-bottom: 6px; }
+  .prjobjs { max-height: 55vh; overflow: auto; }
+  ul.list.prjobjs li { display: grid; grid-template-columns: auto minmax(0, 1fr) 170px; gap: 8px; align-items: center; font-size: 13px; }
+  .prjobjs li .src { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prjobjs li .kind { color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .prjobjs li input[type=text] { font-size: 12px; padding: 1px 6px; }
+  @media (max-width: 900px) { .prjbody { grid-template-columns: minmax(0, 1fr); } .prjsec + .prjsec { border-left: 0; border-top: 1px solid var(--border); } }
   #comparePane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
   #comparePane[hidden] { display: none; }
   #comparePane .filesbar .form-select { width: auto; max-width: 260px; }
@@ -1178,6 +1217,7 @@
       <button class="btn btn-outline-secondary text-start" data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes"><i class="bi bi-box-seam" aria-hidden="true"></i> DB container deployment</button>
       <button class="btn btn-outline-secondary text-start" data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Compare databases</button>
       <button class="btn btn-outline-secondary text-start" data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate database</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="projects" title="Projects: link several databases (Firebird, MariaDB, SQL Server…) and query across them with one SELECT"><i class="bi bi-diagram-3-fill" aria-hidden="true"></i> Projects</button>
       <button class="btn btn-outline-secondary text-start" data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i> Check for update<span class="updot" id="updateDot" hidden></span></button>
       <button class="btn btn-outline-secondary text-start" id="signOutBtn" hidden title="Sign out of cactusdb in this browser"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sign out <span class="signedas" id="signedAs"></span></button>
       <button class="btn btn-outline-danger text-start" id="shutdownBtn" hidden title="Stop this background cactusdb (asks first)"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
@@ -1248,6 +1288,7 @@
       <button class="nav-link" data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <button class="nav-link" data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
       <button class="nav-link" data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
+      <button class="nav-link" data-tab="projects" id="projTab" title="Projects: several linked databases, queried together">Projects</button>
       <button class="nav-link" data-tab="relations" id="relTab" hidden title="A picture of how the objects of the connected database hang together: foreign keys, triggers, and what views, procedures and functions use">DB Relationships</button>
       <button class="nav-link" data-tab="dashboard" id="dashTab" hidden title="The statistics of the connected database">Dashboard</button>
       <button class="nav-link" data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
@@ -1393,6 +1434,64 @@
       </div>
       <div class="lginfo" id="lgSub"></div>
       <pre id="lgText" class="lgtext" tabindex="0">…</pre>
+    </div>
+    <div class="pane" id="projPane" hidden>
+      <div id="prjHome">
+        <div class="filesbar">
+          <span class="flabel">Projects</span>
+          <span class="ronly" title="A project only ever reads its databases: nothing is written to them">Read-only</span>
+          <span class="spacer"></span>
+          <input class="form-control form-control-sm" id="prjNewName" maxlength="100" placeholder="New project name" spellcheck="false" autocomplete="off" aria-label="New project name">
+          <button class="btn btn-primary" id="prjNewBtn" title="Create a project, then link databases to it"><i class="bi bi-plus-lg" aria-hidden="true"></i> New project</button>
+        </div>
+        <div class="lginfo">A project links several saved connections (Firebird, MariaDB, SQL Server, PostgreSQL, Oracle…) under short
+          aliases, and holds the tables you choose, to query them together with one SELECT. It only ever reads them.</div>
+        <ul class="list prjlist" id="prjList"></ul>
+      </div>
+      <div id="prjWork" hidden>
+        <div class="prjbar">
+          <input class="form-control form-control-sm prjname" id="prjName" maxlength="100" spellcheck="false" autocomplete="off" aria-label="Project name" title="The project's name: change it, then Save">
+          <span class="ronly" title="Nothing is ever written to a linked database: queries run on a private copy of the rows they need">Read-only</span>
+          <div class="prjchips" id="prjChips" aria-label="Linked databases"></div>
+          <span class="spacer"></span>
+          <button class="btn btn-sm btn-primary" id="prjSave" title="Save the project: name, linked databases, tables and limits"><i class="bi bi-floppy" aria-hidden="true"></i> Save</button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjDup" title="Save a copy of this project under another name"><i class="bi bi-copy" aria-hidden="true"></i> Duplicate</button>
+          <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)"><i class="bi bi-trash" aria-hidden="true"></i> Delete</button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases"><i class="bi bi-x-lg" aria-hidden="true"></i> Close</button>
+        </div>
+        <div class="prjbody" id="prjSetup">
+          <section class="prjsec">
+            <h4>Linked databases <span class="cnt" id="prjLinkCnt"></span></h4>
+            <div class="prjadd">
+              <select class="form-select form-select-sm" id="prjAddConn" aria-label="Saved connection to link"></select>
+              <input class="form-control form-control-sm" id="prjAddAlias" maxlength="30" placeholder="alias" spellcheck="false" autocomplete="off" aria-label="Alias" title="The short name the SQL uses for this database: alias.table">
+              <button class="btn btn-sm btn-outline-primary" id="prjAddBtn" title="Link this saved connection under the alias">Link</button>
+            </div>
+            <ul class="list prjlinks" id="prjLinks"></ul>
+            <label class="form-label" for="prjDesc">Description</label>
+            <textarea class="form-control form-control-sm" id="prjDesc" rows="2" maxlength="1000" spellcheck="true"></textarea>
+            <details class="prjlimits">
+              <summary>Limits</summary>
+              <div class="prjlim">
+                <label>Rows per table <input class="form-control form-control-sm" type="number" min="1" id="prjMaxRows"></label>
+                <label>Staging in all (MB) <input class="form-control form-control-sm" type="number" min="1" id="prjMaxMB"></label>
+                <label>Time per run (s) <input class="form-control form-control-sm" type="number" min="1" id="prjTimeout"></label>
+              </div>
+              <p class="hint">A query that would need more stops with a message naming the table: never a result from part of a table.</p>
+            </details>
+          </section>
+          <section class="prjsec">
+            <h4>Tables <span class="cnt" id="prjTblCnt"></span></h4>
+            <div class="prjtabs" id="prjAliasTabs" role="tablist" aria-label="Linked database"></div>
+            <div class="prjtblbar">
+              <input class="form-control form-control-sm" id="prjTblFilter" type="search" placeholder="Filter tables…" spellcheck="false" autocomplete="off" aria-label="Filter tables">
+              <button class="btn btn-sm btn-outline-secondary" id="prjTblAll" title="Add every table shown">All</button>
+              <button class="btn btn-sm btn-outline-secondary" id="prjTblNone" title="Remove every table shown">None</button>
+            </div>
+            <ul class="list prjobjs" id="prjObjs"></ul>
+          </section>
+        </div>
+      </div>
     </div>
     <div class="pane" id="comparePane" hidden>
       <div class="filesbar">
@@ -2087,6 +2186,30 @@
 </dialog>
 
 
+
+<dialog id="prjAskDialog" class="dlg" aria-labelledby="prjAskTitle">
+  <h3 id="prjAskTitle">Save your changes?</h3>
+  <p class="sdtext" id="prjAskText"></p>
+  <div class="dactions">
+    <button class="btn btn-outline-secondary" type="button" id="prjAskCancel">Cancel</button>
+    <span class="spacer"></span>
+    <button class="btn btn-outline-danger" type="button" id="prjAskDiscard">Discard</button>
+    <button class="btn btn-primary" type="button" id="prjAskSave">Save</button>
+  </div>
+</dialog>
+
+<dialog id="prjNameDialog" class="dlg" aria-labelledby="prjNameTitle">
+  <form method="dialog" id="prjNameForm">
+    <h3 id="prjNameTitle"></h3>
+    <p class="sdtext" id="prjNameText"></p>
+    <input class="form-control" id="prjNameInput" maxlength="100" spellcheck="false" autocomplete="off" aria-labelledby="prjNameTitle">
+    <div class="dactions">
+      <button class="btn btn-outline-secondary" type="button" id="prjNameCancel">Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" type="submit" id="prjNameOk">OK</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="sqAskDialog" class="dlg" aria-labelledby="sqAskTitle">
   <h3 id="sqAskTitle">Save your changes?</h3>
@@ -4525,6 +4648,333 @@ async function withUnlock(c, fn, action = "connect", first = null) {
   }
 }
 
+// ---- projects (☰ → Projects) -------------------------------------------------
+// A project links several saved connections under aliases and holds a chosen
+// set of their tables, to query them together (projects.go). A single
+// connection and a project are never open at the same time in this page:
+// opening a project disconnects first, connecting closes the project first,
+// asking about unsaved changes either way.
+const prj = { list: [], linkable: [], maxLinks: 10, open: null, orig: "", alias: "", objs: {}, filter: "" };
+
+const prjEditable = () => { const o = prj.open; return o ? JSON.stringify({ n: o.name, d: o.description || "", l: o.links.map((l) => [l.connId, l.alias]), t: o.tables, m: o.limits }) : ""; };
+const prjDirty = () => !!prj.open && prjEditable() !== prj.orig;
+function prjMark() { if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() ? " ●" : "") : ""; }
+
+async function prjShow() {
+  $("prjHome").hidden = !!prj.open; $("prjWork").hidden = !prj.open;
+  if (!state.saved) await loadSaved();
+  try {
+    const res = await api("GET", "/api/projects");
+    prj.list = res.projects; prj.linkable = res.linkable || []; prj.maxLinks = res.maxLinks || 10;
+  } catch (e) { toast(e.message, true); }
+  if (prj.open) { prjRender(); return; }
+  prjMark();
+  const name = (id) => ((state.saved || []).find((c) => c.id === id) || { name: "deleted connection" }).name;
+  $("prjList").innerHTML = prj.list.length ? prj.list.map((p) => `<li><span class="pn">${esc(p.name)}</span>
+     <span class="pd">${p.connIds.length ? esc(p.connIds.map(name).join(" · ")) : "no databases linked yet"}</span>
+     <button type="button" class="btn btn-sm btn-primary" data-prjopen="${p.id}" title="Open the project: connect its databases">Open</button></li>`).join("")
+    : `<li class="empty">No projects yet: give one a name above and click New project.</li>`;
+}
+
+// prjWithPasswords calls fn with the passwords of the project's connections:
+// the ones this page knows, then each one the server says is missing.
+async function prjWithPasswords(fn, title) {
+  const body = { lockPasswords: {}, superPassword: superPw || "" };
+  for (const [id, u] of Object.entries(unlocks)) if (u.lockPassword) body.lockPasswords[id] = u.lockPassword;
+  const typed = new Set();
+  for (;;) {
+    try {
+      const res = await fn(body);
+      for (const id of typed) if (body.lockPasswords[id]) unlocks[id] = { lockPassword: body.lockPasswords[id] };
+      return res;
+    } catch (e) {
+      if (!(e.data && e.data.locked)) throw e;
+      if (!e.data.savedId) { superPw = null; body.superPassword = ""; if (!Object.keys(body.lockPasswords).length && !typed.size) continue; }
+      const id = String(e.data.savedId || ""), name = e.data.name || "a linked connection";
+      const wrong = typed.has(id) || (!e.data.savedId && typed.size);
+      delete body.lockPasswords[id]; delete unlocks[id];
+      const creds = await askPassword({ title, ok: "Unlock",
+        text: (wrong ? e.message.charAt(0).toUpperCase() + e.message.slice(1) + ". " : "") +
+          `“${name}” is linked in this project and protected by its connection password. Enter it, or the superuser password.` });
+      if (!creds) return null;
+      if (creds.superPassword) { superPw = creds.superPassword; body.superPassword = superPw; }
+      else if (id) { body.lockPasswords[id] = creds.lockPassword; typed.add(id); }
+    }
+  }
+}
+
+// prjLeaveSingle disconnects the single connection before a project opens.
+async function prjLeaveSingle() {
+  if (!state.session) return true;
+  if (!$("sqDialog").hidden && sqDirty()) {
+    sqClose();
+    toast("Save or discard the saved query first: opening a project disconnects " + state.label, true);
+    return false;
+  }
+  await disconnect("Disconnected from %s: a project is open (☰ → Projects)");
+  return true;
+}
+
+async function prjOpen(id) {
+  if (prj.open && prj.open.id === id) { prjShow(); return; }
+  if (!(await prjCloseAsk())) return;
+  if (!(await prjLeaveSingle())) return;
+  const p = prj.list.find((x) => x.id === id) || { name: "" };
+  const res = await prjWithPasswords((b) => api("POST", `/api/projects/${id}/open`, b), `Open the project “${p.name}”`).catch((e) => { toast(e.message, true); return null; });
+  if (!res) return;
+  prjSet(res);
+  if (state.tab !== "projects") showTab("projects"); else prjShow();
+  const down = res.links.filter((l) => l.state !== "connected");
+  if (down.length) toast(`Not connected: ${down.map((l) => l.alias).join(", ")} (see Linked databases)`, true);
+}
+function prjSet(res) {
+  prj.open = res; prj.orig = prjEditable(); prj.objs = {};
+  if (!res.links.some((l) => l.alias === prj.alias)) prj.alias = (res.links.find((l) => l.state === "connected") || res.links[0] || {}).alias || "";
+}
+
+// prjAsk asks a question in the dialog: resolves "save", "discard" or "cancel".
+function prjAsk(title, text, { save = "Save", discard = "Discard", danger = false } = {}) {
+  return new Promise((resolve) => {
+    const d = $("prjAskDialog");
+    $("prjAskTitle").textContent = title; $("prjAskText").textContent = text;
+    $("prjAskSave").textContent = save; $("prjAskDiscard").textContent = discard; $("prjAskDiscard").hidden = !discard;
+    $("prjAskSave").className = "btn " + (danger ? "btn-danger" : "btn-primary");
+    const done = (v) => { d.close(); for (const [b, f] of h) b.removeEventListener("click", f); d.removeEventListener("cancel", onEsc); resolve(v); };
+    const h = [[$("prjAskSave"), () => done("save")], [$("prjAskDiscard"), () => done("discard")], [$("prjAskCancel"), () => done("cancel")]];
+    const onEsc = (ev) => { ev.preventDefault(); done("cancel"); };
+    for (const [b, f] of h) b.addEventListener("click", f);
+    d.addEventListener("cancel", onEsc);
+    d.showModal(); $("prjAskSave").focus();
+  });
+}
+
+// prjCloseAsk closes the open project (after asking about unsaved changes):
+// false when the user chose to stay.
+async function prjCloseAsk() {
+  if (!prj.open) return true;
+  if (prjDirty()) {
+    const a = await prjAsk("Save your changes?", `You changed the project “${prj.open.name}”. Save the changes, or discard them?`);
+    if (a === "cancel") return false;
+    if (a === "save" && !(await prjSave())) return false;
+  }
+  const id = prj.open.project;
+  prj.open = null; prj.orig = ""; prj.objs = {};
+  await api("POST", "/api/project/close", { project: id }).catch(() => {});
+  if (state.tab === "projects") prjShow();
+  return true;
+}
+
+function prjRender() {
+  const o = prj.open;
+  $("prjName").value = o.name; $("prjDesc").value = o.description || "";
+  $("prjMaxRows").value = o.limits.maxRows; $("prjMaxMB").value = o.limits.maxMB; $("prjTimeout").value = o.limits.timeoutSec;
+  prjRenderLinks(); prjRenderTables(); prjMark();
+}
+
+const prjStateWords = { connected: "connected", failed: "not connected", broken: "its connection was deleted", connecting: "connecting", new: "Save to link it" };
+function prjRenderLinks() {
+  const o = prj.open;
+  $("prjChips").innerHTML = o.links.map((l) => `<span class="prjchip ${l.state}" title="${esc((l.name || "deleted connection") + " · " + prjStateWords[l.state] + (l.error ? ": " + l.error : ""))}"><span class="dot"></span>${esc(l.alias)}</span>`).join("");
+  $("prjLinkCnt").textContent = `· ${o.links.length} of at most ${prj.maxLinks}`;
+  const linked = new Set(o.links.map((l) => l.connId));
+  const saved = [...(state.saved || [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  $("prjAddConn").innerHTML = `<option value="">Saved connection to link…</option>` + saved.map((c) => {
+    const ok = prj.linkable.includes(c.engine), used = linked.has(c.id);
+    return `<option value="${c.id}"${ok && !used ? "" : " disabled"}>${esc(c.name)} · ${esc(engineInfo(c.engine).name)}${!ok ? " (can't be linked yet: only SQL databases)" : used ? " (linked)" : ""}</option>`;
+  }).join("");
+  $("prjAddBtn").disabled = o.links.length >= prj.maxLinks;
+  $("prjLinks").innerHTML = o.links.length ? o.links.map((l, i) => `<li>
+     <input class="form-control form-control-sm" data-prjalias="${i}" value="${esc(l.alias)}" maxlength="30" spellcheck="false" autocomplete="off" aria-label="Alias of ${esc(l.name || "")}" title="The alias the SQL uses: ${esc(l.alias)}.table">
+     <span class="ln">${esc(l.name || "deleted connection")}<small>${esc(l.engineName || "")}${l.engineName ? " · " : ""}${esc(prjStateWords[l.state] || l.state)}</small></span>
+     <span>${l.state === "failed" ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-prjretry="${esc(l.alias)}" title="Try to connect it again">Retry</button>` : ""}${l.state === "broken" ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-prjrepoint="${i}" title="Link the saved connection chosen above under this alias instead">Re-point</button>` : ""}
+       <button type="button" class="btn btn-sm btn-outline-danger" data-prjunlink="${i}" title="Remove this database (and its tables) from the project">Remove</button></span>
+     ${l.error ? `<span class="lerr">${esc(l.error)}</span>` : ""}</li>`).join("") : `<li class="empty">Link a saved connection above: its tables can then be added.</li>`;
+}
+
+// prjObjects lists the tables and views of a linked database (once per alias).
+async function prjObjects(alias) {
+  if (prj.objs[alias]) return prj.objs[alias];
+  const res = await api("GET", "/api/project/objects?" + new URLSearchParams({ project: prj.open.project, alias }));
+  const items = [];
+  for (const g of res.objects) if (g.queryable) for (const n of g.items) items.push({ source: n, kind: g.type });
+  return (prj.objs[alias] = items);
+}
+// prjDefaultName is a table's name in the project: its own name, or
+// schema_name when another schema's table of that name is in the project.
+function prjDefaultName(alias, source) {
+  const base = source.includes(".") ? source.slice(source.lastIndexOf(".") + 1) : source;
+  const clash = prj.open.tables.some((t) => t.alias === alias && t.source !== source && t.name.toLowerCase() === base.toLowerCase());
+  return (clash ? source.replace(/\./g, "_") : base).replace(/["]/g, "");
+}
+
+async function prjRenderTables() {
+  const o = prj.open, connected = o.links.filter((l) => l.state === "connected");
+  $("prjTblCnt").textContent = `· ${o.tables.length} chosen`;
+  if (!connected.some((l) => l.alias === prj.alias)) prj.alias = connected[0] ? connected[0].alias : "";
+  $("prjAliasTabs").innerHTML = o.links.map((l) => `<button type="button" class="btn btn-sm btn-outline-secondary${l.alias === prj.alias ? " on" : ""}" data-prjtab="${esc(l.alias)}"${l.state === "connected" ? "" : " disabled"} title="${esc(l.name || "")}">${esc(l.alias)} <span class="cnt">${o.tables.filter((t) => t.alias === l.alias).length}</span></button>`).join("");
+  const ul = $("prjObjs");
+  if (!prj.alias) { ul.innerHTML = `<li class="empty">${o.links.length ? "No linked database is connected." : "Link a database first."}</li>`; return; }
+  const alias = prj.alias;
+  let items;
+  try { items = await prjObjects(alias); } catch (e) { ul.innerHTML = `<li class="empty">${esc(e.message)}</li>`; return; }
+  if (!prj.open || prj.alias !== alias) return;
+  const f = prj.filter.toLowerCase();
+  const shown = items.filter((it) => !f || it.source.toLowerCase().includes(f));
+  prj.shown = shown;
+  ul.innerHTML = shown.length ? shown.map((it, i) => {
+    const t = o.tables.find((x) => x.alias === alias && x.source === it.source);
+    return `<li><input class="form-check-input" type="checkbox" data-prjtbl="${i}" ${t ? "checked" : ""} aria-label="Add ${esc(it.source)}">
+      <span class="src" title="${esc(it.source)}">${esc(it.source)}<span class="kind">${it.kind === "views" || it.kind === "view" ? "view" : ""}</span></span>
+      ${t ? `<input class="form-control form-control-sm" type="text" data-prjtname="${i}" value="${esc(t.name)}" maxlength="128" spellcheck="false" autocomplete="off" title="Its name in the project's SQL: ${esc(alias)}.${esc(t.name)}" aria-label="Project name of ${esc(it.source)}">` : "<span></span>"}</li>`;
+  }).join("") : `<li class="empty">${items.length ? "No table matches the filter." : "This database has no tables or views."}</li>`;
+}
+
+function prjToggleTable(it, on) {
+  const o = prj.open, alias = prj.alias, i = o.tables.findIndex((t) => t.alias === alias && t.source === it.source);
+  if (on && i < 0) {
+    const schema = it.source.includes(".") ? it.source.slice(0, it.source.lastIndexOf(".")) : "";
+    o.tables.push({ alias, source: it.source, name: prjDefaultName(alias, it.source), kind: it.kind === "views" || it.kind === "view" ? "view" : "table", schema });
+  } else if (!on && i >= 0) o.tables.splice(i, 1);
+}
+
+async function prjSave(dupName) {
+  const o = prj.open;
+  const body = { project: o.project, name: dupName || o.name, description: o.description || "", links: o.links.map((l) => ({ connId: l.connId, alias: l.alias })),
+    tables: o.tables, limits: o.limits, duplicate: !!dupName };
+  const res = await prjWithPasswords((b) => api("POST", "/api/project/save", { ...body, ...b }), `Link a database to “${o.name}”`)
+    .catch((e) => { toast(e.message, true); return null; });
+  if (!res) return false;
+  if (dupName) { toast(`Saved a copy of the project as “${dupName}”`); return true; }
+  const objs = prj.objs;
+  prjSet(res);
+  for (const l of res.links) if (objs[l.alias] && l.state === "connected") prj.objs[l.alias] = objs[l.alias];
+  prjRender();
+  toast(`Saved the project “${res.name}”`);
+  return true;
+}
+
+// prjNamePrompt asks for a name (Duplicate).
+function prjNamePrompt(title, text, value) {
+  return new Promise((resolve) => {
+    const d = $("prjNameDialog");
+    $("prjNameTitle").textContent = title; $("prjNameText").textContent = text; $("prjNameInput").value = value;
+    const done = (v) => { d.close(); $("prjNameForm").removeEventListener("submit", ok); $("prjNameCancel").removeEventListener("click", no); d.removeEventListener("cancel", no); resolve(v); };
+    const ok = (ev) => { ev.preventDefault(); const v = $("prjNameInput").value.trim(); if (v) done(v); };
+    const no = (ev) => { if (ev) ev.preventDefault(); done(null); };
+    $("prjNameForm").addEventListener("submit", ok); $("prjNameCancel").addEventListener("click", no); d.addEventListener("cancel", no);
+    d.showModal(); $("prjNameInput").select();
+  });
+}
+
+$("prjNewBtn").addEventListener("click", async () => {
+  const name = $("prjNewName").value.trim();
+  if (!name) { $("prjNewName").focus(); toast("Give the project a name first", true); return; }
+  try {
+    const res = await api("POST", "/api/projects", { name });
+    $("prjNewName").value = "";
+    prj.list.push({ id: res.id, name, connIds: [] });
+    await prjOpen(res.id);
+  } catch (e) { toast(e.message, true); }
+});
+$("prjNewName").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); $("prjNewBtn").click(); } });
+$("prjList").addEventListener("click", (ev) => { const b = ev.target.closest("[data-prjopen]"); if (b) prjOpen(+b.dataset.prjopen); });
+$("prjName").addEventListener("input", () => { prj.open.name = $("prjName").value; prjMark(); });
+$("prjDesc").addEventListener("input", () => { prj.open.description = $("prjDesc").value; prjMark(); });
+for (const [id, k] of [["prjMaxRows", "maxRows"], ["prjMaxMB", "maxMB"], ["prjTimeout", "timeoutSec"]])
+  $(id).addEventListener("input", () => { prj.open.limits[k] = Math.max(1, Math.round(+$(id).value) || 1); prjMark(); });
+$("prjAddConn").addEventListener("change", () => {
+  const c = (state.saved || []).find((x) => x.id === +$("prjAddConn").value);
+  if (c) $("prjAddAlias").value = prjAliasFor(c.name);
+});
+// prjAliasFor proposes an alias for a connection name (see defaultAlias in Go).
+function prjAliasFor(name) {
+  let a = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^[0-9_]+|_+$/g, "").slice(0, 12).replace(/_+$/, "") || "db";
+  const taken = new Set(prj.open.links.map((l) => l.alias.toLowerCase()));
+  let out = a;
+  for (let i = 2; taken.has(out); i++) out = a + i;
+  return out;
+}
+$("prjAddBtn").addEventListener("click", async () => {
+  const c = (state.saved || []).find((x) => x.id === +$("prjAddConn").value);
+  if (!c) { toast("Choose a saved connection to link", true); return; }
+  const alias = $("prjAddAlias").value.trim() || prjAliasFor(c.name);
+  prj.open.links.push({ connId: c.id, alias, name: c.name, engine: c.engine, engineName: engineInfo(c.engine).name, state: "new" });
+  if (await prjSave()) { prj.alias = alias; $("prjAddAlias").value = ""; prjRenderTables(); }
+  else { prj.open.links = prj.open.links.filter((l) => !(l.connId === c.id && l.alias === alias && l.state === "new")); prjRenderLinks(); }
+});
+$("prjLinks").addEventListener("input", (ev) => {
+  const i = ev.target.dataset.prjalias;
+  if (i === undefined) return;
+  const l = prj.open.links[+i], old = l.alias, now = ev.target.value.trim();
+  for (const t of prj.open.tables) if (t.alias === old) t.alias = now;
+  if (prj.objs[old]) { prj.objs[now] = prj.objs[old]; delete prj.objs[old]; }
+  if (prj.alias === old) prj.alias = now;
+  l.alias = now; prjMark();
+});
+$("prjLinks").addEventListener("change", () => { prjRenderLinks(); prjRenderTables(); });
+$("prjLinks").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const o = prj.open;
+  if (b.dataset.prjretry) {
+    try { const res = await api("POST", "/api/project/retry", { project: o.project, alias: b.dataset.prjretry }); o.links = res.links; prjRenderLinks(); prjRenderTables(); }
+    catch (e) { toast(e.message, true); }
+  } else if (b.dataset.prjunlink !== undefined) {
+    const l = o.links[+b.dataset.prjunlink], n = o.tables.filter((t) => t.alias === l.alias).length;
+    const a = await prjAsk(`Remove “${l.alias}”?`, `Remove ${l.name || "the deleted connection"} (${l.alias}) from the project${n ? `, with its ${n} table${n > 1 ? "s" : ""}` : ""}? It takes effect when you save the project.`, { save: "Remove", discard: "", danger: true });
+    if (a !== "save") return;
+    o.links.splice(+b.dataset.prjunlink, 1);
+    o.tables = o.tables.filter((t) => t.alias !== l.alias);
+    delete prj.objs[l.alias];
+    prjRender();
+  } else if (b.dataset.prjrepoint !== undefined) {
+    const c = (state.saved || []).find((x) => x.id === +$("prjAddConn").value);
+    if (!c) { toast("Choose the saved connection to link instead in the list above, then click Re-point", true); $("prjAddConn").focus(); return; }
+    const l = o.links[+b.dataset.prjrepoint];
+    Object.assign(l, { connId: c.id, name: c.name, engine: c.engine, engineName: engineInfo(c.engine).name, state: "new", error: "" });
+    if (!(await prjSave())) prjRenderLinks();
+  }
+});
+$("prjAliasTabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-prjtab]"); if (b) { prj.alias = b.dataset.prjtab; prjRenderTables(); } });
+$("prjTblFilter").addEventListener("input", () => { prj.filter = $("prjTblFilter").value; prjRenderTables(); });
+$("prjObjs").addEventListener("change", (ev) => {
+  const i = ev.target.dataset.prjtbl;
+  if (i === undefined) return;
+  prjToggleTable(prj.shown[+i], ev.target.checked);
+  prjRenderTables(); prjMark();
+});
+$("prjObjs").addEventListener("input", (ev) => {
+  const i = ev.target.dataset.prjtname;
+  if (i === undefined) return;
+  const t = prj.open.tables.find((x) => x.alias === prj.alias && x.source === prj.shown[+i].source);
+  if (t) { t.name = ev.target.value.trim(); prjMark(); }
+});
+$("prjTblAll").addEventListener("click", () => { for (const it of prj.shown || []) prjToggleTable(it, true); prjRenderTables(); prjMark(); });
+$("prjTblNone").addEventListener("click", () => { for (const it of prj.shown || []) prjToggleTable(it, false); prjRenderTables(); prjMark(); });
+$("prjSave").addEventListener("click", () => prjSave());
+$("prjCloseBtn").addEventListener("click", () => prjCloseAsk());
+$("prjDup").addEventListener("click", async () => {
+  const name = await prjNamePrompt("Duplicate the project", "A copy with the same databases, tables and limits, under another name.", prj.open.name + " (copy)");
+  if (name) prjSave(name);
+});
+$("prjDel").addEventListener("click", async () => {
+  const o = prj.open;
+  const a = await prjAsk(`Delete “${o.name}”?`, `Delete the project “${o.name}” and its saved queries? The linked databases and their saved connections stay as they are. This can't be undone.`, { save: "Delete", discard: "", danger: true });
+  if (a !== "save") return;
+  try {
+    await api("POST", "/api/project/delete", { project: o.project });
+    prj.open = null; prj.orig = "";
+    toast(`Deleted the project “${o.name}”`);
+    prjShow();
+  } catch (e) { toast(e.message, true); }
+});
+// Closing or reloading the page closes the open project on the server too.
+window.addEventListener("pagehide", () => {
+  if (prj.open) navigator.sendBeacon("/api/project/close", new Blob([JSON.stringify({ project: prj.open.project })], { type: "application/json" }));
+});
+// A changed project isn't lost by closing the page unasked.
+window.addEventListener("beforeunload", (ev) => { if (prjDirty()) { ev.preventDefault(); ev.returnValue = ""; } });
+
 // ---- saved connections ---------------------------------------------------
 async function loadSaved() {
   try {
@@ -4915,6 +5365,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "logs": setNavMenu(false); showTab("logs"); break;
     case "compare": setNavMenu(false); showTab("compare"); break;
     case "migrate": setNavMenu(false); showTab("migrate"); break;
+    case "projects": setNavMenu(false); showTab("projects"); break;
     case "containers": setNavMenu(false); openContainers(); break;
   }
 });
@@ -4930,6 +5381,7 @@ document.addEventListener("keydown", (ev) => {
 
 // ---- connect -------------------------------------------------------------
 async function connect(extra = {}) {
+  if (prj.open && !(await prjCloseAsk())) return; // a project and a connection are never open together
   const btn = $("connectBtn");
   btn.disabled = true; btn.textContent = "Connecting…";
   const before = $("status").innerHTML;
@@ -6082,6 +6534,8 @@ function showTab(tab) {
   $("logsPane").hidden = tab !== "logs";
   $("comparePane").hidden = tab !== "compare";
   if (tab === "compare") openCompare();
+  $("projPane").hidden = tab !== "projects";
+  if (tab === "projects") prjShow();
   if (tab === "logs") openLogs(); else stopLive();
   $("queriesPane").hidden = tab !== "queries";
   if (tab === "queries") loadQueries();

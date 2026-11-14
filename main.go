@@ -117,10 +117,11 @@ type server struct {
 
 	mu         sync.Mutex
 	sessions   map[string]*session
-	batches    map[string]*webBatch    // "export all tables" jobs, by id
-	zips       map[string]*preparedZip // compressed downloads of the Exported files page, by id
-	compares   map[string]*compareJob  // ☰ → Compare databases, by id (compare.go)
-	migrations map[string]*migrateJob  // ☰ → Migrate, by id (migrate.go)
+	batches    map[string]*webBatch       // "export all tables" jobs, by id
+	zips       map[string]*preparedZip    // compressed downloads of the Exported files page, by id
+	compares   map[string]*compareJob     // ☰ → Compare databases, by id (compare.go)
+	migrations map[string]*migrateJob     // ☰ → Migrate, by id (migrate.go)
+	projects   map[string]*projectSession // ☰ → Projects: the open projects, by id (projects.go)
 
 	throttle lockThrottle // slows down guessing connection passwords
 
@@ -562,6 +563,7 @@ func main() {
 	mux.HandleFunc("POST /api/connections/{id}/unlock", s.handleUnlockConn)
 	mux.HandleFunc("GET /api/superuser", s.handleSuperuserStatus)
 	mux.HandleFunc("POST /api/superuser/reveal", s.handleSuperuserReveal)
+	s.projectRoutes(mux)
 	mux.HandleFunc("GET /api/queries", s.handleListQueries)
 	mux.HandleFunc("POST /api/queries", s.handleSaveQuery)
 	mux.HandleFunc("POST /api/queries/check", s.handleCheckQuery)
@@ -745,6 +747,7 @@ func (s *server) release() {
 		delete(s.sessions, id)
 	}
 	s.mu.Unlock()
+	s.closeAllProjects()
 	s.dropZips()
 }
 
@@ -2036,16 +2039,26 @@ func (s *server) handleDeleteConn(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		LockPassword  string `json:"lockPassword"`
 		SuperPassword string `json:"superPassword"`
+		// ProjectsOK: the page showed which projects link it and the user
+		// chose to delete it anyway (their link is then shown broken).
+		ProjectsOK bool `json:"projectsOk"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
-	c, _, ok := s.unlockConnAs(w, r, id, req.LockPassword, req.SuperPassword)
+	c, box, ok := s.unlockConnAs(w, r, id, req.LockPassword, req.SuperPassword)
 	if !ok {
 		return
 	}
-	if err := s.store.Delete(id); err != nil {
+	if names, err := s.store.ProjectsUsing(id); err != nil {
+		writeErr(w, 500, err)
+		return
+	} else if len(names) > 0 && !req.ProjectsOK {
+		writeJSON(w, 409, map[string]any{"error": fmt.Sprintf("projects use this connection: %s", strings.Join(names, ", ")), "projects": names})
+		return
+	}
+	if err := s.store.Delete(id, box); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
