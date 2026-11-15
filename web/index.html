@@ -556,7 +556,8 @@
   .prjret { margin-top: 2px; }
   .prjexpnote > div { margin: 3px 0; }
   .prjexpnote code { word-break: break-all; }
-  .dlbtn { font-size: 12px; padding: 0 8px; line-height: 1.6; margin-left: 6px; vertical-align: baseline; white-space: nowrap; }
+  .dlbtn { font-size: 12px; padding: 0 6px; line-height: 1.6; margin-left: 6px; vertical-align: baseline; white-space: nowrap; }
+  .prjexpnote .dlbtn { margin: 0 6px 0 0; }
   .prjgrid { flex: 1; overflow: auto; min-height: 160px; border: 1px solid var(--border); border-radius: 6px; }
   @media (max-width: 900px) { .prjbody { grid-template-columns: minmax(0, 1fr); } .prjsec + .prjsec { border-left: 0; border-top: 1px solid var(--border); } }
   #comparePane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
@@ -5406,8 +5407,8 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
   note.hidden = false; note.textContent = fmt === "all" ? "Exporting in all formats…" : `Exporting as ${b.dataset.label}…`;
   try {
     const res = await api("POST", "/api/project/export", { project: prj.open.project, sql: prj.ran, format: fmt, name: prj.queryName || "" });
-    note.innerHTML = res.files.map((f) => `<div><i class="bi bi-file-earmark-check" aria-hidden="true"></i> ${f.rows.toLocaleString()} row${f.rows === 1 ? "" : "s"} → <code>${esc(f.path)}</code>
-      <a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a></div>`).join("");
+    note.innerHTML = res.files.map((f) => `<div><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download title="Download ${esc(f.path.split(/[\\/]/).pop())}" aria-label="Download the file"><i class="bi bi-download" aria-hidden="true"></i></a>` +
+      `${f.rows.toLocaleString()} row${f.rows === 1 ? "" : "s"} → <code>${esc(f.path)}</code></div>`).join("");
   } catch (e) { note.textContent = "Export failed: " + e.message; }
   finally { prjSetExport(); }
 }));
@@ -5430,6 +5431,8 @@ const pqNoValue = (op) => op === "IS NULL" || op === "IS NOT NULL";
 const PQ_FNS = [
   { k: "UPPER", t: "UPPER({c})", label: "UPPER: capitals" },
   { k: "LOWER", t: "LOWER({c})", label: "LOWER: small letters" },
+  { k: "TITLE", t: "cdb_title({c})", label: "Title Case: Each Word Capitalised" },
+  { k: "CAMEL", t: "cdb_camel({c})", label: "camelCase: wordsJoinedLikeThis" },
   { k: "TRIM", t: "TRIM({c})", label: "TRIM: no spaces around" },
   { k: "LENGTH", t: "LENGTH({c})", label: "LENGTH: number of characters" },
   { k: "ROUND2", t: "ROUND({c}, 2)", label: "ROUND to 2 decimals" },
@@ -5449,12 +5452,25 @@ const PQ_FNS = [
   { k: "D_YM", t: "strftime('%Y-%m', {c})", label: "year and month yyyy-mm" },
   { k: "D_Y", t: "strftime('%Y', {c})", label: "year yyyy" },
   { k: "D_HM", t: "strftime('%H:%M', {c})", label: "time hh:mm" },
+  // {p}: a format of the user's own, as a quoted text in the SQL.
+  { k: "DATEF", t: "cdb_date({c}, {p})", label: "date in a format of your own…", p: "yyyy-MMM-dd HH:mm",
+    ask: "yyyy year, MM month (MMM Jan, MMMM January), dd day (ddd Mon, dddd Monday), HH hours (hh 12-hour, tt AM/PM), mm minutes, ss seconds; text in 'quotes' stays." },
+  { k: "NUMF", t: "cdb_number({c}, {p})", label: "number in a format of your own…", p: "#,##0.00",
+    ask: "# a digit if any, 0 a digit always: #,##0.00 → 1,234.50; # ##0,00 → 1 234,50; 0.0% → 12.5%; text around it stays: R #,##0.00 → R 1,234.50." },
 ];
-const pqFnOf = (k) => PQ_FNS.find((x) => x.k === k);
+// Ready-made formats: a function and its format, as one choice.
+const PQ_FN_PRESETS = [
+  ["NUMF|#,##0.00", "number 1,234.50"], ["NUMF|#,##0", "number 1,235"], ["NUMF|# ##0,00", "number 1 234,50"], ["NUMF|0.0%", "percent 12.5%"],
+  ["NUMF|R #,##0.00", "currency R 1,234.50"], ["NUMF|$#,##0.00", "currency $1,234.50"], ["NUMF|€#,##0.00", "currency €1,234.50"], ["NUMF|£#,##0.00", "currency £1,234.50"],
+  ["DATEF|yyyy-MMM-dd", "date 2026-Nov-05"], ["DATEF|dd MMMM yyyy", "date 05 November 2026"], ["DATEF|ddd, d MMM yyyy", "date Thu, 5 Nov 2026"], ["DATEF|dd/MM/yyyy hh:mm tt", "date 05/11/2026 02:07 PM"],
+];
+// A function in a chain is its key, or "key|format" for one with a format of its own.
+const pqFnOf = (k) => PQ_FNS.find((x) => x.k === String(k).split("|")[0]);
+const pqFnParam = (k) => { const i = String(k).indexOf("|"); return i < 0 ? "" : String(k).slice(i + 1); };
 // Each template as a pattern: {c} the inner expression (the same each time it appears).
 for (const fn of PQ_FNS) {
   const parts = fn.t.split("{c}").map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*").replace(/,/g, "\\s*,\\s*")
-    .replace(/\\\(/g, "\\s*\\(\\s*").replace(/\\\)/g, "\\s*\\)"));
+    .replace(/\\\(/g, "\\s*\\(\\s*").replace(/\\\)/g, "\\s*\\)").replace("\\{p\\}", "'(?<p>(?:[^']|'')*)'"));
   fn.re = new RegExp("^\\s*" + parts.map((x, i) => (i === 1 ? "(?<c>.+)" : i > 1 ? "\\k<c>" : "") + x).join("") + "\\s*$", "is");
 }
 const PQ_QUAL = /^\s*("(?:[^"]|"")+"|[A-Za-z_][\w$]*)\s*\.\s*("(?:[^"]|"")+"|[A-Za-z_][\w$]*)\s*$/;
@@ -5467,12 +5483,12 @@ function pqFnParse(expr) {
   for (const fn of PQ_FNS) {
     const mt = fn.re.exec(expr);
     const inner = mt && pqFnParse(mt.groups.c);
-    if (inner) return { ...inner, fns: [...inner.fns, fn.k] };
+    if (inner) return { ...inner, fns: [...inner.fns, fn.p !== undefined ? `${fn.k}|${mt.groups.p.replace(/''/g, "'")}` : fn.k] };
   }
   return null;
 }
-const pqFnApply = (fns, e) => (fns || []).reduce((x, k) => pqFnOf(k) ? pqFnOf(k).t.replaceAll("{c}", x) : x, e);
-const pqFnText = (fns) => (fns || []).map((k) => (pqFnOf(k) || { label: k }).label.replace(/:.*/, "")).join(" → ");
+const pqFnApply = (fns, e) => (fns || []).reduce((x, k) => pqFnOf(k) ? pqFnOf(k).t.replaceAll("{c}", x).replace("{p}", "'" + pqFnParam(k).replace(/'/g, "''") + "'") : x, e);
+const pqFnText = (fns) => (fns || []).map((k) => pqFnParam(k) ? `“${pqFnParam(k)}”` : (pqFnOf(k) || { label: k }).label.replace(/:.*/, "")).join(" → ");
 // pqLiteral makes a filter value typed in the grid valid SQL: text is quoted
 // ('%ES'), a number, NULL, TRUE/FALSE, a quoted value, a column (a.b) or a
 // function call is kept; LIKE values are always text.
@@ -6311,7 +6327,10 @@ function pqFnCell(fns, key, r = "") {
     `<span class="fnchain"${dr} title="${esc(fns && fns.length ? "Applied in this order: " + pqFnText(fns) : "")}">${esc(pqFnText(fns))}</span>` +
     `<button type="button" class="btn btn-sm btn-link fnclr" data-k="${key}clr"${dr} title="Remove the last function" aria-label="Remove the last function"${fns && fns.length ? "" : " hidden"}>×</button>` +
     `<select class="form-select form-select-sm fnadd" data-k="${key}add"${dr} aria-label="${key === "cfn" ? "Function on the column before comparing" : "Function on the value shown"}" title="${key === "cfn" ? "A function on the column before it is compared, e.g. LOWER and TRIM to compare without capitals and spaces (the value can be a function too: lower(trim('aaa ')))" : "A function on the value shown; another one goes around it"}">` +
-    `<option value="">${fns && fns.length ? "+" : "ƒ"}</option>${PQ_FNS.map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</select></span>`;
+    `<option value="">${fns && fns.length ? "+" : "ƒ"}</option>` +
+    `<optgroup label="Functions">${PQ_FNS.filter((x) => x.p === undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</optgroup>` +
+    `<optgroup label="Formats">${PQ_FN_PRESETS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}` +
+    PQ_FNS.filter((x) => x.p !== undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("") + `</optgroup></select></span>`;
 }
 function pqDesign() {
   const box = $("prjDesign"), m = pq.model;
@@ -6362,13 +6381,30 @@ $("prjDesign").addEventListener("change", (ev) => {
   else if (k === "alias") f.alias = t.value.trim();
   else if (k === "agg") { f.agg = t.value; if (f.agg) f.group = false; }
   // A function goes around those before it; the column keeps its name in the output, unless it has one.
-  else if (k === "fnadd") { if (!t.value) return; f.fns = [...(f.fns || []), t.value]; if (!f.alias) f.alias = f.col; }
-  else if (k === "cfnadd") { if (!t.value) return; const h = tr.querySelector(`[data-k=cfns][data-r="${t.dataset.r}"]`); h.value = JSON.stringify([...JSON.parse(h.value), t.value]); t.value = ""; if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
+  else if (k === "fnadd" || k === "cfnadd") {
+    if (!t.value) return;
+    pqFnPick(t.value).then((fn) => {
+      t.value = "";
+      if (!fn) return;
+      if (k === "fnadd") { f.fns = [...(f.fns || []), fn]; if (!f.alias) f.alias = f.col; pqCommit(); return; }
+      const h = tr.querySelector(`[data-k=cfns][data-r="${t.dataset.r}"]`);
+      h.value = JSON.stringify([...JSON.parse(h.value), fn]);
+      if (pqCritUpdate(tr, f, +t.dataset.r, k)) pqCommit();
+    });
+    return;
+  }
   else if (k === "group") f.group = t.checked;
   else if (k === "sort") { f.sort = t.value; f.sortPos = f.sort ? Math.max(0, ...m.fields.map((x) => x.sortPos)) + 1 : 0; }
   else if (k === "op" || k === "val" || k === "val2") { if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
   pqCommit();
 });
+// pqFnPick is the function chosen in a list: a format of the user's own is asked for first.
+async function pqFnPick(v) {
+  const fn = pqFnOf(v);
+  if (!fn || fn.p === undefined || pqFnParam(v)) return v;
+  const p = await prjNamePrompt(fn.label.replace("…", ""), fn.ask, fn.p);
+  return p ? `${fn.k}|${p}` : null;
+}
 // pqCritUpdate reads filter r of a row into the model: false while it waits for a value (the row isn't redrawn).
 function pqCritUpdate(tr, f, r, k) {
   const op = tr.querySelector(`[data-k=op][data-r="${r}"]`).value, btw = op.endsWith("BETWEEN");
@@ -8993,7 +9029,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
     const res = await runWithOverall(`Exporting all rows of ${name} as ${fmt === "xlsx" ? "Excel" : fmt.toUpperCase()}`,
       () => api("POST", "/api/export", { session: state.session, sql, format: fmt, name }),
       (r) => `Exported <b>${r.rows.toLocaleString()}</b> row${r.rows === 1 ? "" : "s"} of ${esc(name)}`);
-    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file" aria-label="Download the file"><i class="bi bi-download" aria-hidden="true"></i></a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     toast("Saved " + res.file);
   } catch (e) { toast("Export failed: " + e.message, true); }
@@ -9008,7 +9044,7 @@ $("ddlBtn").addEventListener("click", async () => {
       () => api("POST", "/api/exportddl", { session: state.session }),
       (r) => `Exported the DDL of <b>${r.objects.toLocaleString()}</b> object${r.objects === 1 ? "" : "s"}`);
     closeExportPanel(false);
-    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file" aria-label="Download the file"><i class="bi bi-download" aria-hidden="true"></i></a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     showTab("data");
     toast("Saved " + res.file);
@@ -9029,7 +9065,7 @@ $("backupBtn").addEventListener("click", async () => {
       () => api("POST", "/api/backup", { session: state.session }),
       (r) => `Backed up <b>${r.tables.toLocaleString()}</b> tables and <b>${r.rows.toLocaleString()}</b> rows (${esc(r.sizeText)} compressed)`);
     const failed = res.failed && res.failed.length ? ` <span class="warn">· rows of ${res.failed.length} table${res.failed.length === 1 ? "" : "s"} could not be read: ${esc(res.failed.join(", "))}</span>` : "";
-    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a>${failed}<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file" aria-label="Download the file"><i class="bi bi-download" aria-hidden="true"></i></a>${failed}<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     toast("Saved " + res.file);
   } catch (e) {
     note.hidden = true;
@@ -10970,7 +11006,7 @@ $("cvLogExport").addEventListener("click", async () => {
     const r = await cvWithSuper("Exporting the log", (su) => api("POST", "/api/containers/logs/export", cvBody({ superPassword: su })));
     if (!r) return;
     $("cvResult").hidden = false; $("cvResult").className = resultClass("ok");
-    $("cvResult").innerHTML = `The log of ${esc(cv.c.name)} (${fmtSize(r.size)}) is saved as <code>${esc(r.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(r.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a> · listed on the Exported files page`;
+    $("cvResult").innerHTML = `The log of ${esc(cv.c.name)} (${fmtSize(r.size)}) is saved as <code>${esc(r.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(r.download))}" download title="Download the file" aria-label="Download the file"><i class="bi bi-download" aria-hidden="true"></i></a> · listed on the Exported files page`;
     toast("Log exported to the export folder");
   } catch (e) { cvResult("bad", "✘ " + e.message); } finally { b.disabled = false; }
 });

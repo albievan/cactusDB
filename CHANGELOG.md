@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.62.12 — 2026-11-15
+
+- Advanced query builder: functions **Title Case** (Each Word Capitalised) and
+  **camelCase** (wordsJoinedLikeThis).
+- Advanced query builder: **formats** for a column's value: numbers (1,234.50, 1 234,50,
+  percent), currencies (R, $, €, £) and dates, or a format of your own — a date
+  (`yyyy-MMM-dd HH:mm`, `dddd d MMMM yyyy`) or a number (`#,##0.00`, `R #,##0.00`,
+  `#.##0,00`). They are cactusdb's own SQLite functions (`cdb_title`, `cdb_camel`,
+  `cdb_date`, `cdb_number`), usable in the SQL too.
+- The **Download** button after an export is an icon; in the advanced query builder it
+  comes first on each line, before the row count.
+
 ## 1.62.11 — 2026-11-15
 
 - Advanced query builder: **Search tables** lists the matching tables under it as you type;

@@ -1035,7 +1035,7 @@ than 15 digits).
   project closes, so the grid, *Show n rows* and the **exports** (the coloured icons for
   Excel, CSV, JSON, XML and all four formats) hold exactly the rows shown, all of them. Exports go to
   `<export folder>/projects/<project>/xlsx|csv|xml|json/` and appear under *Exported
-  files*; each file's path is shown with a **Download** button.
+  files*; each file's path is shown with a **Download** button (⤓, before it).
 
 **The query designer.** The SQL sits above the diagram; they are two views of one query:
 typing redraws the diagram, and every change in the diagram rewrites the SQL (one clause
@@ -1064,9 +1064,13 @@ per line). Each is as tall as you drag its bottom-right corner.
   When both tables of a foreign key are in the diagram and the query doesn't join on it,
   a dotted line links them; click it to join on it.
 - Tick columns for the output; the grid under the diagram (*Column definitions*) sets
-  their names, a **function** on the value (UPPER, LOWER, TRIM, LENGTH, ROUND, ABS, as a
-  whole number or text, NULL as empty or 0, and date formats: yyyy-mm-dd, dd/mm/yyyy,
-  mm/dd/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time, yyyy-mm, yyyy, hh:mm), totals
+  their names, a **function** on the value (UPPER, LOWER, **Title Case**, **camelCase**,
+  TRIM, LENGTH, ROUND, ABS, as a whole number or text, NULL as empty or 0, and date
+  formats: yyyy-mm-dd, dd/mm/yyyy, mm/dd/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time,
+  yyyy-mm, yyyy, hh:mm), **formats** (numbers `1,234.50`, `1 234,50`, percent, currencies
+  `R 1,234.50`, `$`, `€`, `£`, and dates such as `Thu, 5 Nov 2026`), or a **format of
+  your own** for a date (`yyyy-MMM-dd HH:mm`, `dddd d MMMM yyyy`: yyyy MM MMM MMMM dd ddd
+  dddd HH hh mm ss tt) or a number (`#,##0.00`, `R #,##0.00`, `0.0%`, `#.##0,00`), totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
   ANDed, the *or* rows ORed), with DISTINCT and LIMIT. Drag a row by its grip (⋮⋮) up
   or down to change the order of the columns (↑ moves it one up). Functions go one around the
@@ -2146,6 +2150,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `projectsql.go` | A project query read just enough: the tables and columns it uses, the conditions that can go to the source (pushdown), and the stricter read-only check |
 | `projectrun.go` | Running a project query: the staging (a SQLite file per alias, attached read-only), type mapping, limits, progress, cancel, exports to `projects/<project>/` |
 | `projects_queries.go` | A project's saved queries and versions (`project_queries`, `project_query_versions`), columns and keys for the designer, join suggestions |
+| `projectfuncs.go` | cactusdb's own SQLite functions for the query builder's formats: `cdb_title`, `cdb_camel`, `cdb_date(x, 'yyyy-MMM-dd')`, `cdb_number(x, 'R #,##0.00')` |
 | `.github/ci/pq-roundtrip.mjs`, `.github/workflows/checks.yml`, `.github/workflows/projects-integration.yml` | The designer's SQL ↔ model round trips (on every push); a project joining MariaDB, PostgreSQL, SQL Server and Firebird, and the read-only guarantee against them (per release) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
