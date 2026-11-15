@@ -1034,7 +1034,9 @@ query: typing redraws the diagram, and every change in the diagram rewrites the 
 clause per line).
 - Drag a table from the left (or *Add table*) onto it; tables are coloured per database.
   A table shows its first 60 columns; click *+N more* under them for the rest (*show
-  fewer* folds them back), or ▾ in its heading to hide its columns.
+  fewer* folds them back), or ▾ in its heading to hide its columns. The compress button
+  in its heading (two arrows pointing in) shows only the columns ticked for the output and
+  those it is joined on; *+N hidden* under them, or the button again, shows the rest.
 - **Join** by dragging a column onto another table's column (again for more column pairs);
   each join line is labelled with the columns it joins in the order the `ON` has
   them (`ON stk.STK_NO = inventory.inventory_no` reads `STK_NO -> inventory_no`; another

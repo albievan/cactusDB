@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.2 — 2026-11-15
+
+- **Projects**: a compress button in each table's heading of the query diagram shows only
+  its ticked and joined columns (*+N hidden* under them brings the rest back); kept with
+  the query's layout, and *Arrange* allows for it.
+
 ## 1.62.1 — 2026-11-15
 
 - **Projects**: the query designer's join lines are labelled with the columns they join

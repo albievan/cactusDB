@@ -471,6 +471,9 @@
   .pq-line:hover, .pq-edge:focus .pq-line { stroke: var(--accent, #2f6f4f); stroke-width: 2.6; }
   .pq-edge:focus { outline: none; }
   .pq-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; }
+  .pq-cmp { cursor: pointer; }
+  .pq-cmp path { fill: none; stroke: var(--muted, #888); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  .pq-cmp:hover path, .pq-cmp.on path { stroke: var(--accent, #2f6f4f); }
   .pq-more { font: 11px var(--sans, system-ui); fill: var(--accent, #2f6f4f); cursor: pointer; }
   .pq-more:hover { text-decoration: underline; }
   .pq-lbl { font: 10px var(--sans, system-ui); fill: var(--muted, #555); paint-order: stroke; stroke: var(--bg, #fff); stroke-width: 3px; }
@@ -5675,6 +5678,19 @@ function pqDisplay() {
 }
 
 const pqMeasure = (s, bold) => { const c = pqMeasure.ctx || (pqMeasure.ctx = document.createElement("canvas").getContext("2d")); c.font = `${bold ? "600 12px" : "11px"} ui-monospace, monospace`; return c.measureText(s).width; };
+// The columns a table's box shows: none when collapsed; only the ticked and
+// joined ones when compressed; else the first 60, or all once expanded.
+function pqNodeCols(m, t) {
+  const k = pqKey(t.alias), cols = pqColsOf(t) || [], pos = pq.layout[k] || {};
+  const used = new Set(m.fields.filter((f) => !f.expr && pqKey(f.table) === k && f.show && !f.agg).map((f) => pqKey(f.col)));
+  const joined = new Set(Object.values(m.joins).flatMap((j) => j.on.flatMap((c) => [pqKey(c.a) === k ? pqKey(c.ac) : null, pqKey(c.b) === k ? pqKey(c.bc) : null])).filter(Boolean));
+  if (pos.collapsed) return { shown: [], used, joined, more: 0, hidden: 0 };
+  if (pos.compact) {
+    const shown = cols.filter((c) => used.has(pqKey(c.name)) || joined.has(pqKey(c.name)));
+    return { shown, used, joined, more: 0, hidden: cols.length - shown.length };
+  }
+  return { shown: pos.all ? cols : cols.slice(0, 60), used, joined, more: cols.length > 60 ? cols.length - 60 : 0, hidden: 0 };
+}
 function pqDraw() {
   if (!prj.open) return;
   const on = $("prjQdOn").checked;
@@ -5706,14 +5722,11 @@ function pqDraw() {
   }
   // Boxes.
   const nodes = m.tables.map((t) => {
-    const k = pqKey(t.alias), cols = pqColsOf(t) || [], pos = pq.layout[k] || (pq.layout[k] = pqFreeSpot());
-    const used = new Set(m.fields.filter((f) => !f.expr && pqKey(f.table) === k && f.show && !f.agg).map((f) => pqKey(f.col)));
-    const joined = new Set(Object.values(m.joins).flatMap((j) => j.on.flatMap((c) => [pqKey(c.a) === k ? pqKey(c.ac) : null, pqKey(c.b) === k ? pqKey(c.bc) : null])).filter(Boolean));
-    // Up to 60 columns, unless the table was expanded to show all of them.
-    const shown = pos.collapsed ? [] : pos.all ? cols : cols.slice(0, 60), extra = !pos.collapsed && cols.length > 60;
+    const k = pqKey(t.alias), pos = pq.layout[k] || (pq.layout[k] = pqFreeSpot());
+    const { shown, used, joined, more, hidden } = pqNodeCols(m, t);
     const title = `${t.name}${pqKey(t.alias) !== pqKey(t.name) ? " " + t.alias : ""}`;
-    const w = Math.max(150, pqMeasure(title, true) + 50, ...shown.map((c) => pqMeasure(c.name) + 40));
-    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0) + (extra ? 16 : 0), cols: shown, used, joined, title, more: extra ? cols.length - 60 : 0, all: !!pos.all };
+    const w = Math.max(150, pqMeasure(title, true) + 66, ...shown.map((c) => pqMeasure(c.name) + 40));
+    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0) + (more || hidden ? 16 : 0), cols: shown, used, joined, title, more, hidden, all: !!pos.all, compact: !!pos.compact };
   });
   const byK = Object.fromEntries(nodes.map((n) => [n.k, n]));
   const rowY = (n, col) => { const i = n.cols.findIndex((c) => pqKey(c.name) === pqKey(col)); return i < 0 ? n.y + 16 : n.y + 34 + i * 16 + 8; };
@@ -5750,6 +5763,8 @@ function pqDraw() {
       `<rect class="pq-head" data-head="${esc(n.k)}" x="${n.x}" y="${n.y}" width="${n.w}" height="32" fill="transparent"/>` +
       `<text class="pq-db" x="${n.x + 8}" y="${n.y + 16}" fill="${col}">${esc(n.t.db)}</text>` +
       `<text class="pq-title" x="${n.x + 8}" y="${n.y + 28}">${esc(n.t.name)}${pqKey(n.t.alias) !== pqKey(n.t.name) ? `<tspan class="pq-db"> ${esc(n.t.alias)}</tspan>` : ""}</text>` +
+      `<g class="pq-cmp${n.compact ? " on" : ""}" data-compact="${esc(n.k)}" role="button" transform="translate(${n.x + n.w - 52} ${n.y + 6})"><title>${n.compact ? "Show all the columns" : "Compress: show only the ticked and joined columns"}</title>` +
+        `<rect width="12" height="12" fill="transparent"/><path d="${n.compact ? "M2 5L6 1L10 5M2 7L6 11L10 7" : "M2 1L6 5L10 1M2 11L6 7L10 11"}"/></g>` +
       (ro ? "" : `<text class="pq-x" data-collapse="${esc(n.k)}" x="${n.x + n.w - 30}" y="${n.y + 16}" role="button"><title>${pq.layout[n.k].collapsed ? "Show the columns" : "Hide the columns"}</title>${pq.layout[n.k].collapsed ? "▸" : "▾"}</text>` +
         `<text class="pq-x" data-remove="${esc(n.k)}" x="${n.x + n.w - 14}" y="${n.y + 16}" role="button"><title>Remove the table from the query</title>×</text>`) +
       n.cols.map((c, i) => {
@@ -5758,6 +5773,7 @@ function pqDraw() {
           `<rect class="pq-check" data-check="${esc(c.name)}" x="${n.x + 8}" y="${y + 3}" width="10" height="10" rx="2" fill="${on ? col : "none"}" stroke="${on ? col : "#999"}" pointer-events="all"><title>${on ? "Remove from" : "Add to"} the output</title></rect>` +
           `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}<title>${esc(c.name + " · " + (c.type || c.kind) + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
       }).join("") +
+      (n.hidden ? `<text class="pq-more" data-compact="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>Show all the columns</title>▾ +${n.hidden} hidden</text>` : "") +
       (n.more ? `<text class="pq-more" data-more="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>${n.all ? "Show the first 60 columns only" : "Show all the columns"}</title>${n.all ? "▴ show fewer" : `▾ +${n.more} more`}</text>` : "") + `</g>`;
   }
   const W = Math.max(...nodes.map((n) => n.x + n.w)) + 60, H = Math.max(...nodes.map((n) => n.y + n.h)) + 30;
@@ -5773,7 +5789,7 @@ $("prjDiagBody").addEventListener("pointerdown", (ev) => {
   const svg = $("pqSvg");
   if (!svg || svg.dataset.ro === "1" || ev.button !== 0) return;
   const head = ev.target.closest("[data-head]"), colg = ev.target.closest("g[data-col]");
-  if (ev.target.closest("[data-check],[data-remove],[data-collapse],[data-more]")) return;
+  if (ev.target.closest("[data-check],[data-remove],[data-collapse],[data-more],[data-compact]")) return;
   if (head) {
     const k = head.dataset.head, p = pqPoint(ev), pos = pq.layout[k];
     pqDrag = { kind: "move", k, dx: p.x - pos.x, dy: p.y - pos.y, moved: false };
@@ -5811,8 +5827,9 @@ $("prjDiagBody").addEventListener("click", (ev) => {
   const t = ev.target;
   const chk = t.closest("[data-check]"), rm = t.closest("[data-remove]"), col = t.closest("[data-collapse]"), edge = t.closest(".pq-edge");
   // All the columns or the first 60: only the view changes, so read-only SQL allows it too.
-  const more = t.closest("[data-more]");
+  const more = t.closest("[data-more]"), cmp = t.closest("[data-compact]");
   if (more) { const p = pq.layout[more.dataset.more]; p.all = !p.all; pqDraw(); prjMark(); return; }
+  if (cmp) { const p = pq.layout[cmp.dataset.compact]; p.compact = !p.compact; if (p.compact) p.collapsed = false; pqDraw(); prjMark(); return; }
   if ($("pqSvg") && $("pqSvg").dataset.ro === "1") return;
   if (chk) { const g = chk.closest("g[data-col]"); const tb = pq.model.tables.find((x) => pqKey(x.alias) === g.dataset.k); pqToggleCol(tb.alias, g.dataset.col); }
   else if (rm) pqRemoveTable(rm.dataset.remove);
@@ -5871,10 +5888,10 @@ $("prjArrange").addEventListener("click", () => {
   for (const t of m.tables) if (!depth.has(pqKey(t.alias))) depth.set(pqKey(t.alias), ++max);
   const rows = {};
   for (const t of m.tables) {
-    const k = pqKey(t.alias), d = depth.get(k), cols = (pqColsOf(t) || []).length;
+    const k = pqKey(t.alias), d = depth.get(k), { shown, more, hidden } = pqNodeCols(m, t);
     rows[d] = rows[d] || 0;
     pq.layout[k] = { ...pq.layout[k], x: 10 + d * 230, y: 10 + rows[d] };
-    rows[d] += (pq.layout[k].collapsed ? 40 : 40 + (pq.layout[k].all ? cols : Math.min(cols, 60)) * 16 + (cols > 60 ? 16 : 0)) + 20;
+    rows[d] += 40 + shown.length * 16 + (more || hidden ? 16 : 0) + 20;
   }
   pqPush(); pqDraw(); prjMark();
 });
