@@ -509,6 +509,9 @@
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
   .prjresbar .info { font-size: 12px; color: var(--muted); }
   .prjexpnote { font-size: 12px; }
+  .prjexpnote > div { margin: 3px 0; }
+  .prjexpnote code { word-break: break-all; }
+  .dlbtn { font-size: 12px; padding: 0 8px; line-height: 1.6; margin-left: 6px; vertical-align: baseline; white-space: nowrap; }
   .prjgrid { flex: 1; overflow: auto; min-height: 160px; border: 1px solid var(--border); border-radius: 6px; }
   @media (max-width: 900px) { .prjbody { grid-template-columns: minmax(0, 1fr); } .prjsec + .prjsec { border-left: 0; border-top: 1px solid var(--border); } }
   #comparePane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
@@ -743,7 +746,7 @@
   .info.error { color: var(--danger); background: var(--danger-soft); white-space: pre-wrap; }
   .exportnote { padding: 6px 16px; font-size: 12px; background: var(--accent-soft); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
   .exportnote code { font-family: var(--mono); }
-  .exportnote a { color: var(--accent); font-weight: 600; }
+  .exportnote a:not(.btn) { color: var(--accent); font-weight: 600; }
   .grid { grid-row: 4; overflow: auto; min-height: 0; background: var(--panel); }
   table { border-collapse: separate; border-spacing: 0; font-size: 13px; }
   th, td { padding: 5px 10px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
@@ -5279,7 +5282,7 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
   try {
     const res = await api("POST", "/api/project/export", { project: prj.open.project, sql: prj.ran, format: fmt, name: prj.queryName || "" });
     note.innerHTML = res.files.map((f) => `<div><i class="bi bi-file-earmark-check" aria-hidden="true"></i> ${f.rows.toLocaleString()} row${f.rows === 1 ? "" : "s"} → <code>${esc(f.path)}</code>
-      <a href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download>Download</a></div>`).join("");
+      <a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a></div>`).join("");
   } catch (e) { note.textContent = "Export failed: " + e.message; }
   finally { prjSetExport(); }
 }));
@@ -8608,7 +8611,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
     const res = await runWithOverall(`Exporting all rows of ${name} as ${fmt === "xlsx" ? "Excel" : fmt.toUpperCase()}`,
       () => api("POST", "/api/export", { session: state.session, sql, format: fmt, name }),
       (r) => `Exported <b>${r.rows.toLocaleString()}</b> row${r.rows === 1 ? "" : "s"} of ${esc(name)}`);
-    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     toast("Saved " + res.file);
   } catch (e) { toast("Export failed: " + e.message, true); }
@@ -8623,7 +8626,7 @@ $("ddlBtn").addEventListener("click", async () => {
       () => api("POST", "/api/exportddl", { session: state.session }),
       (r) => `Exported the DDL of <b>${r.objects.toLocaleString()}</b> object${r.objects === 1 ? "" : "s"}`);
     closeExportPanel(false);
-    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    $("exportNote").innerHTML = `Exported the DDL of ${res.objects.toLocaleString()} object${res.objects === 1 ? "" : "s"} to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a><button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     $("exportNote").hidden = false;
     showTab("data");
     toast("Saved " + res.file);
@@ -8644,7 +8647,7 @@ $("backupBtn").addEventListener("click", async () => {
       () => api("POST", "/api/backup", { session: state.session }),
       (r) => `Backed up <b>${r.tables.toLocaleString()}</b> tables and <b>${r.rows.toLocaleString()}</b> rows (${esc(r.sizeText)} compressed)`);
     const failed = res.failed && res.failed.length ? ` <span class="warn">· rows of ${res.failed.length} table${res.failed.length === 1 ? "" : "s"} could not be read: ${esc(res.failed.join(", "))}</span>` : "";
-    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code> · <a href="${esc(dlLink(res.download))}" download>Download</a>${failed}<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
+    note.innerHTML = `Backed up ${res.tables.toLocaleString()} table${res.tables === 1 ? "" : "s"} and ${res.rows.toLocaleString()} row${res.rows === 1 ? "" : "s"} (${esc(res.sizeText)} compressed) to <code>${esc(res.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(res.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a>${failed}<button class="btn btn-sm btn-outline-secondary clearnote" data-act="close-export" title="Clear the export status">Clear</button>`;
     toast("Saved " + res.file);
   } catch (e) {
     note.hidden = true;
@@ -10584,7 +10587,7 @@ $("cvLogExport").addEventListener("click", async () => {
     const r = await cvWithSuper("Exporting the log", (su) => api("POST", "/api/containers/logs/export", cvBody({ superPassword: su })));
     if (!r) return;
     $("cvResult").hidden = false; $("cvResult").className = resultClass("ok");
-    $("cvResult").innerHTML = `The log of ${esc(cv.c.name)} (${fmtSize(r.size)}) is saved as <code>${esc(r.path)}</code> · <a href="${esc(dlLink(r.download))}" download>Download</a> · listed on the Exported files page`;
+    $("cvResult").innerHTML = `The log of ${esc(cv.c.name)} (${fmtSize(r.size)}) is saved as <code>${esc(r.path)}</code><a class="btn btn-sm btn-outline-secondary dlbtn" href="${esc(dlLink(r.download))}" download title="Download the file"><i class="bi bi-download" aria-hidden="true"></i> Download</a> · listed on the Exported files page`;
     toast("Log exported to the export folder");
   } catch (e) { cvResult("bad", "✘ " + e.message); } finally { b.disabled = false; }
 });

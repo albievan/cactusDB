@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.3 — 2026-11-15
+
+- **Download** after an export (a project's, the Data tab's, a DDL export, a backup and a
+  saved container log) is a small button with a download icon instead of a link, beside
+  the file's path.
+
 ## 1.62.2 — 2026-11-15
 
 - **Projects**: a compress button in each table's heading of the query diagram shows only

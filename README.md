@@ -251,7 +251,7 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
    always contains **all rows** of the query, not just the rows on screen. The file is
    saved in the connection's folder, in a subfolder for its type:
    `<export folder>/<connection name>/json|csv|xlsx|xml/` (see
-   [Where exports go](#where-exports-go)). A bar shows the full path with a **Download** link.
+   [Where exports go](#where-exports-go)). A bar shows the full path with a **Download** button.
    **Clear** removes that bar again. In **CSV**, text that starts like a spreadsheet formula
    (`=`, `+`, `-`, `@`, a tab) gets a `'` in front, so Excel shows it instead of running it;
    numbers such as `-12.5` stay as they are. Exported files and folders are readable only by
@@ -1027,7 +1027,7 @@ than 15 digits).
   project closes, so the grid, *Show n rows* and the **exports** (Excel, CSV, XML, JSON,
   *All formats*) hold exactly the rows shown, all of them. Exports go to
   `<export folder>/projects/<project>/xlsx|csv|xml|json/` and appear under *Exported
-  files*.
+  files*; each file's path is shown with a **Download** button.
 
 **The query designer.** Beside the SQL, the diagram and the SQL are two views of one
 query: typing redraws the diagram, and every change in the diagram rewrites the SQL (one
@@ -1338,7 +1338,7 @@ empty database and exporting again: the second script is identical to the first.
 
 **Backup** (next to **DDL** under *Objects*), or `--backup yes` on the command line, backs
 up the whole connected database to `<database>_backup_<date>-<time>.zip` in the
-connection's `backup` folder (`<export folder>/<connection>/backup/`). The web UI shows a **Download** link when it's done.
+connection's `backup` folder (`<export folder>/<connection>/backup/`). The web UI shows a **Download** button when it's done.
 
 The `.zip` is compressed at the maximum Deflate level and holds:
 
