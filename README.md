@@ -1033,15 +1033,17 @@ than 15 digits).
   `<export folder>/projects/<project>/xlsx|csv|xml|json/` and appear under *Exported
   files*; each file's path is shown with a **Download** button.
 
-**The query designer.** Beside the SQL, the diagram and the SQL are two views of one
-query: typing redraws the diagram, and every change in the diagram rewrites the SQL (one
-clause per line).
+**The query designer.** The SQL sits above the diagram; they are two views of one query:
+typing redraws the diagram, and every change in the diagram rewrites the SQL (one clause
+per line). Each is as tall as you drag its bottom-right corner.
 - Drag a table from the left (or *Add table*) onto it; tables are coloured per database.
   A table shows its first 60 columns; click *+N more* under them for the rest (*show
   fewer* folds them back), or ▾ in its heading to hide its columns. The compress button
   in its heading (two arrows pointing in) shows only the columns ticked for the output and
   those it is joined on; *+N hidden* under them, or the button again, shows the rest.
-- **Join** by dragging a column onto another table's column (again for more column pairs);
+- **Join** by dragging a column onto another table's column (again for more column pairs):
+  a new link is a `LEFT OUTER JOIN` (every row of the tables before it is kept; change
+  the type from its line);
   each join line is labelled with the columns it joins in the order the `ON` has
   them (`ON stk.STK_NO = inventory.inventory_no` reads `STK_NO -> inventory_no`; another
   operator shows both tables, `n.id < o.id`). Click a join line or its
@@ -1049,8 +1051,12 @@ clause per line).
   with a match in both), *LEFT OUTER* (every row of the first table chosen, the other's
   columns empty where nothing matches), *RIGHT OUTER* (every row of the second), *FULL
   OUTER* (every row of both) and *CROSS* (every pair). An outer join chosen there is
-  written `LEFT OUTER JOIN`; one typed as `LEFT JOIN` keeps its spelling. Joins from foreign keys and from names like `customer_id` →
-  `customer.id` are offered when a table is added, never applied without a click.
+  written `LEFT OUTER JOIN`; one typed as `LEFT JOIN` keeps its spelling. Joins from
+  foreign keys and from names like `customer_id` → `customer.id` are offered when a table
+  is added, never applied without a click.
+- **Foreign keys**: a column that is one shows where it points (`cust_id → cust.id`).
+  When both tables of a foreign key are in the diagram and the query doesn't join on it,
+  a dotted line links them; click it to join on it.
 - Tick columns for the output; the grid under the diagram sets their names, totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
   ANDed, the *or* rows ORed), with DISTINCT and LIMIT.
@@ -1062,9 +1068,11 @@ clause per line).
 - Ctrl+Z / Ctrl+Shift+Z undo and redo diagram and text edits alike; *Arrange*, zoom and
   *Fit*; every action works from the keyboard too (Tab to a table: arrows move it,
   Delete removes it, Enter opens its joins). The *Query diagram* switch hides it.
-- **Query**, **Column definitions** and **Results and export** (the grid and the export
-  buttons) each fold away with a click on their
-  heading (▾), to give the others the room; the browser remembers which are folded.
+- **Query** (with its **SQL** and **Diagram** inside, each folding on its own), **Column
+  definitions** and **Results and export** (the grid and the export buttons) each fold
+  away with a click on their heading (▾), to give the others the room. After a run,
+  *Read in … · n tables* folds the rows read per table, leaving the line with the rows
+  the query returned. The browser remembers which are folded.
 
 **Saved queries** of a project work like a connection's: name, description, every
 version kept, *Execute* (the first 100 rows), and the diagram's layout saved with them.

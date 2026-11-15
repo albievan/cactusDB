@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.62.6 — 2026-11-15
+
+- Advanced query builder: the SQL is above the diagram (it was beside it); **SQL** and
+  **Diagram** each fold from their heading and are as tall as dragged.
+- Advanced query builder: *Read in … · n tables* after a run folds the rows read per
+  table; the line with the rows the query returned stays.
+- Advanced query builder: a new link (dragging a column, *Link tables*, a suggestion or a
+  foreign key) is a `LEFT OUTER JOIN`.
+- Advanced query builder: foreign keys are shown in the diagram: a column that is one
+  says where it points (`cust_id → cust.id`), and a dotted line links two tables of the
+  diagram by a foreign key the query doesn't join on; a click on it joins them.
+
 ## 1.62.5 — 2026-11-15
 
 - A sidebar button at the far left of the top bar hides the left sidebar (the page takes

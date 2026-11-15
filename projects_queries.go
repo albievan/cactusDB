@@ -325,9 +325,36 @@ func (s *server) handleProjectColumns(w http.ResponseWriter, r *http.Request) {
 			out[pt.Alias+"."+pt.Name] = map[string]any{"error": err.Error()}
 			continue
 		}
-		out[pt.Alias+"."+pt.Name] = map[string]any{"columns": columnsOfTable(t)}
+		out[pt.Alias+"."+pt.Name] = map[string]any{"columns": columnsOfTable(t), "fks": ps.foreignKeysOf(pt, t)}
 	}
 	writeJSON(w, 200, map[string]any{"tables": out})
+}
+
+// projectFK is a foreign key as the query designer shows it: Table is the
+// project's name of the table it points at, empty when that table isn't in
+// the project (RefSource then says which it is).
+type projectFK struct {
+	Name      string   `json:"name"`
+	Cols      []string `json:"cols"`
+	Table     string   `json:"table,omitempty"`
+	RefSource string   `json:"refSource"`
+	RefCols   []string `json:"refCols"`
+}
+
+// foreignKeysOf lists a table's foreign keys. The caller holds ps.mu.
+func (ps *projectSession) foreignKeysOf(pt *projectTable, t *mTable) []projectFK {
+	out := []projectFK{}
+	for _, fk := range t.FKs {
+		f := projectFK{Name: fk.Name, Cols: fk.Cols, RefSource: fk.RefTable, RefCols: fk.RefCols}
+		for _, o := range ps.data.Tables {
+			if strings.EqualFold(o.Alias, pt.Alias) && (strings.EqualFold(o.Source, fk.RefTable) || strings.EqualFold(o.Name, fk.RefTable)) {
+				f.Table = o.Name
+				break
+			}
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 type joinSuggestion struct {

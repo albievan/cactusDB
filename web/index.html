@@ -441,12 +441,11 @@
   .prjqmeta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .prjqmeta #prjQName { width: 220px; } .prjqmeta #prjQDesc { flex: 1; min-width: 160px; }
   .prjqbar #prjQSel { width: auto; max-width: 260px; } .prjqbar #prjQVers { width: auto; max-width: 220px; }
-  .prjsplit { display: grid; grid-template-columns: minmax(200px, var(--prjsplit, 1fr)) 6px minmax(260px, 1.3fr); height: 330px; resize: vertical; overflow: hidden; min-height: 180px; }
-  .prjsplit.nodiag { grid-template-columns: minmax(0, 1fr); }
-  .prjsplit.nodiag .prjsplitter, .prjsplit.nodiag .prjdiag { display: none; }
-  .prjedwrap { position: relative; min-width: 0; min-height: 0; }
-  .prjsplitter { cursor: col-resize; background: transparent; border-left: 1px solid var(--border); margin-left: 2px; }
-  .prjsplitter:hover, .prjsplitter:focus { background: var(--row-hover); outline: none; }
+  /* The SQL above the diagram; each folds from its heading and is as tall as dragged (bottom-right corner). */
+  .prjsplit { display: flex; flex-direction: column; gap: 4px; }
+  .prjsplit.nodiag #prjDiagBar, .prjsplit.nodiag .prjdiag { display: none; }
+  .prjedwrap { position: relative; min-width: 0; height: 190px; min-height: 90px; resize: vertical; overflow: hidden; }
+  .prjsplit .prjdiag { height: 440px; min-height: 160px; resize: vertical; overflow: hidden; }
   .prjsug { position: absolute; z-index: 20; margin: 0; padding: 2px; list-style: none; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.15); max-height: 220px; overflow: auto; min-width: 180px; font-size: 12px; }
   .prjsug li { padding: 2px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
   .prjsug li.on, .prjsug li:hover { background: var(--accent, #2f6f4f); color: #fff; }
@@ -480,6 +479,10 @@
   .pq-line:hover, .pq-edge:focus .pq-line { stroke: var(--accent, #2f6f4f); stroke-width: 2.6; }
   .pq-edge:focus { outline: none; }
   .pq-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; }
+  .pq-fk { fill: none; stroke: var(--muted, #888); stroke-width: 1.2; stroke-dasharray: 2 4; opacity: .8; }
+  .pq-fkline { cursor: pointer; }
+  .pq-fkline:hover .pq-fk { stroke: var(--accent, #2f6f4f); opacity: 1; stroke-width: 2; }
+  .pq-fkmark { fill: var(--muted, #888); font-size: 10px; font-weight: 400; }
   .pq-cmp { cursor: pointer; }
   .pq-cmp path { fill: none; stroke: var(--muted, #888); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
   .pq-cmp:hover path, .pq-cmp.on path { stroke: var(--accent, #2f6f4f); }
@@ -512,6 +515,7 @@
   .prjfold[aria-expanded=false] .bi { transform: rotate(-90deg); }
   .prjfold:hover { color: var(--accent, #2f6f4f); }
   .prjfoldbar[hidden] { display: none; }
+  .prjquery.fold-sql .prjedwrap, .prjquery.fold-diag .prjdiag, .prjquery.fold-prog .prjprogbody,
   .prjquery.fold-query .prjqmeta, .prjquery.fold-query .prjsplit, .prjquery.fold-cols .prjdesign,
   .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
   .prjquery.fold-res .prjres { flex: 0 0 auto; min-height: 0; }
@@ -1625,11 +1629,12 @@
             <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
           </div>
           <div class="prjsplit" id="prjSplit">
-            <div class="prjedwrap">
+            <div class="prjfoldbar"><button type="button" class="prjfold flabel" data-fold="sql" aria-expanded="true" aria-controls="prjEdWrap" title="Show or hide the SQL"><i class="bi bi-chevron-down" aria-hidden="true"></i> SQL</button></div>
+            <div class="prjedwrap" id="prjEdWrap">
               <textarea class="form-control prjsql" id="prjSql" spellcheck="false" autocomplete="off" aria-label="Project query" aria-autocomplete="list" aria-controls="prjSug" placeholder="SELECT c.name, o.order_date&#10;FROM   fb.customer c&#10;JOIN   maria.orders o ON o.customer_id = c.id"></textarea>
               <ul class="prjsug" id="prjSug" hidden role="listbox" aria-label="Suggestions"></ul>
             </div>
-            <div class="prjsplitter" id="prjSplitter" role="separator" aria-orientation="vertical" aria-label="Resize the editor and the diagram" tabindex="0" title="Drag to share the width between the SQL and the diagram (arrow keys too)"></div>
+            <div class="prjfoldbar" id="prjDiagBar"><button type="button" class="prjfold flabel" data-fold="diag" aria-expanded="true" aria-controls="prjDiag" title="Show or hide the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Diagram</button></div>
             <div class="prjdiag" id="prjDiag">
               <div class="prjdbar">
                 <select class="form-select form-select-sm" id="prjAddTbl" aria-label="Add a table to the query"><option value="">Add table…</option></select>
@@ -4930,7 +4935,7 @@ async function prjOpen(id) {
   const res = await prjWithPasswords((b) => api("POST", `/api/projects/${id}/open`, b), `Open the project “${p.name}”`).catch((e) => { toast(e.message, true); return null; });
   if (!res) return;
   prjSet(res);
-  pq.cols = {}; prj.qid = 0; $("prjQName").value = ""; $("prjQDesc").value = ""; pqReset("", null); prj.qOrig = prjQState();
+  pq.cols = {}; pq.fks = {}; prj.qid = 0; $("prjQName").value = ""; $("prjQDesc").value = ""; pqReset("", null); prj.qOrig = prjQState();
   if (state.tab !== "projects") showTab("projects"); else prjShow();
   prjQLoadList(0); pqLoadCols();
   const down = res.links.filter((l) => l.state !== "connected");
@@ -5238,8 +5243,10 @@ function prjProgress(st) {
   const r = st.state === "done" && st.result, tot = r ? (r.total ?? r.rows.length) : 0;
   const ret = r ? `<div class="prjret">✓ <b>Query returned ${r.totalMore ? "more than " : ""}${tot.toLocaleString()} row${tot === 1 ? "" : "s"}</b>` +
     (tot > r.rows.length ? ` (${r.rows.length.toLocaleString()} shown; exports hold every row)` : "") + `, ${r.columns.length} column${r.columns.length === 1 ? "" : "s"}</div>` : "";
-  p.innerHTML = (what ? `<div>${esc(what)}</div>` : "") + rows.join("") + ret + err;
-  p.hidden = !p.innerHTML;
+  // The heading folds the lines per table; the query's own line and errors always show.
+  const head = !what ? "" : rows.length ? `<div><button type="button" class="prjfold" data-fold="prog" aria-expanded="${!prjFolded("prog")}" aria-controls="prjProgBody" title="Show or hide the rows read per table"><i class="bi bi-chevron-down" aria-hidden="true"></i> ${esc(what)} · ${rows.length} table${rows.length === 1 ? "" : "s"}</button></div>` : `<div>${esc(what)}</div>`;
+  p.innerHTML = head + `<div class="prjprogbody" id="prjProgBody">${rows.join("")}</div>` + ret + err;
+  p.hidden = !(what || rows.length || ret || err);
 }
 async function prjRun(limit) {
   if (!prj.open || prj.running) return;
@@ -5538,7 +5545,7 @@ function pqSql(m) {
 }
 
 // ---- the project query designer: diagram, grid, history ----------------------
-const pq = { model: pqEmpty(), layout: {}, zoom: 1, cols: {}, hist: [], hpos: -1, timer: 0, htimer: 0, sel: "", sug: [], sugAt: 0 };
+const pq = { model: pqEmpty(), layout: {}, zoom: 1, cols: {}, fks: {}, hist: [], hpos: -1, timer: 0, htimer: 0, sel: "", sug: [], sugAt: 0 };
 const PQ_COLORS = ["#2f6fb0", "#c0632b", "#2e8b57", "#8e44ad", "#b8860b", "#c0392b", "#16a085", "#7f8c8d", "#d35400", "#2c3e50"];
 const pqColor = (db) => { const i = prj.open ? prj.open.links.findIndex((l) => l.alias.toLowerCase() === String(db).toLowerCase()) : -1; return i < 0 ? "#999" : PQ_COLORS[i % PQ_COLORS.length]; };
 const pqKey = (s) => String(s).toLowerCase();
@@ -5557,7 +5564,8 @@ async function pqLoadCols() {
   try {
     const res = await api("GET", "/api/project/columns?" + new URLSearchParams({ project: prj.open.project }));
     pq.cols = {};
-    for (const [k, v] of Object.entries(res.tables)) if (v.columns) pq.cols[pqKey(k)] = v.columns;
+    pq.fks = {};
+    for (const [k, v] of Object.entries(res.tables)) if (v.columns) { pq.cols[pqKey(k)] = v.columns; pq.fks[pqKey(k)] = v.fks || []; }
   } catch (e) { /* drawn without columns */ }
   pqDraw();
 }
@@ -5667,7 +5675,8 @@ function pqAddCond(a, ac, b, bc, op = "=", quiet = false) {
   if (j.on.some((c) => (pqKey(c.a) === pqKey(a) && pqKey(c.ac) === pqKey(ac) && pqKey(c.b) === pqKey(b) && pqKey(c.bc) === pqKey(bc)) ||
     (pqKey(c.a) === pqKey(b) && pqKey(c.ac) === pqKey(bc) && pqKey(c.b) === pqKey(a) && pqKey(c.bc) === pqKey(ac)))) return;
   j.on.push({ a, ac, op, b, bc });
-  if (j.type === "CROSS") j.type = "INNER";
+  // A new link is a LEFT OUTER JOIN: every row of the tables before it is kept.
+  if (j.type === "CROSS") { j.type = "LEFT"; j.outer = true; }
   if (!pqComparable(pqKind(a, ac), pqKind(b, bc)) && !quiet) toast(`${a}.${ac} and ${b}.${bc} hold different kinds of values (${pqKind(a, ac)} and ${pqKind(b, bc)}): the join may find nothing`, true);
 }
 function pqToggleCol(alias, col) {
@@ -5753,24 +5762,43 @@ function pqDraw() {
   const nodes = m.tables.map((t) => {
     const k = pqKey(t.alias), pos = pq.layout[k] || (pq.layout[k] = pqFreeSpot());
     const { shown, used, joined, more, hidden } = pqNodeCols(m, t);
+    const fks = pq.fks[pqKey(t.db + "." + t.name)] || [], fkOf = {};
+    for (const fk of fks) fk.cols.forEach((c, i) => { fkOf[pqKey(c)] = `${fk.table || fk.refSource}.${fk.refCols[i] || ""}`; });
     const title = `${t.name}${pqKey(t.alias) !== pqKey(t.name) ? " " + t.alias : ""}`;
-    const w = Math.max(150, pqMeasure(title, true) + 66, ...shown.map((c) => pqMeasure(c.name) + 40));
-    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0) + (more || hidden ? 16 : 0), cols: shown, used, joined, title, more, hidden, all: !!pos.all, compact: !!pos.compact };
+    const w = Math.max(150, pqMeasure(title, true) + 66, ...shown.map((c) => pqMeasure(c.name + (fkOf[pqKey(c.name)] ? " → " + fkOf[pqKey(c.name)] : "")) + 40));
+    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0) + (more || hidden ? 16 : 0), cols: shown, used, joined, fks, fkOf, title, more, hidden, all: !!pos.all, compact: !!pos.compact };
   });
   const byK = Object.fromEntries(nodes.map((n) => [n.k, n]));
   const rowY = (n, col) => { const i = n.cols.findIndex((c) => pqKey(c.name) === pqKey(col)); return i < 0 ? n.y + 16 : n.y + 34 + i * 16 + 8; };
+  // curve draws a line from column ac of A to column bc of B; lx is its middle, where a label goes.
+  const curve = (A, ac, B, bc) => {
+    const [n1, c1, n2, c2] = A.x <= B.x ? [A, ac, B, bc] : [B, bc, A, ac];
+    const y1 = rowY(n1, c1), y2 = rowY(n2, c2);
+    if (n1.x + n1.w + 20 < n2.x) { const mx = (n1.x + n1.w + n2.x) / 2; return { d: `M${n1.x + n1.w} ${y1}C${mx} ${y1} ${mx} ${y2} ${n2.x} ${y2}`, lx: mx, y1, y2 }; }
+    const xr = Math.max(n1.x + n1.w, n2.x + n2.w) + 30;
+    return { d: `M${n1.x + n1.w} ${y1}C${xr} ${y1} ${xr} ${y2} ${n2.x + n2.w} ${y2}`, lx: (n1.x + n1.w + 6 * xr + n2.x + n2.w) / 8, y1, y2 };
+  };
   let svg = "", labels = "";
+  // Foreign keys between tables of the diagram that the query doesn't join on (yet): dashed; a click joins them.
+  for (const n of nodes) for (const fk of n.fks) {
+    if (!fk.table || !fk.cols.length || fk.cols.length !== fk.refCols.length) continue;
+    for (const o of nodes) {
+      if (o === n || pqKey(o.t.db) !== pqKey(n.t.db) || pqKey(o.t.name) !== pqKey(fk.table)) continue;
+      if (fk.cols.every((c, i) => pqJoinedOn(m, n.t.alias, c, o.t.alias, fk.refCols[i]))) continue;
+      const { d } = curve(n, fk.cols[0], o, fk.refCols[0]);
+      const pairs = fk.cols.map((c, i) => [c, fk.refCols[i]]);
+      svg += `<g class="pq-fkline" data-fka="${esc(n.t.alias)}" data-fkb="${esc(o.t.alias)}" data-fkpairs="${esc(JSON.stringify(pairs))}" role="button">` +
+        `<title>${esc(`Foreign key ${fk.name}: ${n.t.alias}.(${fk.cols.join(", ")}) → ${o.t.alias}.(${fk.refCols.join(", ")})`)}${ro ? "" : " — click to join on it"}</title>` +
+        `<path class="pq-hit" d="${d}"/><path class="pq-fk" d="${d}"/></g>`;
+    }
+  }
   for (const t of m.tables) {
     const j = m.joins[pqKey(t.alias)];
     if (!j) continue;
     j.on.forEach((c, ci) => {
       const A = byK[pqKey(c.a)], B = byK[pqKey(c.b)];
       if (!A || !B) return;
-      let [n1, c1, n2, c2] = A.x <= B.x ? [A, c.ac, B, c.bc] : [B, c.bc, A, c.ac];
-      const y1 = rowY(n1, c1), y2 = rowY(n2, c2);
-      let d, lx; // lx: the middle of the curve, where its label goes
-      if (n1.x + n1.w + 20 < n2.x) { const mx = (n1.x + n1.w + n2.x) / 2; d = `M${n1.x + n1.w} ${y1}C${mx} ${y1} ${mx} ${y2} ${n2.x} ${y2}`; lx = mx; }
-      else { const xr = Math.max(n1.x + n1.w, n2.x + n2.w) + 30; d = `M${n1.x + n1.w} ${y1}C${xr} ${y1} ${xr} ${y2} ${n2.x + n2.w} ${y2}`; lx = (n1.x + n1.w + 6 * xr + n2.x + n2.w) / 8; }
+      const { d, lx, y1, y2 } = curve(A, c.ac, B, c.bc);
       const badc = !pqComparable(pqKind(c.a, c.ac), pqKind(c.b, c.bc));
       // Label: the joined fields in the order the ON clause has them ("=" as an arrow).
       const lbl = (ci === 0 && j.type !== "INNER" ? j.type + (j.outer ? " OUTER" : "") + " " : "") + (c.op === "=" ? `${c.ac} -> ${c.bc}` : `${c.a}.${c.ac} ${c.op} ${c.b}.${c.bc}`);
@@ -5800,7 +5828,7 @@ function pqDraw() {
         const y = n.y + 34 + i * 16, on = n.used.has(pqKey(c.name));
         return `<g data-col="${esc(c.name)}" data-k="${esc(n.k)}"><rect class="pq-colbg" x="${n.x + 1}" y="${y}" width="${n.w - 2}" height="16"/>` +
           `<rect class="pq-check" data-check="${esc(c.name)}" x="${n.x + 8}" y="${y + 3}" width="10" height="10" rx="2" fill="${on ? col : "none"}" stroke="${on ? col : "#999"}" pointer-events="all"><title>${on ? "Remove from" : "Add to"} the output</title></rect>` +
-          `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}<title>${esc(c.name + " · " + (c.type || c.kind) + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
+          `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}${n.fkOf[pqKey(c.name)] ? `<tspan class="pq-fkmark"> → ${esc(n.fkOf[pqKey(c.name)])}</tspan>` : ""}<title>${esc(c.name + " · " + (c.type || c.kind) + (n.fkOf[pqKey(c.name)] ? " · foreign key to " + n.fkOf[pqKey(c.name)] : "") + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
       }).join("") +
       (n.hidden ? `<text class="pq-more" data-compact="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>Show all the columns</title>▾ +${n.hidden} hidden</text>` : "") +
       (n.more ? `<text class="pq-more" data-more="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>${n.all ? "Show the first 60 columns only" : "Show all the columns"}</title>${n.all ? "▴ show fewer" : `▾ +${n.more} more`}</text>` : "") + `</g>`;
@@ -5809,6 +5837,9 @@ function pqDraw() {
   $("prjDiagBody").innerHTML = `<svg id="pqSvg" width="${Math.ceil(W * pq.zoom)}" height="${Math.ceil(H * pq.zoom)}" viewBox="0 0 ${W} ${H}" data-ro="${ro ? 1 : 0}">${svg}${labels}</svg>`;
   pqDesign();
 }
+const pqJoinedOn = (m, a, ac, b, bc) => Object.values(m.joins).some((j) => j.on.some((c) =>
+  (pqKey(c.a) === pqKey(a) && pqKey(c.ac) === pqKey(ac) && pqKey(c.b) === pqKey(b) && pqKey(c.bc) === pqKey(bc)) ||
+  (pqKey(c.a) === pqKey(b) && pqKey(c.ac) === pqKey(bc) && pqKey(c.b) === pqKey(a) && pqKey(c.bc) === pqKey(ac))));
 const pqJoined = (m, a, b) => Object.values(m.joins).some((j) => j.on.some((c) => (pqKey(c.a) === pqKey(a) && pqKey(c.b) === pqKey(b)) || (pqKey(c.a) === pqKey(b) && pqKey(c.b) === pqKey(a))) || j.extra.length);
 
 // Pointer: move a table by its head, drag a column onto another to join.
@@ -5860,6 +5891,8 @@ $("prjDiagBody").addEventListener("click", (ev) => {
   if (more) { const p = pq.layout[more.dataset.more]; p.all = !p.all; pqDraw(); prjMark(); return; }
   if (cmp) { const p = pq.layout[cmp.dataset.compact]; p.compact = !p.compact; if (p.compact) p.collapsed = false; pqDraw(); prjMark(); return; }
   if ($("pqSvg") && $("pqSvg").dataset.ro === "1") return;
+  const fkl = t.closest(".pq-fkline");
+  if (fkl) { for (const [ac, bc] of JSON.parse(fkl.dataset.fkpairs)) pqAddCond(fkl.dataset.fka, ac, fkl.dataset.fkb, bc); pqCommit(); return; }
   if (chk) { const g = chk.closest("g[data-col]"); const tb = pq.model.tables.find((x) => pqKey(x.alias) === g.dataset.k); pqToggleCol(tb.alias, g.dataset.col); }
   else if (rm) pqRemoveTable(rm.dataset.remove);
   else if (col) { const p = pq.layout[col.dataset.collapse]; p.collapsed = !p.collapsed; pqPush(); pqDraw(); prjMark(); }
@@ -5929,17 +5962,23 @@ $("prjRedo").addEventListener("click", () => pqUndo(1));
 $("prjQdOn").addEventListener("change", pqDraw);
 // Fold the query, the column definitions or the results; remembered in this browser.
 const PRJ_FOLD_KEY = "cactusdb.prjFold";
+const PRJ_FOLDS = ["query", "sql", "diag", "cols", "prog", "res"];
+const prjFolded = (name) => document.querySelector(".prjquery").classList.contains("fold-" + name);
 function prjFold(name, folded) {
   document.querySelector(".prjquery").classList.toggle("fold-" + name, folded);
-  document.querySelector(`.prjfold[data-fold="${name}"]`).setAttribute("aria-expanded", String(!folded));
+  const b = document.querySelector(`.prjfold[data-fold="${name}"]`);
+  if (b) b.setAttribute("aria-expanded", String(!folded));
 }
-try { for (const n of JSON.parse(localStorage.getItem(PRJ_FOLD_KEY) || "[]")) if (["query", "cols", "res"].includes(n)) prjFold(n, true); } catch (e) { /* all open */ }
-document.querySelectorAll(".prjfold").forEach((b) => b.addEventListener("click", () => {
+try { for (const n of JSON.parse(localStorage.getItem(PRJ_FOLD_KEY) || "[]")) if (PRJ_FOLDS.includes(n)) prjFold(n, true); } catch (e) { /* all open */ }
+// Delegated: the progress heading is drawn again with every run.
+document.querySelector(".prjquery").addEventListener("click", (ev) => {
+  const b = ev.target.closest(".prjfold");
+  if (!b) return;
   const name = b.dataset.fold;
-  prjFold(name, b.getAttribute("aria-expanded") === "true");
-  try { localStorage.setItem(PRJ_FOLD_KEY, JSON.stringify([...document.querySelectorAll('.prjfold[aria-expanded="false"]')].map((x) => x.dataset.fold))); } catch (e) { /* not remembered */ }
-  if (name === "query" && b.getAttribute("aria-expanded") === "true") pqDraw();
-}));
+  prjFold(name, !prjFolded(name));
+  try { localStorage.setItem(PRJ_FOLD_KEY, JSON.stringify(PRJ_FOLDS.filter(prjFolded))); } catch (e) { /* not remembered */ }
+  if ((name === "query" || name === "diag") && !prjFolded(name)) pqDraw();
+});
 $("projPane").addEventListener("keydown", (ev) => {
   if (!(ev.ctrlKey || ev.metaKey) || !prj.open || document.querySelector("dialog[open]")) return;
   const k = ev.key.toLowerCase();
@@ -5952,21 +5991,6 @@ $("prjSql").addEventListener("input", () => {
   clearTimeout(pq.htimer); pq.htimer = setTimeout(pqPush, 700);
   pqSugUpdate();
 });
-// The splitter between the editor and the diagram.
-(() => {
-  const sp = $("prjSplitter"), box = $("prjSplit");
-  const set = (px) => box.style.setProperty("--prjsplit", Math.max(200, Math.min(px, box.clientWidth - 266)) + "px");
-  sp.addEventListener("pointerdown", (ev) => {
-    sp.setPointerCapture(ev.pointerId);
-    const move = (e) => set(e.clientX - box.getBoundingClientRect().left);
-    const up = () => { sp.removeEventListener("pointermove", move); sp.removeEventListener("pointerup", up); };
-    sp.addEventListener("pointermove", move); sp.addEventListener("pointerup", up);
-  });
-  sp.addEventListener("keydown", (ev) => {
-    const cur = $("prjSql").parentElement.getBoundingClientRect().width;
-    if (ev.key === "ArrowLeft") { ev.preventDefault(); set(cur - 30); } else if (ev.key === "ArrowRight") { ev.preventDefault(); set(cur + 30); }
-  });
-})();
 
 // ---- join dialog ----
 function pqJoinDialog(a, b) {
@@ -5982,7 +6006,8 @@ function pqJoinDialog(a, b) {
     const pairs = j ? j.on.filter((c) => (pqKey(c.a) === pqKey(A) && pqKey(c.b) === pqKey(B)) || (pqKey(c.a) === pqKey(B) && pqKey(c.b) === pqKey(A)))
       .map((c) => pqKey(c.a) === pqKey(A) ? { ac: c.ac, op: c.op, bc: c.bc } : { ac: c.bc, op: c.op === "<" ? ">" : c.op === ">" ? "<" : c.op === "<=" ? ">=" : c.op === ">=" ? "<=" : c.op, bc: c.ac }) : [];
     // LEFT/RIGHT as seen from the dialog: the SQL's left side is the earlier table, so they swap when A is the later one.
-    const t = j ? (j.type === "CROSS" && pairs.length ? "INNER" : j.type) : "INNER";
+    // A new link (no join yet) starts as LEFT OUTER.
+    const t = !j || (j.type === "CROSS" && !j.on.length && !j.extra.length) ? "LEFT" : j.type === "CROSS" ? "INNER" : j.type;
     $("prjJType").value = ix(A) > ix(B) ? pqFlipJoin(t) : t;
     pqJoinPairs(pairs.length ? pairs : [{ ac: "", op: "=", bc: "" }]);
   };

@@ -80,3 +80,20 @@ func TestSuggestJoins(t *testing.T) {
 	}
 	_ = whys
 }
+
+// foreignKeysOf names the table a foreign key points at by its project name,
+// and leaves it empty when that table isn't in the project.
+func TestProjectForeignKeysOf(t *testing.T) {
+	ps := &projectSession{data: projectData{Tables: []projectTable{
+		{Alias: "fb", Source: "STOCK", Name: "stock"}, {Alias: "fb", Source: "CUST", Name: "cust"}, {Alias: "ms", Source: "dbo.cust", Name: "cust"}}}}
+	tbl := &mTable{FKs: []mFK{
+		{Name: "fk_cust", Cols: []string{"CUST_ID"}, RefTable: "CUST", RefCols: []string{"ID"}},
+		{Name: "fk_x", Cols: []string{"X_ID"}, RefTable: "XTAB", RefCols: []string{"ID"}}}}
+	got := ps.foreignKeysOf(&ps.data.Tables[0], tbl)
+	if len(got) != 2 || got[0].Table != "cust" || got[0].Cols[0] != "CUST_ID" || got[0].RefCols[0] != "ID" {
+		t.Errorf("fk_cust: %+v", got)
+	}
+	if got[1].Table != "" || got[1].RefSource != "XTAB" {
+		t.Errorf("a table outside the project: %+v", got[1])
+	}
+}
