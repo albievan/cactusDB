@@ -15,3 +15,5 @@ cactus.conn.db.location
 *.download
 release/cactusdb-*
 *.key.backup
+dist/
+.DS_Store
