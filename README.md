@@ -1041,8 +1041,8 @@ than 15 digits).
 typing redraws the diagram, and every change in the diagram rewrites the SQL (one clause
 per line). Each is as tall as you drag its bottom-right corner.
 - Drag a table from the left (or *Add table*) onto it; tables are coloured per database.
-  **Search tables** beside *Add table* narrows its list to the tables whose name has what
-  you type; Enter adds the first of them.
+  **Search tables** beside *Add table* lists the tables whose name has what you type, as
+  you type it; ↑ ↓ and Enter, or a click, adds one (Esc closes the list).
   A table shows its first 60 columns; click *+N more* under them for the rest (*show
   fewer* folds them back), or ▾ in its heading to hide its columns. The compress button
   in its heading (two arrows pointing in) shows only the columns ticked for the output and
@@ -1068,7 +1068,8 @@ per line). Each is as tall as you drag its bottom-right corner.
   whole number or text, NULL as empty or 0, and date formats: yyyy-mm-dd, dd/mm/yyyy,
   mm/dd/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time, yyyy-mm, yyyy, hh:mm), totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
-  ANDed, the *or* rows ORed), with DISTINCT and LIMIT. Functions go one around the
+  ANDed, the *or* rows ORed), with DISTINCT and LIMIT. Drag a row by its grip (⋮⋮) up
+  or down to change the order of the columns (↑ moves it one up). Functions go one around the
   other: choose TRIM, then LOWER, and the column is `LOWER(TRIM(c.name))` (shown as
   *TRIM → LOWER*; × takes off the last one). A function changes only what is shown:
   filters and sorting use the column's own value.

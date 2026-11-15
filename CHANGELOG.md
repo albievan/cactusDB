@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.11 — 2026-11-15
+
+- Advanced query builder: **Search tables** lists the matching tables under it as you type;
+  ↑ ↓ and Enter, or a click, adds one.
+- Advanced query builder: drag a row of *Column definitions* by its grip (⋮⋮) up or down
+  to change the order of the columns.
+- Advanced query builder: *Column definitions* was squeezed to nothing when the SQL and the
+  diagram were both open in a short window; the page now scrolls instead.
+
 ## 1.62.10 — 2026-11-15
 
 - Advanced query builder: functions on a column go one around the other (TRIM, then

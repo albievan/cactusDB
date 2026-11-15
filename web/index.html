@@ -434,6 +434,8 @@
   .prjsetup > summary { padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
   .prjsetup > summary .cnt { color: var(--muted); font-weight: 400; }
   .prjquery { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 8px 12px; gap: 6px; }
+  /* Nothing is squeezed to fit the window (the page scrolls instead); Results takes what is left. */
+  .prjquery > * { flex-shrink: 0; }
   .prjqbar, .prjresbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .prjqbar select { width: auto; }
   .prjdialect { font-size: 12px; color: var(--muted); }
@@ -458,7 +460,16 @@
   .prjdiag { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
   .prjdbar { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px; border-bottom: 1px solid var(--border); }
   .prjdbar select { width: auto; max-width: 200px; }
-  .prjdbar #prjTblSearch { width: 150px; }
+  .prjdbar #prjTblSearch { width: 170px; }
+  .prjtsearch { position: relative; }
+  .prjthits { position: absolute; top: 100%; left: 0; z-index: 60; min-width: 260px; max-height: 320px; overflow: auto; margin: 2px 0 0; padding: 4px 0; list-style: none;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.18); font-size: 13px; }
+  .prjthits[hidden] { display: none; }
+  .prjthits li { padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+  .prjthits li .db { color: var(--muted); }
+  .prjthits li mark { background: none; color: var(--accent); font-weight: 600; padding: 0; }
+  .prjthits li.on, .prjthits li:hover { background: var(--row-hover); }
+  .prjthits li.none { color: var(--muted); cursor: default; }
   .prjlegend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; margin-left: auto; }
   .prjlegend span { display: inline-flex; align-items: center; gap: 3px; }
   .prjlegend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
@@ -506,6 +517,10 @@
   .prjdesign td input[data-k=val] { margin-left: 3px; }
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
+  .prjdesign .grip { cursor: grab; color: var(--muted); user-select: none; width: 14px; padding: 2px 2px 2px 4px; letter-spacing: -2px; }
+  .prjdesign tr.dragging { opacity: .45; }
+  .prjdesign tr.dropabove td { box-shadow: inset 0 2px 0 var(--accent); }
+  .prjdesign tr.dropbelow td { box-shadow: inset 0 -2px 0 var(--accent); }
   .prjdesign .fncell, .prjdesign .critcell { display: inline-flex; align-items: center; gap: 2px; }
   .prjdesign .fnchain { font-size: 11px; color: var(--accent); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
   .prjdesign .fnchain:empty { display: none; }
@@ -1657,7 +1672,8 @@
             <div class="prjfoldbar" id="prjDiagBar"><button type="button" class="prjfold flabel" data-fold="diag" aria-expanded="true" aria-controls="prjDiag" title="Show or hide the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Diagram</button></div>
             <div class="prjdiag" id="prjDiag">
               <div class="prjdbar">
-                <input type="search" class="form-control form-control-sm" id="prjTblSearch" placeholder="Search tables…" spellcheck="false" autocomplete="off" aria-label="Search the tables to add" title="Type part of a table's name: Add table lists only the matching ones; Enter adds the first">
+                <span class="prjtsearch"><input type="search" class="form-control form-control-sm" id="prjTblSearch" placeholder="Search tables…" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="prjTblHits" aria-autocomplete="list" aria-label="Search the tables to add" title="Type part of a table's name: the matching tables are listed; ↑ ↓ and Enter, or a click, adds one">
+                <ul class="prjthits" id="prjTblHits" role="listbox" hidden aria-label="Matching tables"></ul></span>
                 <select class="form-select form-select-sm" id="prjAddTbl" aria-label="Add a table to the query"><option value="">Add table…</option></select>
                 <button class="btn btn-sm btn-outline-secondary" id="prjLinkBtn" title="Join two tables: choose them, the columns and the type of join (or drag a column onto another table's column)">Link tables</button>
                 <button class="btn btn-sm btn-outline-secondary" id="prjArrange" title="Arrange the tables automatically">Arrange</button>
@@ -6122,14 +6138,36 @@ function pqTableOptions() {
     prj.open.links.map((l) => { const ts = hits.filter((t) => t.alias === l.alias); return !ts.length ? "" : `<optgroup label="${esc(l.alias)}">` +
       ts.map((t) => `<option value="${esc(JSON.stringify([t.alias, t.name]))}">${esc(t.alias)}.${esc(t.name)}</option>`).join("") + `</optgroup>`; }).join("");
 }
-$("prjTblSearch").addEventListener("input", () => { if (prj.open) pqTableOptions(); });
+// As the search is typed, the matching tables are listed under it to pick from.
+pq.hit = 0;
+function pqTblHits() {
+  const box = $("prjTblHits"), q = $("prjTblSearch").value.trim();
+  if (!prj.open || !q) { box.hidden = true; $("prjTblSearch").setAttribute("aria-expanded", "false"); return; }
+  const hits = pqTblMatches().slice(0, 100), lq = q.toLowerCase();
+  pq.hit = Math.min(pq.hit, Math.max(0, hits.length - 1));
+  const mark = (s) => { const i = s.toLowerCase().indexOf(lq); return i < 0 ? esc(s) : esc(s.slice(0, i)) + `<mark>${esc(s.slice(i, i + q.length))}</mark>` + esc(s.slice(i + q.length)); };
+  box.innerHTML = hits.length ? hits.map((t, i) => `<li role="option" id="prjTblHit${i}" data-hit="${i}" class="${i === pq.hit ? "on" : ""}" aria-selected="${i === pq.hit}"><span class="db">${esc(t.alias)}.</span>${mark(t.name)}</li>`).join("")
+    : `<li class="none">No table matches</li>`;
+  box.hidden = false; $("prjTblSearch").setAttribute("aria-expanded", "true");
+  if (hits.length) $("prjTblSearch").setAttribute("aria-activedescendant", "prjTblHit" + pq.hit);
+  box.querySelector("li.on")?.scrollIntoView({ block: "nearest" });
+}
+function pqTblPick(i) {
+  const t = pqTblMatches()[i];
+  if (!t) return;
+  $("prjTblSearch").value = ""; pq.hit = 0; pqTableOptions(); pqTblHits(); pqAddTable(t.alias, t.name);
+}
+$("prjTblSearch").addEventListener("input", () => { if (!prj.open) return; pq.hit = 0; pqTableOptions(); pqTblHits(); });
+$("prjTblSearch").addEventListener("focus", pqTblHits);
+$("prjTblSearch").addEventListener("blur", () => setTimeout(() => { $("prjTblHits").hidden = true; $("prjTblSearch").setAttribute("aria-expanded", "false"); }, 150));
 $("prjTblSearch").addEventListener("keydown", (ev) => {
-  if (ev.key !== "Enter" || !prj.open) return;
-  ev.preventDefault();
-  const t = pqTblMatches()[0];
-  if (!t) { toast("No table matches", true); return; }
-  $("prjTblSearch").value = ""; pqAddTable(t.alias, t.name);
+  if (!prj.open) return;
+  const n = Math.min(100, pqTblMatches().length);
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") { ev.preventDefault(); if (n) { pq.hit = (pq.hit + (ev.key === "ArrowDown" ? 1 : n - 1)) % n; pqTblHits(); } }
+  else if (ev.key === "Enter") { ev.preventDefault(); if (!n) { toast("No table matches", true); return; } pqTblPick(pq.hit); }
+  else if (ev.key === "Escape" && !$("prjTblHits").hidden) { ev.preventDefault(); ev.stopPropagation(); $("prjTblHits").hidden = true; }
 });
+$("prjTblHits").addEventListener("mousedown", (ev) => { const li = ev.target.closest("li[data-hit]"); if (li) { ev.preventDefault(); pqTblPick(+li.dataset.hit); } });
 $("prjAddTbl").addEventListener("change", () => { const v = $("prjAddTbl").value; $("prjAddTbl").value = ""; if (v) { const [db, name] = JSON.parse(v); pqAddTable(db, name); } });
 $("prjZoomIn").addEventListener("click", () => { pq.zoom = Math.min(3, pq.zoom * 1.2); pqDraw(); });
 $("prjZoomOut").addEventListener("click", () => { pq.zoom = Math.max(0.3, pq.zoom / 1.2); pqDraw(); });
@@ -6281,10 +6319,11 @@ function pqDesign() {
   const rows = Math.max(1, ...m.fields.flatMap((f) => f.crit.map((c) => c.row + 2)));
   const allCols = m.tables.flatMap((t) => (pqColsOf(t) || []).map((c) => [t.alias, c.name]));
   const fname = (f) => f.expr ? f.expr : (f.agg ? f.agg + "(" : "") + (f.table ? f.table + "." : "") + f.col + (f.agg ? ")" : "");
-  const head = `<tr><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function</th><th>Total</th><th>Group</th><th>Sort</th>` +
+  const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function</th><th>Total</th><th>Group</th><th>Sort</th>` +
     Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}</th>`).join("") + `<th></th></tr>`;
   const body = m.fields.map((f, i) => {
-    if (f.col === "*" && !f.agg) return `<tr data-f="${i}"><td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${5 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
+    const grip = `<td class="grip" draggable="true" title="Drag up or down to change the order of the columns" aria-hidden="true">⋮⋮</td>`;
+    if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${5 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
     const ex = !!f.expr;
     const crit = Array.from({ length: rows }, (_, r) => {
       const c = f.crit.find((x) => x.row === r) || { op: "", value: "" }, btw = c.op.endsWith("BETWEEN"), [lo, hi] = btw ? pqSplitBetween(c.value) : [c.op.endsWith("IN") ? pqUnlist(c.value) : c.value, ""];
@@ -6292,7 +6331,7 @@ function pqDesign() {
         `<input type="text" class="form-control form-control-sm" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
         `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</span></td>`;
     }).join("");
-    return `<tr data-f="${i}"><td title="${esc(fname(f))}">${esc(fname(f).slice(0, 60))}</td>
+    return `<tr data-f="${i}">${grip}<td title="${esc(fname(f))}">${esc(fname(f).slice(0, 60))}</td>
       <td><input type="checkbox" data-k="show"${f.show ? " checked" : ""} aria-label="Show ${esc(fname(f))}"></td>
       <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
       <td>${ex || f.agg ? "" : pqFnCell(f.fns, "fn")}</td>
@@ -6350,6 +6389,35 @@ function pqCritUpdate(tr, f, r, k) {
   f.crit.sort((a, b) => a.row - b.row);
   return true;
 }
+// Drag a row by its grip to move the column up or down (the order of SELECT).
+$("prjDesign").addEventListener("dragstart", (ev) => {
+  const g = ev.target.closest && ev.target.closest("td.grip"), tr = g && g.closest("tr[data-f]");
+  if (!tr) return;
+  pq.dragRow = +tr.dataset.f; tr.classList.add("dragging");
+  ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(pq.dragRow));
+});
+$("prjDesign").addEventListener("dragover", (ev) => {
+  const tr = ev.target.closest && ev.target.closest("tr[data-f]");
+  if (pq.dragRow === undefined || !tr) return;
+  ev.preventDefault(); ev.dataTransfer.dropEffect = "move";
+  const r = tr.getBoundingClientRect(), below = ev.clientY > r.top + r.height / 2;
+  $("prjDesign").querySelectorAll("tr.dropabove, tr.dropbelow").forEach((x) => x.classList.remove("dropabove", "dropbelow"));
+  tr.classList.add(below ? "dropbelow" : "dropabove");
+});
+$("prjDesign").addEventListener("drop", (ev) => {
+  const tr = ev.target.closest && ev.target.closest("tr[data-f]");
+  if (pq.dragRow === undefined || !tr) return;
+  ev.preventDefault();
+  const from = pq.dragRow, r = tr.getBoundingClientRect();
+  let to = +tr.dataset.f + (ev.clientY > r.top + r.height / 2 ? 1 : 0);
+  pq.dragRow = undefined;
+  if (to > from) to--;
+  if (to === from) { pqDesign(); return; }
+  const m = pq.model, [f] = m.fields.splice(from, 1);
+  m.fields.splice(to, 0, f);
+  pqCommit();
+});
+$("prjDesign").addEventListener("dragend", () => { pq.dragRow = undefined; $("prjDesign").querySelectorAll("tr.dragging, tr.dropabove, tr.dropbelow").forEach((x) => x.classList.remove("dragging", "dropabove", "dropbelow")); });
 $("prjDesign").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-k]"), tr = b && b.closest("tr[data-f]");
   if (!tr) return;
