@@ -453,6 +453,7 @@
   .prjdiag { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
   .prjdbar { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px; border-bottom: 1px solid var(--border); }
   .prjdbar select { width: auto; max-width: 200px; }
+  .prjdbar #prjTblSearch { width: 150px; }
   .prjlegend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; margin-left: auto; }
   .prjlegend span { display: inline-flex; align-items: center; gap: 3px; }
   .prjlegend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
@@ -517,8 +518,13 @@
   .prjfoldbar[hidden] { display: none; }
   .prjquery.fold-sql .prjedwrap, .prjquery.fold-diag .prjdiag, .prjquery.fold-prog .prjprogbody,
   .prjquery.fold-query .prjqmeta, .prjquery.fold-query .prjsplit, .prjquery.fold-cols .prjdesign,
-  .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
+  .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .prjpager, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
   .prjquery.fold-res .prjres { flex: 0 0 auto; min-height: 0; }
+  .prjpager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 2px 0; }
+  .prjpager[hidden] { display: none; }
+  .prjpager select { width: auto; }
+  .prjpager #prjPageNo { width: 80px; display: inline-block; }
+  .prjpager .info { color: var(--muted); font-size: 12px; }
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
   .prjresbar .info { font-size: 12px; color: var(--muted); }
   .prjexpnote { font-size: 12px; }
@@ -844,6 +850,7 @@
   .upinstall .uppick input { width: auto; max-width: 100%; }
   .updot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 1px; }
   .updot[hidden] { display: none; }
+  .updot.hdr { position: absolute; top: -3px; right: -3px; margin: 0; }
   .spinner-border-sm { --bs-spinner-width: 11px; --bs-spinner-height: 11px; --bs-spinner-border-width: 2px; color: var(--accent); vertical-align: -1px; }
   .warn { color: var(--danger); }
   .folder { padding: 2px 0 4px; }
@@ -1275,6 +1282,7 @@
       </g>
     </svg>
   </div>
+  <button id="updateBtn" class="btn btn-sm btn-outline-secondary position-relative" type="button" title="Check for update: is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i><span class="visually-hidden">Check for update</span><span class="updot hdr" id="updateDot" hidden></span></button>
   <div class="dropdown" id="usersWrap" hidden>
     <button id="usersBtn" class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Who is using cactusdb"><i class="bi bi-people" aria-hidden="true"></i> <span id="usersN">1</span><span class="visually-hidden"> using cactusdb</span></button>
     <div class="dropdown-menu dropdown-menu-end shadow users" id="usersMenu"></div>
@@ -1331,7 +1339,6 @@
       <button class="btn btn-outline-secondary text-start" data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Compare databases</button>
       <button class="btn btn-outline-secondary text-start" data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate database</button>
       <button class="btn btn-outline-secondary text-start" data-menu="projects" title="Advanced query builder: projects that link several databases (Firebird, MariaDB, SQL Server…) and query across them with one SELECT"><i class="bi bi-diagram-3-fill" aria-hidden="true"></i> Advanced query builder</button>
-      <button class="btn btn-outline-secondary text-start" data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i> Check for update<span class="updot" id="updateDot" hidden></span></button>
       <button class="btn btn-outline-secondary text-start" id="signOutBtn" hidden title="Sign out of cactusdb in this browser"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sign out <span class="signedas" id="signedAs"></span></button>
       <button class="btn btn-outline-danger text-start" id="shutdownBtn" hidden title="Stop this background cactusdb (asks first)"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
     </nav>
@@ -1385,7 +1392,7 @@
     <div class="navfoot">
       <button class="btn btn-outline-secondary" id="navMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="navMenu" title="Menu: connections, new connection, folder setup, drivers, settings and updates">
         <span class="navicon" aria-hidden="true"><i class="bi bi-list" aria-hidden="true"></i></span>
-        <span class="navtext"><b>Connections<span class="updot" id="navUpdateDot" hidden title="A newer cactusdb is available"></span></b><small id="navConn">Not connected</small></span>
+        <span class="navtext"><b>Connections</b><small id="navConn">Not connected</small></span>
         <span class="navcaret" aria-hidden="true"><i class="bi bi-chevron-up" aria-hidden="true"></i></span>
       </button>
     </div>
@@ -1637,6 +1644,7 @@
             <div class="prjfoldbar" id="prjDiagBar"><button type="button" class="prjfold flabel" data-fold="diag" aria-expanded="true" aria-controls="prjDiag" title="Show or hide the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Diagram</button></div>
             <div class="prjdiag" id="prjDiag">
               <div class="prjdbar">
+                <input type="search" class="form-control form-control-sm" id="prjTblSearch" placeholder="Search tables…" spellcheck="false" autocomplete="off" aria-label="Search the tables to add" title="Type part of a table's name: Add table lists only the matching ones; Enter adds the first">
                 <select class="form-select form-select-sm" id="prjAddTbl" aria-label="Add a table to the query"><option value="">Add table…</option></select>
                 <button class="btn btn-sm btn-outline-secondary" id="prjLinkBtn" title="Join two tables: choose them, the columns and the type of join (or drag a column onto another table's column)">Link tables</button>
                 <button class="btn btn-sm btn-outline-secondary" id="prjArrange" title="Arrange the tables automatically">Arrange</button>
@@ -1670,6 +1678,20 @@
               </span>
             </div>
             <div class="prjexpnote" id="prjExpNote" hidden></div>
+            <div class="prjpager" id="prjPager" hidden>
+              <label class="flabel" for="prjPageSize">Rows per page</label>
+              <select class="form-select form-select-sm" id="prjPageSize"><option>100</option><option>200</option><option>400</option><option>800</option><option>1000</option><option>10000</option><option>30000</option><option value="0">All</option></select>
+              <span class="btn-group btn-group-sm" role="group" aria-label="Pages">
+                <button type="button" class="btn btn-outline-secondary" id="prjPageFirst" title="First page" aria-label="First page"><i class="bi bi-chevron-bar-left" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-outline-secondary" id="prjPagePrev" title="Previous page" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+              </span>
+              <span>Page <input type="number" class="form-control form-control-sm" id="prjPageNo" min="1" value="1" aria-label="Page"> of <span id="prjPages">1</span></span>
+              <span class="btn-group btn-group-sm" role="group" aria-label="Pages">
+                <button type="button" class="btn btn-outline-secondary" id="prjPageNext" title="Next page" aria-label="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-outline-secondary" id="prjPageLast" title="Last page" aria-label="Last page"><i class="bi bi-chevron-bar-right" aria-hidden="true"></i></button>
+              </span>
+              <span class="info" id="prjPageInfo"></span>
+            </div>
             <div class="prjgrid" id="prjGrid"></div>
           </div>
         </div>
@@ -2597,7 +2619,7 @@ async function lostConnection(method, url, secs, retried, cause) {
         "a cactusdb killed by the system, for instance for lack of memory during a large export, says so when it starts again), " +
         `or the network to ${location.hostname} is down (VPN, Wi-Fi, firewall). ` +
         "If it runs in a terminal (an SSH session) and the page loads but tables don't: cactusdb before 1.20.0 waited for that terminal, " +
-        "and hung when it stopped reading. Update it (☰ → ⬆ Check for update) and start it with --runas background.");
+        "and hung when it stopped reading. Update it (the Check for update button at the top) and start it with --runas background.");
     } else if (state.serverPid && info.pid !== state.serverPid) {
       lines.push(`cactusdb was restarted meanwhile (process ${state.serverPid} → ${info.pid}, started ${new Date(info.started).toLocaleTimeString()}): ` +
         "the request was lost and your connection to the database has ended. Reload the page and connect again." +
@@ -2937,6 +2959,7 @@ async function openEvents() {
   }, 15000);
 }
 $("eventsBtn").addEventListener("click", openEvents);
+$("updateBtn").addEventListener("click", () => openUpdateDialog());
 $("evRefresh").addEventListener("click", () => evLoad());
 $("evMore").addEventListener("click", () => evLoad(true));
 $("evClose").addEventListener("click", () => $("eventsDialog").close());
@@ -5227,10 +5250,35 @@ function prjSetExport() {
   const ok = !!prj.result && !prj.running && prj.ran === $("prjSql").value.trim().replace(/;\s*$/, "").trim();
   document.querySelectorAll(".pexp").forEach((b) => (b.disabled = !ok));
 }
+// The grid shows a page of the result: rows per page from Rows per page (All: every row,
+// drawn GRID_PAGE at a time), with first/previous/next/last and a page number.
+const PRJ_PAGE_KEY = "cactusdb.prjPageSize";
+try { const v = localStorage.getItem(PRJ_PAGE_KEY); if (v && [...$("prjPageSize").options].some((o) => o.value === v)) $("prjPageSize").value = v; } catch (e) { /* the default */ }
+prj.page = 0;
 function prjRenderGrid() {
-  const res = prj.result;
-  $("prjGrid").innerHTML = !res ? "" : res.columns.length ? gridHtml(res, prj.sort, prj.shown) : `<div class="emptymsg"><p>No columns.</p></div>`;
+  const res = prj.result, size = +$("prjPageSize").value, pager = $("prjPager");
+  if (!res || !res.columns.length) { $("prjGrid").innerHTML = res ? `<div class="emptymsg"><p>No columns.</p></div>` : ""; pager.hidden = true; return; }
+  const n = res.rows.length, pages = size ? Math.max(1, Math.ceil(n / size)) : 1;
+  prj.page = Math.min(Math.max(0, prj.page), pages - 1);
+  $("prjGrid").innerHTML = size ? gridHtml(res, prj.sort, 0, { from: prj.page * size, size }) : gridHtml(res, prj.sort, prj.shown);
+  pager.hidden = false;
+  const from = size ? prj.page * size : 0, to = size ? Math.min(n, from + size) : n;
+  $("prjPageNo").value = prj.page + 1; $("prjPageNo").max = pages; $("prjPages").textContent = pages.toLocaleString();
+  $("prjPageInfo").textContent = !n ? "no rows" : size ? `rows ${(from + 1).toLocaleString()}–${to.toLocaleString()} of ${n.toLocaleString()}` : `all ${n.toLocaleString()} row${n === 1 ? "" : "s"}`;
+  $("prjPageFirst").disabled = $("prjPagePrev").disabled = !size || prj.page === 0;
+  $("prjPageNext").disabled = $("prjPageLast").disabled = !size || prj.page >= pages - 1;
+  $("prjPageNo").disabled = !size || pages === 1;
 }
+function prjGoPage(p) { prj.page = p; prjRenderGrid(); $("prjGrid").scrollTop = 0; }
+$("prjPageFirst").addEventListener("click", () => prjGoPage(0));
+$("prjPagePrev").addEventListener("click", () => prjGoPage(prj.page - 1));
+$("prjPageNext").addEventListener("click", () => prjGoPage(prj.page + 1));
+$("prjPageLast").addEventListener("click", () => prjGoPage(Infinity));
+$("prjPageNo").addEventListener("change", () => prjGoPage((+$("prjPageNo").value || 1) - 1));
+$("prjPageSize").addEventListener("change", () => {
+  try { localStorage.setItem(PRJ_PAGE_KEY, $("prjPageSize").value); } catch (e) { /* not remembered */ }
+  prj.shown = GRID_PAGE; prjGoPage(0);
+});
 function prjProgress(st) {
   const p = $("prjProg");
   const rows = (st.tables || []).map((t) => `<div>${t.done ? "✓" : "…"} <b>${esc(t.alias)}.${esc(t.name)}</b>: ${t.rows.toLocaleString()} row${t.rows === 1 ? "" : "s"} read, ${t.columns} column${t.columns === 1 ? "" : "s"}` +
@@ -5270,7 +5318,7 @@ async function prjRun(limit) {
   prjProgress(st);
   if (st.state === "done") {
     const res = st.result;
-    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; prj.ran = res.sql;
+    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; prj.page = 0; prj.ran = res.sql;
     const n = res.rows.length, tot = res.total ?? n;
     $("prjInfo").textContent = (tot > n ? `${n.toLocaleString()} of ${res.totalMore ? "more than " : ""}${tot.toLocaleString()} rows shown (limited to ${res.limit.toLocaleString()} – exports hold every row)` : `${n.toLocaleString()} row${n === 1 ? "" : "s"}`) +
       ` · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"} · query ${res.elapsedMs} ms`;
@@ -5305,7 +5353,7 @@ $("prjGrid").addEventListener("click", (ev) => {
   if (!th || !prj.result) return;
   const col = +th.dataset.col;
   prj.sort = prj.sort && prj.sort.col === col ? (prj.sort.dir > 0 ? { col, dir: -1 } : null) : { col, dir: 1 };
-  prjRenderGrid();
+  prj.page = 0; prjRenderGrid();
 });
 document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", async () => {
   const fmt = b.dataset.pfmt;
@@ -5739,9 +5787,8 @@ function pqDraw() {
   if (pq.sug.length && pq.sug.every((s) => pqJoined(pq.model, s.a, s.b) || !m.tables.some((t) => pqKey(t.alias) === pqKey(s.b)))) pqSuggest([]);
   // Legend: one colour per linked database.
   $("prjLegend").innerHTML = prj.open.links.map((l) => `<span title="${esc(l.name || "")}"><i style="background:${pqColor(l.alias)}"></i>${esc(l.alias)}</span>`).join("");
-  $("prjAddTbl").innerHTML = `<option value="">Add table…</option>` + prj.open.links.map((l) => `<optgroup label="${esc(l.alias)}">` +
-    prj.open.tables.filter((t) => t.alias === l.alias).map((t) => `<option value="${esc(JSON.stringify([t.alias, t.name]))}">${esc(t.alias)}.${esc(t.name)}</option>`).join("") + `</optgroup>`).join("");
-  for (const id of ["prjAddTbl", "prjLinkBtn", "prjArrange"]) $(id).disabled = ro;
+  pqTableOptions();
+  for (const id of ["prjTblSearch", "prjAddTbl", "prjLinkBtn", "prjArrange"]) $(id).disabled = ro;
   const note = $("prjDiagNote");
   const cross = m.tables.length > 1 ? m.tables.filter((t, k) => !m.tables.some((o) => o !== t && pqJoined(m, t.alias, o.alias))) : [];
   const unknown = m.tables.filter((t) => !pqInProject(t));
@@ -5930,6 +5977,25 @@ $("prjDiagBody").addEventListener("drop", (ev) => {
   ev.preventDefault();
   const [db, name] = d.split("\u0000"), r = $("prjDiagBody").getBoundingClientRect();
   pqAddTable(db, name, Math.max(0, Math.round((ev.clientX - r.left + $("prjDiagBody").scrollLeft) / pq.zoom - 60)), Math.max(0, Math.round((ev.clientY - r.top + $("prjDiagBody").scrollTop) / pq.zoom - 10)));
+});
+// Add table lists the project's tables, only those matching Search tables when it has text.
+function pqTblMatches() {
+  const q = $("prjTblSearch").value.trim().toLowerCase();
+  return prj.open.tables.filter((t) => !q || `${t.alias}.${t.name}`.toLowerCase().includes(q));
+}
+function pqTableOptions() {
+  const q = $("prjTblSearch").value.trim(), hits = pqTblMatches();
+  $("prjAddTbl").innerHTML = `<option value="">${q ? `Add table… (${hits.length} match${hits.length === 1 ? "" : "es"})` : "Add table…"}</option>` +
+    prj.open.links.map((l) => { const ts = hits.filter((t) => t.alias === l.alias); return !ts.length ? "" : `<optgroup label="${esc(l.alias)}">` +
+      ts.map((t) => `<option value="${esc(JSON.stringify([t.alias, t.name]))}">${esc(t.alias)}.${esc(t.name)}</option>`).join("") + `</optgroup>`; }).join("");
+}
+$("prjTblSearch").addEventListener("input", () => { if (prj.open) pqTableOptions(); });
+$("prjTblSearch").addEventListener("keydown", (ev) => {
+  if (ev.key !== "Enter" || !prj.open) return;
+  ev.preventDefault();
+  const t = pqTblMatches()[0];
+  if (!t) { toast("No table matches", true); return; }
+  $("prjTblSearch").value = ""; pqAddTable(t.alias, t.name);
 });
 $("prjAddTbl").addEventListener("change", () => { const v = $("prjAddTbl").value; $("prjAddTbl").value = ""; if (v) { const [db, name] = JSON.parse(v); pqAddTable(db, name); } });
 $("prjZoomIn").addEventListener("click", () => { pq.zoom = Math.min(3, pq.zoom * 1.2); pqDraw(); });
@@ -6675,7 +6741,7 @@ $("navMenu").querySelector(".menuitems").addEventListener("click", (ev) => {
     case "settings": setNavMenu(false); openSettingsDialog(); break;
     case "email": setNavMenu(false); openEmailDialog(); break;
     case "users": setNavMenu(false); openUsersDialog(); break;
-    case "update": setNavMenu(false); openUpdateDialog(); break;
+    case "update": setNavMenu(false); openUpdateDialog(); break; // kept for links that still name it
     case "logs": setNavMenu(false); showTab("logs"); break;
     case "compare": setNavMenu(false); showTab("compare"); break;
     case "migrate": setNavMenu(false); showTab("migrate"); break;
@@ -8608,8 +8674,9 @@ function renderGrid() {
   $("grid").innerHTML = gridHtml(res, state.sort, state.gridShown || GRID_PAGE);
 }
 // gridHtml is the table of a result, sorted, with its first shown rows and a
-// button for more (the Data tab's grid and the Projects pane's).
-function gridHtml(res, sort, shown) {
+// button for more (the Data tab's grid and the Projects pane's); with page
+// ({from, size}) it is that page of the sorted rows instead.
+function gridHtml(res, sort, shown, page) {
   let rows = res.rows.map((r, i) => [i, r]);
   if (sort) {
     const { col, dir } = sort;
@@ -8617,7 +8684,8 @@ function gridHtml(res, sort, shown) {
   }
   const head = `<tr><th class="n">#</th>` + res.columns.map((c, i) =>
     `<th data-col="${i}" title="${esc(c)} – click to sort">${esc(c)}${sort && sort.col === i ? `<span class="dir">${sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
-  const more = rows.length - shown;
+  if (page) rows = rows.slice(page.from, page.from + page.size);
+  const more = page ? 0 : rows.length - shown;
   if (more > 0) rows = rows.slice(0, shown);
   const body = rows.map(([i, r]) => `<tr><td class="n">${i + 1}</td>` + r.map((v) => {
     if (v === null) return `<td class="null">NULL</td>`;
@@ -8951,8 +9019,9 @@ function renderUpdate(u) {
   $("upList").dataset.cmds = JSON.stringify(setupCommands(u).map((r) => r.cmd || ""));
   renderInstall(u);
   const dot = !!u.newer;
-  $("updateDot").hidden = !dot; $("navUpdateDot").hidden = !dot;
-  if (dot) $("appVersion").title = `cactusdb ${u.current} · ${u.latest} is available (☰ → Check for update)`;
+  $("updateDot").hidden = !dot;
+  $("updateBtn").title = dot ? `Check for update: cactusdb ${u.latest} is available (you have ${u.current})` : "Check for update: is there a newer cactusdb? With the command to download it for each system";
+  if (dot) $("appVersion").title = `cactusdb ${u.current} · ${u.latest} is available (the ⤓ button at the top)`;
 }
 
 // ---- install the new version from here ------------------------------------

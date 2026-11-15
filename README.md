@@ -172,7 +172,6 @@ The **Connections** menu at the bottom of the sidebar has these items:
 | **DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection. Each deployed container has a page with its settings and its CPU, memory and storage use, and start, stop, restart, delete and purge (see [Deploying a database as a container](#db-containers)) |
 | **Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
 | **Migrate database** | Copies a database, structure and data, with its views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB (see [Migrating a database](#migrate)) |
-| **Check for update** | Whether a newer cactusdb is out; **Install** puts it in place and restarts cactusdb with the same options, or copy the command to download it for any system (see below) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
 the connection dialog, opened by **New connection** or **Edit**, never in the sidebar.
@@ -288,9 +287,11 @@ in `cactus.conn.db` on the cactusdb server and applies to everyone using it. The
 also closes connections of pages that were closed, a little after the same time.
 
 **Checking for an update.** When the page opens, cactusdb checks whether a newer version is
-out. When one is, a dot appears on the **Connections** button, and the cactusdb log says so
-at startup. **☰ → Check for update** shows the version you have and the latest one, and the
-command that downloads cactusdb for each system:
+out. When one is, a dot appears on the **Check for update** button (the cloud with an
+arrow, first of the buttons at the top right), and the cactusdb log says so at startup. That
+button shows the version you have and the latest one; **Install** puts it in place and
+restarts cactusdb with the same options, or copy the command that downloads cactusdb for
+each system:
 
 - the setup scripts for **Linux and macOS** (`setup.sh`) and **Windows** (`setup.ps1`), which
   pick the right file themselves
@@ -1027,6 +1028,9 @@ than 15 digits).
   many rows it returned (counted up to 10 million), also when the grid shows fewer.
 - **Show** sets how many rows the grid gets: 100, 1000, 10000, 100000 or **All** (every
   row, up to 1,000,000). Exports always hold every row.
+- The grid shows them a page at a time: **Rows per page** (100, 200, 400, 800, 1000,
+  10000, 30000 or All), first, previous, next and last page, or type a page number. Sorting
+  by a column sorts every row, then shows its first page. The browser remembers the size.
 - Each run reads afresh. The copies of the last run stay until the next run or until the
   project closes, so the grid, *Show n rows* and the **exports** (the coloured icons for
   Excel, CSV, JSON, XML and all four formats) hold exactly the rows shown, all of them. Exports go to
@@ -1037,6 +1041,8 @@ than 15 digits).
 typing redraws the diagram, and every change in the diagram rewrites the SQL (one clause
 per line). Each is as tall as you drag its bottom-right corner.
 - Drag a table from the left (or *Add table*) onto it; tables are coloured per database.
+  **Search tables** beside *Add table* narrows its list to the tables whose name has what
+  you type; Enter adds the first of them.
   A table shows its first 60 columns; click *+N more* under them for the rest (*show
   fewer* folds them back), or ▾ in its heading to hide its columns. The compress button
   in its heading (two arrows pointing in) shows only the columns ticked for the output and
@@ -1581,7 +1587,7 @@ opened…), you get the error straight away. The process id is also written to
 `cactusdb.pid` next to the log file, so you can stop it later:
 
 - **From the browser:** a background cactusdb has **⏻ Shutdown** at the bottom of the
-  ☰ menu (bottom left, under *Check for update*). Click it and confirm. cactusdb cancels running exports,
+  ☰ menu (bottom left). Click it and confirm. cactusdb cancels running exports,
   closes every database connection and the connection file, removes `cactusdb.pid`,
   logs `stopped` and exits. The page then says it has shut down, with the command to
   start it again. (The button only appears in background mode; in a terminal, press

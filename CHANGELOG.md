@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.62.7 — 2026-11-15
+
+- **Check for update** is a button at the top right (a cloud with an arrow, first of the
+  buttons there), with a dot when a newer cactusdb is out; it left the ☰ menu.
+- Advanced query builder: **Search tables** beside *Add table* narrows its list to the
+  matching tables; Enter adds the first.
+- Advanced query builder: the results grid has pages: **Rows per page** 100, 200, 400,
+  800, 1000, 10000, 30000 or All, first/previous/next/last and a page number; the
+  browser remembers the size.
+
 ## 1.62.6 — 2026-11-15
 
 - Advanced query builder: the SQL is above the diagram (it was beside it); **SQL** and
