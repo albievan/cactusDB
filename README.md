@@ -230,8 +230,14 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
    - Click a column heading to sort; click again to reverse.
    - Use **Show** to view 100, 1,000, 10,000 or 100,000 rows on screen.
    - Empty values are shown as *NULL*.
-7. *(Optional)* Edit the SQL, e.g. add `WHERE` or `ORDER BY`, and press **Run** or
+7. *(Optional)* Edit the SQL, e.g. add `WHERE` or `ORDER BY`, and press **Run** (▶) or
    **Ctrl+Enter**. Only read queries are accepted (see [Read-only](#read-only)).
+   **Refresh** (⟳, beside Run) runs the query of the result again, for the rows as they
+   are now; 💾 saves the query.
+   - The grid shows the rows a page at a time, with a pager above and under it: **Rows
+     per page** (100, 200, 400, 800, 1000, 10000, 30000 or All), first, previous, next and
+     last page, or type a page number. Sorting by a column sorts every row. The browser
+     remembers the size.
    - **Suggestions** while you type: after a table's name or alias and a dot
      (`select t1.` … `from mytable t1`) a list of that table's columns (🔑 for its key);
      after `FROM`, `JOIN`, `UPDATE` or `INTO` the tables and views; anywhere else the
@@ -246,7 +252,7 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
      RIGHT joins named. A table joined to nothing (every row paired with every row of the
      others) is outlined red and named above; so is a name that isn't a table of the
      database. Switch off *Query diagram* to hide it.
-8. **Export** with the **Excel**, **JSON**, **XML** or **CSV** buttons. The export
+8. **Export** with the **Excel**, **CSV**, **JSON** or **XML** icons. The export
    always contains **all rows** of the query, not just the rows on screen. The file is
    saved in the connection's folder, in a subfolder for its type:
    `<export folder>/<connection name>/json|csv|xlsx|xml/` (see
@@ -985,7 +991,10 @@ Server, say), and queries them together with **one SELECT** that joins their tab
 only ever reads them.
 
 1. **New project**: give it a name. Projects are kept in `cactus.conn.db`, sealed (see
-   below), and never hold a password: they refer to your saved connections.
+   below), and never hold a password: they refer to your saved connections. The projects
+   are listed in a grid: **open** (first), the name, the databases linked, the number of
+   saved queries, when it was created and last changed, and **edit**, **duplicate** and
+   **delete** (these open the project first: its databases' passwords open it).
 2. **Link** a saved connection under a short **alias** (`fb`, `maria`, `ms`: letters,
    digits and `_`). A project links up to **10** databases (the most SQLite can attach at
    once) of the types that speak SQL: SQLite, MySQL, MariaDB, PostgreSQL and its flavours
@@ -1028,9 +1037,10 @@ than 15 digits).
   many rows it returned (counted up to 10 million), also when the grid shows fewer.
 - **Show** sets how many rows the grid gets: 100, 1000, 10000, 100000 or **All** (every
   row, up to 1,000,000). Exports always hold every row.
-- The grid shows them a page at a time: **Rows per page** (100, 200, 400, 800, 1000,
-  10000, 30000 or All), first, previous, next and last page, or type a page number. Sorting
-  by a column sorts every row, then shows its first page. The browser remembers the size.
+- The grid shows them a page at a time, with a pager above and under it: **Rows per page**
+  (100, 200, 400, 800, 1000, 10000, 30000 or All), first, previous, next and last page, or
+  type a page number. Sorting by a column sorts every row, then shows its first page. The
+  browser remembers the size.
 - Each run reads afresh. The copies of the last run stay until the next run or until the
   project closes, so the grid, *Show n rows* and the **exports** (the coloured icons for
   Excel, CSV, JSON, XML and all four formats) hold exactly the rows shown, all of them. Exports go to

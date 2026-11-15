@@ -317,6 +317,8 @@
   .exportall .btn:hover:not(:disabled) { background: var(--panel-2); }
   .exportall .bi { font-size: 20px; }
   .prjexpicons { display: inline-flex; align-items: center; gap: 3px; }
+  .iconbtns { display: inline-flex; gap: 4px; }
+  .iconbtns .btn { --bs-btn-padding-x: 9px; }
   .prjexpicons .btn { --bs-btn-padding-x: 3px; --bs-btn-padding-y: 2px; line-height: 0; }
   .prjexpicons .btn:hover:not(:disabled) { background: var(--panel-2); }
   .prjexpicons .bi { font-size: 20px; }
@@ -375,12 +377,22 @@
   #objTree ul.list li.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); border-radius: 14px; }
   main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
   .tabs { align-items: center; gap: 2px; padding: 6px 12px 0; background: var(--panel-2); flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  /* The tabs: text with an accent bar under the open one, a soft background on hover. */
+  .tabs.nav-tabs { border-bottom: 1px solid var(--border); gap: 4px; padding: 4px 12px 0; }
+  .tabs.nav-tabs .nav-link { border: 0; border-bottom: 2px solid transparent; border-radius: 8px 8px 0 0; margin-bottom: -1px; padding: 7px 12px 8px;
+    color: var(--muted); background: transparent; white-space: nowrap; transition: color .15s, background-color .15s, border-color .15s; }
+  .tabs.nav-tabs .nav-link:hover { color: var(--text); background: var(--row-hover); }
+  .tabs.nav-tabs .nav-link.active { color: var(--accent); background: transparent; border-bottom-color: var(--accent); font-weight: 600; }
+  .tabs.nav-tabs .nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .tabs .nav-link { flex: none; white-space: nowrap; }
   .tabs .title { margin-left: 12px; font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     color: var(--accent); font-weight: 600; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 4px; max-width: 45%; }
   .tabs .title:empty { display: none; }
   .pane { min-height: 0; min-width: 0; }
-  #dataPane { display: grid; grid-template-rows: auto auto auto 1fr; }
+  #dataPane { display: grid; grid-template-rows: auto auto auto auto 1fr auto; }
+  #dataPane > .pager { padding: 3px 12px; background: var(--panel); grid-row: 4; }
+  #dataPane > .grid ~ .pager { grid-row: 6; }
+  #dataPane.allexport > .pager, #dataPane.offline > .pager { display: none !important; }
   #dataPane[hidden], #defPane[hidden], #fddlPane[hidden], #filesPane[hidden], #logsPane[hidden] { display: none; }
   #logsPane { display: grid; grid-template-rows: auto auto 1fr; background: var(--panel); min-height: 0; }
   #logsPane .filesbar input[type=search] { flex: 1; min-width: 220px; }
@@ -395,6 +407,15 @@
   #projPane[hidden] { display: none; }
   #prjNewName { width: 240px; }
   .ronly { font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--accent, #2f6f4f); border: 1px solid currentColor; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .prjgridwrap { overflow: auto; padding: 0 12px 12px; }
+  .prjtable { font-size: 13px; margin: 0; --bs-table-bg: transparent; }
+  .prjtable th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .prjtable td { vertical-align: middle; }
+  .prjtable .pn { font-weight: 600; white-space: nowrap; }
+  .prjtable .pd { color: var(--muted); max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prjtable .num { text-align: right; } .prjtable .dt { white-space: nowrap; color: var(--muted); }
+  .prjtable td.act { width: 1%; white-space: nowrap; }
+  .prjtable .empty { color: var(--muted); padding: 14px; }
   ul.list.prjlist li { display: flex; align-items: center; gap: 10px; }
   ul.list.prjlist li .btn, ul.list.prjlinks li .btn { display: inline-block; }
   .prjlist .pn { font-weight: 600; }
@@ -543,13 +564,14 @@
   .prjfoldbar[hidden] { display: none; }
   .prjquery.fold-sql .prjedwrap, .prjquery.fold-diag .prjdiag, .prjquery.fold-prog .prjprogbody,
   .prjquery.fold-query .prjqmeta, .prjquery.fold-query .prjsplit, .prjquery.fold-cols .prjdesign,
-  .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .prjpager, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
+  .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .pager, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
   .prjquery.fold-res .prjres { flex: 0 0 auto; min-height: 0; }
-  .prjpager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 2px 0; }
-  .prjpager[hidden] { display: none; }
-  .prjpager select { width: auto; }
-  .prjpager #prjPageNo { width: 80px; display: inline-block; }
-  .prjpager .info { color: var(--muted); font-size: 12px; }
+  .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 3px 0; }
+  .pager[hidden] { display: none !important; }
+  .pager label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+  .pager select { width: auto; }
+  .pager [data-pg=no] { width: 80px; display: inline-block; }
+  .pager .pginfo { color: var(--muted); font-size: 12px; }
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
   .prjresbar .info { font-size: 12px; color: var(--muted); }
   .prjexpnote { font-size: 12px; }
@@ -793,7 +815,7 @@
   .exportnote { padding: 6px 16px; font-size: 12px; background: var(--accent-soft); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
   .exportnote code { font-family: var(--mono); }
   .exportnote a:not(.btn) { color: var(--accent); font-weight: 600; }
-  .grid { grid-row: 4; overflow: auto; min-height: 0; background: var(--panel); }
+  .grid { grid-row: 5; overflow: auto; min-height: 0; background: var(--panel); }
   table { border-collapse: separate; border-spacing: 0; font-size: 13px; }
   th, td { padding: 5px 10px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
   th {
@@ -1453,8 +1475,11 @@
         </aside>
       </div>
       <div class="toolbar">
-        <button class="btn btn-primary" id="runBtn" disabled><i class="bi bi-play-fill" aria-hidden="true"></i> Run <small>(Ctrl+Enter)</small></button>
-        <button class="btn btn-outline-secondary" id="saveQueryBtn" disabled title="Save this query for the connection"><i class="bi bi-floppy" aria-hidden="true"></i> Save query</button>
+        <span class="iconbtns">
+        <button class="btn btn-primary" id="runBtn" disabled title="Run the query (Ctrl+Enter)" aria-label="Run the query"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+        <button class="btn btn-outline-secondary" id="refreshBtn" disabled title="Refresh: run the query of the result again, for the rows as they are now" aria-label="Refresh the result"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
+        <button class="btn btn-outline-secondary" id="saveQueryBtn" disabled title="Save this query for the connection" aria-label="Save the query"><i class="bi bi-floppy" aria-hidden="true"></i></button>
+        </span>
         <div class="group">
           <span>Show</span>
           <select class="form-select form-select-sm" id="limit">
@@ -1469,10 +1494,12 @@
         <div class="spacer"></div>
         <div class="group">
           <span>Export all rows to folder</span>
-          <button data-fmt="xlsx" class="btn btn-outline-secondary exp" disabled>Excel</button>
-          <button data-fmt="json" class="btn btn-outline-secondary exp" disabled>JSON</button>
-          <button data-fmt="xml" class="btn btn-outline-secondary exp" disabled>XML</button>
-          <button data-fmt="csv" class="btn btn-outline-secondary exp" disabled>CSV</button>
+          <span class="prjexpicons">
+          <button data-fmt="xlsx" class="btn btn-sm btn-link exp-icon exp" disabled title="Export every row to Excel" aria-label="Export to Excel"><i class="bi bi-filetype-xlsx fmt-xlsx" aria-hidden="true"></i></button>
+          <button data-fmt="csv" class="btn btn-sm btn-link exp-icon exp" disabled title="Export every row to CSV" aria-label="Export to CSV"><i class="bi bi-filetype-csv fmt-csv" aria-hidden="true"></i></button>
+          <button data-fmt="json" class="btn btn-sm btn-link exp-icon exp" disabled title="Export every row to JSON" aria-label="Export to JSON"><i class="bi bi-filetype-json fmt-json" aria-hidden="true"></i></button>
+          <button data-fmt="xml" class="btn btn-sm btn-link exp-icon exp" disabled title="Export every row to XML" aria-label="Export to XML"><i class="bi bi-filetype-xml fmt-xml" aria-hidden="true"></i></button>
+          </span>
         </div>
       </div>
       <div class="overall" id="overall" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Export progress">
@@ -1482,9 +1509,11 @@
     </div>
     <div class="info" id="info"></div>
     <div class="exportnote" id="exportNote" hidden></div>
+    <div data-pager-slot="data"></div>
     <div class="grid" id="grid">
       <div class="emptymsg"><div><div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div><p>Connect to a database, then pick a table on the left.</p></div></div>
     </div>
+    <div data-pager-slot="data"></div>
     </div>
     <div class="pane" id="queriesPane" hidden>
       <div class="filesbar">
@@ -1592,7 +1621,7 @@
         </div>
         <div class="lginfo">A project links several saved connections (Firebird, MariaDB, SQL Server, PostgreSQL, Oracle…) under short
           aliases, and holds the tables you choose, to query them together with one SELECT. It only ever reads them.</div>
-        <ul class="list prjlist" id="prjList"></ul>
+        <div class="prjgridwrap"><table class="table table-sm table-hover prjtable" id="prjList"></table></div>
       </div>
       <div id="prjWork" hidden>
         <div class="prjbar">
@@ -1600,10 +1629,12 @@
           <span class="ronly" title="Nothing is ever written to a linked database: queries run on a private copy of the rows they need">Read-only</span>
           <div class="prjchips" id="prjChips" aria-label="Linked databases"></div>
           <span class="spacer"></span>
-          <button class="btn btn-sm btn-primary" id="prjSave" title="Save the project: name, linked databases, tables and limits"><i class="bi bi-floppy" aria-hidden="true"></i> Save</button>
-          <button class="btn btn-sm btn-outline-secondary" id="prjDup" title="Save a copy of this project under another name"><i class="bi bi-copy" aria-hidden="true"></i> Duplicate</button>
-          <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)"><i class="bi bi-trash" aria-hidden="true"></i> Delete</button>
-          <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases"><i class="bi bi-x-lg" aria-hidden="true"></i> Close</button>
+          <span class="iconbtns">
+          <button class="btn btn-sm btn-primary" id="prjSave" title="Save the project: name, linked databases, tables and limits" aria-label="Save the project"><i class="bi bi-floppy" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjDup" title="Duplicate: save a copy of this project under another name" aria-label="Duplicate the project"><i class="bi bi-copy" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)" aria-label="Delete the project"><i class="bi bi-trash" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases" aria-label="Close the project"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+          </span>
         </div>
         <details class="prjsetup" id="prjSetupWrap" open>
         <summary>Databases and tables <span class="cnt" id="prjSetupSum"></span></summary>
@@ -1708,21 +1739,9 @@
               </span>
             </div>
             <div class="prjexpnote" id="prjExpNote" hidden></div>
-            <div class="prjpager" id="prjPager" hidden>
-              <label class="flabel" for="prjPageSize">Rows per page</label>
-              <select class="form-select form-select-sm" id="prjPageSize"><option>100</option><option>200</option><option>400</option><option>800</option><option>1000</option><option>10000</option><option>30000</option><option value="0">All</option></select>
-              <span class="btn-group btn-group-sm" role="group" aria-label="Pages">
-                <button type="button" class="btn btn-outline-secondary" id="prjPageFirst" title="First page" aria-label="First page"><i class="bi bi-chevron-bar-left" aria-hidden="true"></i></button>
-                <button type="button" class="btn btn-outline-secondary" id="prjPagePrev" title="Previous page" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
-              </span>
-              <span>Page <input type="number" class="form-control form-control-sm" id="prjPageNo" min="1" value="1" aria-label="Page"> of <span id="prjPages">1</span></span>
-              <span class="btn-group btn-group-sm" role="group" aria-label="Pages">
-                <button type="button" class="btn btn-outline-secondary" id="prjPageNext" title="Next page" aria-label="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
-                <button type="button" class="btn btn-outline-secondary" id="prjPageLast" title="Last page" aria-label="Last page"><i class="bi bi-chevron-bar-right" aria-hidden="true"></i></button>
-              </span>
-              <span class="info" id="prjPageInfo"></span>
-            </div>
+            <div data-pager-slot="prj"></div>
             <div class="prjgrid" id="prjGrid"></div>
+            <div data-pager-slot="prj"></div>
           </div>
         </div>
       </div>
@@ -4950,10 +4969,18 @@ async function prjShow() {
   if (prj.open) { prjRender(); return; }
   prjMark();
   const name = (id) => ((state.saved || []).find((c) => c.id === id) || { name: "deleted connection" }).name;
-  $("prjList").innerHTML = prj.list.length ? prj.list.map((p) => `<li><span class="pn">${esc(p.name)}</span>
-     <span class="pd">${p.connIds.length ? esc(p.connIds.map(name).join(" · ")) : "no databases linked yet"}</span>
-     <button type="button" class="btn btn-sm btn-primary" data-prjopen="${p.id}" title="Open the project: connect its databases">Open</button></li>`).join("")
-    : `<li class="empty">No projects yet: give one a name above and click New project.</li>`;
+  // A grid: Open first, the name, its databases, queries and dates, then edit, duplicate and delete.
+  const ib = (act, id, icon, t, cls = "btn-outline-secondary") => `<button type="button" class="btn btn-sm ${cls}" data-prjact="${act}" data-id="${id}" title="${t}" aria-label="${t}"><i class="bi ${icon}" aria-hidden="true"></i></button>`;
+  $("prjList").innerHTML = `<thead><tr><th></th><th>Project</th><th>Databases linked</th><th class="num">Queries</th><th>Created</th><th>Changed</th><th></th></tr></thead><tbody>` +
+    (prj.list.length ? prj.list.map((p) => `<tr data-id="${p.id}">
+      <td class="act">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}</td>
+      <td class="pn">${esc(p.name)}</td>
+      <td class="pd" title="${esc(p.connIds.map(name).join("\n"))}"><span class="badge rounded-pill text-bg-secondary">${p.connIds.length}</span> ${p.connIds.length ? esc(p.connIds.map(name).join(" · ")) : `<span class="muted">none yet</span>`}</td>
+      <td class="num">${(p.queries || 0).toLocaleString()}</td>
+      <td class="dt">${esc(fmtDate(p.created || ""))}</td>
+      <td class="dt">${esc(fmtDate(p.updated || ""))}</td>
+      <td class="act"><span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></td></tr>`).join("")
+    : `<tr><td colspan="7" class="empty">No projects yet: give one a name above and click New project.</td></tr>`) + `</tbody>`;
 }
 
 // prjWithPasswords calls fn with the passwords of the project's connections:
@@ -5185,7 +5212,17 @@ $("prjNewBtn").addEventListener("click", async () => {
   } catch (e) { toast(e.message, true); }
 });
 $("prjNewName").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); $("prjNewBtn").click(); } });
-$("prjList").addEventListener("click", (ev) => { const b = ev.target.closest("[data-prjopen]"); if (b) prjOpen(+b.dataset.prjopen); });
+// Edit, duplicate and delete work on an open project (its databases' passwords open it): open it, then act.
+$("prjList").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-prjact]");
+  if (!b) return;
+  const id = +b.dataset.id;
+  await prjOpen(id);
+  if (!prj.open || prj.open.id !== id) return;
+  if (b.dataset.prjact === "edit") { $("prjSetupWrap").open = true; $("prjName").focus(); $("prjName").select(); }
+  else if (b.dataset.prjact === "dup") $("prjDup").click();
+  else if (b.dataset.prjact === "del") $("prjDel").click();
+});
 $("prjName").addEventListener("input", () => { prj.open.name = $("prjName").value; prjMark(); });
 $("prjDesc").addEventListener("input", () => { prj.open.description = $("prjDesc").value; prjMark(); });
 for (const [id, k] of [["prjMaxRows", "maxRows"], ["prjMaxMB", "maxMB"], ["prjTimeout", "timeoutSec"]])
@@ -5295,35 +5332,70 @@ function prjSetExport() {
   const ok = !!prj.result && !prj.running && prj.ran === $("prjSql").value.trim().replace(/;\s*$/, "").trim();
   document.querySelectorAll(".pexp").forEach((b) => (b.disabled = !ok));
 }
-// The grid shows a page of the result: rows per page from Rows per page (All: every row,
-// drawn GRID_PAGE at a time), with first/previous/next/last and a page number.
-const PRJ_PAGE_KEY = "cactusdb.prjPageSize";
-try { const v = localStorage.getItem(PRJ_PAGE_KEY); if (v && [...$("prjPageSize").options].some((o) => o.value === v)) $("prjPageSize").value = v; } catch (e) { /* the default */ }
-prj.page = 0;
-function prjRenderGrid() {
-  const res = prj.result, size = +$("prjPageSize").value, pager = $("prjPager");
-  if (!res || !res.columns.length) { $("prjGrid").innerHTML = res ? `<div class="emptymsg"><p>No columns.</p></div>` : ""; pager.hidden = true; return; }
-  const n = res.rows.length, pages = size ? Math.max(1, Math.ceil(n / size)) : 1;
-  prj.page = Math.min(Math.max(0, prj.page), pages - 1);
-  $("prjGrid").innerHTML = size ? gridHtml(res, prj.sort, 0, { from: prj.page * size, size }) : gridHtml(res, prj.sort, prj.shown);
-  pager.hidden = false;
-  const from = size ? prj.page * size : 0, to = size ? Math.min(n, from + size) : n;
-  $("prjPageNo").value = prj.page + 1; $("prjPageNo").max = pages; $("prjPages").textContent = pages.toLocaleString();
-  $("prjPageInfo").textContent = !n ? "no rows" : size ? `rows ${(from + 1).toLocaleString()}–${to.toLocaleString()} of ${n.toLocaleString()}` : `all ${n.toLocaleString()} row${n === 1 ? "" : "s"}`;
-  $("prjPageFirst").disabled = $("prjPagePrev").disabled = !size || prj.page === 0;
-  $("prjPageNext").disabled = $("prjPageLast").disabled = !size || prj.page >= pages - 1;
-  $("prjPageNo").disabled = !size || pages === 1;
+// ---- pages of a grid (the Data tab's and the query builder's) ----
+// A pager shows one page of a result: rows per page (All: every row, drawn
+// GRID_PAGE at a time), first/previous/next/last and a page number. Each grid
+// has one above it and one under it; the size is remembered in the browser.
+const PAGE_SIZES = [100, 200, 400, 800, 1000, 10000, 30000, 0];
+const pagers = {};
+function pagerHtml(key) {
+  const btn = (k, icon, t) => `<button type="button" class="btn btn-outline-secondary" data-pg="${k}" title="${t}" aria-label="${t}"><i class="bi ${icon}" aria-hidden="true"></i></button>`;
+  return `<div class="pager" data-pager="${key}" hidden>
+    <label class="flabel">Rows per page <select class="form-select form-select-sm" data-pg="size" aria-label="Rows per page">${PAGE_SIZES.map((n) => `<option value="${n}">${n ? n : "All"}</option>`).join("")}</select></label>
+    <span class="btn-group btn-group-sm" role="group" aria-label="Pages">${btn("first", "bi-chevron-bar-left", "First page")}${btn("prev", "bi-chevron-left", "Previous page")}</span>
+    <span>Page <input type="number" class="form-control form-control-sm" data-pg="no" min="1" value="1" aria-label="Page"> of <span data-pg="pages">1</span></span>
+    <span class="btn-group btn-group-sm" role="group" aria-label="Pages">${btn("next", "bi-chevron-right", "Next page")}${btn("last", "bi-chevron-bar-right", "Last page")}</span>
+    <span class="pginfo" data-pg="info"></span></div>`;
 }
-function prjGoPage(p) { prj.page = p; prjRenderGrid(); $("prjGrid").scrollTop = 0; }
-$("prjPageFirst").addEventListener("click", () => prjGoPage(0));
-$("prjPagePrev").addEventListener("click", () => prjGoPage(prj.page - 1));
-$("prjPageNext").addEventListener("click", () => prjGoPage(prj.page + 1));
-$("prjPageLast").addEventListener("click", () => prjGoPage(Infinity));
-$("prjPageNo").addEventListener("change", () => prjGoPage((+$("prjPageNo").value || 1) - 1));
-$("prjPageSize").addEventListener("change", () => {
-  try { localStorage.setItem(PRJ_PAGE_KEY, $("prjPageSize").value); } catch (e) { /* not remembered */ }
-  prj.shown = GRID_PAGE; prjGoPage(0);
+// pagerInit puts the pagers of a grid in place of its [data-pager-slot] elements.
+function pagerInit(key, sizeKey, rows, render) {
+  let size = 100;
+  try { const v = localStorage.getItem(sizeKey); if (v !== null && PAGE_SIZES.includes(+v)) size = +v; } catch (e) { /* the default */ }
+  pagers[key] = { page: 0, size, sizeKey, rows, render };
+  document.querySelectorAll(`[data-pager-slot="${key}"]`).forEach((el) => { el.outerHTML = pagerHtml(key); });
+}
+function pagerRange(key) {
+  const p = pagers[key], n = p.rows(), pages = p.size ? Math.max(1, Math.ceil(n / p.size)) : 1;
+  p.page = Math.min(Math.max(0, p.page), pages - 1);
+  return { from: p.size ? p.page * p.size : 0, size: p.size, pages, n };
+}
+function pagerShow(key, on) {
+  const p = pagers[key], r = on && pagerRange(key);
+  document.querySelectorAll(`.pager[data-pager="${key}"]`).forEach((el) => {
+    el.hidden = !on;
+    if (!on) return;
+    const q = (k) => el.querySelector(`[data-pg="${k}"]`), to = p.size ? Math.min(r.n, r.from + p.size) : r.n;
+    q("size").value = String(p.size); q("no").value = p.page + 1; q("no").max = r.pages; q("pages").textContent = r.pages.toLocaleString();
+    q("info").textContent = !r.n ? "no rows" : p.size ? `rows ${(r.from + 1).toLocaleString()}–${to.toLocaleString()} of ${r.n.toLocaleString()}` : `all ${r.n.toLocaleString()} row${r.n === 1 ? "" : "s"}`;
+    q("first").disabled = q("prev").disabled = !p.size || p.page === 0;
+    q("next").disabled = q("last").disabled = !p.size || p.page >= r.pages - 1;
+    q("no").disabled = !p.size || r.pages === 1;
+  });
+}
+function pagerGo(key, page) { pagers[key].page = page; pagers[key].render(true); }
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest && ev.target.closest(".pager button[data-pg]");
+  if (!b) return;
+  const key = b.closest(".pager").dataset.pager, p = pagers[key], k = b.dataset.pg;
+  pagerGo(key, k === "first" ? 0 : k === "prev" ? p.page - 1 : k === "next" ? p.page + 1 : Infinity);
 });
+document.addEventListener("change", (ev) => {
+  const t = ev.target.closest && ev.target.closest(".pager [data-pg]");
+  if (!t) return;
+  const key = t.closest(".pager").dataset.pager, p = pagers[key];
+  if (t.dataset.pg === "size") { p.size = +t.value; try { localStorage.setItem(p.sizeKey, t.value); } catch (e) { /* not remembered */ } pagerGo(key, 0); }
+  else if (t.dataset.pg === "no") pagerGo(key, (+t.value || 1) - 1);
+});
+// The query builder's grid.
+function prjRenderGrid(top) {
+  const res = prj.result;
+  if (!res || !res.columns.length) { $("prjGrid").innerHTML = res ? `<div class="emptymsg"><p>No columns.</p></div>` : ""; pagerShow("prj", false); return; }
+  const r = pagerRange("prj");
+  $("prjGrid").innerHTML = r.size ? gridHtml(res, prj.sort, 0, { from: r.from, size: r.size }) : gridHtml(res, prj.sort, prj.shown);
+  pagerShow("prj", true);
+  if (top) $("prjGrid").scrollTop = 0;
+}
+pagerInit("prj", "cactusdb.prjPageSize", () => (prj.result ? prj.result.rows.length : 0), prjRenderGrid);
 function prjProgress(st) {
   const p = $("prjProg");
   const rows = (st.tables || []).map((t) => `<div>${t.done ? "✓" : "…"} <b>${esc(t.alias)}.${esc(t.name)}</b>: ${t.rows.toLocaleString()} row${t.rows === 1 ? "" : "s"} read, ${t.columns} column${t.columns === 1 ? "" : "s"}` +
@@ -5363,7 +5435,7 @@ async function prjRun(limit) {
   prjProgress(st);
   if (st.state === "done") {
     const res = st.result;
-    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; prj.page = 0; prj.ran = res.sql;
+    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; pagers.prj.page = 0; prj.ran = res.sql;
     const n = res.rows.length, tot = res.total ?? n;
     $("prjInfo").textContent = (tot > n ? `${n.toLocaleString()} of ${res.totalMore ? "more than " : ""}${tot.toLocaleString()} rows shown (limited to ${res.limit.toLocaleString()} – exports hold every row)` : `${n.toLocaleString()} row${n === 1 ? "" : "s"}`) +
       ` · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"} · query ${res.elapsedMs} ms`;
@@ -5398,7 +5470,7 @@ $("prjGrid").addEventListener("click", (ev) => {
   if (!th || !prj.result) return;
   const col = +th.dataset.col;
   prj.sort = prj.sort && prj.sort.col === col ? (prj.sort.dir > 0 ? { col, dir: -1 } : null) : { col, dir: 1 };
-  prj.page = 0; prjRenderGrid();
+  pagers.prj.page = 0; prjRenderGrid(true);
 });
 document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", async () => {
   const fmt = b.dataset.pfmt;
@@ -7106,7 +7178,7 @@ async function connect(extra = {}) {
     $("sql").placeholder = eng.queryHint || sqlHint;
     $("sqSqlHint").textContent = eng.language && eng.language !== "SQL" ? `read-only ${eng.language}` : "read-only: SELECT, WITH, SHOW, EXPLAIN…";
     setExportAllEnabled(true);
-    $("runBtn").disabled = false; $("saveQueryBtn").disabled = false;
+    $("runBtn").disabled = false; $("refreshBtn").disabled = false; $("saveQueryBtn").disabled = false;
     $("queriesTab").hidden = false;
     state.objTab = "table";
     renderObjects();
@@ -7155,7 +7227,7 @@ async function disconnect(reason = "") {
   $("engineBadge").hidden = true;
   dashReset(false);
   relReset(); qaReset(); fddlReset();
-  $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("saveQueryBtn").disabled = true;
+  $("disconnectBtn").hidden = true; $("reconnectBtn").hidden = true; $("runBtn").disabled = true; $("refreshBtn").disabled = true; $("saveQueryBtn").disabled = true;
   $("queriesTab").hidden = true;
   $("objFilter").disabled = true; $("refreshBtn").disabled = true; $("ddlBtn").disabled = true; $("backupBtn").disabled = true; setExportAllEnabled(false); $("objCount").textContent = "";
   renderHome();
@@ -8360,16 +8432,21 @@ async function run() {
   const sql = $("sql").value.trim();
   if (!sql) return;
   setInfo("Running…");
-  $("runBtn").disabled = true;
+  $("runBtn").disabled = $("refreshBtn").disabled = true;
   const current = gridNow();
   try {
     const res = await api("POST", "/api/query", { session: state.session, sql, limit: +$("limit").value });
     if (current()) showResult(res);
   } catch (e) {
     if (current()) setInfo(e.message, true);
-  } finally { $("runBtn").disabled = !state.session; }
+  } finally { $("runBtn").disabled = $("refreshBtn").disabled = !state.session; }
 }
 $("runBtn").addEventListener("click", run);
+// Refresh runs the query that made the result again (the editor may hold another by now).
+$("refreshBtn").addEventListener("click", () => {
+  if (state.result && state.result.sql && $("sql").value.trim() !== state.result.sql.trim()) $("sql").value = state.result.sql;
+  run();
+});
 $("sql").addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); }
 });
@@ -8834,7 +8911,7 @@ async function runWithOverall(label, fn, summary) {
 
 function showResult(res) {
   closeExportPanel(false);
-  state.result = res; state.sort = null; state.gridShown = GRID_PAGE;
+  state.result = res; state.sort = null; state.gridShown = GRID_PAGE; pagers.data.page = 0;
   const n = res.rows.length;
   setInfo(`${n.toLocaleString()} row${n === 1 ? "" : "s"}` +
     (res.truncated ? ` shown (limited to ${res.limit.toLocaleString()} – exports include all rows)` : "") +
@@ -8845,7 +8922,7 @@ function showResult(res) {
 
 function clearGrid(msg, scene = false) {
   closeExportPanel(false);
-  state.result = null;
+  state.result = null; pagerShow("data", false);
   $("dataPane").classList.remove("offline");
   $("grid").innerHTML = `<div class="emptymsg"><div>${scene ? pickTableScene() : `<div class="big"><img src="cactusdb.svg" alt="" width="64" height="64"></div>`}<p>${esc(msg)}</p></div></div>`;
 }
@@ -8967,11 +9044,15 @@ function showNoConnection() {
 // The grid draws GRID_PAGE rows at a time: 100,000 rows as one table would
 // freeze the page. Show more adds the next ones; sorting sorts them all.
 const GRID_PAGE = 2000;
-function renderGrid() {
+function renderGrid(top) {
   const res = state.result;
   if (!res.columns.length) { clearGrid("Statement executed. No result set returned."); return; }
-  $("grid").innerHTML = gridHtml(res, state.sort, state.gridShown || GRID_PAGE);
+  const r = pagerRange("data");
+  $("grid").innerHTML = r.size ? gridHtml(res, state.sort, 0, { from: r.from, size: r.size }) : gridHtml(res, state.sort, state.gridShown || GRID_PAGE);
+  pagerShow("data", true);
+  if (top) $("grid").scrollTop = 0;
 }
+pagerInit("data", "cactusdb.dataPageSize", () => (state.result ? state.result.rows.length : 0), renderGrid);
 // gridHtml is the table of a result, sorted, with its first shown rows and a
 // button for more (the Data tab's grid and the Projects pane's); with page
 // ({from, size}) it is that page of the sorted rows instead.
@@ -9012,7 +9093,7 @@ $("grid").addEventListener("click", (ev) => {
   state.sort = state.sort && state.sort.col === col
     ? (state.sort.dir > 0 ? { col, dir: -1 } : null)
     : { col, dir: 1 };
-  renderGrid();
+  pagers.data.page = 0; renderGrid(true);
 });
 
 // ---- export --------------------------------------------------------------
@@ -9024,7 +9105,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
   const fmt = b.dataset.fmt;
   const sql = (state.result && state.result.sql) || $("sql").value;
   const name = (state.result && state.result.table) || "query";
-  b.disabled = true; const label = b.textContent; b.textContent = "…";
+  b.disabled = true; const label = b.innerHTML; b.innerHTML = `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>`;
   try {
     const res = await runWithOverall(`Exporting all rows of ${name} as ${fmt === "xlsx" ? "Excel" : fmt.toUpperCase()}`,
       () => api("POST", "/api/export", { session: state.session, sql, format: fmt, name }),
@@ -9033,7 +9114,7 @@ document.querySelectorAll(".exp").forEach((b) => b.addEventListener("click", asy
     $("exportNote").hidden = false;
     toast("Saved " + res.file);
   } catch (e) { toast("Export failed: " + e.message, true); }
-  finally { b.disabled = !state.result || !state.session; b.textContent = label; }
+  finally { b.disabled = !state.result || !state.session; b.innerHTML = label; }
 }));
 
 $("ddlBtn").addEventListener("click", async () => {

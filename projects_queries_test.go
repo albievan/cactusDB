@@ -19,6 +19,9 @@ func TestProjectQueries(t *testing.T) {
 	if err != nil || v != 1 {
 		t.Fatalf("save: %d %v", v, err)
 	}
+	if list, err := st.Projects(); err != nil || len(list) != 1 || list[0].Queries != 1 || list[0].Created == "" {
+		t.Errorf("the list counts the saved query: %+v %v", list, err)
+	}
 	// A layout-only change makes no version; a changed SQL does.
 	if _, v, _ := st.SaveProjectQuery(pid, key, ProjectQuery{ID: id, projectQueryData: projectQueryData{Name: "Open orders", SQL: "SELECT * FROM maria.orders", Layout: json.RawMessage(`{}`)}}); v != 1 {
 		t.Errorf("layout-only save made version %d", v)

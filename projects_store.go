@@ -78,7 +78,9 @@ type ProjectSummary struct {
 	ID      int64   `json:"id"`
 	Name    string  `json:"name"`
 	ConnIDs []int64 `json:"connIds"`
+	Created string  `json:"created"`
 	Updated string  `json:"updated"`
+	Queries int     `json:"queries"` // saved queries
 }
 
 var errProjectName = errors.New("a project with this name exists already")
@@ -197,9 +199,10 @@ func projectBox(key []byte) *secretBox {
 
 // ---- projects -----------------------------------------------------------------
 
-// Projects lists the projects (names only: no password needed).
+// Projects lists the projects: names, linked connection ids, dates and how
+// many saved queries (no password needed).
 func (s *Store) Projects() ([]ProjectSummary, error) {
-	rows, err := s.DB().Query(`SELECT id, name, updated_at FROM projects`)
+	rows, err := s.DB().Query(`SELECT p.id, p.name, p.created_at, p.updated_at, (SELECT COUNT(*) FROM project_queries q WHERE q.project_id = p.id) FROM projects p`)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +210,7 @@ func (s *Store) Projects() ([]ProjectSummary, error) {
 	for rows.Next() {
 		var p ProjectSummary
 		var name string
-		if err := rows.Scan(&p.ID, &name, &p.Updated); err != nil {
+		if err := rows.Scan(&p.ID, &name, &p.Created, &p.Updated, &p.Queries); err != nil {
 			rows.Close()
 			return nil, err
 		}

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.62.13 — 2026-11-15
+
+- The tabs look more modern: plain text, a soft background on hover and an accent bar
+  under the open one.
+- Data tab: the grid shows its rows a page at a time, with a pager above and under it
+  (rows per page 100 … 30000 or All, first/previous/next/last, a page number), as the
+  advanced query builder's, which now has one under its grid too.
+- Data tab: a **Refresh** button beside Run runs the query of the result again; Run, Refresh
+  and Save query are icon buttons, and the export buttons are the coloured file icons.
+- Advanced query builder: the projects are a grid: Open first, the name, the databases
+  linked, the number of saved queries, created and changed, and edit, duplicate and delete
+  buttons; the open project's Save, Duplicate, Delete and Close are icon buttons.
+
 ## 1.62.12 — 2026-11-15
 
 - Advanced query builder: functions **Title Case** (Each Word Capitalised) and
