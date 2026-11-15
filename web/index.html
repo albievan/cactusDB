@@ -471,6 +471,8 @@
   .pq-line:hover, .pq-edge:focus .pq-line { stroke: var(--accent, #2f6f4f); stroke-width: 2.6; }
   .pq-edge:focus { outline: none; }
   .pq-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; }
+  .pq-more { font: 11px var(--sans, system-ui); fill: var(--accent, #2f6f4f); cursor: pointer; }
+  .pq-more:hover { text-decoration: underline; }
   .pq-lbl { font: 10px var(--sans, system-ui); fill: var(--muted, #555); paint-order: stroke; stroke: var(--bg, #fff); stroke-width: 3px; }
   .pq-drag { stroke: var(--accent, #2f6f4f); stroke-width: 2; stroke-dasharray: 4 3; fill: none; pointer-events: none; }
   .prjdesign { overflow: auto; max-height: 230px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
@@ -493,6 +495,14 @@
   #prjSideList .tb:hover, #prjSideList .tb:focus { background: var(--row-hover); outline: none; }
   .prjprog { font-size: 12px; display: grid; gap: 2px; }
   .prjprog .bad { color: var(--danger, #c0392b); white-space: pre-wrap; }
+  .prjfold { border: 0; background: none; padding: 0 2px; cursor: pointer; color: inherit; }
+  .prjfold .bi { display: inline-block; font-size: 11px; transition: transform .15s; }
+  .prjfold[aria-expanded=false] .bi { transform: rotate(-90deg); }
+  .prjfold:hover { color: var(--accent, #2f6f4f); }
+  .prjfoldbar[hidden] { display: none; }
+  .prjquery.fold-query .prjqmeta, .prjquery.fold-query .prjsplit, .prjquery.fold-cols .prjdesign,
+  .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
+  .prjquery.fold-res .prjres { flex: 0 0 auto; min-height: 0; }
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
   .prjresbar .info { font-size: 12px; color: var(--muted); }
   .prjexpnote { font-size: 12px; }
@@ -1578,7 +1588,7 @@
         </details>
         <div class="prjquery">
           <div class="prjqbar">
-            <span class="flabel">Query</span>
+            <button type="button" class="prjfold flabel" data-fold="query" aria-expanded="true" aria-controls="prjQMeta prjSplit" title="Show or hide the SQL and the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Query</button>
             <select class="form-select form-select-sm" id="prjQSel" aria-label="Saved query of the project" title="The project's saved queries"><option value="">New query (not saved)</option></select>
             <select class="form-select form-select-sm" id="prjQVers" hidden aria-label="Version" title="Every save of the query is kept: pick one to put it in the editor"></select>
             <button class="btn btn-sm btn-outline-secondary" id="prjQSave" title="Save the query (and its diagram) in the project">Save</button>
@@ -1592,7 +1602,7 @@
             <button class="btn btn-sm btn-primary" id="prjRun" title="Read the rows the query needs from each database, then run it (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button>
             <button class="btn btn-sm btn-outline-danger" id="prjCancel" hidden title="Stop reading and remove the copies"><i class="bi bi-stop-fill" aria-hidden="true"></i> Cancel</button>
           </div>
-          <div class="prjqmeta">
+          <div class="prjqmeta" id="prjQMeta">
             <input class="form-control form-control-sm" id="prjQName" maxlength="100" placeholder="Name (to save it)" spellcheck="false" autocomplete="off" aria-label="Name of the query">
             <input class="form-control form-control-sm" id="prjQDesc" maxlength="1000" placeholder="Description" aria-label="Description of the query">
             <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
@@ -1620,10 +1630,12 @@
               <div class="prjdbody" id="prjDiagBody" tabindex="-1" aria-label="Query diagram: Tab to a table or join; arrow keys move a table, Delete removes it, Enter opens its joins"></div>
             </div>
           </div>
+          <div class="prjfoldbar" id="prjDesignBar"><button type="button" class="prjfold flabel" data-fold="cols" aria-expanded="true" aria-controls="prjDesign" title="Show or hide the column definitions: output columns, totals, grouping, sorting and filters"><i class="bi bi-chevron-down" aria-hidden="true"></i> Column definitions</button></div>
           <div class="prjdesign" id="prjDesign"></div>
           <div class="prjprog" id="prjProg" hidden></div>
           <div class="prjres">
             <div class="prjresbar">
+              <button type="button" class="prjfold flabel" data-fold="res" aria-expanded="true" aria-controls="prjExpNote prjGrid" title="Show or hide the results and the export buttons"><i class="bi bi-chevron-down" aria-hidden="true"></i> Results and export</button>
               <span class="info" id="prjInfo"></span>
               <span class="spacer"></span>
               <span class="flabel">Export</span>
@@ -2349,8 +2361,8 @@
     <h3 id="prjJoinTitle">Join tables</h3>
     <div class="prjjrow">
       <select class="form-select form-select-sm" id="prjJA" aria-label="First table"></select>
-      <select class="form-select form-select-sm" id="prjJType" aria-label="Type of join" title="INNER: rows with a match in both · LEFT: every row of the first · RIGHT: every row of the second · FULL: every row of both · CROSS: every pair">
-        <option>INNER</option><option>LEFT</option><option>RIGHT</option><option>FULL</option><option>CROSS</option></select>
+      <select class="form-select form-select-sm" id="prjJType" aria-label="Type of join" title="INNER: only rows with a match in both · LEFT OUTER: every row of the table on the left, with the right one's columns empty where nothing matches · RIGHT OUTER: every row of the table on the right · FULL OUTER: every row of both · CROSS: every pair">
+        <option value="INNER">INNER</option><option value="LEFT">LEFT OUTER</option><option value="RIGHT">RIGHT OUTER</option><option value="FULL">FULL OUTER</option><option value="CROSS">CROSS</option></select>
       <select class="form-select form-select-sm" id="prjJB" aria-label="Second table"></select>
     </div>
     <div id="prjJPairs"></div>
@@ -5354,9 +5366,9 @@ function pqParse(src) {
   m.tables.push(first);
   while (i < fromEnd) {
     let type = "INNER";
+    const words = [];
     if (tk[i].t === ",") { type = "CROSS"; i++; }
     else {
-      const words = [];
       while (i < fromEnd && ["left", "right", "full", "inner", "outer", "cross", "natural"].includes(tk[i].l)) words.push(tk[i++].l);
       if (!tk[i] || tk[i].l !== "join") return { ...m, readOnly: "its FROM has something the designer can't show" };
       i++;
@@ -5368,6 +5380,7 @@ function pqParse(src) {
     if (m.tables.some((t) => t.alias.toLowerCase() === item.alias.toLowerCase())) return { ...m, readOnly: `two tables have the alias ${item.alias}` };
     m.tables.push(item);
     const j = { type, on: [], extra: [] };
+    if (type !== "CROSS" && type !== "INNER" && words.includes("outer")) j.outer = true; // written LEFT OUTER JOIN: kept so
     m.joins[item.alias.toLowerCase()] = j;
     if (tk[i] && tk[i].l === "using") return { ...m, readOnly: "it uses JOIN … USING" };
     if (tk[i] && tk[i].l === "on") {
@@ -5474,7 +5487,7 @@ function pqSql(m) {
     const j = m.joins[t.alias.toLowerCase()] || { type: "CROSS", on: [], extra: [] };
     const conds = [...j.on.map((c) => `${pqIdent(c.a)}.${pqIdent(c.ac)} ${c.op} ${pqIdent(c.b)}.${pqIdent(c.bc)}`), ...j.extra];
     const type = j.type === "CROSS" && conds.length ? "INNER" : j.type;
-    out.push((type === "INNER" ? "JOIN" : type + " JOIN").padEnd(6) + " " + item + (conds.length && type !== "CROSS" ? " ON " + conds.join(" AND ") : ""));
+    out.push((type === "INNER" ? "JOIN" : type + (j.outer && type !== "CROSS" ? " OUTER" : "") + " JOIN").padEnd(6) + " " + item + (conds.length && type !== "CROSS" ? " ON " + conds.join(" AND ") : ""));
   });
   const rows = [];
   for (const f of m.fields) for (const c of f.crit) (rows[c.row] = rows[c.row] || []).push(`${col(f)} ${c.op}${c.op.startsWith("IS") ? "" : " " + c.value}`);
@@ -5665,7 +5678,7 @@ const pqMeasure = (s, bold) => { const c = pqMeasure.ctx || (pqMeasure.ctx = doc
 function pqDraw() {
   if (!prj.open) return;
   const on = $("prjQdOn").checked;
-  $("prjSplit").classList.toggle("nodiag", !on); $("prjDesign").hidden = !on;
+  $("prjSplit").classList.toggle("nodiag", !on); $("prjDesign").hidden = $("prjDesignBar").hidden = !on;
   pqSide();
   if (!on) return;
   const m = pqDisplay(), ro = !!m.readOnly;
@@ -5696,14 +5709,15 @@ function pqDraw() {
     const k = pqKey(t.alias), cols = pqColsOf(t) || [], pos = pq.layout[k] || (pq.layout[k] = pqFreeSpot());
     const used = new Set(m.fields.filter((f) => !f.expr && pqKey(f.table) === k && f.show && !f.agg).map((f) => pqKey(f.col)));
     const joined = new Set(Object.values(m.joins).flatMap((j) => j.on.flatMap((c) => [pqKey(c.a) === k ? pqKey(c.ac) : null, pqKey(c.b) === k ? pqKey(c.bc) : null])).filter(Boolean));
-    const shown = pos.collapsed ? [] : cols.slice(0, 60);
+    // Up to 60 columns, unless the table was expanded to show all of them.
+    const shown = pos.collapsed ? [] : pos.all ? cols : cols.slice(0, 60), extra = !pos.collapsed && cols.length > 60;
     const title = `${t.name}${pqKey(t.alias) !== pqKey(t.name) ? " " + t.alias : ""}`;
     const w = Math.max(150, pqMeasure(title, true) + 50, ...shown.map((c) => pqMeasure(c.name) + 40));
-    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0), cols: shown, used, joined, title, more: pos.collapsed ? 0 : Math.max(0, cols.length - 60) };
+    return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0) + (extra ? 16 : 0), cols: shown, used, joined, title, more: extra ? cols.length - 60 : 0, all: !!pos.all };
   });
   const byK = Object.fromEntries(nodes.map((n) => [n.k, n]));
   const rowY = (n, col) => { const i = n.cols.findIndex((c) => pqKey(c.name) === pqKey(col)); return i < 0 ? n.y + 16 : n.y + 34 + i * 16 + 8; };
-  let svg = "";
+  let svg = "", labels = "";
   for (const t of m.tables) {
     const j = m.joins[pqKey(t.alias)];
     if (!j) continue;
@@ -5712,15 +5726,19 @@ function pqDraw() {
       if (!A || !B) return;
       let [n1, c1, n2, c2] = A.x <= B.x ? [A, c.ac, B, c.bc] : [B, c.bc, A, c.ac];
       const y1 = rowY(n1, c1), y2 = rowY(n2, c2);
-      let d;
-      if (n1.x + n1.w + 20 < n2.x) { const mx = (n1.x + n1.w + n2.x) / 2; d = `M${n1.x + n1.w} ${y1}C${mx} ${y1} ${mx} ${y2} ${n2.x} ${y2}`; }
-      else { const xr = Math.max(n1.x + n1.w, n2.x + n2.w) + 30; d = `M${n1.x + n1.w} ${y1}C${xr} ${y1} ${xr} ${y2} ${n2.x + n2.w} ${y2}`; }
+      let d, lx; // lx: the middle of the curve, where its label goes
+      if (n1.x + n1.w + 20 < n2.x) { const mx = (n1.x + n1.w + n2.x) / 2; d = `M${n1.x + n1.w} ${y1}C${mx} ${y1} ${mx} ${y2} ${n2.x} ${y2}`; lx = mx; }
+      else { const xr = Math.max(n1.x + n1.w, n2.x + n2.w) + 30; d = `M${n1.x + n1.w} ${y1}C${xr} ${y1} ${xr} ${y2} ${n2.x + n2.w} ${y2}`; lx = (n1.x + n1.w + 6 * xr + n2.x + n2.w) / 8; }
       const badc = !pqComparable(pqKind(c.a, c.ac), pqKind(c.b, c.bc));
-      const lbl = (ci === 0 && j.type !== "INNER" ? j.type + " " : "") + (c.op !== "=" ? c.op : "");
+      // Label: the joined fields in the order the ON clause has them ("=" as an arrow).
+      const lbl = (ci === 0 && j.type !== "INNER" ? j.type + (j.outer ? " OUTER" : "") + " " : "") + (c.op === "=" ? `${c.ac} -> ${c.bc}` : `${c.a}.${c.ac} ${c.op} ${c.b}.${c.bc}`);
       svg += `<g class="pq-edge" tabindex="${ro ? -1 : 0}" data-ja="${esc(c.a)}" data-jb="${esc(c.b)}" data-ci="${ci}" data-jt="${esc(t.alias)}" role="button" aria-label="Join ${esc(c.a)}.${esc(c.ac)} ${esc(c.op)} ${esc(c.b)}.${esc(c.bc)}">` +
-        `<title>${esc(`${j.type} JOIN: ${c.a}.${c.ac} ${c.op} ${c.b}.${c.bc}`)}${badc ? " — different kinds of values" : ""}${ro ? "" : " (click to change, Delete removes)"}</title>` +
+        `<title>${esc(`${j.type}${j.type === "LEFT" || j.type === "RIGHT" || j.type === "FULL" ? " OUTER" : ""} JOIN: ${c.a}.${c.ac} ${c.op} ${c.b}.${c.bc}`)}${badc ? " — different kinds of values" : ""}${ro ? "" : " (click to change, Delete removes)"}</title>` +
         `<path class="pq-hit" d="${d}"/><path class="pq-line${badc ? " bad" : ""}" d="${d}"/>` +
-        (lbl ? `<text class="pq-lbl" x="${(n1.x + n1.w + n2.x) / 2}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${esc(lbl)}</text>` : "") + `</g>`;
+        `</g>`;
+      // The label goes in a layer above the tables, so a box never hides it; a click on it acts on the join.
+      labels += `<g class="pq-edge" tabindex="-1" aria-hidden="true" data-ja="${esc(c.a)}" data-jb="${esc(c.b)}" data-ci="${ci}" data-jt="${esc(t.alias)}">` +
+        `<text class="pq-lbl" x="${lx}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${esc(lbl)}</text></g>`;
     });
   }
   for (const n of nodes) {
@@ -5740,10 +5758,10 @@ function pqDraw() {
           `<rect class="pq-check" data-check="${esc(c.name)}" x="${n.x + 8}" y="${y + 3}" width="10" height="10" rx="2" fill="${on ? col : "none"}" stroke="${on ? col : "#999"}" pointer-events="all"><title>${on ? "Remove from" : "Add to"} the output</title></rect>` +
           `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}<title>${esc(c.name + " · " + (c.type || c.kind) + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
       }).join("") +
-      (n.more ? `<text class="pq-db" x="${n.x + 8}" y="${n.y + n.h - 2}">+${n.more} more</text>` : "") + `</g>`;
+      (n.more ? `<text class="pq-more" data-more="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>${n.all ? "Show the first 60 columns only" : "Show all the columns"}</title>${n.all ? "▴ show fewer" : `▾ +${n.more} more`}</text>` : "") + `</g>`;
   }
   const W = Math.max(...nodes.map((n) => n.x + n.w)) + 60, H = Math.max(...nodes.map((n) => n.y + n.h)) + 30;
-  $("prjDiagBody").innerHTML = `<svg id="pqSvg" width="${Math.ceil(W * pq.zoom)}" height="${Math.ceil(H * pq.zoom)}" viewBox="0 0 ${W} ${H}" data-ro="${ro ? 1 : 0}">${svg}</svg>`;
+  $("prjDiagBody").innerHTML = `<svg id="pqSvg" width="${Math.ceil(W * pq.zoom)}" height="${Math.ceil(H * pq.zoom)}" viewBox="0 0 ${W} ${H}" data-ro="${ro ? 1 : 0}">${svg}${labels}</svg>`;
   pqDesign();
 }
 const pqJoined = (m, a, b) => Object.values(m.joins).some((j) => j.on.some((c) => (pqKey(c.a) === pqKey(a) && pqKey(c.b) === pqKey(b)) || (pqKey(c.a) === pqKey(b) && pqKey(c.b) === pqKey(a))) || j.extra.length);
@@ -5755,7 +5773,7 @@ $("prjDiagBody").addEventListener("pointerdown", (ev) => {
   const svg = $("pqSvg");
   if (!svg || svg.dataset.ro === "1" || ev.button !== 0) return;
   const head = ev.target.closest("[data-head]"), colg = ev.target.closest("g[data-col]");
-  if (ev.target.closest("[data-check],[data-remove],[data-collapse]")) return;
+  if (ev.target.closest("[data-check],[data-remove],[data-collapse],[data-more]")) return;
   if (head) {
     const k = head.dataset.head, p = pqPoint(ev), pos = pq.layout[k];
     pqDrag = { kind: "move", k, dx: p.x - pos.x, dy: p.y - pos.y, moved: false };
@@ -5792,6 +5810,9 @@ $("prjDiagBody").addEventListener("pointerup", (ev) => {
 $("prjDiagBody").addEventListener("click", (ev) => {
   const t = ev.target;
   const chk = t.closest("[data-check]"), rm = t.closest("[data-remove]"), col = t.closest("[data-collapse]"), edge = t.closest(".pq-edge");
+  // All the columns or the first 60: only the view changes, so read-only SQL allows it too.
+  const more = t.closest("[data-more]");
+  if (more) { const p = pq.layout[more.dataset.more]; p.all = !p.all; pqDraw(); prjMark(); return; }
   if ($("pqSvg") && $("pqSvg").dataset.ro === "1") return;
   if (chk) { const g = chk.closest("g[data-col]"); const tb = pq.model.tables.find((x) => pqKey(x.alias) === g.dataset.k); pqToggleCol(tb.alias, g.dataset.col); }
   else if (rm) pqRemoveTable(rm.dataset.remove);
@@ -5853,13 +5874,26 @@ $("prjArrange").addEventListener("click", () => {
     const k = pqKey(t.alias), d = depth.get(k), cols = (pqColsOf(t) || []).length;
     rows[d] = rows[d] || 0;
     pq.layout[k] = { ...pq.layout[k], x: 10 + d * 230, y: 10 + rows[d] };
-    rows[d] += (pq.layout[k].collapsed ? 40 : 40 + Math.min(cols, 60) * 16) + 20;
+    rows[d] += (pq.layout[k].collapsed ? 40 : 40 + (pq.layout[k].all ? cols : Math.min(cols, 60)) * 16 + (cols > 60 ? 16 : 0)) + 20;
   }
   pqPush(); pqDraw(); prjMark();
 });
 $("prjUndo").addEventListener("click", () => pqUndo(-1));
 $("prjRedo").addEventListener("click", () => pqUndo(1));
 $("prjQdOn").addEventListener("change", pqDraw);
+// Fold the query, the column definitions or the results; remembered in this browser.
+const PRJ_FOLD_KEY = "cactusdb.prjFold";
+function prjFold(name, folded) {
+  document.querySelector(".prjquery").classList.toggle("fold-" + name, folded);
+  document.querySelector(`.prjfold[data-fold="${name}"]`).setAttribute("aria-expanded", String(!folded));
+}
+try { for (const n of JSON.parse(localStorage.getItem(PRJ_FOLD_KEY) || "[]")) if (["query", "cols", "res"].includes(n)) prjFold(n, true); } catch (e) { /* all open */ }
+document.querySelectorAll(".prjfold").forEach((b) => b.addEventListener("click", () => {
+  const name = b.dataset.fold;
+  prjFold(name, b.getAttribute("aria-expanded") === "true");
+  try { localStorage.setItem(PRJ_FOLD_KEY, JSON.stringify([...document.querySelectorAll('.prjfold[aria-expanded="false"]')].map((x) => x.dataset.fold))); } catch (e) { /* not remembered */ }
+  if (name === "query" && b.getAttribute("aria-expanded") === "true") pqDraw();
+}));
 $("projPane").addEventListener("keydown", (ev) => {
   if (!(ev.ctrlKey || ev.metaKey) || !prj.open || document.querySelector("dialog[open]")) return;
   const k = ev.key.toLowerCase();
@@ -5901,7 +5935,9 @@ function pqJoinDialog(a, b) {
     const A = $("prjJA").value, B = $("prjJB").value, later = m.tables[Math.max(ix(A), ix(B))], j = later && m.joins[pqKey(later.alias)];
     const pairs = j ? j.on.filter((c) => (pqKey(c.a) === pqKey(A) && pqKey(c.b) === pqKey(B)) || (pqKey(c.a) === pqKey(B) && pqKey(c.b) === pqKey(A)))
       .map((c) => pqKey(c.a) === pqKey(A) ? { ac: c.ac, op: c.op, bc: c.bc } : { ac: c.bc, op: c.op === "<" ? ">" : c.op === ">" ? "<" : c.op === "<=" ? ">=" : c.op === ">=" ? "<=" : c.op, bc: c.ac }) : [];
-    $("prjJType").value = j ? (j.type === "CROSS" && pairs.length ? "INNER" : j.type) : "INNER";
+    // LEFT/RIGHT as seen from the dialog: the SQL's left side is the earlier table, so they swap when A is the later one.
+    const t = j ? (j.type === "CROSS" && pairs.length ? "INNER" : j.type) : "INNER";
+    $("prjJType").value = ix(A) > ix(B) ? pqFlipJoin(t) : t;
     pqJoinPairs(pairs.length ? pairs : [{ ac: "", op: "=", bc: "" }]);
   };
   pq.joinLoad = load;
@@ -5929,14 +5965,19 @@ $("prjJPairs").addEventListener("change", pqJoinWarn);
 $("prjJPairs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-rm]"); if (b) { const p = pqJoinRead(); p.splice(+b.dataset.rm, 1); pqJoinPairs(p.length ? p : [{ ac: "", op: "=", bc: "" }]); } });
 $("prjJAdd").addEventListener("click", () => pqJoinPairs([...pqJoinRead(), { ac: "", op: "=", bc: "" }]));
 $("prjJCancel").addEventListener("click", () => $("prjJoinDialog").close());
+const pqFlipJoin = (t) => t === "LEFT" ? "RIGHT" : t === "RIGHT" ? "LEFT" : t;
 function pqJoinApply(pairs, type) {
   const m = pq.model, A = $("prjJA").value, B = $("prjJB").value;
   if (pqKey(A) === pqKey(B)) { toast("Choose two different tables", true); return false; }
   const ix = (q) => m.tables.findIndex((t) => pqKey(t.alias) === pqKey(q));
+  if (ix(A) > ix(B)) type = pqFlipJoin(type);
   const later = m.tables[Math.max(ix(A), ix(B))], j = m.joins[pqKey(later.alias)];
   j.on = j.on.filter((c) => !((pqKey(c.a) === pqKey(A) && pqKey(c.b) === pqKey(B)) || (pqKey(c.a) === pqKey(B) && pqKey(c.b) === pqKey(A))));
   for (const p of pairs) j.on.push({ a: A, ac: p.ac, op: p.op, b: B, bc: p.bc });
+  const was = j.type;
   j.type = type === "CROSS" ? (j.on.length ? "INNER" : "CROSS") : (j.on.length || j.extra.length ? type : "CROSS");
+  // An outer join chosen here is written LEFT/RIGHT/FULL OUTER JOIN; one typed as LEFT JOIN keeps its spelling.
+  if (j.type === "INNER" || j.type === "CROSS") delete j.outer; else if (j.type !== was) j.outer = true;
   if (type === "CROSS" && pairs.length) toast("A CROSS join has no columns: the pairs make it an INNER join");
   return true;
 }

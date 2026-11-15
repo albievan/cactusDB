@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.62.1 — 2026-11-15
+
+- **Projects**: the query designer's join lines are labelled with the columns they join
+  (`STK_NO -> inventory_no`, in the order of the `ON`); the labels sit above the tables
+  and a click on one opens the join.
+- **Projects**: the *Query*, *Column definitions* and *Results and export* sections fold
+  and unfold from their headings, remembered in the browser.
+- **Projects**: a table with more than 60 columns expands to show them all from *+N more*
+  under its columns (it no longer overlaps the last column).
+- **Projects**: the join dialog names the outer joins — *LEFT OUTER*, *RIGHT OUTER*,
+  *FULL OUTER* — and writes them as `LEFT OUTER JOIN` (a typed `OUTER` is kept, no longer
+  rewritten to `LEFT JOIN`). *LEFT OUTER* keeps every row of the first table chosen in the
+  dialog even when it comes later in the FROM (it was taken as the SQL's left side).
+
 ## 1.62.0 — 2026-11-14
 
 - **Projects** (☰ → Projects): link several saved connections of different types (e.g.

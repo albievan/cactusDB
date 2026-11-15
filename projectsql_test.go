@@ -184,3 +184,15 @@ func TestCheckProjectQuery(t *testing.T) {
 		}
 	}
 }
+
+// LEFT OUTER JOIN is LEFT JOIN: the table after it is on the nullable side and
+// gets nothing pushed down; the one before it still does.
+func TestProjectPushdownLeftOuter(t *testing.T) {
+	got := pushFor(t, `SELECT o.id FROM maria.orders o LEFT OUTER JOIN fb.customer c ON c.id = o.customer_id WHERE o.id = 7 AND c.id = 3`)
+	if len(got["fb.customer"]) != 0 {
+		t.Errorf("the nullable side of a LEFT OUTER JOIN got %+v", got["fb.customer"])
+	}
+	if len(got["maria.orders"]) != 1 {
+		t.Errorf("orders: %+v", got["maria.orders"])
+	}
+}

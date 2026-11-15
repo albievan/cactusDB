@@ -23,6 +23,7 @@ const editable = [
   'SELECT "Order Details".qty FROM maria."Order Details"',
   'SELECT COUNT(*) FROM maria.orders',
   "SELECT c.name FROM fb.customer c FULL JOIN maria.orders o ON o.customer_id = c.id WHERE c.name LIKE 'A%' LIMIT 5 OFFSET 10",
+  'SELECT s.STK_NO, c.CUST_ID FROM fb.STK s LEFT OUTER JOIN fb.CUST c ON c.CUST_ID = s.CUST_ID RIGHT OUTER JOIN maria.orders o ON o.id = s.STK_NO',
 ]
 const readOnly = ['WITH x AS (SELECT 1) SELECT * FROM x', 'SELECT * FROM maria.orders UNION SELECT * FROM maria.orders',
   'SELECT row_number() OVER (ORDER BY 1) FROM fb.customer', 'SELECT * FROM maria.orders o WHERE o.id IN (SELECT 1)',

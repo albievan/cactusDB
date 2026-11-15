@@ -1033,9 +1033,17 @@ than 15 digits).
 query: typing redraws the diagram, and every change in the diagram rewrites the SQL (one
 clause per line).
 - Drag a table from the left (or *Add table*) onto it; tables are coloured per database.
+  A table shows its first 60 columns; click *+N more* under them for the rest (*show
+  fewer* folds them back), or ▾ in its heading to hide its columns.
 - **Join** by dragging a column onto another table's column (again for more column pairs);
-  click a join line for its type (INNER, LEFT, RIGHT, FULL, CROSS), operator and columns,
-  or use *Link tables*. Joins from foreign keys and from names like `customer_id` →
+  each join line is labelled with the columns it joins in the order the `ON` has
+  them (`ON stk.STK_NO = inventory.inventory_no` reads `STK_NO -> inventory_no`; another
+  operator shows both tables, `n.id < o.id`). Click a join line or its
+  label for its type, operator and columns, or use *Link tables*. The types: *INNER* (rows
+  with a match in both), *LEFT OUTER* (every row of the first table chosen, the other's
+  columns empty where nothing matches), *RIGHT OUTER* (every row of the second), *FULL
+  OUTER* (every row of both) and *CROSS* (every pair). An outer join chosen there is
+  written `LEFT OUTER JOIN`; one typed as `LEFT JOIN` keeps its spelling. Joins from foreign keys and from names like `customer_id` →
   `customer.id` are offered when a table is added, never applied without a click.
 - Tick columns for the output; the grid under the diagram sets their names, totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
@@ -1048,6 +1056,9 @@ clause per line).
 - Ctrl+Z / Ctrl+Shift+Z undo and redo diagram and text edits alike; *Arrange*, zoom and
   *Fit*; every action works from the keyboard too (Tab to a table: arrows move it,
   Delete removes it, Enter opens its joins). The *Query diagram* switch hides it.
+- **Query**, **Column definitions** and **Results and export** (the grid and the export
+  buttons) each fold away with a click on their
+  heading (▾), to give the others the room; the browser remembers which are folded.
 
 **Saved queries** of a project work like a connection's: name, description, every
 version kept, *Execute* (the first 100 rows), and the diagram's layout saved with them.
