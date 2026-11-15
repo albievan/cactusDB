@@ -1080,8 +1080,12 @@ per line). Each is as tall as you drag its bottom-right corner.
   *Read in … · n tables* folds the rows read per table, leaving the line with the rows
   the query returned. The browser remembers which are folded.
 
-**Saved queries** of a project work like a connection's: name, description, every
-version kept, *Execute* (the first 100 rows), and the diagram's layout saved with them.
+**Saved queries** of a project: pick one in *Query*; every version is kept, with the
+diagram's layout. The icon buttons beside it: **New query** (a form asks for its name and
+description, then the editor is empty), **Save**, **Save as** (the same form, for a new
+saved query) and **Delete**. The name and description show under the bar as text; the
+pencil changes them (Save keeps the change). The green ▶ (**Run**, or Ctrl+Enter) runs
+the query in the editor.
 
 **One at a time.** Opening a project disconnects the database you're connected to, and
 connecting to a database closes the open project (both ask about unsaved changes first).

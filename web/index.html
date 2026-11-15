@@ -439,7 +439,12 @@
   .prjdialect { font-size: 12px; color: var(--muted); }
   .prjsql { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; min-height: 140px; height: 100%; resize: none; }
   .prjqmeta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .prjqmeta #prjQName { width: 220px; } .prjqmeta #prjQDesc { flex: 1; min-width: 160px; }
+  .prjqlabel { flex: 1; min-width: 160px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prjqlabel b { font-weight: 600; }
+  .prjqlabel .d { color: var(--muted); margin-left: 8px; }
+  .prjqlabel .none { color: var(--muted); font-style: italic; }
+  .prjqbtns { display: inline-flex; gap: 3px; }
+  .prjqbtns .btn, .prjicon { --bs-btn-padding-x: 7px; }
   .prjqbar #prjQSel { width: auto; max-width: 260px; } .prjqbar #prjQVers { width: auto; max-width: 220px; }
   /* The SQL above the diagram; each folds from its heading and is as tall as dragged (bottom-right corner). */
   .prjsplit { display: flex; flex-direction: column; gap: 4px; }
@@ -1619,20 +1624,23 @@
             <button type="button" class="prjfold flabel" data-fold="query" aria-expanded="true" aria-controls="prjQMeta prjSplit" title="Show or hide the SQL and the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Query</button>
             <select class="form-select form-select-sm" id="prjQSel" aria-label="Saved query of the project" title="The project's saved queries"><option value="">New query (not saved)</option></select>
             <select class="form-select form-select-sm" id="prjQVers" hidden aria-label="Version" title="Every save of the query is kept: pick one to put it in the editor"></select>
-            <button class="btn btn-sm btn-outline-secondary" id="prjQSave" title="Save the query (and its diagram) in the project">Save</button>
-            <button class="btn btn-sm btn-outline-secondary" id="prjQSaveAs" title="Save as a new saved query">Save as…</button>
-            <button class="btn btn-sm btn-outline-secondary" id="prjQExec" hidden title="Run the saved query and show its first 100 rows">Execute</button>
-            <button class="btn btn-sm btn-outline-danger" id="prjQDel" hidden title="Delete the saved query (asks first)">Delete</button>
+            <span class="prjqbtns">
+            <button class="btn btn-sm btn-outline-secondary" id="prjQNew" title="New query: give it a name and a description, then write it" aria-label="New query"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" id="prjQSave" title="Save the query (and its diagram) in the project" aria-label="Save the query"><i class="bi bi-floppy" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" id="prjQSaveAs" title="Save as a new saved query, with its own name and description" aria-label="Save as a new query"><i class="bi bi-copy" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-outline-danger" id="prjQDel" hidden title="Delete the saved query (asks first)" aria-label="Delete the saved query"><i class="bi bi-trash" aria-hidden="true"></i></button>
+            </span>
             <span class="spacer"></span>
             <label class="form-check form-switch" title="Show the query designer: the diagram of the tables and the grid of columns, filters and sorting"><input class="form-check-input" type="checkbox" id="prjQdOn" role="switch" checked> Query diagram</label>
             <label class="flabel" for="prjLimit">Show</label>
             <select class="form-select form-select-sm" id="prjLimit" title="How many rows the grid shows (exports always hold every row). All: every row, up to 1,000,000"><option>100</option><option selected>1000</option><option>10000</option><option>100000</option><option value="1000000">All</option></select>
-            <button class="btn btn-sm btn-primary" id="prjRun" title="Read the rows the query needs from each database, then run it (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button>
-            <button class="btn btn-sm btn-outline-danger" id="prjCancel" hidden title="Stop reading and remove the copies"><i class="bi bi-stop-fill" aria-hidden="true"></i> Cancel</button>
+            <button class="btn btn-sm btn-primary prjicon" id="prjRun" title="Run: read the rows the query needs from each database, then run it (Ctrl+Enter)" aria-label="Run the query"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-outline-danger prjicon" id="prjCancel" hidden title="Cancel: stop reading and remove the copies" aria-label="Cancel the run"><i class="bi bi-stop-fill" aria-hidden="true"></i></button>
           </div>
           <div class="prjqmeta" id="prjQMeta">
-            <input class="form-control form-control-sm" id="prjQName" maxlength="100" placeholder="Name (to save it)" spellcheck="false" autocomplete="off" aria-label="Name of the query">
-            <input class="form-control form-control-sm" id="prjQDesc" maxlength="1000" placeholder="Description" aria-label="Description of the query">
+            <input type="hidden" id="prjQName"><input type="hidden" id="prjQDesc">
+            <span class="prjqlabel" id="prjQLabel"></span>
+            <button class="btn btn-sm btn-link prjicon" id="prjQEdit" title="Change the name and description" aria-label="Change the name and description"><i class="bi bi-pencil" aria-hidden="true"></i></button>
             <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
           </div>
           <div class="prjsplit" id="prjSplit">
@@ -2419,6 +2427,21 @@
       <span class="spacer"></span>
       <button class="btn btn-outline-secondary" type="button" id="prjJCancel">Cancel</button>
       <button class="btn btn-primary" type="submit">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="prjQDialog" class="dlg" aria-labelledby="prjQDTitle">
+  <form method="dialog" id="prjQForm">
+    <h3 id="prjQDTitle"></h3>
+    <label class="form-label" for="prjQDName">Name</label>
+    <input class="form-control" id="prjQDName" maxlength="100" spellcheck="false" autocomplete="off" required>
+    <label class="form-label mt-2" for="prjQDDesc">Description</label>
+    <textarea class="form-control" id="prjQDDesc" maxlength="1000" rows="3"></textarea>
+    <div class="dactions">
+      <button class="btn btn-outline-secondary" type="button" id="prjQDCancel">Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" type="submit" id="prjQDOk">OK</button>
     </div>
   </form>
 </dialog>
@@ -4958,7 +4981,7 @@ async function prjOpen(id) {
   const res = await prjWithPasswords((b) => api("POST", `/api/projects/${id}/open`, b), `Open the project “${p.name}”`).catch((e) => { toast(e.message, true); return null; });
   if (!res) return;
   prjSet(res);
-  pq.cols = {}; pq.fks = {}; prj.qid = 0; $("prjQName").value = ""; $("prjQDesc").value = ""; pqReset("", null); prj.qOrig = prjQState();
+  pq.cols = {}; pq.fks = {}; prj.qid = 0; prjQMeta("", ""); pqReset("", null); prj.qOrig = prjQState();
   if (state.tab !== "projects") showTab("projects"); else prjShow();
   prjQLoadList(0); pqLoadCols();
   const down = res.links.filter((l) => l.state !== "connected");
@@ -6271,6 +6294,25 @@ $("prjSug").addEventListener("mousedown", (ev) => { const li = ev.target.closest
 
 // ---- saved queries of the project ---------------------------------------------
 Object.assign(prj, { queries: [], qid: 0, qOrig: "" });
+// The name and description show as text; prjQMeta sets them (and the text).
+function prjQMeta(name, desc) {
+  if (name !== undefined) { $("prjQName").value = name; $("prjQDesc").value = desc || ""; }
+  const n = $("prjQName").value.trim(), d = $("prjQDesc").value.trim();
+  $("prjQLabel").innerHTML = n ? `<b>${esc(n)}</b>${d ? `<span class="d">${esc(d)}</span>` : ""}` : `<span class="none">New query, not saved</span>`;
+  $("prjQLabel").title = n ? n + (d ? " — " + d : "") : "";
+}
+// prjQAskMeta asks for a name and description: null when cancelled.
+function prjQAskMeta(title, name, desc) {
+  return new Promise((resolve) => {
+    const d = $("prjQDialog");
+    $("prjQDTitle").textContent = title; $("prjQDName").value = name || ""; $("prjQDDesc").value = desc || "";
+    const done = (v) => { d.close(); $("prjQForm").removeEventListener("submit", ok); $("prjQDCancel").removeEventListener("click", no); d.removeEventListener("cancel", no); resolve(v); };
+    const ok = (ev) => { ev.preventDefault(); const n = $("prjQDName").value.trim(); if (n) done({ name: n, description: $("prjQDDesc").value.trim() }); };
+    const no = (ev) => { if (ev) ev.preventDefault(); done(null); };
+    $("prjQForm").addEventListener("submit", ok); $("prjQDCancel").addEventListener("click", no); d.addEventListener("cancel", no);
+    d.showModal(); $("prjQDName").select();
+  });
+}
 const prjQState = () => JSON.stringify({ n: $("prjQName").value.trim(), d: $("prjQDesc").value.trim(), s: $("prjSql").value.trim() });
 const prjQDirty = () => !!prj.open && !!prj.qid && prjQState() !== prj.qOrig;
 const prjQUses = (alias) => prj.queries.filter((q) => new RegExp(`(^|[^\\w."])${alias.replace(/\W/g, "\\$&")}\\s*\\.`, "i").test(q.sql));
@@ -6282,7 +6324,7 @@ async function prjQLoadList(select = prj.qid) {
   $("prjQSel").innerHTML = `<option value="0">New query (not saved)</option>` +
     prj.queries.map((q) => `<option value="${q.id}">${esc(q.name)} · v${q.version}</option>`).join("");
   $("prjQSel").value = String(select || 0);
-  $("prjQDel").hidden = $("prjQExec").hidden = !prj.qid;
+  $("prjQDel").hidden = !prj.qid;
 }
 // prjQAskSave asks to save an edited saved query: false when the user stays.
 async function prjQAskSave() {
@@ -6295,12 +6337,12 @@ async function prjQOpen(id) {
   if (!(await prjQAskSave())) { $("prjQSel").value = String(prj.qid); return; }
   const q = prj.queries.find((x) => x.id === id);
   prj.qid = q ? q.id : 0;
-  $("prjQName").value = q ? q.name : ""; $("prjQDesc").value = q ? q.description : "";
+  prjQMeta(q ? q.name : "", q ? q.description : "");
   pqReset(q ? q.sql : "", q ? q.layout : null);
   prj.qOrig = prjQState(); prj.queryName = q ? q.name : "";
   prj.result = null; prj.ran = ""; prjRenderGrid(); prjSetExport(); $("prjProg").hidden = true; $("prjInfo").textContent = ""; $("prjExpNote").hidden = true;
   $("prjQVers").hidden = true;
-  $("prjQDel").hidden = $("prjQExec").hidden = !q;
+  $("prjQDel").hidden = !q;
   $("prjQSel").value = String(prj.qid);
   if (q) prjQVersions(q.id);
   prjMark();
@@ -6317,22 +6359,23 @@ async function prjQVersions(id) {
 $("prjQVers").addEventListener("change", () => {
   const v = (prj.versions || []).find((x) => x.version === +$("prjQVers").value);
   if (!v) return;
-  $("prjQName").value = v.name; $("prjQDesc").value = v.description;
+  prjQMeta(v.name, v.description);
   pqReset(v.sql, v.layout); prjSetExport(); prjMark();
   if (v !== prj.versions[0]) toast(`Version ${v.version} is in the editor: Save to make it the current version`);
 });
 async function prjQSave(asNew) {
-  let name = $("prjQName").value.trim();
-  if (asNew || !name) {
-    name = await prjNamePrompt(asNew ? "Save as a new query" : "Save the query", "Its name in the project.", asNew && name ? name + " (copy)" : name);
-    if (!name) return false;
-  }
   const sql = $("prjSql").value.trim();
   if (!sql) { toast("Write a query first", true); return false; }
+  let name = $("prjQName").value.trim(), description = $("prjQDesc").value.trim();
+  if (asNew || !name) {
+    const m = await prjQAskMeta(asNew ? "Save as a new query" : "Save the query", asNew && name ? name + " (copy)" : name, description);
+    if (!m) return false;
+    ({ name, description } = m);
+  }
   try {
-    const r = await api("POST", "/api/project/queries", { project: prj.open.project, id: asNew ? 0 : prj.qid, name, description: $("prjQDesc").value.trim(),
+    const r = await api("POST", "/api/project/queries", { project: prj.open.project, id: asNew ? 0 : prj.qid, name, description,
       sql, layout: { tables: pq.layout, zoom: pq.zoom } });
-    prj.qid = r.id; $("prjQName").value = name; prj.qOrig = prjQState(); prj.queryName = name;
+    prj.qid = r.id; prjQMeta(name, description); prj.qOrig = prjQState(); prj.queryName = name;
     await prjQLoadList(r.id); prjQVersions(r.id); prjMark();
     toast(`Saved the query “${name}” (version ${r.version})`);
     return true;
@@ -6341,8 +6384,20 @@ async function prjQSave(asNew) {
 $("prjQSel").addEventListener("change", () => prjQOpen(+$("prjQSel").value));
 $("prjQSave").addEventListener("click", () => prjQSave(false));
 $("prjQSaveAs").addEventListener("click", () => prjQSave(true));
-$("prjQExec").addEventListener("click", () => prjRun(100));
-for (const id of ["prjQName", "prjQDesc"]) $(id).addEventListener("input", prjMark);
+// New query: its name and description first, then an empty editor.
+$("prjQNew").addEventListener("click", async () => {
+  if (!(await prjQAskSave())) return;
+  const m = await prjQAskMeta("New query", "", "");
+  if (!m) return;
+  prj.qid = 0; prj.qOrig = ""; await prjQOpen(0);
+  prjQMeta(m.name, m.description); prjMark();
+  $("prjSql").focus();
+});
+// The pencil changes the name and description; Save keeps them.
+$("prjQEdit").addEventListener("click", async () => {
+  const m = await prjQAskMeta("Name and description", $("prjQName").value, $("prjQDesc").value);
+  if (m) { prjQMeta(m.name, m.description); prjMark(); }
+});
 $("prjQDel").addEventListener("click", async () => {
   const name = $("prjQName").value.trim();
   const a = await prjAsk(`Delete “${name}”?`, `Delete the saved query “${name}” and its versions? This can't be undone.`, { save: "Delete", discard: "", danger: true });

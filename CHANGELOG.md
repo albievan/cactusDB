@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.8 — 2026-11-15
+
+- Advanced query builder: the query bar's buttons are icons — **New query**, Save, Save
+  as, Delete and Run (▶). *Execute* is gone: Run runs the query.
+- Advanced query builder: **New query** and **Save as** ask for the name and description
+  in a form; under the bar they show as text, and the pencil changes them.
+
 ## 1.62.7 — 2026-11-15
 
 - **Check for update** is a button at the top right (a cloud with an arrow, first of the
