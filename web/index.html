@@ -311,6 +311,10 @@
   .exportall .btn { --bs-btn-padding-x: 3px; --bs-btn-padding-y: 2px; line-height: 0; }
   .exportall .btn:hover:not(:disabled) { background: var(--panel-2); }
   .exportall .bi { font-size: 20px; }
+  .prjexpicons { display: inline-flex; align-items: center; gap: 3px; }
+  .prjexpicons .btn { --bs-btn-padding-x: 3px; --bs-btn-padding-y: 2px; line-height: 0; }
+  .prjexpicons .btn:hover:not(:disabled) { background: var(--panel-2); }
+  .prjexpicons .bi { font-size: 20px; }
   .fmt-xlsx { color: #217346; } .fmt-csv { color: #0e7490; } .fmt-json { color: #b45309; } .fmt-xml { color: #7c3aed; } .fmt-all { color: #64748b; }
   @media (prefers-color-scheme: dark) { .fmt-xlsx { color: #4cc38a; } .fmt-csv { color: #38bdf8; } .fmt-json { color: #f59e0b; } .fmt-xml { color: #a78bfa; } .fmt-all { color: #94a3b8; } }
   .ealist { list-style: none; margin: 6px 0 2px; padding: 0; max-height: 220px; overflow-y: auto; }
@@ -509,6 +513,7 @@
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
   .prjresbar .info { font-size: 12px; color: var(--muted); }
   .prjexpnote { font-size: 12px; }
+  .prjret { margin-top: 2px; }
   .prjexpnote > div { margin: 3px 0; }
   .prjexpnote code { word-break: break-all; }
   .dlbtn { font-size: 12px; padding: 0 8px; line-height: 1.6; margin-left: 6px; vertical-align: baseline; white-space: nowrap; }
@@ -1315,7 +1320,7 @@
       <button class="btn btn-outline-secondary text-start" data-menu="containers" title="Deploy a database server (SQL Server, PostgreSQL, MySQL, Oracle, MongoDB…) as a container on this server's Docker or Kubernetes"><i class="bi bi-box-seam" aria-hidden="true"></i> DB container deployment</button>
       <button class="btn btn-outline-secondary text-start" data-menu="compare" title="Compare the structure (DDL) of databases with a master: tables, views, procedures, triggers…, and make a script that removes the differences"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Compare databases</button>
       <button class="btn btn-outline-secondary text-start" data-menu="migrate" title="Copy a database, structure and data, views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB"><i class="bi bi-database-up" aria-hidden="true"></i> Migrate database</button>
-      <button class="btn btn-outline-secondary text-start" data-menu="projects" title="Projects: link several databases (Firebird, MariaDB, SQL Server…) and query across them with one SELECT"><i class="bi bi-diagram-3-fill" aria-hidden="true"></i> Projects</button>
+      <button class="btn btn-outline-secondary text-start" data-menu="projects" title="Advanced query builder: projects that link several databases (Firebird, MariaDB, SQL Server…) and query across them with one SELECT"><i class="bi bi-diagram-3-fill" aria-hidden="true"></i> Advanced query builder</button>
       <button class="btn btn-outline-secondary text-start" data-menu="update" title="Is there a newer cactusdb? With the command to download it for each system"><i class="bi bi-cloud-arrow-down" aria-hidden="true"></i> Check for update<span class="updot" id="updateDot" hidden></span></button>
       <button class="btn btn-outline-secondary text-start" id="signOutBtn" hidden title="Sign out of cactusdb in this browser"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sign out <span class="signedas" id="signedAs"></span></button>
       <button class="btn btn-outline-danger text-start" id="shutdownBtn" hidden title="Stop this background cactusdb (asks first)"><i class="bi bi-power" aria-hidden="true"></i> Shutdown</button>
@@ -1386,7 +1391,7 @@
       <button class="nav-link" data-tab="logs" title="cactusdb's log and crash log, live or of any day">Logs</button>
       <button class="nav-link" data-tab="compare" title="Compare the structure of databases with a master">Compare</button>
       <button class="nav-link" data-tab="migrate" title="Copy a database to a new database of another type">Migrate</button>
-      <button class="nav-link" data-tab="projects" id="projTab" title="Projects: several linked databases, queried together">Projects</button>
+      <button class="nav-link" data-tab="projects" id="projTab" title="Advanced query builder: projects of several linked databases, queried together">Advanced query builder</button>
       <button class="nav-link" data-tab="relations" id="relTab" hidden title="A picture of how the objects of the connected database hang together: foreign keys, triggers, and what views, procedures and functions use">DB Relationships</button>
       <button class="nav-link" data-tab="dashboard" id="dashTab" hidden title="The statistics of the connected database">Dashboard</button>
       <button class="nav-link" data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
@@ -1536,7 +1541,7 @@
     <div class="pane" id="projPane" hidden>
       <div id="prjHome">
         <div class="filesbar">
-          <span class="flabel">Projects</span>
+          <span class="flabel">Advanced query builder · projects</span>
           <span class="ronly" title="A project only ever reads its databases: nothing is written to them">Read-only</span>
           <span class="spacer"></span>
           <input class="form-control form-control-sm" id="prjNewName" maxlength="100" placeholder="New project name" spellcheck="false" autocomplete="off" aria-label="New project name">
@@ -1645,11 +1650,13 @@
               <span class="info" id="prjInfo"></span>
               <span class="spacer"></span>
               <span class="flabel">Export</span>
-              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="xlsx" disabled title="Every row of the result as an Excel workbook">Excel</button>
-              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="csv" disabled title="Every row as CSV">CSV</button>
-              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="xml" disabled title="Every row as XML">XML</button>
-              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="json" disabled title="Every row as JSON">JSON</button>
-              <button class="btn btn-sm btn-outline-secondary pexp" data-pfmt="all" disabled title="Every row in all four formats at once">All formats</button>
+              <span class="prjexpicons">
+              <button class="btn btn-sm btn-link exp-icon pexp" data-pfmt="xlsx" data-label="Excel" disabled title="Export every row of the result to Excel" aria-label="Export to Excel"><i class="bi bi-filetype-xlsx fmt-xlsx" aria-hidden="true"></i></button>
+              <button class="btn btn-sm btn-link exp-icon pexp" data-pfmt="csv" data-label="CSV" disabled title="Export every row to CSV" aria-label="Export to CSV"><i class="bi bi-filetype-csv fmt-csv" aria-hidden="true"></i></button>
+              <button class="btn btn-sm btn-link exp-icon pexp" data-pfmt="json" data-label="JSON" disabled title="Export every row to JSON" aria-label="Export to JSON"><i class="bi bi-filetype-json fmt-json" aria-hidden="true"></i></button>
+              <button class="btn btn-sm btn-link exp-icon pexp" data-pfmt="xml" data-label="XML" disabled title="Export every row to XML" aria-label="Export to XML"><i class="bi bi-filetype-xml fmt-xml" aria-hidden="true"></i></button>
+              <button class="btn btn-sm btn-link exp-icon pexp" data-pfmt="all" data-label="all formats" disabled title="Export every row to Excel, CSV, JSON and XML in one go" aria-label="Export to all four formats"><i class="bi bi-files fmt-all" aria-hidden="true"></i></button>
+              </span>
             </div>
             <div class="prjexpnote" id="prjExpNote" hidden></div>
             <div class="prjgrid" id="prjGrid"></div>
@@ -4833,7 +4840,7 @@ async function withUnlock(c, fn, action = "connect", first = null) {
   }
 }
 
-// ---- projects (☰ → Projects) -------------------------------------------------
+// ---- projects (☰ → Advanced query builder) -------------------------------------------------
 // A project links several saved connections under aliases and holds a chosen
 // set of their tables, to query them together (projects.go). A single
 // connection and a project are never open at the same time in this page:
@@ -4896,7 +4903,7 @@ async function prjLeaveSingle() {
     toast("Save or discard the saved query first: opening a project disconnects " + state.label, true);
     return false;
   }
-  await disconnect("Disconnected from %s: a project is open (☰ → Projects)");
+  await disconnect("Disconnected from %s: a project is open (☰ → Advanced query builder)");
   return true;
 }
 
@@ -5212,7 +5219,11 @@ function prjProgress(st) {
     : st.state === "done" ? `Read in ${(st.elapsedMs / 1000).toFixed(1)} s` : st.state === "cancelled" ? "Cancelled" : "";
   const err = st.error ? `<div class="bad">${esc(st.errorKind === "source" ? "A database failed: " : st.errorKind === "limit" ? "Stopped at a limit: " : "The query is wrong: ")}${esc(st.error)}` +
     (st.addTable ? ` <button type="button" class="btn btn-sm btn-outline-primary" id="prjAddMissing">Add ${esc(st.addTable.alias)}.${esc(st.addTable.table)} to the project</button>` : "") + `</div>` : "";
-  p.innerHTML = (what ? `<div>${esc(what)}</div>` : "") + rows.join("") + err;
+  // After the tables: how many rows the query itself returned.
+  const r = st.state === "done" && st.result, tot = r ? (r.total ?? r.rows.length) : 0;
+  const ret = r ? `<div class="prjret">✓ <b>Query returned ${r.totalMore ? "more than " : ""}${tot.toLocaleString()} row${tot === 1 ? "" : "s"}</b>` +
+    (tot > r.rows.length ? ` (${r.rows.length.toLocaleString()} shown; exports hold every row)` : "") + `, ${r.columns.length} column${r.columns.length === 1 ? "" : "s"}</div>` : "";
+  p.innerHTML = (what ? `<div>${esc(what)}</div>` : "") + rows.join("") + ret + err;
   p.hidden = !p.innerHTML;
 }
 async function prjRun(limit) {
@@ -5238,9 +5249,9 @@ async function prjRun(limit) {
   if (st.state === "done") {
     const res = st.result;
     prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; prj.ran = res.sql;
-    const n = res.rows.length;
-    $("prjInfo").textContent = `${n.toLocaleString()} row${n === 1 ? "" : "s"}` + (res.truncated ? ` shown (limited to ${res.limit.toLocaleString()} – exports hold every row)` : "") +
-      ` · ${res.columns.length} columns · query ${res.elapsedMs} ms`;
+    const n = res.rows.length, tot = res.total ?? n;
+    $("prjInfo").textContent = (tot > n ? `${n.toLocaleString()} of ${res.totalMore ? "more than " : ""}${tot.toLocaleString()} rows shown (limited to ${res.limit.toLocaleString()} – exports hold every row)` : `${n.toLocaleString()} row${n === 1 ? "" : "s"}`) +
+      ` · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"} · query ${res.elapsedMs} ms`;
     prjRenderGrid();
   } else if (st.state !== "cancelled") { prj.result = null; prj.ran = ""; prjRenderGrid(); }
   prjSetExport();
@@ -5278,7 +5289,7 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
   const fmt = b.dataset.pfmt;
   document.querySelectorAll(".pexp").forEach((x) => (x.disabled = true));
   const note = $("prjExpNote");
-  note.hidden = false; note.textContent = fmt === "all" ? "Exporting in all formats…" : `Exporting as ${b.textContent}…`;
+  note.hidden = false; note.textContent = fmt === "all" ? "Exporting in all formats…" : `Exporting as ${b.dataset.label}…`;
   try {
     const res = await api("POST", "/api/project/export", { project: prj.open.project, sql: prj.ran, format: fmt, name: prj.queryName || "" });
     note.innerHTML = res.files.map((f) => `<div><i class="bi bi-file-earmark-check" aria-hidden="true"></i> ${f.rows.toLocaleString()} row${f.rows === 1 ? "" : "s"} → <code>${esc(f.path)}</code>

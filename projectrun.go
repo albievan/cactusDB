@@ -480,13 +480,18 @@ func (run *projectRun) execute(ctx context.Context, jobs []stageJob, limits proj
 	start := time.Now()
 	var cols []string
 	rows := [][]any{}
-	truncated := false
+	// Every row the query returns is counted (up to maxProjectCount, so a
+	// runaway join stops); only the first limit are kept.
+	total, more := 0, false
 	err = streamQuery(ctx, EngineSQLite, qdb, q, func(c []string) error { cols = c; return nil }, func(row []any) (bool, error) {
-		if len(rows) >= limit {
-			truncated = true
+		if total >= maxProjectCount {
+			more = true
 			return false, nil
 		}
-		rows = append(rows, row)
+		total++
+		if len(rows) < limit {
+			rows = append(rows, row)
+		}
 		return true, nil
 	})
 	if err != nil {
@@ -504,9 +509,12 @@ func (run *projectRun) execute(ctx context.Context, jobs []stageJob, limits proj
 		return
 	}
 	run.state = "done"
-	run.result = map[string]any{"sql": q, "columns": cols, "rows": rows, "truncated": truncated, "limit": limit,
+	run.result = map[string]any{"sql": q, "columns": cols, "rows": rows, "total": total, "totalMore": more, "truncated": total > len(rows), "limit": limit,
 		"elapsedMs": time.Since(start).Milliseconds()}
 }
+
+// maxProjectCount caps the rows a project query counts past those it shows.
+const maxProjectCount = 10_000_000
 
 type limitErr struct{ msg string }
 

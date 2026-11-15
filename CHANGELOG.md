@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.62.4 — 2026-11-15
+
+- **Projects** is renamed **Advanced query builder** (its tab, ☰ menu item and page); it
+  still holds projects, and the README anchor `#projects` still works.
+- Advanced query builder: when a query has run, a line under the rows read per table says
+  how many rows the query returned (counted up to 10 million), also when the grid shows
+  fewer; the bar above the grid says e.g. "100 of 2,345 rows shown".
+- Advanced query builder: the export buttons of *Results and export* are the coloured
+  file-type icons (Excel, CSV, JSON, XML, all formats) used for *Export all tables*.
+
 ## 1.62.3 — 2026-11-15
 
 - **Download** after an export (a project's, the Data tab's, a DDL export, a backup and a

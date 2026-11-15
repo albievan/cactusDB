@@ -96,7 +96,21 @@ ORDER BY o.id`
 
 	// Exports: all four formats, every row, from the staged copy.
 	call("POST", "/api/project/export", map[string]any{"project": ps, "sql": q + " ", "format": "csv"}, 409) // changed text
+	// Past the rows shown, the query's rows are still counted.
+	call("POST", "/api/project/run", map[string]any{"project": ps, "sql": `SELECT * FROM maria.orders ORDER BY id`, "limit": 2}, 200)
+	for i := 0; i < 200; i++ {
+		if st = call("GET", "/api/project/run?project="+ps, nil, 200); st["state"] != "loading" && st["state"] != "querying" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if r := st["result"].(map[string]any); r["total"] != 4.0 || len(r["rows"].([]any)) != 2 || r["truncated"] != true || r["totalMore"] != false {
+		t.Errorf("limited to 2: total %v, rows %d, truncated %v", r["total"], len(r["rows"].([]any)), r["truncated"])
+	}
 	st = run(`SELECT * FROM maria.orders ORDER BY id`)
+	if r := st["result"].(map[string]any); r["total"] != 4.0 || r["truncated"] != false {
+		t.Errorf("all shown: total %v, truncated %v", r["total"], r["truncated"])
+	}
 	ex := call("POST", "/api/project/export", map[string]any{"project": ps, "sql": `SELECT * FROM maria.orders ORDER BY id`, "format": "all", "name": "orders"}, 200)
 	files := ex["files"].([]any)
 	if len(files) != 4 {

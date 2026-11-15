@@ -976,11 +976,12 @@ A part the connection may not read is noted under the title; the rest is still d
 
 <a id="browsing-objects"></a>
 <a id="projects"></a>
-### Projects: several databases in one query
+### Advanced query builder: several databases in one query
 
-**☰ → Projects** links several saved connections, of different types (a Firebird, a
-MariaDB and a SQL Server, say), into a **project**, and queries them together with **one
-SELECT** that joins their tables. It only ever reads them.
+**☰ → Advanced query builder** (its tab has the same name) holds **projects**. A project
+links several saved connections, of different types (a Firebird, a MariaDB and a SQL
+Server, say), and queries them together with **one SELECT** that joins their tables. It
+only ever reads them.
 
 1. **New project**: give it a name. Projects are kept in `cactus.conn.db`, sealed (see
    below), and never hold a password: they refer to your saved connections.
@@ -1022,10 +1023,11 @@ than 15 digits).
   minutes per run. A query that would need more **stops, naming the table**: you never
   get a result built from part of a table.
 - **Progress and Cancel**: the rows read per table are shown while loading; *Cancel*
-  stops the reads and deletes the copies.
+  stops the reads and deletes the copies. When the query has run, a last line says how
+  many rows it returned (counted up to 10 million), also when the grid shows fewer.
 - Each run reads afresh. The copies of the last run stay until the next run or until the
-  project closes, so the grid, *Show n rows* and the **exports** (Excel, CSV, XML, JSON,
-  *All formats*) hold exactly the rows shown, all of them. Exports go to
+  project closes, so the grid, *Show n rows* and the **exports** (the coloured icons for
+  Excel, CSV, JSON, XML and all four formats) hold exactly the rows shown, all of them. Exports go to
   `<export folder>/projects/<project>/xlsx|csv|xml|json/` and appear under *Exported
   files*; each file's path is shown with a **Download** button.
 
@@ -1407,7 +1409,7 @@ tables (CREATE, ALTER, DROP, TRUNCATE…) are blocked twice:
      `distinct` and `getIndexes`; Redis only the commands that read; Cassandra and Athena
      only `SELECT`.
 
-[Projects](#projects) add nothing to this: a project query runs on private copies of the
+[Projects of the advanced query builder](#projects) add nothing to this: a project query runs on private copies of the
 rows it needs, read through the paths above, and writes nothing anywhere else.
 
 The one exception is [migrating a database](#migrate): cactusdb then writes to a **new**
@@ -1887,7 +1889,7 @@ is sent and how to set it up. In short:
   Its exports are protected like those of its first password-protected connection. A
   project query's copies of rows live in a private temporary folder (0700) and are
   deleted when the run is replaced, the project closes or cactusdb stops. See
-  [Projects](#projects).
+  [Advanced query builder](#projects).
 - **Who is using cactusdb** (the people button) shows every open page's client IP and
   browser to everyone who can open cactusdb, and the notices name who changed what by client
   IP. They never contain a password, a query or a query's name.
