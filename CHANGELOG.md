@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.62.10 — 2026-11-15
+
+- Advanced query builder: functions on a column go one around the other (TRIM, then
+  LOWER: `LOWER(TRIM(c.name))`); × takes off the last one.
+- Advanced query builder: each filter has its own functions on the column it compares
+  (`UPPER(c.name) LIKE '%ES'`), and its value can be a function call
+  (`lower(trim('aaa   '))`).
+- Advanced query builder: more filters: **IN** / **NOT IN** (a list typed as `1, 2, 3`),
+  GLOB / NOT GLOB, and IS / IS NOT (NULL equal to NULL).
+
 ## 1.62.9 — 2026-11-15
 
 - Advanced query builder: a filter value typed plainly is quoted for you — `%ES` for LIKE

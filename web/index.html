@@ -506,6 +506,11 @@
   .prjdesign td input[data-k=val] { margin-left: 3px; }
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
+  .prjdesign .fncell, .prjdesign .critcell { display: inline-flex; align-items: center; gap: 2px; }
+  .prjdesign .fnchain { font-size: 11px; color: var(--accent); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .prjdesign .fnchain:empty { display: none; }
+  .prjdesign select.fnadd { width: 46px !important; padding-right: 14px; }
+  .prjdesign .fnclr { padding: 0 3px; }
   .prjjrow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; margin-bottom: 8px; }
   #prjJPairs .pr { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; margin-bottom: 4px; }
   #prjJWarn { color: var(--danger, #c0392b); }
@@ -5400,7 +5405,10 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
 // read-only; parts it doesn't model but can keep (an expression in the
 // select list, a HAVING) are kept as written.
 const PQ_AGGS = ["COUNT", "SUM", "AVG", "MIN", "MAX"];
-const PQ_OPS = ["=", "<>", "<", "<=", ">", ">=", "LIKE", "NOT LIKE", "BETWEEN", "NOT BETWEEN", "IS NULL", "IS NOT NULL"];
+const PQ_OPS = ["=", "<>", "<", "<=", ">", ">=", "IN", "NOT IN", "LIKE", "NOT LIKE", "GLOB", "NOT GLOB", "BETWEEN", "NOT BETWEEN", "IS", "IS NOT", "IS NULL", "IS NOT NULL"];
+const PQ_OP_TITLES = { "IN": "one of a list: 1, 2, 3", "NOT IN": "none of a list", "LIKE": "% any text, _ one character (capitals alike)", "GLOB": "* any text, ? one character (capitals differ)",
+  "BETWEEN": "from … to, both included", "IS": "equal, NULL equal to NULL", "IS NOT": "different, NULL equal to NULL" };
+const pqNoValue = (op) => op === "IS NULL" || op === "IS NOT NULL";
 // Functions on a column's value in the output: {c} is the column. The parser
 // knows a SELECT item written exactly so (spaces and case aside) again.
 const PQ_FNS = [
@@ -5427,34 +5435,55 @@ const PQ_FNS = [
   { k: "D_HM", t: "strftime('%H:%M', {c})", label: "time hh:mm" },
 ];
 const pqFnOf = (k) => PQ_FNS.find((x) => x.k === k);
-// pqFnMatch finds the function and column of a SELECT item written by a PQ_FNS template.
-function pqFnMatch(expr) {
-  const id = String.raw`(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*)`;
+// Each template as a pattern: {c} the inner expression (the same each time it appears).
+for (const fn of PQ_FNS) {
+  const parts = fn.t.split("{c}").map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*").replace(/,/g, "\\s*,\\s*")
+    .replace(/\\\(/g, "\\s*\\(\\s*").replace(/\\\)/g, "\\s*\\)"));
+  fn.re = new RegExp("^\\s*" + parts.map((x, i) => (i === 1 ? "(?<c>.+)" : i > 1 ? "\\k<c>" : "") + x).join("") + "\\s*$", "is");
+}
+const PQ_QUAL = /^\s*("(?:[^"]|"")+"|[A-Za-z_][\w$]*)\s*\.\s*("(?:[^"]|"")+"|[A-Za-z_][\w$]*)\s*$/;
+const pqUnq = (x) => x.startsWith('"') ? x.slice(1, -1).replace(/""/g, '"') : x;
+// pqFnParse reads alias.column under PQ_FNS functions (any number, nested): fns
+// innermost first, so ["TRIM", "LOWER"] is LOWER(TRIM(c.x)); null when it is something else.
+function pqFnParse(expr) {
+  const q = PQ_QUAL.exec(expr);
+  if (q) return { table: pqUnq(q[1]), col: pqUnq(q[2]), fns: [] };
   for (const fn of PQ_FNS) {
-    const parts = fn.t.split("{c}").map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*").replace(/,/g, "\\s*,\\s*").replace(/\\\(/g, "\\s*\\(\\s*").replace(/\\\)/g, "\\s*\\)"));
-    const re = new RegExp("^\\s*" + parts.map((x, i) => i ? `\\k<c>${x}` : x).join("").replace("\\k<c>", `(?<c>${id}\\s*\\.\\s*${id})`) + "\\s*$", "i");
-    const mt = re.exec(expr);
-    if (mt) {
-      const q = /^("(?:[^"]|"")+"|[A-Za-z_][\w$]*)\s*\.\s*("(?:[^"]|"")+"|[A-Za-z_][\w$]*)$/.exec(mt.groups.c.trim());
-      const un = (x) => x.startsWith('"') ? x.slice(1, -1).replace(/""/g, '"') : x;
-      if (q) return { fn: fn.k, table: un(q[1]), col: un(q[2]) };
-    }
+    const mt = fn.re.exec(expr);
+    const inner = mt && pqFnParse(mt.groups.c);
+    if (inner) return { ...inner, fns: [...inner.fns, fn.k] };
   }
   return null;
 }
+const pqFnApply = (fns, e) => (fns || []).reduce((x, k) => pqFnOf(k) ? pqFnOf(k).t.replaceAll("{c}", x) : x, e);
+const pqFnText = (fns) => (fns || []).map((k) => (pqFnOf(k) || { label: k }).label.replace(/:.*/, "")).join(" → ");
 // pqLiteral makes a filter value typed in the grid valid SQL: text is quoted
 // ('%ES'), a number, NULL, TRUE/FALSE, a quoted value, a column (a.b) or a
 // function call is kept; LIKE values are always text.
 function pqLiteral(v, op) {
   v = String(v).trim();
   if (!v || /^'(?:[^']|'')*'$/.test(v)) return v;
-  if (!/LIKE/.test(op || "")) {
+  if (!/LIKE|GLOB/.test(op || "")) {
     if (/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(v) || /^(null|true|false)$/i.test(v)) return v;
     if (/^[A-Za-z_][\w$]*\s*\.\s*[A-Za-z_"][\w$" ]*$/.test(v) && !/\s/.test(v.replace(/\s*\.\s*/, "."))) return v;
     if (/^[A-Za-z_][\w$]*\s*\(.*\)$/.test(v) || /^\(.*\)$/.test(v)) return v;
   }
   return "'" + v.replace(/'/g, "''") + "'";
 }
+// pqList makes "1, 2, Ann" an IN list: (1, 2, 'Ann'); commas inside quotes stay.
+function pqList(v) {
+  v = String(v).trim();
+  if (/^\(.*\)$/s.test(v)) return v;
+  const items = [];
+  let cur = "", inq = false;
+  for (const ch of v) {
+    if (ch === "'") inq = !inq;
+    if (ch === "," && !inq) { items.push(cur); cur = ""; } else cur += ch;
+  }
+  items.push(cur);
+  return "(" + items.map((x) => pqLiteral(x.trim(), "=")).filter(Boolean).join(", ") + ")";
+}
+const pqUnlist = (v) => String(v || "").replace(/^\s*\(\s*|\s*\)\s*$/g, "");
 // A BETWEEN value is "low AND high" (at the top level of the value).
 function pqSplitBetween(v) {
   const m = /^(.*?)\s+AND\s+(.*)$/i.exec(String(v || ""));
@@ -5568,7 +5597,7 @@ function pqParse(src) {
     } else if (j.type === "INNER") j.type = "CROSS";
   }
   const fieldOf = (table, col) => {
-    let f = m.fields.find((x) => !x.expr && !x.fn && x.table.toLowerCase() === table.toLowerCase() && x.col.toLowerCase() === col.toLowerCase() && !x.agg);
+    let f = m.fields.find((x) => !x.expr && !(x.fns && x.fns.length) && x.table.toLowerCase() === table.toLowerCase() && x.col.toLowerCase() === col.toLowerCase() && !x.agg);
     if (!f) { f = { table, col, show: false, alias: "", agg: "", group: false, sort: "", sortPos: 0, crit: [] }; m.fields.push(f); }
     return f;
   };
@@ -5592,8 +5621,8 @@ function pqParse(src) {
         continue;
       }
     }
-    const fm = pqFnMatch(text(a, e));
-    if (fm) { m.fields.push({ table: fm.table, col: fm.col, fn: fm.fn, show: true, alias, agg: "", group: false, sort: "", sortPos: 0, crit: [] }); continue; }
+    const fm = pqFnParse(text(a, e));
+    if (fm) { m.fields.push({ table: fm.table, col: fm.col, fns: fm.fns, show: true, alias, agg: "", group: false, sort: "", sortPos: 0, crit: [] }); continue; }
     m.fields.push({ expr: text(a, e), table: "", col: "", show: true, alias, agg: "", group: false, sort: "", sortPos: 0, crit: [] });
   }
   // WHERE: OR of AND-chains of column op value, else kept as written.
@@ -5611,23 +5640,36 @@ function pqParse(src) {
         if (last && last.open) { last[1] = seg[1]; last.open = false; } else { const x = [...seg]; x.open = tk.slice(seg[0], seg[1]).some((t) => t.l === "between"); parts.push(x); }
       }
       for (const [ca, cb] of parts) {
-        const p = qual(ca);
-        if (!p || p[1] === "*") { ok = false; return; }
-        const rest = tk.slice(ca + 3, cb).map((x) => x.t.toUpperCase()).join(" ");
-        let op = "", value = "";
-        if (rest === "IS NULL" || rest === "IS NOT NULL") op = rest;
-        else {
-          const two = tk[ca + 3] && tk[ca + 4] && `${tk[ca + 3].t} ${tk[ca + 4].t}`.toUpperCase();
-          const k = two === "NOT LIKE" || two === "NOT BETWEEN" ? 2 : 1;
-          op = k === 2 ? two : tk[ca + 3] ? tk[ca + 3].t.toUpperCase() : "";
-          if (!PQ_OPS.includes(op) || ca + 3 + k >= cb) { ok = false; return; }
-          value = text(ca + 3 + k, cb);
-          if (op.endsWith("BETWEEN") && !/\sAND\s/i.test(value)) { ok = false; return; }
+        // The operator: the first one at the top level; before it the column, maybe under functions.
+        let o = ca, d = 0;
+        for (; o < cb; o++) {
+          if (tk[o].t === "(") d++; else if (tk[o].t === ")") d--;
+          else if (!d && (["=", "<>", "!=", "<", "<=", ">", ">="].includes(tk[o].t) || ["in", "not", "like", "glob", "between", "is"].includes(tk[o].l))) break;
         }
-        conds.push({ table: p[0], col: p[1], op, value, row });
+        const left = o > ca && o < cb && pqFnParse(text(ca, o));
+        if (!left || left.col === "*") { ok = false; return; }
+        const words = [];
+        let v = o;
+        while (v < cb && words.length < 3 && (["not", "in", "like", "glob", "between", "is", "null"].includes(tk[v].l) || (!words.length && ["=", "<>", "!=", "<", "<=", ">", ">="].includes(tk[v].t)))) {
+          words.push(tk[v].t.toUpperCase()); v++;
+          if (["=", "<>", "!=", "<", "<=", ">", ">="].includes(words[0])) break;
+          if (words[words.length - 1] === "NULL") break;
+          if (words.length === 1 && words[0] === "IS" && tk[v] && tk[v].l !== "not" && tk[v].l !== "null") break;
+          if (["IN", "LIKE", "GLOB", "BETWEEN"].includes(words[words.length - 1])) break;
+          if (words.length === 2 && words[0] === "IS" && words[1] === "NOT" && tk[v] && tk[v].l !== "null") break;
+        }
+        let op = words.join(" ").replace("!=", "<>"), value = "";
+        if (!PQ_OPS.includes(op)) { ok = false; return; }
+        if (!pqNoValue(op)) {
+          if (v >= cb) { ok = false; return; }
+          value = text(v, cb);
+          if (op.endsWith("BETWEEN") && !/\sAND\s/i.test(value)) { ok = false; return; }
+          if (op.endsWith("IN") && !/^\(.*\)$/s.test(value)) { ok = false; return; }
+        } else if (v !== cb) { ok = false; return; }
+        conds.push({ table: left.table, col: left.col, fns: left.fns, op, value, row });
       }
     });
-    if (ok && conds.length) for (const c of conds) fieldOf(c.table, c.col).crit.push({ op: c.op, value: c.value, row: c.row });
+    if (ok && conds.length) for (const c of conds) fieldOf(c.table, c.col).crit.push({ op: c.op, value: c.value, row: c.row, ...(c.fns.length ? { fns: c.fns } : {}) });
     else m.whereExtra = text(a, b);
   }
   if (at.group !== undefined) for (const [a, b] of split(at.group + 2, stop("group"))) {
@@ -5654,7 +5696,7 @@ function pqSql(m) {
   const col = (f) => `${pqIdent(f.table)}.${f.col === "*" ? "*" : pqIdent(f.col)}`;
   const out = [];
   const sel = m.fields.filter((f) => f.show).map((f) => {
-    const e = f.expr ? f.expr : f.agg ? `${f.agg}(${f.col === "*" && !f.table ? "*" : col(f)})` : f.fn && pqFnOf(f.fn) ? pqFnOf(f.fn).t.replaceAll("{c}", col(f)) : col(f);
+    const e = f.expr ? f.expr : f.agg ? `${f.agg}(${f.col === "*" && !f.table ? "*" : col(f)})` : f.fns && f.fns.length ? pqFnApply(f.fns, col(f)) : col(f);
     return e + (f.alias ? ` AS ${pqIdent(f.alias)}` : "");
   });
   if (m.star || !sel.length) sel.unshift("*");
@@ -5668,7 +5710,7 @@ function pqSql(m) {
     out.push((type === "INNER" ? "JOIN" : type + (j.outer && type !== "CROSS" ? " OUTER" : "") + " JOIN").padEnd(6) + " " + item + (conds.length && type !== "CROSS" ? " ON " + conds.join(" AND ") : ""));
   });
   const rows = [];
-  for (const f of m.fields) for (const c of f.crit) (rows[c.row] = rows[c.row] || []).push(`${col(f)} ${c.op}${c.op.startsWith("IS") ? "" : " " + c.value}`);
+  for (const f of m.fields) for (const c of f.crit) (rows[c.row] = rows[c.row] || []).push(`${pqFnApply(c.fns, col(f))} ${c.op}${pqNoValue(c.op) ? "" : " " + c.value}`);
   const ors = rows.filter((r) => r && r.length);
   let where = ors.length > 1 ? ors.map((r) => "(" + r.join(" AND ") + ")").join(" OR ") : ors.length ? ors[0].join("\n  AND  ") : "";
   if (m.whereExtra) where = where ? `(${m.whereExtra})\n  AND  ${ors.length > 1 ? "(" + where + ")" : where}` : m.whereExtra;
@@ -6223,6 +6265,16 @@ $("prjLinkBtn").addEventListener("click", () => {
 });
 
 // ---- the grid of columns: output, alias, aggregate, group, sort, filters ----
+// pqFnCell is a chain of functions: the chain (innermost first), × removes the
+// last one, and the list adds one around it.
+function pqFnCell(fns, key, r = "") {
+  const dr = r === "" ? "" : ` data-r="${r}"`;
+  return `<span class="fncell">${key === "cfn" ? `<input type="hidden" data-k="cfns"${dr} value="${esc(JSON.stringify(fns || []))}">` : ""}` +
+    `<span class="fnchain"${dr} title="${esc(fns && fns.length ? "Applied in this order: " + pqFnText(fns) : "")}">${esc(pqFnText(fns))}</span>` +
+    `<button type="button" class="btn btn-sm btn-link fnclr" data-k="${key}clr"${dr} title="Remove the last function" aria-label="Remove the last function"${fns && fns.length ? "" : " hidden"}>×</button>` +
+    `<select class="form-select form-select-sm fnadd" data-k="${key}add"${dr} aria-label="${key === "cfn" ? "Function on the column before comparing" : "Function on the value shown"}" title="${key === "cfn" ? "A function on the column before it is compared, e.g. LOWER and TRIM to compare without capitals and spaces (the value can be a function too: lower(trim('aaa ')))" : "A function on the value shown; another one goes around it"}">` +
+    `<option value="">${fns && fns.length ? "+" : "ƒ"}</option>${PQ_FNS.map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</select></span>`;
+}
 function pqDesign() {
   const box = $("prjDesign"), m = pq.model;
   if (m.readOnly) { box.innerHTML = `<div class="ro">The grid is read-only for this query: ${esc(m.readOnly)}.</div>`; return; }
@@ -6235,16 +6287,16 @@ function pqDesign() {
     if (f.col === "*" && !f.agg) return `<tr data-f="${i}"><td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${5 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
     const ex = !!f.expr;
     const crit = Array.from({ length: rows }, (_, r) => {
-      const c = f.crit.find((x) => x.row === r) || { op: "", value: "" }, btw = c.op.endsWith("BETWEEN"), [lo, hi] = btw ? pqSplitBetween(c.value) : [c.value, ""];
-      return `<td>${ex ? "" : `<select class="form-select form-select-sm" data-k="op" data-r="${r}" aria-label="Filter operator"><option value=""></option>${PQ_OPS.map((o) => `<option${o === c.op ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>` +
-        `<input type="text" class="form-control form-control-sm" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01; LIKE: % any text, _ one character"${c.op.startsWith("IS") ? " disabled" : ""}>` +
-        `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</td>`;
+      const c = f.crit.find((x) => x.row === r) || { op: "", value: "" }, btw = c.op.endsWith("BETWEEN"), [lo, hi] = btw ? pqSplitBetween(c.value) : [c.op.endsWith("IN") ? pqUnlist(c.value) : c.value, ""];
+      return `<td><span class="critcell">${ex ? "" : pqFnCell(c.fns, "cfn", r) + `<select class="form-select form-select-sm" data-k="op" data-r="${r}" aria-label="Filter operator"><option value=""></option>${PQ_OPS.map((o) => `<option${o === c.op ? " selected" : ""} title="${esc(PQ_OP_TITLES[o] || "")}">${esc(o)}</option>`).join("")}</select>` +
+        `<input type="text" class="form-control form-control-sm" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
+        `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</span></td>`;
     }).join("");
     return `<tr data-f="${i}"><td title="${esc(fname(f))}">${esc(fname(f).slice(0, 60))}</td>
       <td><input type="checkbox" data-k="show"${f.show ? " checked" : ""} aria-label="Show ${esc(fname(f))}"></td>
       <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
-      <td>${ex || f.agg ? "" : `<select class="form-select form-select-sm" data-k="fn" aria-label="Function on the value"><option value=""></option>${PQ_FNS.map((x) => `<option value="${x.k}"${x.k === f.fn ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select>`}</td>
-      <td>${ex || f.fn ? "" : `<select class="form-select form-select-sm" data-k="agg" aria-label="Total"><option value=""></option>${PQ_AGGS.map((a) => `<option${a === f.agg ? " selected" : ""}>${a}</option>`).join("")}</select>`}</td>
+      <td>${ex || f.agg ? "" : pqFnCell(f.fns, "fn")}</td>
+      <td>${ex || (f.fns && f.fns.length) ? "" : `<select class="form-select form-select-sm" data-k="agg" aria-label="Total"><option value=""></option>${PQ_AGGS.map((a) => `<option${a === f.agg ? " selected" : ""}>${a}</option>`).join("")}</select>`}</td>
       <td>${ex || f.agg ? "" : `<input type="checkbox" data-k="group"${f.group ? " checked" : ""} aria-label="Group by">`}</td>
       <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="sort" aria-label="Sort"><option value=""></option><option${f.sort === "ASC" ? " selected" : ""}>ASC</option><option${f.sort === "DESC" ? " selected" : ""}>DESC</option></select>`}</td>
       ${crit}<td><button type="button" class="btn btn-sm btn-link" data-k="up" aria-label="Move up" title="Move up">↑</button><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td></tr>`;
@@ -6270,30 +6322,40 @@ $("prjDesign").addEventListener("change", (ev) => {
   if (k === "show") f.show = t.checked;
   else if (k === "alias") f.alias = t.value.trim();
   else if (k === "agg") { f.agg = t.value; if (f.agg) f.group = false; }
-  // A function keeps the column's name in the output, unless it has one.
-  else if (k === "fn") { if (t.value) { f.fn = t.value; if (!f.alias) f.alias = f.col; } else delete f.fn; }
+  // A function goes around those before it; the column keeps its name in the output, unless it has one.
+  else if (k === "fnadd") { if (!t.value) return; f.fns = [...(f.fns || []), t.value]; if (!f.alias) f.alias = f.col; }
+  else if (k === "cfnadd") { if (!t.value) return; const h = tr.querySelector(`[data-k=cfns][data-r="${t.dataset.r}"]`); h.value = JSON.stringify([...JSON.parse(h.value), t.value]); t.value = ""; if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
   else if (k === "group") f.group = t.checked;
   else if (k === "sort") { f.sort = t.value; f.sortPos = f.sort ? Math.max(0, ...m.fields.map((x) => x.sortPos)) + 1 : 0; }
-  else if (k === "op" || k === "val" || k === "val2") {
-    const r = +t.dataset.r, op = tr.querySelector(`[data-k=op][data-r="${r}"]`).value, btw = op.endsWith("BETWEEN");
-    const v1 = tr.querySelector(`[data-k=val][data-r="${r}"]`), v2 = tr.querySelector(`[data-k=val2][data-r="${r}"]`);
-    const val = v1.value.trim(), val2 = v2.value.trim();
-    v2.hidden = !btw;
-    // An operator chosen before its value(s), or half a BETWEEN, waits for the rest (the row isn't redrawn);
-    // a value emptied removes the condition.
-    const missing = !!op && !op.startsWith("IS") && (!val || (btw && !val2));
-    if (missing && (k === "op" || (btw && (val || val2)))) { v1.disabled = false; (!val ? v1 : v2).focus(); return; }
-    f.crit = f.crit.filter((c) => c.row !== r);
-    // Values are made SQL: text is quoted for you ('%ES'), numbers and columns stay.
-    if (op && !missing) f.crit.push({ op, value: op.startsWith("IS") ? "" : btw ? `${pqLiteral(val, op)} AND ${pqLiteral(val2, op)}` : pqLiteral(val, op), row: r });
-    f.crit.sort((a, b) => a.row - b.row);
-  }
+  else if (k === "op" || k === "val" || k === "val2") { if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
   pqCommit();
 });
+// pqCritUpdate reads filter r of a row into the model: false while it waits for a value (the row isn't redrawn).
+function pqCritUpdate(tr, f, r, k) {
+  const op = tr.querySelector(`[data-k=op][data-r="${r}"]`).value, btw = op.endsWith("BETWEEN");
+  const fns = JSON.parse(tr.querySelector(`[data-k=cfns][data-r="${r}"]`).value || "[]");
+  tr.querySelector(`.fnchain[data-r="${r}"]`).textContent = pqFnText(fns);
+  tr.querySelector(`[data-k=cfnclr][data-r="${r}"]`).hidden = !fns.length;
+  const v1 = tr.querySelector(`[data-k=val][data-r="${r}"]`), v2 = tr.querySelector(`[data-k=val2][data-r="${r}"]`);
+  const val = v1.value.trim(), val2 = v2.value.trim();
+  v2.hidden = !btw; v1.disabled = pqNoValue(op);
+  // An operator chosen before its value(s), or half a BETWEEN, waits for the rest; functions
+  // wait for an operator; a value emptied removes the condition.
+  const missing = !!op && !pqNoValue(op) && (!val || (btw && !val2));
+  if (!op && fns.length) return false;
+  if (missing && (k === "op" || k === "cfnadd" || k === "cfnclr" || (btw && (val || val2)))) { (!val ? v1 : v2).focus(); return false; }
+  f.crit = f.crit.filter((c) => c.row !== r);
+  // Values are made SQL: text is quoted for you ('%ES'), numbers and columns stay; an IN list gets its brackets.
+  if (op && !missing) f.crit.push({ op, value: pqNoValue(op) ? "" : btw ? `${pqLiteral(val, op)} AND ${pqLiteral(val2, op)}` : op.endsWith("IN") ? pqList(val) : pqLiteral(val, op), row: r, ...(fns.length ? { fns } : {}) });
+  f.crit.sort((a, b) => a.row - b.row);
+  return true;
+}
 $("prjDesign").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-k]"), tr = b && b.closest("tr[data-f]");
   if (!tr) return;
   const m = pq.model, i = +tr.dataset.f;
+  if (b.dataset.k === "fnclr") { const f = m.fields[i]; f.fns = (f.fns || []).slice(0, -1); if (!f.fns.length) delete f.fns; pqCommit(); return; }
+  if (b.dataset.k === "cfnclr") { const h = tr.querySelector(`[data-k=cfns][data-r="${b.dataset.r}"]`); h.value = JSON.stringify(JSON.parse(h.value).slice(0, -1)); if (pqCritUpdate(tr, m.fields[i], +b.dataset.r, "cfnclr")) pqCommit(); return; }
   if (b.dataset.k === "rm") m.fields.splice(i, 1);
   else if (b.dataset.k === "up" && i > 0) [m.fields[i - 1], m.fields[i]] = [m.fields[i], m.fields[i - 1]];
   else return;

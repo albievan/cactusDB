@@ -25,6 +25,8 @@ const editable = [
   "SELECT c.name FROM fb.customer c FULL JOIN maria.orders o ON o.customer_id = c.id WHERE c.name LIKE 'A%' LIMIT 5 OFFSET 10",
   'SELECT s.STK_NO, c.CUST_ID FROM fb.STK s LEFT OUTER JOIN fb.CUST c ON c.CUST_ID = s.CUST_ID RIGHT OUTER JOIN maria.orders o ON o.id = s.STK_NO',
   "SELECT UPPER(c.name) AS n, strftime('%Y-%m-%d', o.order_date), ROUND(o.total, 2), c.city FROM fb.customer c JOIN maria.orders o ON o.customer_id = c.id WHERE c.name LIKE '%ES' AND o.total BETWEEN 10 AND 20 OR c.id NOT BETWEEN 1 AND 3",
+  "SELECT LOWER(TRIM(c.name)) AS n, UPPER(strftime('%Y-%m-%d', o.d)) FROM fb.customer c JOIN maria.orders o ON o.cid = c.id WHERE LOWER(TRIM(c.name)) = lower(trim('aaa   ')) AND c.id IN (1, 2, 3) OR c.city NOT IN ('A', 'B') AND c.name GLOB 'A*' AND o.x IS NOT c.id",
+  "SELECT c.name FROM fb.customer c WHERE UPPER(c.name) LIKE '%ES' AND c.id IS 3 AND c.city IS NOT NULL",
   "SELECT strftime('%Y', o.d) || '-' || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', o.d) * 3 - 2, 3) || '-' || strftime('%d', o.d) AS d FROM maria.orders o WHERE o.d BETWEEN '2026-01-01' AND '2026-12-31'",
 ]
 const readOnly = ['WITH x AS (SELECT 1) SELECT * FROM x', 'SELECT * FROM maria.orders UNION SELECT * FROM maria.orders',

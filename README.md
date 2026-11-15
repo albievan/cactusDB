@@ -1068,12 +1068,17 @@ per line). Each is as tall as you drag its bottom-right corner.
   whole number or text, NULL as empty or 0, and date formats: yyyy-mm-dd, dd/mm/yyyy,
   mm/dd/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time, yyyy-mm, yyyy, hh:mm), totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
-  ANDed, the *or* rows ORed), with DISTINCT and LIMIT. A function changes only what is
-  shown: filters and sorting use the column's own value.
-- Filters: =, <>, <, <=, >, >=, LIKE / NOT LIKE (`%` any text, `_` one character),
-  BETWEEN / NOT BETWEEN (two boxes: from and to) and IS (NOT) NULL. Type values plainly
-  (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers, `NULL`, a column
-  (`c.id`) and a function call stay as they are.
+  ANDed, the *or* rows ORed), with DISTINCT and LIMIT. Functions go one around the
+  other: choose TRIM, then LOWER, and the column is `LOWER(TRIM(c.name))` (shown as
+  *TRIM → LOWER*; × takes off the last one). A function changes only what is shown:
+  filters and sorting use the column's own value.
+- Filters: =, <>, <, <=, >, >=, IN / NOT IN (a list: `1, 2, 3`), LIKE / NOT LIKE (`%`
+  any text, `_` one character, capitals alike), GLOB / NOT GLOB (`*` and `?`, capitals
+  differ), BETWEEN / NOT BETWEEN (two boxes: from and to), IS / IS NOT (equal or not,
+  NULL equal to NULL) and IS (NOT) NULL. Each filter has its own **ƒ** functions on the
+  column before it is compared (e.g. LOWER and TRIM: `LOWER(TRIM(c.name)) = 'ann'`).
+  Type values plainly (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers,
+  `NULL`, a column (`c.id`) and a function call (`lower(trim('aaa   '))`) stay as they are.
 - A join of a text column with a number (or a date with a number) is shown in red, as
   is a table joined to nothing or one that isn't in the project.
 - SQL the designer can't hold (a subquery, `WITH`, `UNION`, a window function) makes it
