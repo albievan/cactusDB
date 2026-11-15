@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.5 — 2026-11-15
+
+- A sidebar button at the far left of the top bar hides the left sidebar (the page takes
+  the whole width) and shows it again; the browser remembers which.
+- Advanced query builder: **All** in *Show* puts every row of the result in the grid (up
+  to 1,000,000; the most a grid gets was 100,000).
+
 ## 1.62.4 — 2026-11-15
 
 - **Projects** is renamed **Advanced query builder** (its tab, ☰ menu item and page); it

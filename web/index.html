@@ -193,6 +193,11 @@
   .toast.notice .toast-header .bi { color: var(--accent); }
   .toast.notice .toast-header strong { font-family: var(--mono); font-size: 12px; }
   .layout { display: grid; grid-template-columns: var(--nav-w, 320px) minmax(0, 1fr); min-height: 0; }
+  /* Hidden sidebar (the button left of the name): the page takes the whole width. */
+  body.navhidden .layout { grid-template-columns: minmax(0, 1fr); }
+  body.navhidden #sidebar { display: none; }
+  #navToggle { flex: none; --bs-btn-padding-x: 6px; }
+  body.navhidden #navToggle { border-color: var(--accent); color: var(--accent); }
   /* The sidebar's right edge: drag it to make the sidebar wider or narrower. */
   .navsizer { position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; z-index: 40; cursor: col-resize; touch-action: none; }
   .navsizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
@@ -1241,6 +1246,7 @@
 </head>
 <body>
 <header>
+  <button id="navToggle" class="btn btn-sm btn-outline-secondary" type="button" aria-controls="sidebar" aria-expanded="true" title="Hide the sidebar" aria-label="Hide the sidebar"><i class="bi bi-layout-sidebar" aria-hidden="true"></i></button>
   <h1 class="brand"><img src="cactusdb.svg" alt="" width="28" height="28"><span class="bname">cactusdb<small class="bver" id="appVersion"></small></span></h1>
   <span class="badge rounded-pill text-success-emphasis bg-success-subtle border border-success" title="INSERT, UPDATE, DELETE and schema changes are blocked">read-only</span>
   <span class="badge rounded-pill text-secondary-emphasis bg-secondary-subtle border" id="engineBadge" hidden><i class="bi bi-database" aria-hidden="true"></i> <span id="engineName"></span></span>
@@ -1609,7 +1615,7 @@
             <span class="spacer"></span>
             <label class="form-check form-switch" title="Show the query designer: the diagram of the tables and the grid of columns, filters and sorting"><input class="form-check-input" type="checkbox" id="prjQdOn" role="switch" checked> Query diagram</label>
             <label class="flabel" for="prjLimit">Show</label>
-            <select class="form-select form-select-sm" id="prjLimit" title="How many rows the grid shows (exports always hold every row)"><option>100</option><option selected>1000</option><option>10000</option><option>100000</option></select>
+            <select class="form-select form-select-sm" id="prjLimit" title="How many rows the grid shows (exports always hold every row). All: every row, up to 1,000,000"><option>100</option><option selected>1000</option><option>10000</option><option>100000</option><option value="1000000">All</option></select>
             <button class="btn btn-sm btn-primary" id="prjRun" title="Read the rows the query needs from each database, then run it (Ctrl+Enter)"><i class="bi bi-play-fill" aria-hidden="true"></i> Run</button>
             <button class="btn btn-sm btn-outline-danger" id="prjCancel" hidden title="Stop reading and remove the copies"><i class="bi bi-stop-fill" aria-hidden="true"></i> Cancel</button>
           </div>
@@ -4729,6 +4735,15 @@ function setNavWidth(px, keep = true) {
   if (keep) try { w === NAV_W.def ? localStorage.removeItem(NAV_W.key) : localStorage.setItem(NAV_W.key, w); } catch {}
 }
 try { const w = +localStorage.getItem(NAV_W.key); if (w) setNavWidth(w, false); } catch {}
+// Show or hide the sidebar; remembered in this browser.
+function setNavHidden(hidden, keep = true) {
+  document.body.classList.toggle("navhidden", hidden);
+  const b = $("navToggle"), t = hidden ? "Show the sidebar" : "Hide the sidebar";
+  b.setAttribute("aria-expanded", String(!hidden)); b.title = t; b.setAttribute("aria-label", t);
+  if (keep) try { hidden ? localStorage.setItem("cactusdb.navHidden", "1") : localStorage.removeItem("cactusdb.navHidden"); } catch {}
+}
+try { if (localStorage.getItem("cactusdb.navHidden")) setNavHidden(true, false); } catch {}
+$("navToggle").addEventListener("click", () => { setNavHidden(!document.body.classList.contains("navhidden")); dispatchEvent(new Event("resize")); });
 $("navSizer").setAttribute("aria-valuemin", NAV_W.min);
 $("navSizer").addEventListener("pointerdown", (ev) => {
   if (ev.button !== 0) return;

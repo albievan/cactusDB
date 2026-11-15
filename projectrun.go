@@ -471,8 +471,8 @@ func (run *projectRun) execute(ctx context.Context, jobs []stageJob, limits proj
 	limit := run.limit
 	q := run.sql
 	run.mu.Unlock()
-	if limit > 100000 {
-		limit = 100000
+	if limit > maxProjectShow {
+		limit = maxProjectShow
 	}
 	if limit <= 0 {
 		limit = 1000
@@ -512,6 +512,9 @@ func (run *projectRun) execute(ctx context.Context, jobs []stageJob, limits proj
 	run.result = map[string]any{"sql": q, "columns": cols, "rows": rows, "total": total, "totalMore": more, "truncated": total > len(rows), "limit": limit,
 		"elapsedMs": time.Since(start).Milliseconds()}
 }
+
+// maxProjectShow caps the rows a project query sends to the grid ("All").
+const maxProjectShow = 1_000_000
 
 // maxProjectCount caps the rows a project query counts past those it shows.
 const maxProjectCount = 10_000_000

@@ -1025,6 +1025,8 @@ than 15 digits).
 - **Progress and Cancel**: the rows read per table are shown while loading; *Cancel*
   stops the reads and deletes the copies. When the query has run, a last line says how
   many rows it returned (counted up to 10 million), also when the grid shows fewer.
+- **Show** sets how many rows the grid gets: 100, 1000, 10000, 100000 or **All** (every
+  row, up to 1,000,000). Exports always hold every row.
 - Each run reads afresh. The copies of the last run stay until the next run or until the
   project closes, so the grid, *Show n rows* and the **exports** (the coloured icons for
   Excel, CSV, JSON, XML and all four formats) hold exactly the rows shown, all of them. Exports go to
@@ -1143,6 +1145,8 @@ those objects.
 - The sidebar is as wide as you like: drag its right edge (220 pixels up to 60% of the
   window). The browser remembers the width; double-click the edge for the usual width again.
   With the edge focused, the arrow keys make it narrower or wider and Home resets it.
+- The sidebar button at the far left of the top bar (left of the name) hides the sidebar,
+  giving the page the whole width, and shows it again; the browser remembers which.
 
 | Engine | Object groups |
 |--------|---------------|
