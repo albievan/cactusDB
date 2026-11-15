@@ -545,6 +545,7 @@
   .prjdesign .fncell, .prjdesign .critcell { display: inline-flex; align-items: center; gap: 2px; }
   .prjdesign .fnchain { font-size: 11px; color: var(--accent); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
   .prjdesign .fnchain:empty { display: none; }
+  .prjdesign .fnchain.editable { cursor: pointer; text-decoration: underline dotted; }
   .prjdesign select.fnadd { width: 46px !important; padding-right: 14px; }
   .prjdesign .fnclr { padding: 0 3px; }
   .prjjrow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; margin-bottom: 8px; }
@@ -5528,7 +5529,7 @@ const PQ_FNS = [
   { k: "DATEF", t: "cdb_date({c}, {p})", label: "date in a format of your own…", p: "yyyy-MMM-dd HH:mm",
     ask: "yyyy year, MM month (MMM Jan, MMMM January), dd day (ddd Mon, dddd Monday), HH hours (hh 12-hour, tt AM/PM), mm minutes, ss seconds; text in 'quotes' stays." },
   { k: "NUMF", t: "cdb_number({c}, {p})", label: "number in a format of your own…", p: "#,##0.00",
-    ask: "# a digit if any, 0 a digit always: #,##0.00 → 1,234.50; # ##0,00 → 1 234,50; 0.0% → 12.5%; text around it stays: R #,##0.00 → R 1,234.50." },
+    ask: "# a digit if any, 0 a digit always: #,##0.00 → 1,234.50; # ##0,00 → 1 234,50; 0.0% → 12.5%; text or a currency of your own around it stays: Zl #,##0.00 → Zl 1,234.50, #,##0.00 zł → 1,234.50 zł." },
 ];
 // Ready-made formats: a function and its format, as one choice.
 const PQ_FN_PRESETS = [
@@ -6396,7 +6397,7 @@ $("prjLinkBtn").addEventListener("click", () => {
 function pqFnCell(fns, key, r = "") {
   const dr = r === "" ? "" : ` data-r="${r}"`;
   return `<span class="fncell">${key === "cfn" ? `<input type="hidden" data-k="cfns"${dr} value="${esc(JSON.stringify(fns || []))}">` : ""}` +
-    `<span class="fnchain"${dr} title="${esc(fns && fns.length ? "Applied in this order: " + pqFnText(fns) : "")}">${esc(pqFnText(fns))}</span>` +
+    `<span class="fnchain${fns && fns.length && pqFnParam(fns[fns.length - 1]) ? " editable" : ""}"${dr} title="${esc(fns && fns.length ? "Applied in this order: " + pqFnText(fns) + (pqFnParam(fns[fns.length - 1]) ? " — click to change the format" : "") : "")}">${esc(pqFnText(fns))}</span>` +
     `<button type="button" class="btn btn-sm btn-link fnclr" data-k="${key}clr"${dr} title="Remove the last function" aria-label="Remove the last function"${fns && fns.length ? "" : " hidden"}>×</button>` +
     `<select class="form-select form-select-sm fnadd" data-k="${key}add"${dr} aria-label="${key === "cfn" ? "Function on the column before comparing" : "Function on the value shown"}" title="${key === "cfn" ? "A function on the column before it is compared, e.g. LOWER and TRIM to compare without capitals and spaces (the value can be a function too: lower(trim('aaa ')))" : "A function on the value shown; another one goes around it"}">` +
     `<option value="">${fns && fns.length ? "+" : "ƒ"}</option>` +
@@ -6470,12 +6471,20 @@ $("prjDesign").addEventListener("change", (ev) => {
   else if (k === "op" || k === "val" || k === "val2") { if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
   pqCommit();
 });
-// pqFnPick is the function chosen in a list: a format of the user's own is asked for first.
+// pqFnPick is the function chosen in a list: a format (ready-made or of the user's
+// own) is shown first, to be changed (R to Zl, the decimals…) or taken as it is.
 async function pqFnPick(v) {
   const fn = pqFnOf(v);
-  if (!fn || fn.p === undefined || pqFnParam(v)) return v;
-  const p = await prjNamePrompt(fn.label.replace("…", ""), fn.ask, fn.p);
+  if (!fn || fn.p === undefined) return v;
+  const p = await prjNamePrompt(fn.k === "DATEF" ? "Date format" : "Number format", fn.ask, pqFnParam(v) || fn.p);
   return p ? `${fn.k}|${p}` : null;
+}
+// pqFnEdit changes the last format of a chain (a click on the chain): null when there is none or it is cancelled.
+async function pqFnEdit(fns) {
+  const last = fns[fns.length - 1], fn = last && pqFnOf(last);
+  if (!fn || fn.p === undefined) return null;
+  const p = await prjNamePrompt(fn.k === "DATEF" ? "Change the date format" : "Change the number format", fn.ask, pqFnParam(last));
+  return p ? [...fns.slice(0, -1), `${fn.k}|${p}`] : null;
 }
 // pqCritUpdate reads filter r of a row into the model: false while it waits for a value (the row isn't redrawn).
 function pqCritUpdate(tr, f, r, k) {
@@ -6526,7 +6535,16 @@ $("prjDesign").addEventListener("drop", (ev) => {
   pqCommit();
 });
 $("prjDesign").addEventListener("dragend", () => { pq.dragRow = undefined; $("prjDesign").querySelectorAll("tr.dragging, tr.dropabove, tr.dropbelow").forEach((x) => x.classList.remove("dragging", "dropabove", "dropbelow")); });
-$("prjDesign").addEventListener("click", (ev) => {
+$("prjDesign").addEventListener("click", async (ev) => {
+  // A click on a chain ending with a format changes that format.
+  const ch = ev.target.closest(".fnchain"), ctr = ch && ch.closest("tr[data-f]");
+  if (ctr) {
+    const f = pq.model.fields[+ctr.dataset.f];
+    if (ch.dataset.r === undefined) { const fns = await pqFnEdit(f.fns || []); if (fns) { f.fns = fns; pqCommit(); } return; }
+    const h = ctr.querySelector(`[data-k=cfns][data-r="${ch.dataset.r}"]`), fns = await pqFnEdit(JSON.parse(h.value));
+    if (fns) { h.value = JSON.stringify(fns); if (pqCritUpdate(ctr, f, +ch.dataset.r, "cfnadd")) pqCommit(); }
+    return;
+  }
   const b = ev.target.closest("button[data-k]"), tr = b && b.closest("tr[data-f]");
   if (!tr) return;
   const m = pq.model, i = +tr.dataset.f;

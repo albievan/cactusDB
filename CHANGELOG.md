@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.14 — 2026-11-16
+
+- Advanced query builder: a ready-made format (`£#,##0.00`, `yyyy-MMM-dd`…) is shown
+  before it is applied, to be changed into your own (`Zl #,##0.00`, `#,##0.00 zł`); a click
+  on a chain ending with a format changes it again.
+
 ## 1.62.13 — 2026-11-15
 
 - The tabs look more modern: plain text, a soft background on hover and an accent bar

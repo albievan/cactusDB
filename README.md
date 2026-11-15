@@ -1080,7 +1080,10 @@ per line). Each is as tall as you drag its bottom-right corner.
   yyyy-mm, yyyy, hh:mm), **formats** (numbers `1,234.50`, `1 234,50`, percent, currencies
   `R 1,234.50`, `$`, `€`, `£`, and dates such as `Thu, 5 Nov 2026`), or a **format of
   your own** for a date (`yyyy-MMM-dd HH:mm`, `dddd d MMMM yyyy`: yyyy MM MMM MMMM dd ddd
-  dddd HH hh mm ss tt) or a number (`#,##0.00`, `R #,##0.00`, `0.0%`, `#.##0,00`), totals
+  dddd HH hh mm ss tt) or a number (`#,##0.00`, `R #,##0.00`, `0.0%`, `#.##0,00`).
+  Choosing a ready-made format shows it first, to change it (`£#,##0.00` to
+  `Zl #,##0.00` or `#,##0.00 zł`: any currency or text around the number) or take it as it
+  is; a click on a chain that ends with a format changes it again. Totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
   ANDed, the *or* rows ORed), with DISTINCT and LIMIT. Drag a row by its grip (⋮⋮) up
   or down to change the order of the columns (↑ moves it one up). Functions go one around the
