@@ -11,6 +11,8 @@
   `cdb_date`, `cdb_number`), usable in the SQL too.
 - The **Download** button after an export is an icon; in the advanced query builder it
   comes first on each line, before the row count.
+- README, Troubleshooting: a floating *Not Connected* label on every page is a browser
+  extension's, not cactusdb's, and how to find which one.
 
 ## 1.62.11 — 2026-11-15
 
