@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.62.9 — 2026-11-15
+
+- Advanced query builder: a filter value typed plainly is quoted for you — `%ES` for LIKE
+  gave "near "%": syntax error"; now it is `LIKE '%ES'`. Numbers, NULL, columns and
+  function calls stay as typed.
+- Advanced query builder: **BETWEEN** and **NOT BETWEEN** filters, with a from and a to box.
+- Advanced query builder: a **Function** column in *Column definitions* runs a function on
+  the value shown: UPPER, LOWER, TRIM, LENGTH, ROUND, ABS, CAST, NULL as empty or 0, and
+  date formats (yyyy-mm-dd, dd/mm/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time, …). The
+  SQL and the grid stay in step both ways.
+
 ## 1.62.8 — 2026-11-15
 
 - Advanced query builder: the query bar's buttons are icons — **New query**, Save, Save

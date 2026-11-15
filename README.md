@@ -1063,9 +1063,17 @@ per line). Each is as tall as you drag its bottom-right corner.
 - **Foreign keys**: a column that is one shows where it points (`cust_id → cust.id`).
   When both tables of a foreign key are in the diagram and the query doesn't join on it,
   a dotted line links them; click it to join on it.
-- Tick columns for the output; the grid under the diagram sets their names, totals
+- Tick columns for the output; the grid under the diagram (*Column definitions*) sets
+  their names, a **function** on the value (UPPER, LOWER, TRIM, LENGTH, ROUND, ABS, as a
+  whole number or text, NULL as empty or 0, and date formats: yyyy-mm-dd, dd/mm/yyyy,
+  mm/dd/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time, yyyy-mm, yyyy, hh:mm), totals
   (COUNT, SUM, AVG, MIN, MAX), grouping, sorting and filters (conditions in a row are
-  ANDed, the *or* rows ORed), with DISTINCT and LIMIT.
+  ANDed, the *or* rows ORed), with DISTINCT and LIMIT. A function changes only what is
+  shown: filters and sorting use the column's own value.
+- Filters: =, <>, <, <=, >, >=, LIKE / NOT LIKE (`%` any text, `_` one character),
+  BETWEEN / NOT BETWEEN (two boxes: from and to) and IS (NOT) NULL. Type values plainly
+  (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers, `NULL`, a column
+  (`c.id`) and a function call stay as they are.
 - A join of a text column with a number (or a date with a number) is shown in red, as
   is a table joined to nothing or one that isn't in the project.
 - SQL the designer can't hold (a subquery, `WITH`, `UNION`, a window function) makes it
