@@ -1161,6 +1161,9 @@ saved query) and **Delete**. The name and description show under the bar as text
 pencil changes them (Save keeps the change). The green ▶ (**Run**, or Ctrl+Enter) runs
 the query in the editor.
 
+**Closing a project**: ✕ in the project's bar, or the × beside its name in the tab row
+(asks first when there are changes not saved); the databases it linked are disconnected.
+
 **One at a time.** Opening a project disconnects the database you're connected to, and
 connecting to a database closes the open project (both ask about unsaved changes first).
 Opening a project connects every linked database; one that can't be reached is shown

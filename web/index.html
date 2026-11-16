@@ -388,6 +388,12 @@
   .tabs .title { margin-left: 12px; font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     color: var(--accent); font-weight: 600; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 4px; max-width: 45%; }
   .tabs .title:empty { display: none; }
+  /* The open project's name in the tab row has a × that closes the project. */
+  .tabs .titleclose { border: 1px solid var(--accent); border-left: 0; border-radius: 0 999px 999px 0; background: var(--accent-soft); color: var(--accent);
+    margin: 0 0 4px -2px; padding: 0 8px 0 4px; font-size: 11px; line-height: 1.9; flex: none; align-self: stretch; }
+  .tabs .titleclose:hover { background: var(--accent); color: #fff; }
+  .tabs .titleclose[hidden] { display: none; }
+  .tabs .title.hasclose { border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .pane { min-height: 0; min-width: 0; }
   #dataPane { display: grid; grid-template-rows: auto auto auto auto 1fr auto; }
   #dataPane > .pager { padding: 3px 12px; background: var(--panel); grid-row: 4; }
@@ -1480,6 +1486,7 @@
       <button class="nav-link" data-tab="dashboard" id="dashTab" hidden title="The statistics of the connected database">Dashboard</button>
       <button class="nav-link" data-tab="container" id="ctrTab" hidden title="A container deployed by cactusdb: its settings and usage, with start, stop, restart, delete and purge">Container</button>
       <span class="title" id="tabTitle"></span>
+      <button type="button" class="titleclose" id="prjTitleClose" hidden title="Close the project: disconnect its databases (asks first about unsaved changes)" aria-label="Close the project"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
     </div>
     <div class="pane" id="dataPane">
     <div class="editor">
@@ -4999,7 +5006,15 @@ const prj = { list: [], linkable: [], maxLinks: 10, open: null, orig: "", alias:
 
 const prjEditable = () => { const o = prj.open; return o ? JSON.stringify({ n: o.name, d: o.description || "", l: o.links.map((l) => [l.connId, l.alias]), t: o.tables, m: o.limits }) : ""; };
 const prjDirty = () => !!prj.open && prjEditable() !== prj.orig;
-function prjMark() { if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() || prjQDirty() ? " ●" : "") : ""; }
+function prjMark() {
+  if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() || prjQDirty() ? " ●" : "") : "";
+  prjTitleClose();
+}
+// The × beside the project's name shows on the query builder's tab while a project is open.
+function prjTitleClose() {
+  const on = state.tab === "projects" && !!prj.open;
+  $("prjTitleClose").hidden = !on; $("tabTitle").classList.toggle("hasclose", on);
+}
 
 async function prjShow() {
   $("prjHome").hidden = !!prj.open; $("prjWork").hidden = !prj.open;
@@ -5380,6 +5395,7 @@ $("prjTblAll").addEventListener("click", () => { for (const it of prj.shown || [
 $("prjTblNone").addEventListener("click", () => { for (const it of prj.shown || []) prjToggleTable(it, false); prjRenderTables(); prjMark(); });
 $("prjSave").addEventListener("click", () => prjSave());
 $("prjCloseBtn").addEventListener("click", () => prjCloseAsk());
+$("prjTitleClose").addEventListener("click", () => prjCloseAsk());
 $("prjDup").addEventListener("click", async () => {
   const name = await prjNamePrompt("Duplicate the project", "A copy with the same databases, tables and limits, under another name.", prj.open.name + " (copy)");
   if (name) prjSave(name);
@@ -8379,7 +8395,7 @@ $("fpDelete").addEventListener("click", () => { const f = prevFile(); if (f) ask
 $("fNote").addEventListener("click", (ev) => { if (ev.target.closest("[data-act]")?.dataset.act === "close-fnote") $("fNote").hidden = true; });
 
 // ---- tabs & definition -----------------------------------------------------
-document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+document.querySelectorAll(".tabs button[data-tab]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
 function showTab(tab) {
   // Leaving the saved query's form: first asked when it has changes not saved.
@@ -8388,7 +8404,8 @@ function showTab(tab) {
     $("sqDialog").hidden = true; qaClose();
   }
   state.tab = tab;
-  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tabs button[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  prjTitleClose();
   $("dataPane").hidden = tab !== "data";
   $("defPane").hidden = tab !== "def";
   $("fddlPane").hidden = tab !== "fullddl";

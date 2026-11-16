@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.62.19 — 2026-11-16
+
+- Advanced query builder: the open project's name in the tab row has a **×** that closes the
+  project (asking first about changes not saved), like ✕ in its bar.
+
 ## 1.62.18 — 2026-11-16
 
 - With `--remotelogin`, **Sign out** is always at the bottom of the sidebar (under
