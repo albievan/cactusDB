@@ -139,8 +139,9 @@ func (s *server) closeAllProjects() {
 // password-protected connections: a password per connection id, or the
 // superuser password for all of them.
 type projectUnlock struct {
-	LockPasswords map[string]string `json:"lockPasswords"`
-	SuperPassword string            `json:"superPassword"`
+	LockPasswords   map[string]string `json:"lockPasswords"`
+	SuperPassword   string            `json:"superPassword"`
+	ProjectPassword string            `json:"projectPassword"` // opens the connections it seals
 }
 
 // unlockLinks unlocks the saved connections ids. A deleted one is reported
@@ -291,6 +292,7 @@ func (s *server) projectRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/project/retry", s.handleRetryProjectLink)
 	mux.HandleFunc("POST /api/project/close", s.handleCloseProject)
 	mux.HandleFunc("POST /api/project/delete", s.handleDeleteProject)
+	mux.HandleFunc("POST /api/project/password", s.handleProjectPassword)
 	mux.HandleFunc("GET /api/project/objects", s.handleProjectObjects)
 	s.projectRunRoutes(mux)
 	s.projectQueryRoutes(mux)
@@ -356,9 +358,43 @@ func (s *server) handleOpenProject(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	// The project password gives the passwords of the connections it seals;
+	// one typed in the request (a connection added since) goes first.
+	var sealed map[string]string
+	if req.ProjectPassword != "" {
+		if sealed, err = s.store.ProjectPasswords(id, req.ProjectPassword); err != nil {
+			if errors.Is(err, errProjectPassword) {
+				time.Sleep(time.Second) // slows guessing
+				writeJSON(w, 200, map[string]any{"error": "wrong project password", "projectLocked": true})
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		if req.LockPasswords == nil {
+			req.LockPasswords = map[string]string{}
+		}
+		for k, v := range sealed {
+			if req.LockPasswords[k] == "" {
+				req.LockPasswords[k] = v
+			}
+		}
+	}
 	conns, boxes, _, ok := s.unlockLinks(w, r, ids, req)
 	if !ok {
 		return
+	}
+	if req.ProjectPassword != "" {
+		used := map[string]string{}
+		for _, cid := range ids {
+			k := strconv.FormatInt(cid, 10)
+			if c, ok := conns[cid]; ok && c.Lock != "" {
+				used[k] = req.LockPasswords[k]
+			}
+		}
+		if err := s.store.resealProjectPassword(id, req.ProjectPassword, sealed, used); err != nil {
+			log.Printf("project %d: can't update its password's connections: %v", id, err)
+		}
 	}
 	key, err := s.store.ProjectKey(id, boxes)
 	switch {
@@ -540,6 +576,62 @@ func (s *server) handleCloseProject(w http.ResponseWriter, r *http.Request) {
 	s.closeProject(req.Project)
 	logAction(r, "close project session %.8s", req.Project)
 	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// handleProjectPassword sets (or with "" removes) the open project's password.
+// It seals the linked connections' passwords, so the request carries them
+// (checked here, asked for one by one like opening a project).
+func (s *server) handleProjectPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		projectUnlock
+		Project  string `json:"project"`
+		Password string `json:"password"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	ps, err := s.project(r, req.Project)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if req.Password != "" && len(req.Password) < 8 {
+		writeErr(w, 400, errors.New("the project password needs at least 8 characters"))
+		return
+	}
+	ps.mu.Lock()
+	ids := make([]int64, 0, len(ps.data.Links))
+	for _, l := range ps.data.Links {
+		ids = append(ids, l.ConnID)
+	}
+	ps.mu.Unlock()
+	seal := map[string]string{}
+	if req.Password != "" {
+		// Only connection passwords sealable: the superuser's doesn't count.
+		req.SuperPassword = ""
+		conns, _, _, ok := s.unlockLinks(w, r, ids, req.projectUnlock)
+		if !ok {
+			return
+		}
+		for id, c := range conns {
+			if c.Lock != "" {
+				k := strconv.FormatInt(id, 10)
+				seal[k] = req.LockPasswords[k]
+			}
+		}
+	}
+	if err := s.store.SetProjectPassword(ps.projectID, req.Password, seal); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	what := "set the password of"
+	if req.Password == "" {
+		what = "removed the password of"
+	}
+	logAction(r, "%s project %q", what, ps.name)
+	s.event(r, "project", false, "%s the project %q", what, ps.name)
+	writeJSON(w, 200, map[string]any{"ok": true, "hasPassword": req.Password != ""})
 }
 
 // handleDeleteProject deletes the open project (opening it needed every

@@ -89,6 +89,9 @@ func (s *Store) init(path, keyFile string) error {
 	if err := s.migrateProjects(); err != nil {
 		return err
 	}
+	if err := s.migrateProjectPassword(); err != nil {
+		return err
+	}
 	if err := s.migrateSuperuser(); err != nil {
 		return err
 	}

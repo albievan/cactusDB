@@ -405,7 +405,6 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-miss: #f2867c; --c-miss-bg: #3a1f1d; --c-extra: #8ab8f0; --c-extra-bg: #1c2a3b; --c-diff: #f0c060; --c-diff-bg: #3a3018; } }
   #projPane { display: grid; grid-template-rows: minmax(0, 1fr); background: var(--panel); min-height: 0; overflow: auto; }
   #projPane[hidden] { display: none; }
-  #prjNewName { width: 240px; }
   .ronly { font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--accent, #2f6f4f); border: 1px solid currentColor; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
   .prjgridwrap { overflow: auto; padding: 0 12px 12px; }
   .prjtable { font-size: 13px; margin: 0; --bs-table-bg: transparent; }
@@ -1617,8 +1616,7 @@
           <span class="flabel">Advanced query builder · projects</span>
           <span class="ronly" title="A project only ever reads its databases: nothing is written to them">Read-only</span>
           <span class="spacer"></span>
-          <input class="form-control form-control-sm" id="prjNewName" maxlength="100" placeholder="New project name" spellcheck="false" autocomplete="off" aria-label="New project name">
-          <button class="btn btn-primary" id="prjNewBtn" title="Create a project, then link databases to it"><i class="bi bi-plus-lg" aria-hidden="true"></i> New project</button>
+          <button class="btn btn-sm btn-primary" id="prjNewBtn" title="New project: give it a name and a description, then link databases to it" aria-label="New project"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
         </div>
         <div class="lginfo">A project links several saved connections (Firebird, MariaDB, SQL Server, PostgreSQL, Oracle…) under short
           aliases, and holds the tables you choose, to query them together with one SELECT. It only ever reads them.</div>
@@ -1632,6 +1630,7 @@
           <span class="spacer"></span>
           <span class="iconbtns">
           <button class="btn btn-sm btn-primary" id="prjSave" title="Save the project: name, linked databases, tables and limits" aria-label="Save the project"><i class="bi bi-floppy" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjPwBtn" title="Project password: one password that opens the project and connects every database it links" aria-label="Project password"><i class="bi bi-key" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-secondary" id="prjDup" title="Duplicate: save a copy of this project under another name" aria-label="Duplicate the project"><i class="bi bi-copy" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)" aria-label="Delete the project"><i class="bi bi-trash" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases" aria-label="Close the project"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
@@ -2469,6 +2468,24 @@
       <span class="spacer"></span>
       <button class="btn btn-outline-secondary" type="button" id="prjJCancel">Cancel</button>
       <button class="btn btn-primary" type="submit">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="prjPwDialog" class="dlg" aria-labelledby="prjPwTitle">
+  <form method="dialog" id="prjPwForm">
+    <h3 id="prjPwTitle">Project password</h3>
+    <p class="sdtext" id="prjPwText">One password that opens the project and connects every database it links, without their own passwords: it keeps them, sealed with it. Anyone with it can read those databases through cactusdb, so make it as strong as theirs. At least 8 characters.</p>
+    <label class="form-label" for="prjPw1">New project password</label>
+    <input type="password" class="form-control" id="prjPw1" autocomplete="new-password">
+    <label class="form-label mt-2" for="prjPw2">Again</label>
+    <input type="password" class="form-control" id="prjPw2" autocomplete="new-password">
+    <p class="hint text-danger" id="prjPwErr" hidden></p>
+    <div class="dactions">
+      <button class="btn btn-outline-danger" type="button" id="prjPwRemove" hidden title="The project opens with each connection's password again">Remove the project password</button>
+      <span class="spacer"></span>
+      <button class="btn btn-outline-secondary" type="button" id="prjPwCancel">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save</button>
     </div>
   </form>
 </dialog>
@@ -4972,16 +4989,15 @@ async function prjShow() {
   const name = (id) => ((state.saved || []).find((c) => c.id === id) || { name: "deleted connection" }).name;
   // A grid: Open first, the name, its databases, queries and dates, then edit, duplicate and delete.
   const ib = (act, id, icon, t, cls = "btn-outline-secondary") => `<button type="button" class="btn btn-sm ${cls}" data-prjact="${act}" data-id="${id}" title="${t}" aria-label="${t}"><i class="bi ${icon}" aria-hidden="true"></i></button>`;
-  $("prjList").innerHTML = `<thead><tr><th></th><th>Project</th><th>Databases linked</th><th class="num">Queries</th><th>Created</th><th>Changed</th><th></th></tr></thead><tbody>` +
+  $("prjList").innerHTML = `<thead><tr><th></th><th>Project</th><th>Databases linked</th><th class="num">Queries</th><th>Created</th><th>Changed</th></tr></thead><tbody>` +
     (prj.list.length ? prj.list.map((p) => `<tr data-id="${p.id}">
-      <td class="act">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}</td>
-      <td class="pn">${esc(p.name)}</td>
+      <td class="act"><span class="iconbtns">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}<span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></span></td>
+      <td class="pn">${esc(p.name)}${p.hasPassword ? ` <i class="bi bi-key muted" title="Opens with its project password" aria-label="has a project password"></i>` : ""}</td>
       <td class="pd" title="${esc(p.connIds.map(name).join("\n"))}"><span class="badge rounded-pill text-bg-secondary">${p.connIds.length}</span> ${p.connIds.length ? esc(p.connIds.map(name).join(" · ")) : `<span class="muted">none yet</span>`}</td>
       <td class="num">${(p.queries || 0).toLocaleString()}</td>
       <td class="dt">${esc(fmtDate(p.created || ""))}</td>
-      <td class="dt">${esc(fmtDate(p.updated || ""))}</td>
-      <td class="act"><span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></td></tr>`).join("")
-    : `<tr><td colspan="7" class="empty">No projects yet: give one a name above and click New project.</td></tr>`) + `</tbody>`;
+      <td class="dt">${esc(fmtDate(p.updated || ""))}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty">No projects yet: click + (New project) above to make one.</td></tr>`) + `</tbody>`;
 }
 
 // prjWithPasswords calls fn with the passwords of the project's connections:
@@ -5028,8 +5044,21 @@ async function prjOpen(id) {
   if (!(await prjCloseAsk())) return;
   if (!(await prjLeaveSingle())) return;
   const p = prj.list.find((x) => x.id === id) || { name: "" };
-  const res = await prjWithPasswords((b) => api("POST", `/api/projects/${id}/open`, b), `Open the project “${p.name}”`).catch((e) => { toast(e.message, true); return null; });
-  if (!res) return;
+  const openWith = (pp) => prjWithPasswords((b) => api("POST", `/api/projects/${id}/open`, pp ? { ...b, projectPassword: pp } : b), `Open the project “${p.name}”`)
+    .catch((e) => { toast(e.message, true); return null; });
+  // A project with a password: it alone opens the project and connects every database
+  // (cancel asks each connection's password instead).
+  let res;
+  if (p.hasPassword) {
+    for (let wrong = false; ;) {
+      const c = await askPassword({ title: `Open the project “${p.name}”`, label: "Project password", allowSuper: false, ok: "Open",
+        text: (wrong ? "Wrong project password. " : "") + "The project password opens the project and connects every database it links. Cancel to give the connections' passwords instead." });
+      res = await openWith(c ? c.lockPassword : "");
+      if (c && res && res.projectLocked) { wrong = true; continue; }
+      break;
+    }
+  } else res = await openWith("");
+  if (!res || res.projectLocked) return;
   prjSet(res);
   pq.cols = {}; pq.fks = {}; prj.qid = 0; prjQMeta("", ""); pqReset("", null); prj.qOrig = prjQState();
   if (state.tab !== "projects") showTab("projects"); else prjShow();
@@ -5202,17 +5231,43 @@ function prjNamePrompt(title, text, value) {
   });
 }
 
-$("prjNewBtn").addEventListener("click", async () => {
-  const name = $("prjNewName").value.trim();
-  if (!name) { $("prjNewName").focus(); toast("Give the project a name first", true); return; }
+// The project password: set, changed or removed; the linked connections' passwords
+// it seals are asked for (as when opening) where this page doesn't know them.
+$("prjPwBtn").addEventListener("click", () => {
+  const d = $("prjPwDialog"), p = prj.list.find((x) => x.id === prj.open.id) || {};
+  $("prjPw1").value = $("prjPw2").value = ""; $("prjPwErr").hidden = true; $("prjPwRemove").hidden = !p.hasPassword;
+  $("prjPwTitle").textContent = p.hasPassword ? "Change the project password" : "Set a project password";
+  d.showModal(); $("prjPw1").focus();
+});
+$("prjPwCancel").addEventListener("click", () => $("prjPwDialog").close());
+async function prjPwSave(password) {
+  const p = prj.list.find((x) => x.id === prj.open.id);
   try {
-    const res = await api("POST", "/api/projects", { name });
-    $("prjNewName").value = "";
-    prj.list.push({ id: res.id, name, connIds: [] });
+    const res = await prjWithPasswords((b) => api("POST", "/api/project/password", { ...b, project: prj.open.project, password }), "The project password keeps the connections' passwords");
+    if (!res) return;
+    if (p) p.hasPassword = res.hasPassword;
+    $("prjPwDialog").close();
+    toast(password ? "The project password is set: it alone opens the project from now on" : "The project password is removed");
+  } catch (e) { $("prjPwErr").textContent = e.message; $("prjPwErr").hidden = false; }
+}
+$("prjPwForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const a = $("prjPw1").value, b = $("prjPw2").value, err = (m) => { $("prjPwErr").textContent = m; $("prjPwErr").hidden = false; };
+  if (a.length < 8) { err("The project password needs at least 8 characters"); return; }
+  if (a !== b) { err("The two passwords differ"); return; }
+  prjPwSave(a);
+});
+$("prjPwRemove").addEventListener("click", () => prjPwSave(""));
+// New project: a form asks for its name and description.
+$("prjNewBtn").addEventListener("click", async () => {
+  const m = await prjQAskMeta("New project", "", "");
+  if (!m) return;
+  try {
+    const res = await api("POST", "/api/projects", { name: m.name, description: m.description });
+    prj.list.push({ id: res.id, name: m.name, connIds: [], queries: 0 });
     await prjOpen(res.id);
   } catch (e) { toast(e.message, true); }
 });
-$("prjNewName").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); $("prjNewBtn").click(); } });
 // Edit, duplicate and delete work on an open project (its databases' passwords open it): open it, then act.
 $("prjList").addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-prjact]");

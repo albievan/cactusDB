@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.62.15 — 2026-11-16
+
+- Advanced query builder: a **project password** (🔑 in an open project) opens the project
+  and connects every database it links without their own passwords: it keeps them,
+  sealed with a key derived from it (Argon2id) and the store's key. A connection linked
+  later or whose password changed is asked for once, then kept. Removable; projects
+  without one open as before.
+- Advanced query builder: **New project** is an icon button (+) that asks the name and the
+  description in a form; in the projects grid, edit, duplicate and delete sit next to Open.
+
 ## 1.62.14 — 2026-11-16
 
 - Advanced query builder: a ready-made format (`£#,##0.00`, `yyyy-MMM-dd`…) is shown

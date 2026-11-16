@@ -393,6 +393,10 @@ be recovered. The [superuser](#superuser) can still open the connection, if one 
 before; otherwise delete the connection and save it again.
 
 <a id="superuser"></a>
+**Project password.** A project's password opens the connections that project links (see
+[Advanced query builder](#projects)): it seals their passwords, as the superuser's escrow
+does for every connection, and is never stored itself.
+
 **Superuser.** The superuser password opens every saved connection, its saved queries and
 its exported files, without each connection's own password. Click **🛡** next to
 *Saved connections* and sign in. The list then shows every connection's details, and you
@@ -990,11 +994,22 @@ links several saved connections, of different types (a Firebird, a MariaDB and a
 Server, say), and queries them together with **one SELECT** that joins their tables. It
 only ever reads them.
 
-1. **New project**: give it a name. Projects are kept in `cactus.conn.db`, sealed (see
-   below), and never hold a password: they refer to your saved connections. The projects
-   are listed in a grid: **open** (first), the name, the databases linked, the number of
-   saved queries, when it was created and last changed, and **edit**, **duplicate** and
-   **delete** (these open the project first: its databases' passwords open it).
+1. **New project** (**+**): a form asks for its name and a description. Projects are kept
+   in `cactus.conn.db`, sealed (see below); they refer to your saved connections. The
+   projects are listed in a grid: **open**, **edit**, **duplicate** and **delete** first
+   (the last three open the project, then act), the name (🔑 when it has a project
+   password), the databases linked, the number of saved queries, when it was created and
+   last changed.
+   - **Project password** (🔑 in an open project): one password that opens the project and
+     connects every database it links, without asking their own passwords. Setting it
+     needs those passwords once (they are asked for where the page doesn't know them):
+     the project password keeps them, sealed with a key derived from it (Argon2id) and
+     then with the store's key, like the superuser's escrow. A connection linked later,
+     or whose password changed, is asked for once when the project opens, and kept from
+     then on. Opening a project with a password asks for it first; Cancel asks each
+     connection's password instead. Anyone with the project password can read those
+     databases through cactusdb: make it as strong as theirs (8 characters at least).
+     *Remove the project password* goes back to the connections' passwords.
 2. **Link** a saved connection under a short **alias** (`fb`, `maria`, `ms`: letters,
    digits and `_`). A project links up to **10** databases (the most SQLite can attach at
    once) of the types that speak SQL: SQLite, MySQL, MariaDB, PostgreSQL and its flavours
@@ -2164,6 +2179,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `projectsql.go` | A project query read just enough: the tables and columns it uses, the conditions that can go to the source (pushdown), and the stricter read-only check |
 | `projectrun.go` | Running a project query: the staging (a SQLite file per alias, attached read-only), type mapping, limits, progress, cancel, exports to `projects/<project>/` |
 | `projects_queries.go` | A project's saved queries and versions (`project_queries`, `project_query_versions`), columns and keys for the designer, join suggestions |
+| `projects_password.go` | The project password: the linked connections' passwords sealed with it (`projects.pw_lock`, `pw_seal`), opened and kept up to date when the project opens |
 | `projectfuncs.go` | cactusdb's own SQLite functions for the query builder's formats: `cdb_title`, `cdb_camel`, `cdb_date(x, 'yyyy-MMM-dd')`, `cdb_number(x, 'R #,##0.00')` |
 | `.github/ci/pq-roundtrip.mjs`, `.github/workflows/checks.yml`, `.github/workflows/projects-integration.yml` | The designer's SQL ↔ model round trips (on every push); a project joining MariaDB, PostgreSQL, SQL Server and Firebird, and the read-only guarantee against them (per release) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |
