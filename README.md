@@ -25,6 +25,9 @@ or export tables with a single command without opening a browser at all.
   database it writes to is a new one it creates itself, when it migrates a database to
   another type (☰ → Migrate database).
 - Remembers your connections, so you only type them once.
+- **Advanced query builder:** joins tables of different databases (say Firebird, MariaDB and
+  SQL Server) in one SELECT, with a visual designer, functions and formats for the output,
+  and exports of every row.
 
 ```sh
 cactusdb --port 8080 --web yes
@@ -168,10 +171,13 @@ The **Connections** menu at the bottom of the sidebar has these items:
 | **Folder setup** | Where exports and backups are saved, and where the connection database is kept; change either |
 | **Drivers** | The databases cactusdb supports, and the version of each built-in driver |
 | **Settings** | How long a connection may go unused before cactusdb disconnects it (see below), Google Analytics, and deleting old events of the usage log |
+| **E-mail server** | With `--remotelogin`: the mail server sign-in codes and invitations go through (see [E-mail server](#email-server)) |
+| **Users** | With `--remotelogin`: who can sign in, requests for access, your own password |
 | **Logs** | Opens the **Logs** tab (see below) |
 | **DB container deployment** | When the server has Docker or Kubernetes: deploy SQL Server, PostgreSQL, MySQL, Oracle, MongoDB… as a container, choosing the data folder, port and password, then add it as a connection. Each deployed container has a page with its settings and its CPU, memory and storage use, and start, stop, restart, delete and purge (see [Deploying a database as a container](#db-containers)) |
 | **Compare databases** | Compares the structure (DDL) of databases with a master and makes the script that removes the differences (see below) |
 | **Migrate database** | Copies a database, structure and data, with its views, procedures and triggers, to a new database of another type, e.g. Firebird to MariaDB (see [Migrating a database](#migrate)) |
+| **Advanced query builder** | Projects that link several databases of different types and query them together with one SELECT, with a visual query designer, saved queries and an optional project password (see [Advanced query builder](#projects)) |
 
 Click outside the menu or press Esc to close it. The connection details are only shown in
 the connection dialog, opened by **New connection** or **Edit**, never in the sidebar.

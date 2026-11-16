@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.20 — 2026-11-16
+
+- README: the advanced query builder in the introduction, and the menu table lists every
+  item of the ☰ menu (E-mail server, Users, Advanced query builder). No change to the
+  program.
+
 ## 1.62.19 — 2026-11-16
 
 - Advanced query builder: the open project's name in the tab row has a **×** that closes the
