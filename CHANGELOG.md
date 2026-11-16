@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.62.25 — 2026-11-16
+
+- README: *Save query* on the Data tab is the 💾 icon beside ▶ and ⟳ (it has been an icon
+  since 1.62.13). No change to the program.
+
 ## 1.62.24 — 2026-11-16
 
 - Advanced query builder: while a query runs, the results area is dimmed under a card

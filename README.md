@@ -447,7 +447,7 @@ page.
 
 <a id="saved-queries"></a>
 **Saved queries.** For a saved connection, write a query on the *Data* tab and click
-**💾 Save query**, then give it a **name** and a **description**. The form opens in the main
+**💾** (*Save query*, beside ▶ and ⟳), then give it a **name** and a **description**. The form opens in the main
 area, in place of the tab's page (not as a pop-up: the tabs and objects stay as they are), and
 fills it, so a long query has room; **← Back**, **Cancel** or Esc goes back to where you were,
 and clicking another tab leaves it too. Only read-only queries can
