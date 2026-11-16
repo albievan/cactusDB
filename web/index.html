@@ -9278,8 +9278,9 @@ function groupedGridHtml(res, sort, gidx, open) {
     `<th data-col="${i}" title="${esc(c)} – click to sort the rows in their groups">${esc(c)}${sort && sort.col === i ? `<span class="dir">${sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
   const body = render(top, 0);
   return `<div class="grpbar">Grouped by <b>${gidx.map((i) => esc(res.columns[i])).join(" → ")}</b> · ${top.length.toLocaleString()} group${top.length === 1 ? "" : "s"}` +
-    ` <button type="button" class="btn btn-sm btn-outline-secondary" data-gact="open" data-all="${esc(JSON.stringify(all))}">Expand all</button>` +
-    ` <button type="button" class="btn btn-sm btn-outline-secondary" data-gact="close">Collapse all</button>` +
+    ` <span class="btn-group btn-group-sm" role="group" aria-label="Groups">` +
+    `<button type="button" class="btn btn-outline-secondary" data-gact="open" data-all="${esc(JSON.stringify(all))}" title="Expand all the groups" aria-label="Expand all the groups"><i class="bi bi-arrows-expand" aria-hidden="true"></i></button>` +
+    `<button type="button" class="btn btn-outline-secondary" data-gact="close" title="Collapse all the groups" aria-label="Collapse all the groups"><i class="bi bi-arrows-collapse" aria-hidden="true"></i></button></span>` +
     (hidden ? ` <span class="hint">the first ${LIMIT.toLocaleString()} rows of the open groups are shown (exports hold every row)</span>` : "") + `</div>` +
     `<table class="table table-sm table-hover datagrid grouped"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }

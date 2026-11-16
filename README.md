@@ -1142,8 +1142,8 @@ per line). Each is as tall as you drag its bottom-right corner.
 - **Group** works two ways. With a **Total** on some column (COUNT, SUM…), it is SQL's
   `GROUP BY`: one row per group. Without one, it **groups the rows** for reading, like a
   pivot: the grid shows a row per value of that column (*Location: BIN · 12 rows*, with
-  the sums of the number columns), ▸ opens a group to show its rows, and *Expand all* /
-  *Collapse all* do every group; a second grouped column makes groups within groups.
+  the sums of the number columns), ▸ opens a group to show its rows, and the *Expand all*
+  / *Collapse all* icons (arrows apart / together) do every group; a second grouped column makes groups within groups.
   The exports keep the groups: **Excel** as an outline (a bold row per group, its rows
   one level deeper, so Excel's [-] / [+] fold them), **JSON** and **XML** nested by group,
   **CSV** sorted by the groups with their columns first. The SQL stays as it is, with a

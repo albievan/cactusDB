@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.62.22 — 2026-11-16
+
+- Advanced query builder: *Expand all* and *Collapse all* of grouped rows are icon buttons.
+
 ## 1.62.21 — 2026-11-16
 
 - Advanced query builder: **Group** without a total groups the rows for reading, like a
