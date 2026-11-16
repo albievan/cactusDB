@@ -7381,7 +7381,7 @@ document.addEventListener("change", (ev) => {
 // nothing else changes. Events are only pushed into gtag's queue, which
 // never waits or throws; once the tag is known to be unreachable nothing more
 // is queued. Only names of functions and fixed values are sent (see
-// GOOGLE_ANALYTICS.md), never data, SQL, names, paths or addresses.
+// docs/GOOGLE_ANALYTICS.md), never data, SQL, names, paths or addresses.
 const ga = { id: "", loaded: false, ok: false, dead: false };
 const GA_KEY = "cactusdb.analytics"; // "yes" | "no"; missing: not asked yet
 function gaChoice() { try { return localStorage.getItem(GA_KEY) || ""; } catch (e) { return "no"; } }

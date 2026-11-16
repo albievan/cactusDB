@@ -2,14 +2,14 @@
 
 cactusdb can send usage statistics to Google Analytics 4: which functions are used, how
 often, with which database types and export formats, and by which cactusdb version. The
-[usage log](README.md#the-usage-log-what-is-used-in-cactusdb) in `cactus.conn.db` keeps
+[usage log](../README.md#the-usage-log-what-is-used-in-cactusdb) in `cactus.conn.db` keeps
 the full detail on your own server either way; Google Analytics adds charts, trends over
 months and a view over time without running SQL.
 
 ## How it works
 
 - **One Measurement ID per cactusdb server.** Each server gets its own (production, test,
-  …), set in ☰ → ⚙ Settings or with `CACTUSDB_GA_ID` (which wins, e.g. in `deploy.sh`'s
+  …), set in ☰ → ⚙ Settings or with `CACTUSDB_GA_ID` (which wins, e.g. in `deploy/deploy.sh`'s
   `.env`). Without one, nothing is loaded and nothing is sent.
 - **Opt-in, per person.** When a server has an ID, everyone is asked once, in a bar at the
   bottom of the page: *May cactusdb send anonymous usage statistics to Google Analytics?*
@@ -55,7 +55,7 @@ months and a view over time without running SQL.
 | `ui_click`, `ui_toggle`, `ui_choose` | buttons, check boxes and drop-down lists with a fixed id | `control` (the id, e.g. `cmpDrops`); never the chosen value |
 | `cli_export`, `cli_export_ddl`, `cli_backup`, `cli_show_tables` | command-line runs | `engine`, `format`, `tables_bucket`, `result`, `duration_bucket` |
 
-Every event also has `app_version` (e.g. `1.62.16`).
+Every event also has `app_version` (e.g. `1.62.17`).
 
 **Never sent:** SQL, table, column, connection, host or database names, file paths, IP
 addresses, session ids, usernames, error messages, or anything typed. Google's terms
@@ -78,7 +78,7 @@ For **each** cactusdb server:
      *Scrolls* and *Outbound clicks* may stay on.
 3. **Copy the Measurement ID** (`G-…`, top right of the stream) into ☰ → ⚙ Settings →
    *Measurement ID of this cactusdb server* → **Save**. Or set `CACTUSDB_GA_ID=G-…` where
-   cactusdb runs (with `deploy.sh`: in `.env`) and restart it.
+   cactusdb runs (with `deploy/deploy.sh`: in `deploy/.env`) and restart it.
 4. **For command-line runs** (optional): in the stream, *Measurement Protocol API secrets*
    → *Create*, copy the value into ☰ → ⚙ Settings → *API secret* (or
    `CACTUSDB_GA_API_SECRET`), tick *Send command-line runs on this server too* and **Save**.

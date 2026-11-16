@@ -378,7 +378,7 @@ and starts that. The usage log records *install update* and *upgrade installed* 
 versions and the command).
 
 With a [superuser password](#superuser) set, **Install** asks for it: installing restarts
-cactusdb for everyone using it. Releases are **signed**: `build.sh` signs `release/SHA256SUMS`
+cactusdb for everyone using it. Releases are **signed**: `scripts/build.sh` signs `release/SHA256SUMS`
 with a private Ed25519 key kept outside the repository (in
 `~/.config/cactusdb/release-ed25519.key`, or `$CACTUSDB_RELEASE_KEY`), its public key is built
 into the binaries, and an update from GitHub is only installed when `SHA256SUMS.sig`
@@ -426,7 +426,7 @@ page.
 - **Setting it:** set it on the computer that runs cactusdb with
   `cactusdb --superuser set`, which asks twice and, when changing it, first asks for the
   current one. `cactusdb --superuser status` shows whether one is set. In a container, set
-  `CACTUSDB_SUPERUSER_PASSWORD` once (see `.env.example`). It only sets a missing password
+  `CACTUSDB_SUPERUSER_PASSWORD` once (see `deploy/.env.example`). It only sets a missing password
   and never changes an existing one.
 - **Never stored:** the password itself is never stored, and it isn't part of the program.
   It encrypts the private half of a key pair, and every connection password is also
@@ -1680,28 +1680,28 @@ The log looks like this:
 | Environment variable | What it does |
 |----------------------|--------------|
 | `CACTUSDB_DBPASSWORD` | The database password for [command-line exports](#4-exporting-from-the-command-line-no-browser), so you aren't prompted for it. |
-| `CACTUSDB_GA_ID` | The [Google Analytics](GOOGLE_ANALYTICS.md) Measurement ID of this server (`G-…`); wins over ☰ → Settings. |
+| `CACTUSDB_GA_ID` | The [Google Analytics](docs/GOOGLE_ANALYTICS.md) Measurement ID of this server (`G-…`); wins over ☰ → Settings. |
 | `CACTUSDB_GA_API_SECRET` | The Measurement Protocol API secret, to send command-line runs to Google Analytics; wins over ☰ → Settings. |
 | `CACTUSDB_PASSPHRASE` | Derives the encryption key for saved usernames and passwords from this passphrase instead of using `cactus.key`. Nothing secret is then stored on disk, but you must set the same passphrase every time. On Windows: `set CACTUSDB_PASSPHRASE=…` (Command Prompt) or `$env:CACTUSDB_PASSPHRASE='…'` (PowerShell). |
 
 ### Deploying to Docker, k3s or Kubernetes — `deploy.sh`
 
-`deploy.sh` installs cactusdb as a container on **Docker** (Docker Desktop, Docker Engine or
+`deploy/deploy.sh` installs cactusdb as a container on **Docker** (Docker Desktop, Docker Engine or
 Podman), **Docker CE** on a Linux server (this one, or another one over SSH), **k3s** or any
 **Kubernetes** cluster, with all settings in an env file:
 
 ```sh
-cp .env.example .env             # then edit .env
-./deploy.sh --docker dd  --env .env --install
-./deploy.sh --docker ce  --env .env --install     # CE_HOST=admin@server in .env, or empty for this machine
-./deploy.sh --docker k3s --env .env --install
-./deploy.sh --docker k8s --env .env --install
-./deploy.sh --env .env --status
-./deploy.sh --env .env --uninstall            # keeps the data
-./deploy.sh --env .env --uninstall --purge    # also deletes the data volumes (asks first)
+cp deploy/.env.example deploy/.env   # then edit deploy/.env
+deploy/deploy.sh --docker dd --env deploy/.env --install
+deploy/deploy.sh --docker ce --env deploy/.env --install     # CE_HOST=admin@server in .env, or empty for this machine
+deploy/deploy.sh --docker k3s --env deploy/.env --install
+deploy/deploy.sh --docker k8s --env deploy/.env --install
+deploy/deploy.sh --env deploy/.env --status
+deploy/deploy.sh --env deploy/.env --uninstall            # keeps the data
+deploy/deploy.sh --env deploy/.env --uninstall --purge    # also deletes the data volumes (asks first)
 ```
 
-`.env.example` lists every setting with its default and an explanation. Lines are read as
+`deploy/.env.example` lists every setting with its default and an explanation. Lines are read as
 `KEY=VALUE` (the file isn't run), so it's safe to keep secrets such as
 `CACTUSDB_PASSPHRASE` in `.env`, which git ignores. `--install` again deploys a new build
 over the running one and keeps the data. Without `--docker`, the target comes from
@@ -1760,20 +1760,20 @@ does, `deploy.sh --docker dd` (or `ce`) does too. For Docker CE on a Linux serve
 folders are then on the server, `/srv/cactusdb` by default:
 
 ```sh
-./deploy-container.sh up --remote admin@server --install-docker --port 8087
-./deploy-container.sh status --remote admin@server       # also logs, restart, down
+deploy/deploy-container.sh up --remote admin@server --install-docker --port 8087
+deploy/deploy-container.sh status --remote admin@server       # also logs, restart, down
 ```
 
-`deploy-container.sh` builds a small Docker (or Podman) image from the Linux binary in
-`release/` (made by `./build.sh`) and runs cactusdb in it, listening on every address. The port is published on the
+`deploy/deploy-container.sh` builds a small Docker (or Podman) image from the Linux binary in
+`release/` (made by `scripts/build.sh`) and runs cactusdb in it, listening on every address. The port is published on the
 host, and the export folder and the saved-connections folder are stored on the host, so
 they survive upgrades and re-creating the container.
 
 ```sh
-./deploy-container.sh                                   # port 8080, data in ~/cactusdb
-./deploy-container.sh up --port 8087 --export-dir /srv/cactusdb/export --conn-dir /srv/cactusdb/conn
-./deploy-container.sh up --port 8087 --sqlite-dir /srv/sqlite   # also browse SQLite files
-./deploy-container.sh status | logs | restart | down
+deploy/deploy-container.sh                                   # port 8080, data in ~/cactusdb
+deploy/deploy-container.sh up --port 8087 --export-dir /srv/cactusdb/export --conn-dir /srv/cactusdb/conn
+deploy/deploy-container.sh up --port 8087 --sqlite-dir /srv/sqlite   # also browse SQLite files
+deploy/deploy-container.sh status | logs | restart | down
 ```
 ```
 cactusdb 1.31.0 is running in container cactusdb
@@ -1807,8 +1807,8 @@ cactusdb 1.31.0 is running in container cactusdb
   Linux.
 - The container runs as your user, so exports and connection files on the host belong to
   you. It restarts automatically (`--restart unless-stopped`) and has a health check.
-- The log goes to `./deploy-container.sh logs` (`docker logs`). The ⏻ Shutdown button isn't
-  shown; stop it with `./deploy-container.sh down`.
+- The log goes to `deploy/deploy-container.sh logs` (`docker logs`). The ⏻ Shutdown button isn't
+  shown; stop it with `deploy/deploy-container.sh down`.
 - Set `CACTUSDB_PASSPHRASE` before running the script to use a passphrase instead of
   `cactus.key` (see the table above).
 - **Export folder in a container:** a folder chosen in the web UI is a path *inside* the
@@ -1932,7 +1932,7 @@ WHERE source = 'server' AND (status >= 400 OR duration_ms > 5000) ORDER BY at DE
 ### Google Analytics (opt-in)
 
 Each cactusdb server can also send usage statistics to its own Google Analytics property,
-but only for people who say yes. [GOOGLE_ANALYTICS.md](GOOGLE_ANALYTICS.md) explains what
+but only for people who say yes. [docs/GOOGLE_ANALYTICS.md](docs/GOOGLE_ANALYTICS.md) explains what
 is sent and how to set it up. In short:
 
 - Set the server's **Measurement ID** in ☰ → Settings (or `CACTUSDB_GA_ID`). Without one,
@@ -2131,12 +2131,12 @@ cactusdb is written in Go and uses pure-Go drivers, so no CGO or C compiler is n
 
 ```sh
 go build -o cactusdb .   # build for this computer
-./build.sh               # build all six binaries into release/, as the version in VERSION
-./release.sh             # publish them as the GitHub release v<VERSION> (before pushing main)
+scripts/build.sh               # build all six binaries into release/, as the version in VERSION
+scripts/release.sh             # publish them as the GitHub release v<VERSION> (before pushing main)
 go test ./...            # unit tests
 ```
 
-Builds are **reproducible**: `build.sh` leaves the git state out of the binaries
+Builds are **reproducible**: `scripts/build.sh` leaves the git state out of the binaries
 (`-buildvcs=false`) and always builds with Go 1.26.0 (`GOTOOLCHAIN`; Go downloads and
 verifies it when another version is installed), so building a release's tag again gives the
 files of its `SHA256SUMS` byte for byte, which lets anyone check that a release was built from
@@ -2162,6 +2162,18 @@ reads every table of the Access files in a folder:
 ```sh
 CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 ```
+
+**Folder layout.**
+
+| Folder | What is there |
+|--------|---------------|
+| (top) | The Go code: one package (`main`), so all its files share one folder, each with its `_test.go`; `go.mod`. Also the files installed cactusdbs read from GitHub by name, which stay here: `VERSION`, `setup.sh`, `setup.ps1`; and `README.md`, `CHANGELOG.md`, `LICENSE` |
+| `web/` | The page (`index.html`, built into the binary) and the libraries it uses (`vendor/`) |
+| `release/` | `SHA256SUMS` and its signature (committed; read by installed cactusdbs), and the built binaries (not committed) |
+| `scripts/` | `build.sh` (build and sign the six binaries) and `release.sh` (publish them) |
+| `deploy/` | `deploy.sh`, `deploy-container.sh`, the `Dockerfile` and `.env.example` |
+| `docs/` | The Projects plan and requirements, and what Google Analytics receives |
+| `.github/` | CI: the workflows and the scripts they run (`.github/ci/`) |
 
 | File | Contents |
 |------|----------|
@@ -2207,9 +2219,9 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `superuser.go` | The superuser password: X25519 key pair, sealed connection passwords, `--superuser` |
 | `queries.go` | The saved-queries API (read-only check) and Check syntax |
 | `files.go` | The *Exported files* page: listing, previews, deleting, and compressed downloads of a selection |
-| `Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
-| `deploy.sh`, `.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
-| `deploy-container.sh` | Docker-only deployment (older) |
+| `deploy/Dockerfile` | Container image (no build steps, so it builds for any CPU without emulation) |
+| `deploy/deploy.sh`, `deploy/.env.example` | Deployment to Docker, k3s or Kubernetes, and its settings |
+| `deploy/deploy-container.sh` | Docker-only deployment (older) |
 | `crypt.go` | Encryption of saved usernames and passwords |
 | `compare.go` | ☰ → Compare databases: the structure of databases against a master, and the script that removes the differences |
 | `dbstats.go` | The Dashboard: the statistics queries of each kind of database and `/api/dbstats` |
@@ -2224,7 +2236,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `termlog.go` | Logging to the terminal without ever holding up a request |
 | `update.go`, `VERSION` | Checking GitHub for a newer version; `VERSION` names the latest release |
 | `upgrade.go`, `release/SHA256SUMS` | Installing a newer version from the web UI and restarting with the saved startup options (`startup_options` table); the checksums the download is checked against (written and signed by `build.sh`; the binaries themselves are in the GitHub release, not in git) |
-| `build.sh`, `release.sh` | Build and sign the six binaries into `release/`; publish them as the GitHub release `v<VERSION>` |
+| `scripts/build.sh`, `scripts/release.sh` | Build and sign the six binaries into `release/`; publish them as the GitHub release `v<VERSION>` |
 | `.github/workflows/setup-scripts.yml` | Installs each published release with `setup.sh` (Linux, macOS) and `setup.ps1` (Windows PowerShell 5.1 and 7), with the signature checked |
 | `.github/workflows/relationships-types.yml`, `.github/ci/relationships-types.mjs` | For every published release, and on demand: DB Relationships' column types on SQL Server and Oracle, read in a browser |
 | `.github/workflows/pdf-acrobat.yml`, `.github/ci/export-pdf.mjs` | For every published release, and on demand: exports a DB Relationships PDF in a browser and opens it in Adobe Acrobat Reader on Windows (installing Reader accepts Adobe's licence on the runner); fails unless Reader shows it, and keeps a screenshot as an artifact |

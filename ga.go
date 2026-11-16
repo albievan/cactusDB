@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// Google Analytics (see GOOGLE_ANALYTICS.md). Each cactusdb server has its
+// Google Analytics (see docs/GOOGLE_ANALYTICS.md). Each cactusdb server has its
 // own Measurement ID, set in ☰ → Settings (or $CACTUSDB_GA_ID, which wins).
 // Nothing is sent unless a person opts in, in their browser; the page then
 // loads Google's tag itself, so a blocked Google never holds anything up.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.17 — 2026-11-16
+
+- The repository's folders are tidied: `scripts/` holds `build.sh` and `release.sh` (they
+  work from any folder), `deploy/` holds `deploy.sh`, `deploy-container.sh`, the
+  `Dockerfile` and `.env.example` (`deploy.sh` still reads a `.env` at the top), and
+  `docs/` holds `GOOGLE_ANALYTICS.md`. What installed cactusdbs read from GitHub by name
+  stays where it was: `VERSION`, `setup.sh`, `setup.ps1`, `release/SHA256SUMS`. The README
+  has a *Folder layout* table. No change to the program.
+
 ## 1.62.16 — 2026-11-16
 
 - README: updating a server by hand (copy the binary, check it against `SHA256SUMS`, swap

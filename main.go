@@ -37,7 +37,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.62.16"
+var version = "1.62.17"
 
 //go:embed web
 var webFS embed.FS
@@ -143,7 +143,7 @@ type server struct {
 }
 
 func main() {
-	if ok, err := releaseCommand(os.Args[1:]); ok { // build.sh's signing helpers
+	if ok, err := releaseCommand(os.Args[1:]); ok { // scripts/build.sh's signing helpers
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "cactusdb:", err)
 			os.Exit(1)

@@ -3,17 +3,18 @@
 # address, with the port published and the export folder and the saved
 # connections folder (cactus.conn.db + cactus.key) stored on the host.
 #
-#   ./deploy-container.sh                       # build the image and start on port 8080
-#   ./deploy-container.sh up --port 8087 --export-dir /srv/cactusdb/export --conn-dir /srv/cactusdb/conn
-#   ./deploy-container.sh logs | status | restart | down
-#   ./deploy-container.sh up --remote admin@server [--install-docker]   # Docker CE on a Linux server
+#   deploy/deploy-container.sh                       # build the image and start on port 8080
+#   deploy/deploy-container.sh up --port 8087 --export-dir /srv/cactusdb/export --conn-dir /srv/cactusdb/conn
+#   deploy/deploy-container.sh logs | status | restart | down
+#   deploy/deploy-container.sh up --remote admin@server [--install-docker]   # Docker CE on a Linux server
 #
 # Works with docker or podman, and with Docker CE on another Linux server over
 # SSH (--remote; that part is done by deploy.sh --docker ce). Run
-# ./deploy-container.sh --help for every option.
+# deploy/deploy-container.sh --help for every option.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_DIR=$(cd "$SCRIPT_DIR/.." && pwd) # the repository: main.go, release/ and the Go code
 APP=/opt/cactusdb # where the image keeps the program, conn/ and export/
 
 # Defaults; each can also be set in the environment (e.g. CACTUSDB_PORT=8087).
@@ -200,13 +201,13 @@ mkdir -p "$ROOT/conn" "$ROOT/export"
 chmod 1777 "$ROOT/conn" "$ROOT/export" # sticky: whoever runs it can write, not remove others' files
 if [[ $FROM_SOURCE == yes ]]; then
   command -v go >/dev/null 2>&1 || die "--from-source needs Go installed"
-  VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$SCRIPT_DIR/main.go")
+  VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$REPO_DIR/main.go")
   echo "Compiling cactusdb $VERSION for linux/${ARCH}…"
-  (cd "$SCRIPT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -trimpath \
+  (cd "$REPO_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -trimpath \
     -ldflags "-s -w -X main.version=$VERSION" -o "$ROOT/cactusdb" .)
 else
-  BIN=$SCRIPT_DIR/release/cactusdb-linux-$ARCH
-  [[ -f $BIN ]] || die "$BIN not found: run ./build.sh first, or use --from-source"
+  BIN=$REPO_DIR/release/cactusdb-linux-$ARCH
+  [[ -f $BIN ]] || die "$BIN not found: run scripts/build.sh first, or use --from-source"
   cp "$BIN" "$ROOT/cactusdb"
 fi
 chmod 0755 "$ROOT/cactusdb"

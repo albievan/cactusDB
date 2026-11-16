@@ -2,20 +2,21 @@
 # Deploy cactusdb as a container: on Docker (dd), Docker CE on a Linux server
 # (ce), k3s or Kubernetes (k8s).
 #
-#   ./deploy.sh --docker dd  --env .env --install     # Docker Desktop / Docker / Podman here
-#   ./deploy.sh --docker ce  --env .env --install     # Docker CE, here or on CE_HOST over SSH
-#   ./deploy.sh --docker k3s --env .env --install     # k3s
-#   ./deploy.sh --docker k8s --env .env --install     # any Kubernetes cluster
-#   ./deploy.sh --env .env --status
-#   ./deploy.sh --env .env --uninstall [--purge]
+#   deploy/deploy.sh --docker dd  --env .env --install     # Docker Desktop / Docker / Podman here
+#   deploy/deploy.sh --docker ce  --env .env --install     # Docker CE, here or on CE_HOST over SSH
+#   deploy/deploy.sh --docker k3s --env .env --install     # k3s
+#   deploy/deploy.sh --docker k8s --env .env --install     # any Kubernetes cluster
+#   deploy/deploy.sh --env .env --status
+#   deploy/deploy.sh --env .env --uninstall [--purge]
 #
 # Every setting lives in the env file; .env.example lists them all with their
 # defaults. cactusdb listens on every address, the port is published, and the
 # export folder and the saved-connections folder (cactus.conn.db + cactus.key)
-# are kept outside the container. Run ./deploy.sh --help for the options.
+# are kept outside the container. Run deploy/deploy.sh --help for the options.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_DIR=$(cd "$SCRIPT_DIR/.." && pwd) # the repository: main.go, release/ and the Go code
 APP=/opt/cactusdb # where the image keeps the program, conn/ and export/
 
 usage() {
@@ -75,6 +76,7 @@ done
 # earlier one, and a variable already set in the environment wins over both.
 # --env none: no file at all.
 if [[ -z $ENV_FILE && -f $SCRIPT_DIR/.env ]]; then ENV_FILE=$SCRIPT_DIR/.env; fi
+if [[ -z $ENV_FILE && -f $REPO_DIR/.env ]]; then ENV_FILE=$REPO_DIR/.env; fi # where it was before deploy/
 if [[ $ENV_FILE == none ]]; then
   ENV_FILE='' # settings from the environment only
 elif [[ -n $ENV_FILE ]]; then
@@ -215,7 +217,7 @@ TARGET=${TARGET:-dd}
 case $TARGET in dd|ce|k3s|k8s) ;; docker) TARGET="dd" ;; docker-ce) TARGET=ce ;; *) die "--docker must be dd, ce, k3s or k8s, not $TARGET" ;; esac
 case $CE_INSTALL_DOCKER in yes|no) ;; *) die "CE_INSTALL_DOCKER must be yes or no" ;; esac
 
-VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$SCRIPT_DIR/main.go" 2>/dev/null || true)
+VERSION=$(sed -n 's/^var version = "\(.*\)"/\1/p' "$REPO_DIR/main.go" 2>/dev/null || true)
 VERSION=${VERSION:-latest}
 
 # ---- building the image ---------------------------------------------------
@@ -234,11 +236,11 @@ build_image() {
     if [[ $FROM_SOURCE == yes ]]; then
       command -v go >/dev/null 2>&1 || die "--from-source needs Go installed"
       say "Compiling cactusdb $VERSION for linux/${arch}…"
-      (cd "$SCRIPT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath \
+      (cd "$REPO_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath \
         -ldflags "-s -w -X main.version=$VERSION" -o "$root/cactusdb" .)
     else
-      local bin=$SCRIPT_DIR/release/cactusdb-linux-$arch
-      [[ -f $bin ]] || die "$bin not found: run ./build.sh first, or use --from-source"
+      local bin=$REPO_DIR/release/cactusdb-linux-$arch
+      [[ -f $bin ]] || die "$bin not found: run scripts/build.sh first, or use --from-source"
       cp "$bin" "$root/cactusdb"
     fi
     chmod 0755 "$root/cactusdb"

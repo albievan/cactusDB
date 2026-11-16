@@ -1,10 +1,11 @@
 #!/bin/sh
 # Cross-compiles cactusdb for Linux, macOS and Windows into ./release. The
 # binaries aren't committed: they are published as the GitHub release
-# v<version> (release.sh). release/SHA256SUMS and its signature are
+# v<version> (scripts/release.sh). release/SHA256SUMS and its signature are
 # committed, so the web UI can check a file the browser was given.
 # All drivers are pure Go, so CGO is disabled and no toolchains are needed.
 set -e
+cd "$(dirname "$0")/.." # the repository's root, from wherever it is run
 # The version is in the VERSION file, which running cactusdbs check for updates.
 VERSION=${VERSION:-$(cat VERSION)}
 # Releases are built with this exact Go, so building a release's tag again gives

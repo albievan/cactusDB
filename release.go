@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Releases are signed: build.sh signs release/SHA256SUMS with a private
+// Releases are signed: scripts/build.sh signs release/SHA256SUMS with a private
 // Ed25519 key kept outside the repository, and the public key is built into
 // the binaries (releaseKey, set with -ldflags). An update from GitHub is only
 // installed when SHA256SUMS carries a valid signature by that key, so a
@@ -21,7 +21,7 @@ import (
 // build that isn't a release: its updates aren't checked for a signature).
 var releaseKey = ""
 
-// releaseCommand runs build.sh's helpers: release-keygen <key file> makes a
+// releaseCommand runs scripts/build.sh's helpers: release-keygen <key file> makes a
 // key (once), release-pubkey <key file> prints its public key, and
 // release-sign <key file> <file> writes <file>.sig. ok is false for any
 // other command line.
