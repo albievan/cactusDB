@@ -817,9 +817,13 @@ sign-in page shows, on the left in green, what cactusdb does and its
 source on GitHub, and **Install or upgrade cactusdb on your own computer or server**: three
 tabs with every command and a copy button each (the row of the visitor's own system
 marked). *Standalone*: the setup scripts, one download per system, and how to start it.
-*Container*: step by step with `deploy/deploy.sh` for Docker Desktop, Docker CE, Podman,
-k3s or Kubernetes, from Linux, macOS or Windows (in WSL). *Upgrade*: from the page, by hand,
-or a container. On the right the form, and the version. Each password box has a small eye button in it
+*Container*: step by step with `deploy/deploy.sh` for Docker Desktop, Docker CE (a Linux
+server over SSH), Podman, k3s or Kubernetes, run from Linux, Windows (Ubuntu on WSL 2) or
+macOS: installing what is needed (Docker, git, Podman, k3s, kubectl, an SSH key), getting
+the scripts and the program, the settings (`deploy/.env`), installing, opening it, and
+later upgrading, its status and removing it. *Upgrade*, by how it was installed
+(standalone or each container platform) and the system the steps run on: from cactusdb's
+own *Install* button, or by hand, the newest or a particular version. On the right the form, and the version. Each password box has a small eye button in it
 that shows what is typed there, and hides it again.
 
 ```sh

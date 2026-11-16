@@ -162,7 +162,7 @@
       <p class="src">Free and open source: <a href="https://github.com/albievan/cactusDB" target="_blank" rel="noreferrer"><i class="bi bi-github" aria-hidden="true"></i> github.com/albievan/cactusDB</a></p>
       <details class="install" id="install">
         <summary>Install or upgrade cactusdb on your own computer or server</summary>
-        <p class="ilead">As a standalone program, or in a container on Docker Desktop, Docker CE, Podman, k3s or Kubernetes, step by step for Linux, macOS and Windows; and how to upgrade to a new version.</p>
+        <p class="ilead">As a standalone program, or in containers on Docker Desktop, Docker CE, Podman, k3s or Kubernetes, step by step for Linux, Windows and macOS; and how to upgrade to a new version.</p>
         <div class="itabs" role="tablist" aria-label="How to install">
           <button type="button" role="tab" data-itab="standalone" aria-selected="true"><i class="bi bi-download" aria-hidden="true"></i> Standalone</button>
           <button type="button" role="tab" data-itab="container" aria-selected="false"><i class="bi bi-box" aria-hidden="true"></i> Container</button>
@@ -332,49 +332,101 @@ const rows = (list) => `<ul>${list.map(([l, p, c]) => `<li class="${isMine(p) ? 
 const steps = (list) => `<ol class="steps">${list.map((s) => `<li><div class="sbody"><div class="st">${iesc(s.t)}</div>${s.p ? `<p>${s.p}</p>` : ""}` +
   (s.c || []).map(([l, c]) => `<div class="box"><div class="cmd">${l ? `<div class="cl">${iesc(l)}</div>` : ""}<pre><code>${iesc(c)}</code></pre></div>${copyBtn(c, s.t + (l ? " (" + l + ")" : ""))}</div>`).join("") + `</div></li>`).join("")}</ol>`;
 
-// The container ways: deploy/deploy.sh (in cactusdb's repository) does the work on each.
-const CPLAT = [["dd", "Docker Desktop", ["linux", "darwin", "windows"]], ["ce", "Docker CE", ["linux", "darwin", "windows"]], ["podman", "Podman", ["linux", "darwin", "windows"]],
-  ["k3s", "k3s", ["linux", "darwin", "windows"]], ["k8s", "Kubernetes", ["linux", "darwin", "windows"]]];
-const COS = [["linux", "Linux"], ["darwin", "macOS"], ["windows", "Windows"]];
-let cPlat = "dd", cOS = myOS || "linux", uWay = "page";
+// The container ways: deploy/deploy.sh (in cactusdb's repository) does the work on each,
+// step by step from the computer the steps run on (Windows: in Ubuntu on WSL 2).
+const CPLAT = [["dd", "Docker Desktop"], ["ce", "Docker CE (a Linux server)"], ["podman", "Podman"], ["k3s", "k3s"], ["k8s", "Kubernetes"]];
+const COS = [["linux", "Linux"], ["windows", "Windows"], ["darwin", "macOS"]];
+let cPlat = "dd", cOS = myOS || "linux", uWay = "standalone", uOS = myOS || "linux";
+const code = (s) => `<code style="display:inline">${s}</code>`;
+const S_WSL = { t: "Install Ubuntu on WSL 2", p: `The deploy script is a bash script, so on Windows it runs in Ubuntu on WSL 2. In PowerShell opened as administrator (restart Windows if it asks), then open <i>Ubuntu</i> from the Start menu and choose a user name and password. Run every next step in that Ubuntu window.`, c: [["", "wsl --install -d Ubuntu-24.04"]] };
+const S_DDWIN = { t: "Install Docker Desktop", p: `From <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noreferrer">docker.com/products/docker-desktop</a>, with the WSL 2 backend. Then in Docker Desktop: Settings → Resources → WSL integration → turn on Ubuntu-24.04 → Apply &amp; restart.` };
+const S_GITWSL = (also) => ({ t: "Install git" + (also ? " and check " + also : ""), p: "In the Ubuntu window.", c: [["", "sudo apt update && sudo apt install -y git curl"], ...(also === "Docker" ? [["", "docker version"]] : [])] });
+const S_GET = { t: "Get cactusdb's deploy scripts", p: `Anywhere in your home folder (on Windows in the Ubuntu window, not under ${code("/mnt/c")}). Upgrades later come from this folder.`, c: [["", "git clone https://github.com/albievan/cactusDB.git\ncd cactusDB"]] };
+const S_DL = { t: "Download the program for the container", p: "The image is made from the Linux program of the newest release (both processors: it is built for the machine it runs on). Nothing needs compiling.",
+  c: [["", `mkdir -p release\nfor a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done`]] };
+const S_SSH = (who) => ({ t: "Sign in to the server with a key", p: `Replace ${code(who)} with the user and address of your server. The deploy script works over SSH, without a password.`,
+  c: [["", `ssh-keygen -t ed25519\nssh-copy-id ${who}\nssh ${who} true`]] });
+const envBox = (lines, note) => ({ t: "Choose the settings", p: `Writes ${code("deploy/.env")} (every other setting keeps its default; ${code("deploy/.env.example")} explains them all). ${note || ""}`, c: [["", `cat > deploy/.env <<'EOF'\n${lines.join("\n")}\nEOF`]] });
+const later = (t, extra) => ({ t: "Later: upgrade and look after it", p: "In the cactusDB folder. An upgrade keeps the data (saved connections and exports).",
+  c: [["Upgrade to the newest version", `git pull\nfor a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done\ndeploy/deploy.sh --docker ${t} --env deploy/.env --install`],
+    ["What is running", "deploy/deploy.sh --env deploy/.env --status"], ["Remove it (keeps the data; add --purge to delete it too)", "deploy/deploy.sh --env deploy/.env --uninstall"], ...(extra || [])] });
 function containerSteps(plat, os) {
-  const win = os === "windows", target = plat === "podman" ? "dd" : plat;
-  const out = [];
-  if (win) out.push({ t: "Open a WSL terminal", p: `The deploy script is a bash script: run it in <b>WSL 2</b> (Ubuntu). In PowerShell, once: <code style="display:inline">wsl --install</code>, then open <i>Ubuntu</i>. ${plat === "dd" ? "Turn on Docker Desktop's <i>Use the WSL 2 based engine</i> and its integration with your Ubuntu." : ""}` });
-  out.push({ t: "Get the deploy scripts", p: "cactusdb's repository holds them (deploy/), with the Dockerfile.", c: [["", "git clone https://github.com/albievan/cactusDB.git && cd cactusDB"]] });
-  out.push({ t: "Download the program for the container", p: "The image is built from the Linux program of the newest release (both processors: the image is made for the machine it runs on).",
-    c: [["", `mkdir -p release && for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done`]] });
-  if (plat === "dd") out.push({ t: "Install Docker Desktop", p: `From <a href="https://docs.docker.com/desktop/" target="_blank" rel="noreferrer">docs.docker.com/desktop</a>${os === "linux" ? " (or Docker Engine)" : ""}; start it, then check that it answers:`, c: [["", "docker version"]] });
-  if (plat === "podman") out.push({ t: "Install Podman", p: `From <a href="https://podman.io/docs/installation" target="_blank" rel="noreferrer">podman.io</a>.${os === "linux" ? "" : " On macOS and Windows it runs in a small virtual machine: create and start it once."}`,
-    c: os === "linux" ? [["", "podman version"]] : [["", "podman machine init && podman machine start"], ["Check", "podman version"]] });
-  if (plat === "ce") out.push({ t: "A Linux server with Docker CE", p: "cactusdb runs on a Linux server; this computer drives it over SSH. You need SSH access with a key, and the <code style=\"display:inline\">docker</code> command here (Docker Desktop, or just the Docker CLI). Docker CE on the server can be installed for you (next step)." ,
-    c: [["Check the SSH access", "ssh admin@server true"]] });
-  if (plat === "k3s") out.push({ t: "A k3s server", p: "k3s on a Linux server, and Docker or Podman where you run the deploy script (to build the image). Simplest: run the next steps on the k3s server itself. From another computer, let kubectl reach the server with its kubeconfig (and SSH with sudo to load the image there).",
-    c: [["On the server", "curl -sfL https://get.k3s.io | sh -"], ["Check, on the server", "sudo k3s kubectl get nodes"], ["Only from another computer: its kubeconfig", "mkdir -p ~/.kube && ssh admin@server sudo cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/server/' > ~/.kube/config"]] });
-  if (plat === "k8s") out.push({ t: "A Kubernetes cluster", p: "kubectl that reaches the cluster, Docker or Podman to build the image, and a registry the cluster pulls from (Docker Desktop's own Kubernetes needs none).", c: [["Check", "kubectl get nodes"]] });
-  const env = { dd: ["CACTUSDB_PORT=8080", "DD_CONN_DIR=~/cactusdb/conn", "DD_EXPORT_DIR=~/cactusdb/export"], podman: ["CONTAINER_RUNTIME=podman", "CACTUSDB_PORT=8080"],
-    ce: ["CE_HOST=admin@server", "CE_INSTALL_DOCKER=yes      # installs Docker CE on the server if it's missing", "CACTUSDB_PORT=8080"],
-    k3s: ["K3S_SSH=                   # empty on the k3s server; admin@server from another computer", "K8S_SERVICE_TYPE=NodePort  # or LoadBalancer (k3s has one built in)"],
-    k8s: ["K8S_CONTEXT=my-cluster", "K8S_REGISTRY=registry.example.com/cactusdb", "K8S_SERVICE_TYPE=LoadBalancer"] }[plat];
-  out.push({ t: "Settings", p: "Copy the example settings and change these lines in <code style=\"display:inline\">deploy/.env</code> (every setting is explained in the file):", c: [["", "cp deploy/.env.example deploy/.env"], ["In deploy/.env", env.join("\n")]] });
-  out.push({ t: "Install", p: "Builds the image and starts cactusdb; run it again later to deploy a new version over it (the data stays).", c: [["", `deploy/deploy.sh --docker ${target} --env deploy/.env --install`]] });
-  out.push({ t: "Check and open it", p: "It prints the address to open (with k3s and Kubernetes also a <code style=\"display:inline\">kubectl port-forward</code> command when none answers from here). To remove it: <code style=\"display:inline\">--uninstall</code> (keeps the data).", c: [["", "deploy/deploy.sh --env deploy/.env --status"]] });
+  const win = os === "windows", mac = os === "darwin", out = [];
+  if (plat === "dd") {
+    if (win) out.push(S_WSL, S_DDWIN, S_GITWSL("Docker"));
+    else if (mac) out.push({ t: "Install Docker Desktop and git", p: `Docker Desktop for Mac (Apple Silicon or Intel) from <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noreferrer">docker.com/products/docker-desktop</a>; install and start it. Then in Terminal install git (skip it if ${code("git --version")} works).`, c: [["", "xcode-select --install"], ["Check", "docker version"]] });
+    else out.push({ t: "Install Docker and git", p: "Docker Engine (or Docker Desktop for Linux) on Ubuntu, Debian, Fedora, RHEL, Rocky or Alma Linux. Then let your user run docker; log out and in again if docker still says permission denied.",
+      c: [["", "curl -fsSL https://get.docker.com | sudo sh"], ["git: Ubuntu and Debian", "sudo apt install -y git"], ["git: Fedora, RHEL, Rocky and Alma", "sudo dnf install -y git"], ["", "sudo usermod -aG docker $USER\nnewgrp docker\ndocker version"]] });
+    out.push(S_GET, S_DL, envBox(["CACTUSDB_PORT=8080", "DD_DATA_DIR=~/cactusdb        # conn/ (saved connections) and export/ go in here"]));
+    out.push({ t: "Install", p: "Builds the image and starts cactusdb; Docker starts it again after a restart" + (win || mac ? " (whenever Docker Desktop runs)." : "."), c: [["", "deploy/deploy.sh --docker dd --env deploy/.env --install"]] });
+    out.push({ t: "Open it", p: `Open <b>http://localhost:8080</b>${win ? " in your Windows browser" : ""} (from another computer: http://&lt;this computer&gt;:8080). A database on this computer is ${code("host.docker.internal")} inside the container, not localhost.` });
+    out.push(later("dd"));
+  } else if (plat === "ce") {
+    if (win) out.push(S_WSL, S_DDWIN, S_GITWSL("Docker"));
+    else if (mac) out.push({ t: "Install Docker Desktop and git", p: "Here only for the docker command: the image is built and runs on the server.", c: [["", "xcode-select --install"], ["Check", "docker version"]] });
+    else out.push({ t: "Install the docker command and git", p: "Here only the docker command is needed (the image is built and runs on the server): Docker Engine, or just its CLI.", c: [["", "curl -fsSL https://get.docker.com | sudo sh"], ["git: Ubuntu and Debian", "sudo apt install -y git"], ["git: Fedora, RHEL, Rocky and Alma", "sudo dnf install -y git"]] });
+    out.push(S_SSH("admin@your-server"), S_GET, S_DL, envBox(["CE_HOST=admin@your-server", "CE_INSTALL_DOCKER=yes          # installs Docker CE on the server if missing (needs sudo there)", "CE_DATA_DIR=/srv/cactusdb       # on the server: conn/ and export/", "CACTUSDB_PORT=8080"],
+      `To run it on this Linux machine itself instead, leave ${code("CE_HOST")} empty.`));
+    out.push({ t: "Install", p: "Every docker command runs on the server over SSH: the image is built there for its processor, and Docker CE starts cactusdb again after the server restarts.", c: [["", "deploy/deploy.sh --docker ce --env deploy/.env --install"]] });
+    out.push({ t: "Open it", p: `Open <b>http://your-server:8080</b>. A database on the server itself is ${code("host.docker.internal")} inside the container.` });
+    out.push(later("ce"));
+  } else if (plat === "podman") {
+    if (win) out.push(S_WSL, { t: "Install Podman and git", p: "In the Ubuntu window. Rootless: no sudo for Podman itself.", c: [["", "sudo apt update && sudo apt install -y podman git curl\npodman version"]] },
+      { t: "Keep it running", p: "cactusdb runs while Ubuntu runs: after restarting Windows, open Ubuntu (Podman starts it again where it can; or run the install command again, the data is kept).", c: [["", "systemctl --user enable --now podman-restart.service"]] });
+    else if (mac) out.push({ t: "Install Podman and git", p: `Podman from <a href="https://podman.io/docs/installation" target="_blank" rel="noreferrer">podman.io</a> (or ${code("brew install podman")}); on macOS it runs in a small virtual machine: create and start it once.`, c: [["", "xcode-select --install"], ["", "podman machine init\npodman machine start\npodman version"]] });
+    else out.push({ t: "Install Podman and git", p: "Rootless: no sudo for Podman itself.", c: [["Fedora, RHEL, Rocky and Alma", "sudo dnf install -y podman git"], ["Ubuntu and Debian", "sudo apt update && sudo apt install -y podman git curl"], ["Check", "podman version"]] },
+      { t: "Keep it running", p: "Linger keeps cactusdb running when you log out; podman-restart starts it again after a reboot (Podman 4.4 or newer).", c: [["", "systemctl --user enable --now podman-restart.service\nsudo loginctl enable-linger $USER"]] });
+    out.push(S_GET, S_DL, envBox(["CONTAINER_RUNTIME=podman", "CACTUSDB_PORT=8080", "DD_DATA_DIR=~/cactusdb        # conn/ (saved connections) and export/ go in here"]));
+    out.push({ t: "Install", p: "Builds the image with Podman and starts cactusdb.", c: [["", "deploy/deploy.sh --docker dd --env deploy/.env --install"]] });
+    out.push({ t: "Open it", p: `Open <b>http://localhost:8080</b>${win ? " in your Windows browser" : ""} (from another computer: http://&lt;this computer&gt;:8080).` });
+    out.push(later("dd"));
+  } else if (plat === "k3s") {
+    if (os === "linux") {
+      out.push({ t: "Install k3s, Docker and git on the server", p: "As root (sudo -i) on the Linux server: k3s, and Docker to build the image (k3s gets it without a registry).",
+        c: [["", "curl -sfL https://get.k3s.io | sh -\nk3s kubectl get nodes"], ["", "curl -fsSL https://get.docker.com | sh"], ["git: Ubuntu and Debian", "apt install -y git"], ["git: Fedora, RHEL, Rocky and Alma", "dnf install -y git"]] });
+      out.push(S_GET, S_DL, envBox(["K8S_SERVICE_TYPE=NodePort       # or LoadBalancer (k3s has one built in)", "K8S_STORAGE=pvc                 # k3s's local-path volumes; hostpath for folders on the node"]));
+      out.push({ t: "Install", p: "Builds the image, imports it into k3s and applies the namespace cactusdb, its Deployment, Service and volumes. Or run these steps from your own computer instead: choose Windows or macOS above.", c: [["", "deploy/deploy.sh --docker k3s --env deploy/.env --install"]] });
+    } else {
+      out.push({ t: "Install k3s on a Linux server", p: "k3s runs on Linux only: a server, a VM or a Raspberry Pi 4/5. As root on that server:", c: [["", "curl -sfL https://get.k3s.io | sh -\nk3s kubectl get nodes"]] });
+      if (win) out.push(S_WSL, S_DDWIN, S_GITWSL("Docker"));
+      else out.push({ t: "Install Docker Desktop and git", p: "Docker builds the image here; the deploy script copies it to the server over SSH.", c: [["", "xcode-select --install"], ["Check", "docker version"]] });
+      out.push(S_SSH("root@your-server"), { t: "Let kubectl reach the server", p: `kubectl${win ? " in Ubuntu" : ""} with the server's kubeconfig (its address in place of 127.0.0.1).`,
+        c: [["", `${mac ? "brew install kubectl" : 'curl -fLO "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/$(dpkg --print-architecture)/kubectl" && sudo install kubectl /usr/local/bin/'}\nmkdir -p ~/.kube\nssh root@your-server cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/your-server/' > ~/.kube/config\nkubectl get nodes`]] });
+      out.push(S_GET, S_DL, envBox(["K3S_SSH=root@your-server        # the image goes to k3s over SSH", "K8S_SERVICE_TYPE=NodePort       # or LoadBalancer (k3s has one built in)"]));
+      out.push({ t: "Install", p: "Builds the image here, copies it to k3s over SSH, then applies the namespace cactusdb, its Deployment, Service and volumes.", c: [["", "deploy/deploy.sh --docker k3s --env deploy/.env --install"]] });
+    }
+    out.push({ t: "Open it", p: `The install prints the address, e.g. <b>http://your-server:&lt;node port&gt;</b> (fixed with ${code("K8S_NODE_PORT")}), or the ${code("kubectl port-forward")} command to use when none answers from here.` });
+    out.push(later("k3s"));
+  } else {
+    if (win) out.push(S_WSL, S_DDWIN);
+    out.push({ t: "Prepare kubectl, Docker and a registry", p: `${win ? "In the Ubuntu window. " : ""}kubectl with your cluster's config (${code("kubectl get nodes")} works), Docker or Podman to build the image, git, and a container registry the cluster can pull from (Docker Desktop's own Kubernetes needs none). The image is built for the nodes' processor.`,
+      c: [["", (win ? "sudo apt update && sudo apt install -y git curl\n" : "") + "kubectl get nodes\ndocker login registry.example.com"]] });
+    out.push(S_GET, S_DL, envBox(["K8S_CONTEXT=                    # empty: kubectl's current context", "K8S_REGISTRY=registry.example.com/cactusdb", "K8S_SERVICE_TYPE=LoadBalancer   # or NodePort, or ClusterIP behind your ingress", "K8S_STORAGE_CLASS=              # empty: the cluster's default"]));
+    out.push({ t: "Install", p: "Builds the image, pushes it to the registry and applies the namespace cactusdb, its Deployment (one replica, an unprivileged user, a read-only root filesystem), Service and volumes.", c: [["", "deploy/deploy.sh --docker k8s --env deploy/.env --install"]] });
+    out.push({ t: "Open it", p: `The install prints the address (the load balancer's, or a node port), or the ${code("kubectl port-forward")} command when none answers from here.` });
+    out.push(later("k8s"));
+  }
   return out;
 }
-const UWAY = [["page", "From the page"], ["standalone", "Standalone, by hand"], ["container", "Container"]];
-function upgradeSteps(way) {
-  if (way === "page") return [
-    { t: "Check for update", p: "In cactusdb, the cloud button at the top right (a dot on it means a newer version is out) shows the version you have and the newest." },
-    { t: "Install and restart", p: "<b>Install <i>x.y.z</i> and restart</b> (click twice) downloads the new program, checks its signature, keeps the old one as <code style=\"display:inline\">cactusdb.old</code> and starts the new one with the same options. Open pages reload themselves." },
-    { t: "Before 1.61", p: "Versions older than 1.61.0 can't do this: upgrade them once by hand (<i>Standalone, by hand</i>); after that the button works." }];
+const UWAY = [["standalone", "Standalone program"], ["dd", "Docker Desktop"], ["ce", "Docker CE"], ["podman", "Podman"], ["k3s", "k3s"], ["k8s", "Kubernetes"]];
+function upgradeSteps(way, os) {
+  const win = os === "windows";
   if (way === "standalone") return [
-    { t: "In cactusdb's folder, download the new version", p: "The same command as installing: the setup script replaces the program (a running cactusdb keeps running).", c: [["Linux and macOS", `curl -fsSL ${RAW}/setup.sh | sh`], ["Windows (PowerShell)", `irm ${RAW}/setup.ps1 | iex`]] },
-    { t: "Stop the running cactusdb", p: "With ⏻ Shutdown in its menu (a background one), Ctrl+C in its terminal, or by its process id:", c: [["Linux and macOS", "kill $(cat cactusdb.pid)"]] },
-    { t: "Start it again with the same options", c: [["For example", "./cactusdb --port 8080 --runas background"]] }];
+    { t: "See whether a newer version is out", p: "In cactusdb, the cloud button at the top right (with a dot when a newer version is out) shows the version running now and the newest one." },
+    { t: "Easiest: install it from cactusdb", p: "In that window, <b>Install <i>x.y.z</i> and restart</b> (click twice). cactusdb downloads the program for this computer, checks its signature, keeps the old one as <code style=\"display:inline\">cactusdb.old</code> and restarts with the same options; open pages reload themselves. Versions before 1.61.0 can't: upgrade them once by hand." },
+    { t: "Or by hand: run the setup script again", p: "In a terminal, in the folder cactusdb lives in. It downloads the newest release (or the one you name), checks it, and replaces the program; your connections and exports stay where they are.",
+      c: win ? [["The newest version (PowerShell)", `irm ${RAW}/setup.ps1 | iex`], ["A particular version (its number in place of 1.62.0)", `$env:CACTUSDB_VERSION="1.62.0"; irm ${RAW}/setup.ps1 | iex`]]
+        : [["The newest version", `curl -fsSL ${RAW}/setup.sh | sh`], ["A particular version (its number in place of 1.62.0)", `curl -fsSL ${RAW}/setup.sh | CACTUSDB_VERSION=1.62.0 sh`]] },
+    { t: "Restart cactusdb", p: "Stop it (⏻ Shutdown in its menu, Ctrl+C in its terminal" + (win ? "" : ", or kill its process") + ") and start it again with the same options.",
+      c: win ? [["For example", ".\\cactusdb.exe --port 8080 --runas background"], ["Which version is here", ".\\cactusdb.exe --version"]] : [["", "kill $(cat cactusdb.pid)"], ["For example", "./cactusdb --port 8080 --runas background"], ["Which version is here", "./cactusdb --version"]] },
+    { t: "Check", p: "Its version shows under its name at the top left, and on this page under the form." }];
+  const t = way === "podman" ? "dd" : way;
   return [
-    { t: "Update the deploy scripts", c: [["In the cactusDB folder", "git pull"]] },
-    { t: "Download the new program", c: [["", `for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done`]] },
-    { t: "Install it over the running one", p: "The same settings; the data (connections, exports) stays.", c: [["", "deploy/deploy.sh --env deploy/.env --install"]] }];
+    ...(win ? [{ t: "Open Ubuntu", p: "The deploy script runs in Ubuntu on WSL 2, as when you installed it." }] : []),
+    { t: "Go to the cactusDB folder and update the deploy scripts", p: "The folder you installed from.", c: [["", "cd ~/cactusDB\ngit pull"]] },
+    { t: "Download the new program", c: [["The newest version", `for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done`], ["A particular version (its number in place of 1.62.0)", "for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a https://github.com/albievan/cactusDB/releases/download/v1.62.0/cactusdb-linux-$a; done"]] },
+    { t: "Install it over the running one", p: "With the same settings: the new image replaces the old one, and the data (saved connections, exports) stays.", c: [["", `deploy/deploy.sh --docker ${t} --env deploy/.env --install`]] },
+    { t: "Check", p: "What is running, and its version under cactusdb's name at the top left.", c: [["", "deploy/deploy.sh --env deploy/.env --status"]] }];
 }
 const choice = (legend, list, val, key) => `<div class="choice"><div class="lg">${legend}</div><div class="opts">${list.map(([k, l]) => `<button type="button" data-${key}="${k}" aria-pressed="${k === val}">${iesc(l)}</button>`).join("")}</div></div>`;
 function renderInstall(tab) {
@@ -382,11 +434,11 @@ function renderInstall(tab) {
   let h = "";
   if (tab === "standalone") h = `<p>Run one command in the folder you want cactusdb in. The setup scripts pick the right file for the system and check its signature; the other commands download one particular file. Then start it, and open <b>http://&lt;this computer&gt;:8080</b>.</p>` +
     `<div class="ihead">Setup script: picks the right file itself and checks it</div>${rows(IM.setup)}<div class="ihead">One particular file</div>${rows(IM.files)}<div class="ihead">Then start it</div>${rows(IM.start)}`;
-  else if (tab === "container") {
-    const osOK = CPLAT.find((p) => p[0] === cPlat)[2], os = osOK.includes(cOS) ? cOS : "linux";
-    h = `<p>Step by step with <code style="display:inline">deploy/deploy.sh</code> from cactusdb's repository: choose where it runs and the system you work on.</p>` +
-      choice("Where it runs", CPLAT.map((p) => [p[0], p[1]]), cPlat, "cplat") + choice("Your computer", COS.filter((o) => osOK.includes(o[0])), os, "cos") + steps(containerSteps(cPlat, os));
-  } else h = `<p>How to move to a newer version, by the way cactusdb was installed. Every way keeps your saved connections and exports.</p>` + choice("Installed", UWAY, uWay, "uway") + steps(upgradeSteps(uWay));
+  else if (tab === "container")
+    h = `<p><code style="display:inline">deploy/deploy.sh</code> installs cactusdb as a container from a copy of its repository: on Docker or Podman on one computer, on Docker CE on a Linux server, or on k3s or any Kubernetes cluster. It builds the image and keeps your saved connections and exports on volumes.</p>` +
+      choice("Container platform", CPLAT, cPlat, "cplat") + choice("Run the steps on", COS, cOS, "cos") + steps(containerSteps(cPlat, cOS));
+  else h = `<p>Upgrading keeps your saved connections, settings and exports. Choose how this cactusdb was installed.</p>` +
+    choice("Installed as", UWAY, uWay, "uway") + choice("Run the steps on", COS, uOS, "uos") + steps(upgradeSteps(uWay, uOS));
   $("iPane").innerHTML = h;
   $("iPane").dataset.tab = tab;
 }
@@ -398,6 +450,7 @@ $("iPane").addEventListener("click", async (ev) => {
   if (t.dataset.cplat) { cPlat = t.dataset.cplat; renderInstall("container"); return; }
   if (t.dataset.cos) { cOS = t.dataset.cos; renderInstall("container"); return; }
   if (t.dataset.uway) { uWay = t.dataset.uway; renderInstall("upgrade"); return; }
+  if (t.dataset.uos) { uOS = t.dataset.uos; renderInstall("upgrade"); return; }
   if (t.dataset.copy === undefined) return;
   let ok = false;
   try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t.dataset.copy); ok = true; } } catch (e) { /* the old way */ }

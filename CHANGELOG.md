@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.27 — 2026-11-16
+
+- Sign-in page: the install guide goes step by step for every container platform (Docker
+  Desktop, Docker CE on a Linux server, Podman, k3s, Kubernetes) and every system the steps
+  run on (Linux, Windows in Ubuntu on WSL 2, macOS): what to install first (Docker, git,
+  Podman, k3s, kubectl, an SSH key), the settings, installing, opening it, and upgrading,
+  status and removing it later. *Upgrade* goes by how cactusdb was installed and the
+  system, with a particular version too.
+
 ## 1.62.26 — 2026-11-16
 
 - Sign-in page (`--remotelogin`): **Install or upgrade cactusdb on your own computer or
