@@ -1139,6 +1139,16 @@ per line). Each is as tall as you drag its bottom-right corner.
   other: choose TRIM, then LOWER, and the column is `LOWER(TRIM(c.name))` (shown as
   *TRIM → LOWER*; × takes off the last one). A function changes only what is shown:
   filters and sorting use the column's own value.
+- **Group** works two ways. With a **Total** on some column (COUNT, SUM…), it is SQL's
+  `GROUP BY`: one row per group. Without one, it **groups the rows** for reading, like a
+  pivot: the grid shows a row per value of that column (*Location: BIN · 12 rows*, with
+  the sums of the number columns), ▸ opens a group to show its rows, and *Expand all* /
+  *Collapse all* do every group; a second grouped column makes groups within groups.
+  The exports keep the groups: **Excel** as an outline (a bold row per group, its rows
+  one level deeper, so Excel's [-] / [+] fold them), **JSON** and **XML** nested by group,
+  **CSV** sorted by the groups with their columns first. The SQL stays as it is, with a
+  last line `-- group rows by: ["Location"]` (a comment: the query runs unchanged, and is
+  saved with it).
 - Filters: =, <>, <, <=, >, >=, IN / NOT IN (a list: `1, 2, 3`), LIKE / NOT LIKE (`%`
   any text, `_` one character, capitals alike), GLOB / NOT GLOB (`*` and `?`, capitals
   differ), BETWEEN / NOT BETWEEN (two boxes: from and to), IS / IS NOT (equal or not,
@@ -2230,6 +2240,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `projectrun.go` | Running a project query: the staging (a SQLite file per alias, attached read-only), type mapping, limits, progress, cancel, exports to `projects/<project>/` |
 | `projects_queries.go` | A project's saved queries and versions (`project_queries`, `project_query_versions`), columns and keys for the designer, join suggestions |
 | `projects_password.go` | The project password: the linked connections' passwords sealed with it (`projects.pw_lock`, `pw_seal`), opened and kept up to date when the project opens |
+| `projectgroups.go` | Rows grouped for reading (`-- group rows by`): the grouped exports (Excel outline, nested JSON and XML, sorted CSV) |
 | `projectfuncs.go` | cactusdb's own SQLite functions for the query builder's formats: `cdb_title`, `cdb_camel`, `cdb_date(x, 'yyyy-MMM-dd')`, `cdb_number(x, 'R #,##0.00')` |
 | `.github/ci/pq-roundtrip.mjs`, `.github/workflows/checks.yml`, `.github/workflows/projects-integration.yml` | The designer's SQL ↔ model round trips (on every push); a project joining MariaDB, PostgreSQL, SQL Server and Firebird, and the read-only guarantee against them (per release) |
 | `mail.go` | ☰ → E-mail server: the SMTP settings (password sealed with the key), sending e-mail (STARTTLS, SSL/TLS or none), the test e-mail (`/api/email`) |

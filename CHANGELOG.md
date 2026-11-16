@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.62.21 — 2026-11-16
+
+- Advanced query builder: **Group** without a total groups the rows for reading, like a
+  pivot table: a row per value (with its number of rows and the sums of number columns)
+  that opens and closes on a click, *Expand all* / *Collapse all*, groups within groups for
+  a second column. The exports keep the groups: Excel as an outline (collapsible in
+  Excel), JSON and XML nested, CSV sorted by the groups. With a total, Group is still
+  `GROUP BY` (a row per group). The grouping is kept in the SQL as a last comment line,
+  `-- group rows by: ["Location"]`.
+
 ## 1.62.20 — 2026-11-16
 
 - README: the advanced query builder in the introduction, and the menu table lists every

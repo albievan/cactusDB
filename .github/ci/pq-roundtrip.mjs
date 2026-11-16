@@ -27,6 +27,7 @@ const editable = [
   "SELECT UPPER(c.name) AS n, strftime('%Y-%m-%d', o.order_date), ROUND(o.total, 2), c.city FROM fb.customer c JOIN maria.orders o ON o.customer_id = c.id WHERE c.name LIKE '%ES' AND o.total BETWEEN 10 AND 20 OR c.id NOT BETWEEN 1 AND 3",
   "SELECT LOWER(TRIM(c.name)) AS n, UPPER(strftime('%Y-%m-%d', o.d)) FROM fb.customer c JOIN maria.orders o ON o.cid = c.id WHERE LOWER(TRIM(c.name)) = lower(trim('aaa   ')) AND c.id IN (1, 2, 3) OR c.city NOT IN ('A', 'B') AND c.name GLOB 'A*' AND o.x IS NOT c.id",
   "SELECT c.name FROM fb.customer c WHERE UPPER(c.name) LIKE '%ES' AND c.id IS 3 AND c.city IS NOT NULL",
+  "SELECT c.name, c.city AS Town, o.total FROM fb.customer c JOIN maria.orders o ON o.customer_id = c.id ORDER BY c.name\n-- group rows by: [\"Town\",\"name\"]",
   "SELECT cdb_title(TRIM(c.name)) AS name, cdb_camel(c.city), cdb_date(o.d, 'yyyy-MMM-dd ''at'' HH:mm') AS d, cdb_number(o.total, 'R #,##0.00') AS total FROM fb.customer c JOIN maria.orders o ON o.cid = c.id WHERE cdb_title(c.name) = 'Ann'",
   "SELECT strftime('%Y', o.d) || '-' || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', o.d) * 3 - 2, 3) || '-' || strftime('%d', o.d) AS d FROM maria.orders o WHERE o.d BETWEEN '2026-01-01' AND '2026-12-31'",
 ]

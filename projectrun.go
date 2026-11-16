@@ -770,8 +770,16 @@ func (s *server) handleProjectExport(w http.ResponseWriter, r *http.Request) {
 		base = "query"
 	}
 	var files []map[string]any
+	groups := projectGroupRows(ran) // "-- group rows by": the exports keep the groups
 	for _, f := range formats {
-		path, rows, err := exportToDir(r.Context(), dir, EngineSQLite, qdb, ran, f, base, nil)
+		var path string
+		var rows int
+		var err error
+		if len(groups) > 0 {
+			path, rows, err = exportGroupedToDir(r.Context(), dir, qdb, ran, f, base, groups)
+		} else {
+			path, rows, err = exportToDir(r.Context(), dir, EngineSQLite, qdb, ran, f, base, nil)
+		}
 		if err != nil {
 			logAction(r, "[project %s] export %s FAILED: %v", name, f, err)
 			writeErr(w, 400, err)

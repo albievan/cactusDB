@@ -572,6 +572,15 @@
   .prjquery.fold-query .prjqmeta, .prjquery.fold-query .prjsplit, .prjquery.fold-cols .prjdesign,
   .prjquery.fold-res #prjExpNote, .prjquery.fold-res .prjgrid, .prjquery.fold-res .pager, .prjquery.fold-res .prjresbar > :not(.prjfold) { display: none !important; }
   .prjquery.fold-res .prjres { flex: 0 0 auto; min-height: 0; }
+  .grpbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; padding: 4px 6px; color: var(--muted); }
+  .grpbar b { color: var(--text); }
+  .datagrid.grouped tr.grp { cursor: pointer; }
+  .datagrid.grouped tr.grp td { background: var(--accent-soft); font-weight: 400; }
+  .datagrid.grouped tr.grp td.n { color: var(--accent); text-align: center; }
+  .datagrid.grouped td.gv { padding-left: calc(6px + var(--lvl, 0) * 18px); white-space: nowrap; }
+  .datagrid.grouped td.gv .gc { color: var(--muted); font-size: 11.5px; margin-left: 4px; }
+  .datagrid.grouped td.gs { font-style: italic; color: var(--accent); }
+  .datagrid.grouped tr.gr td.n { padding-left: calc(var(--lvl, 0) * 10px); }
   .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 3px 0; }
   .pager[hidden] { display: none !important; }
   .pager label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
@@ -5486,6 +5495,10 @@ document.addEventListener("change", (ev) => {
 function prjRenderGrid(top) {
   const res = prj.result;
   if (!res || !res.columns.length) { $("prjGrid").innerHTML = res ? `<div class="emptymsg"><p>No columns.</p></div>` : ""; pagerShow("prj", false); return; }
+  // Rows grouped for the reader ("-- group rows by"): groups to expand and collapse, no pages.
+  const gidx = [];
+  for (const g of pqGroupNames(prj.ran)) { const i = res.columns.findIndex((c) => pqKey(c) === pqKey(g)); if (i >= 0 && !gidx.includes(i)) gidx.push(i); }
+  if (gidx.length) { $("prjGrid").innerHTML = groupedGridHtml(res, prj.sort, gidx, prj.gopen || (prj.gopen = new Set())); pagerShow("prj", false); if (top) $("prjGrid").scrollTop = 0; return; }
   const r = pagerRange("prj");
   $("prjGrid").innerHTML = r.size ? gridHtml(res, prj.sort, 0, { from: r.from, size: r.size }) : gridHtml(res, prj.sort, prj.shown);
   pagerShow("prj", true);
@@ -5531,7 +5544,7 @@ async function prjRun(limit) {
   prjProgress(st);
   if (st.state === "done") {
     const res = st.result;
-    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; pagers.prj.page = 0; prj.ran = res.sql;
+    prj.result = res; prj.sort = null; prj.shown = GRID_PAGE; pagers.prj.page = 0; prj.gopen = new Set(); prj.ran = res.sql;
     const n = res.rows.length, tot = res.total ?? n;
     $("prjInfo").textContent = (tot > n ? `${n.toLocaleString()} of ${res.totalMore ? "more than " : ""}${tot.toLocaleString()} rows shown (limited to ${res.limit.toLocaleString()} – exports hold every row)` : `${n.toLocaleString()} row${n === 1 ? "" : "s"}`) +
       ` · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"} · query ${res.elapsedMs} ms`;
@@ -5562,6 +5575,10 @@ $("prjProg").addEventListener("click", async (ev) => {
 });
 $("prjGrid").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-act=more-rows]")) { prj.shown += GRID_PAGE; prjRenderGrid(); return; }
+  // Grouped rows: a group's row opens or closes it; expand or collapse them all.
+  const ga = ev.target.closest("[data-gact]"), gr = ev.target.closest("tr.grp");
+  if (ga) { prj.gopen = new Set(ga.dataset.gact === "open" ? JSON.parse(ga.dataset.all) : []); prjRenderGrid(); return; }
+  if (gr) { const p = gr.dataset.g; prj.gopen.has(p) ? prj.gopen.delete(p) : prj.gopen.add(p); prjRenderGrid(); return; }
   const th = ev.target.closest("th[data-col]");
   if (!th || !prj.result) return;
   const col = +th.dataset.col;
@@ -5694,10 +5711,17 @@ const pqKeyword = new Set(("select from where group by having order limit offset
   "as asc desc distinct all union intersect except with case when then else end is null like in between exists").split(" "));
 // pqIdent writes a name as SQL: plain when it can be, else "quoted".
 const pqIdent = (s) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(s) && !pqKeyword.has(s.toLowerCase()) ? s : `"${String(s).replace(/"/g, '""')}"`;
-const pqEmpty = () => ({ distinct: false, tables: [], joins: {}, fields: [], star: false, whereExtra: "", groupExtra: [], having: "", orderExtra: [], limit: "", offset: "", readOnly: "" });
+const pqEmpty = () => ({ distinct: false, tables: [], joins: {}, fields: [], star: false, whereExtra: "", groupExtra: [], having: "", orderExtra: [], limit: "", offset: "", readOnly: "", groupRows: [] });
+// A query can group its rows for the reader (the grid and the exports): its last line is
+// "-- group rows by: ["Location"]", a comment SQLite skips (projectgroups.go reads it too).
+function pqGroupNames(sql) {
+  const m = [...String(sql || "").matchAll(/^\s*--\s*group rows by:\s*(\[.*\])\s*$/gm)].pop();
+  try { const v = m ? JSON.parse(m[1]) : []; return Array.isArray(v) ? v.map(String) : []; } catch (e) { return []; }
+}
 
 function pqParse(src) {
   const m = pqEmpty();
+  m.groupRows = pqGroupNames(src);
   const tk = qaTokens(src);
   if (!tk.length) return m;
   const text = (a, b) => src.slice(tk[a].at, tk[b - 1].end).trim();
@@ -5922,6 +5946,7 @@ function pqSql(m) {
   const ord = [...sorted, ...m.orderExtra];
   if (ord.length) out.push("ORDER BY " + ord.join(", "));
   if (m.limit) out.push("LIMIT " + m.limit + (m.offset ? " OFFSET " + m.offset : ""));
+  if (m.groupRows && m.groupRows.length) out.push("-- group rows by: " + JSON.stringify(m.groupRows));
   return out.join("\n");
 }
 
@@ -6487,6 +6512,9 @@ $("prjLinkBtn").addEventListener("click", () => {
 });
 
 // ---- the grid of columns: output, alias, aggregate, group, sort, filters ----
+// A column's name in the output, and whether the rows are grouped by it.
+const pqOutName = (f) => f.alias || f.col;
+const pqGroupsRows = (m, f) => !f.expr && !f.agg && (m.groupRows || []).some((x) => pqKey(x) === pqKey(pqOutName(f)));
 // pqFnCell is a chain of functions: the chain (innermost first), × removes the
 // last one, and the list adds one around it.
 function pqFnCell(fns, key, r = "") {
@@ -6523,7 +6551,7 @@ function pqDesign() {
       <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
       <td>${ex || f.agg ? "" : pqFnCell(f.fns, "fn")}</td>
       <td>${ex || (f.fns && f.fns.length) ? "" : `<select class="form-select form-select-sm" data-k="agg" aria-label="Total"><option value=""></option>${PQ_AGGS.map((a) => `<option${a === f.agg ? " selected" : ""}>${a}</option>`).join("")}</select>`}</td>
-      <td>${ex || f.agg ? "" : `<input type="checkbox" data-k="group"${f.group ? " checked" : ""} aria-label="Group by">`}</td>
+      <td>${ex || f.agg ? "" : `<input type="checkbox" data-k="group"${f.group || pqGroupsRows(m, f) ? " checked" : ""} aria-label="Group by" title="${m.fields.some((x) => x.agg) ? "Group: one row per value, for the totals (GROUP BY)" : "Group: the rows in groups per value, to expand and collapse (choose a Total for one row per group instead)"}">`}</td>
       <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="sort" aria-label="Sort"><option value=""></option><option${f.sort === "ASC" ? " selected" : ""}>ASC</option><option${f.sort === "DESC" ? " selected" : ""}>DESC</option></select>`}</td>
       ${crit}<td><button type="button" class="btn btn-sm btn-link" data-k="up" aria-label="Move up" title="Move up">↑</button><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td></tr>`;
   }).join("");
@@ -6560,8 +6588,17 @@ $("prjDesign").addEventListener("change", (ev) => {
   if (!tr) return;
   const f = m.fields[+tr.dataset.f], k = t.dataset.k;
   if (k === "show") f.show = t.checked;
-  else if (k === "alias") f.alias = t.value.trim();
-  else if (k === "agg") { f.agg = t.value; if (f.agg) f.group = false; }
+  else if (k === "alias") {
+    const was = pqOutName(f);
+    f.alias = t.value.trim();
+    m.groupRows = m.groupRows.map((x) => (pqKey(x) === pqKey(was) ? pqOutName(f) : x));
+  }
+  else if (k === "agg") {
+    f.agg = t.value; if (f.agg) f.group = false;
+    // With a total the grouping is GROUP BY (a row per group); without one, rows grouped to expand.
+    if (m.fields.some((x) => x.agg)) { for (const x of m.fields) if (pqGroupsRows(m, x)) x.group = true; m.groupRows = []; }
+    else { for (const x of m.fields) if (x.group && !x.expr) { m.groupRows.push(pqOutName(x)); x.group = false; } }
+  }
   // A function goes around those before it; the column keeps its name in the output, unless it has one.
   else if (k === "fnadd" || k === "cfnadd") {
     if (!t.value) return;
@@ -6575,7 +6612,10 @@ $("prjDesign").addEventListener("change", (ev) => {
     });
     return;
   }
-  else if (k === "group") f.group = t.checked;
+  else if (k === "group") {
+    if (m.fields.some((x) => x.agg)) f.group = t.checked;
+    else { f.group = false; m.groupRows = m.groupRows.filter((x) => pqKey(x) !== pqKey(pqOutName(f))); if (t.checked) m.groupRows.push(pqOutName(f)); }
+  }
   else if (k === "sort") { f.sort = t.value; f.sortPos = f.sort ? Math.max(0, ...m.fields.map((x) => x.sortPos)) + 1 : 0; }
   else if (k === "op" || k === "val" || k === "val2") { if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
   pqCommit();
@@ -9196,6 +9236,60 @@ function renderGrid(top) {
   if (top) $("grid").scrollTop = 0;
 }
 pagerInit("data", "cactusdb.dataPageSize", () => (state.result ? state.result.rows.length : 0), renderGrid);
+// groupedGridHtml is a result grouped by the columns gidx (a level each): a row per group with
+// its value, its number of rows and the sums of number columns, its rows (or groups) under it
+// when it is open (open: the groups' paths). Sorting sorts the rows within their groups.
+function groupedGridHtml(res, sort, gidx, open) {
+  let rows = res.rows.map((r, i) => [i, r]);
+  if (sort) rows.sort((a, b) => cmp(a[1][sort.col], b[1][sort.col]) * sort.dir);
+  const tree = (list, lvl, path) => {
+    const by = new Map();
+    for (const it of list) {
+      const v = it[1][gidx[lvl]], k = v === null ? "\u0000" : typeof v + ":" + v;
+      if (!by.has(k)) by.set(k, { v, rows: [] });
+      by.get(k).rows.push(it);
+    }
+    const gs = [...by.values()].sort((a, b) => cmp(a.v, b.v));
+    for (const g of gs) { g.path = path + "\u0001" + (g.v === null ? "\u0000" : String(g.v)); if (lvl + 1 < gidx.length) g.sub = tree(g.rows, lvl + 1, g.path); }
+    return gs;
+  };
+  const top = tree(rows, 0, ""), num = res.columns.map((c, i) => !gidx.includes(i) && res.rows.some((r) => typeof r[i] === "number"));
+  const all = [];
+  const walk = (gs) => { for (const g of gs) { all.push(g.path); if (g.sub) walk(g.sub); } };
+  walk(top);
+  const LIMIT = 5000;
+  let shown = 0, hidden = 0;
+  const render = (gs, lvl) => gs.map((g) => {
+    const on = open.has(g.path), name = res.columns[gidx[lvl]];
+    const sums = res.columns.map((c, i) => num[i] ? g.rows.reduce((t, it) => t + (typeof it[1][i] === "number" ? it[1][i] : 0), 0) : null);
+    let h = `<tr class="grp" data-g="${esc(g.path)}" style="--lvl:${lvl}" aria-expanded="${on}"><td class="n">${on ? "▾" : "▸"}</td>` + res.columns.map((c, i) =>
+      i === gidx[lvl] ? `<td class="gv" title="${esc(name)}"><b>${g.v === null ? "<i>(empty)</i>" : esc(String(g.v))}</b> <span class="gc">${g.rows.length.toLocaleString()} row${g.rows.length === 1 ? "" : "s"}</span></td>`
+      : sums[i] !== null ? `<td class="num gs" title="Sum of ${esc(c)}">${esc(Number.isInteger(sums[i]) ? sums[i].toLocaleString() : sums[i].toLocaleString(undefined, { maximumFractionDigits: 6 }))}</td>` : `<td></td>`).join("") + `</tr>`;
+    if (!on) return h;
+    if (g.sub) return h + render(g.sub, lvl + 1);
+    for (const [i, r] of g.rows) {
+      if (shown >= LIMIT) { hidden++; continue; }
+      shown++;
+      h += `<tr class="gr" style="--lvl:${lvl + 1}"><td class="n">${i + 1}</td>` + r.map(gridCell).join("") + `</tr>`;
+    }
+    return h;
+  }).join("");
+  const head = `<tr><th class="n">#</th>` + res.columns.map((c, i) =>
+    `<th data-col="${i}" title="${esc(c)} – click to sort the rows in their groups">${esc(c)}${sort && sort.col === i ? `<span class="dir">${sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + `</tr>`;
+  const body = render(top, 0);
+  return `<div class="grpbar">Grouped by <b>${gidx.map((i) => esc(res.columns[i])).join(" → ")}</b> · ${top.length.toLocaleString()} group${top.length === 1 ? "" : "s"}` +
+    ` <button type="button" class="btn btn-sm btn-outline-secondary" data-gact="open" data-all="${esc(JSON.stringify(all))}">Expand all</button>` +
+    ` <button type="button" class="btn btn-sm btn-outline-secondary" data-gact="close">Collapse all</button>` +
+    (hidden ? ` <span class="hint">the first ${LIMIT.toLocaleString()} rows of the open groups are shown (exports hold every row)</span>` : "") + `</div>` +
+    `<table class="table table-sm table-hover datagrid grouped"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+// gridCell is one value of a row in a grid.
+function gridCell(v) {
+  if (v === null) return `<td class="null">NULL</td>`;
+  const s = String(v);
+  const cls = typeof v === "number" ? ` class="num"` : "";
+  return `<td${cls} title="${s.length > 40 ? esc(s.slice(0, 2000)) : ""}">${esc(s.length > 500 ? s.slice(0, 500) + "…" : s)}</td>`;
+}
 // gridHtml is the table of a result, sorted, with its first shown rows and a
 // button for more (the Data tab's grid and the Projects pane's); with page
 // ({from, size}) it is that page of the sorted rows instead.
@@ -9210,12 +9304,7 @@ function gridHtml(res, sort, shown, page) {
   if (page) rows = rows.slice(page.from, page.from + page.size);
   const more = page ? 0 : rows.length - shown;
   if (more > 0) rows = rows.slice(0, shown);
-  const body = rows.map(([i, r]) => `<tr><td class="n">${i + 1}</td>` + r.map((v) => {
-    if (v === null) return `<td class="null">NULL</td>`;
-    const s = String(v);
-    const cls = typeof v === "number" ? ` class="num"` : "";
-    return `<td${cls} title="${s.length > 40 ? esc(s.slice(0, 2000)) : ""}">${esc(s.length > 500 ? s.slice(0, 500) + "…" : s)}</td>`;
-  }).join("") + `</tr>`).join("") +
+  const body = rows.map(([i, r]) => `<tr><td class="n">${i + 1}</td>` + r.map(gridCell).join("") + `</tr>`).join("") +
     (more > 0 ? `<tr><td class="n"></td><td colspan="${res.columns.length}"><button class="btn btn-sm btn-outline-secondary" data-act="more-rows">Show ${Math.min(more, GRID_PAGE).toLocaleString()} more of ${more.toLocaleString()} rows not shown</button></td></tr>` : "");
   return `<table class="table table-sm table-striped table-hover datagrid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
