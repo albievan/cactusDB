@@ -228,7 +228,11 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
 6. **Click a table or view.** cactusdb writes the query that selects every column
    (`SELECT "id", "name", … FROM "customers"`) and shows the data in the grid.
    - Click a column heading to sort; click again to reverse.
-   - Use **Show** to view 100, 1,000, 10,000 or 100,000 rows on screen.
+   - Use **Show** to view 100, 1,000, 10,000 or 100,000 rows on screen, or **All rows**
+     (up to 1,000,000).
+   - **Query**, **Tables of the query** (under the query) and **Output** (the rows and their
+     pages) each fold from their heading, and the browser remembers which; the query and
+     the tables of the query are as tall as you drag their bottom-right corner.
    - Empty values are shown as *NULL*.
 7. *(Optional)* Edit the SQL, e.g. add `WHERE` or `ORDER BY`, and press **Run** (▶) or
    **Ctrl+Enter**. Only read queries are accepted (see [Read-only](#read-only)).
@@ -246,7 +250,7 @@ the connection dialog, opened by **New connection** or **Edit**, never in the si
      the query's tables is written with its alias (`u.name`); names that need quotes get
      them. The columns are read once a connection, from the catalog only. Switch off
      *Suggestions* to type without them.
-   - **Query diagram** beside the query: its tables (with their aliases and the columns it
+   - **Query diagram** under the query: its tables (with their aliases and the columns it
      uses, the joined ones in bold, 🔑 keys) and the conditions joining them (`ur.uid = u.uid`
      in an ON, dashed when in the WHERE), **1** or **N** at each end from the keys, LEFT /
      RIGHT joins named. A table joined to nothing (every row paired with every row of the
@@ -833,8 +837,9 @@ cactusdb --port 8087 --remotelogin --runas background
   the request.
 - ☰ → **Users** also lists everyone with their status (*Active*, *Invited: no password yet*,
   *Requests access*), who added them and their last sign-in, deletes users (asks first; not
-  yourself, nor the last user who can sign in), and changes your own password. ☰ →
-  **Sign out** signs this browser out. A sign-in ends after 12 hours unused.
+  yourself, nor the last user who can sign in), and changes your own password. **Sign
+  out**, always under *Connections* at the bottom of the sidebar and as an icon in the top
+  bar (left of Events), signs this browser out. A sign-in ends after 12 hours unused.
 - The e-mails go through the mail server of ☰ → [**E-mail server**](#email-server), which
   must be set up first (sign in as `admin` to do it).
 
@@ -880,7 +885,8 @@ a mail client's account setup:
 ### The database's dashboard
 
 When the connected database has statistics cactusdb can read, a **Dashboard** button
-appears in the top bar. It opens the **Dashboard** tab in the main area (not a dialog): what
+(the speedometer icon) appears in the top bar, next to **New connection** (+), Refresh and
+Disconnect (the plug). It opens the **Dashboard** tab in the main area (not a dialog): what
 the database says about itself, measured again every 10 seconds while the tab is shown (untick
 **Live** to stop; **Refresh** measures at once). Only reads: the statistics views of the
 database.
@@ -1109,7 +1115,8 @@ per line). Each is as tall as you drag its bottom-right corner.
 - **Foreign keys**: a column that is one shows where it points (`cust_id → cust.id`).
   When both tables of a foreign key are in the diagram and the query doesn't join on it,
   a dotted line links them; click it to join on it.
-- Tick columns for the output; the grid under the diagram (*Column definitions*) sets
+- Tick columns for the output; the grid under the diagram (*Column definitions*, as tall
+  as its rows up to 230 pixels, or as you drag its bottom-right corner) sets
   their names, a **function** on the value (UPPER, LOWER, **Title Case**, **camelCase**,
   TRIM, LENGTH, ROUND, ABS, as a whole number or text, NULL as empty or 0, and date
   formats: yyyy-mm-dd, dd/mm/yyyy, mm/dd/yyyy, yyyy-Mon-dd, dd Mon yyyy, with the time,
@@ -1220,7 +1227,8 @@ those objects.
 - **Sorting:** click a column heading above the list (**Name**, **Rows**, **MB**) to sort by
   it; click it again to reverse the order. ▲ is ascending, ▼ descending. Rows and MB start
   with the biggest. The order is remembered in this browser.
-- **⟳**, and **Refresh** next to **Disconnect**, refresh the connection and everything
+- **⟳**, and the **Refresh** icon in the top bar (next to Dashboard and Disconnect),
+  refresh the connection and everything
   of the database: cactusdb closes its unused connections (a firewall or the database server
   may have cut them), checks a fresh one, and lists every table, view, procedure, function,
   trigger, sequence… again, with their rows and sizes. The open table or definition is

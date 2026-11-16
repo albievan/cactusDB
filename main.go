@@ -37,7 +37,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.62.17"
+var version = "1.62.18"
 
 //go:embed web
 var webFS embed.FS
@@ -1668,8 +1668,8 @@ func (s *server) runGrid(w http.ResponseWriter, r *http.Request, ss *session, q 
 		writeErr(w, 400, errors.New("SQL is empty"))
 		return
 	}
-	if limit > 100000 { // the most the page offers: one answer holds them all
-		limit = 100000
+	if limit > 1000000 { // the most the page offers ("All rows"): one answer holds them all
+		limit = 1000000
 	}
 	if limit <= 0 {
 		limit = 1000

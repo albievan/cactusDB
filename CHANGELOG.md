@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.62.18 — 2026-11-16
+
+- With `--remotelogin`, **Sign out** is always at the bottom of the sidebar (under
+  Connections) and an icon in the top bar, left of Events.
+- Top bar: Refresh, Dashboard and Disconnect are icon buttons, and a **New connection** (+)
+  button is added.
+- Data tab: **All rows** (up to 1,000,000) in *Show*; the tables of the query are under the
+  query; **Query**, **Tables of the query** and **Output** fold from their headings
+  (remembered), and the query and its tables resize from their corner. "1 column", not
+  "1 columns".
+- Advanced query builder: *Column definitions* resizes from its corner (it starts as tall
+  as its rows, up to 230 pixels).
+
 ## 1.62.17 — 2026-11-16
 
 - The repository's folders are tidied: `scripts/` holds `build.sh` and `release.sh` (they
