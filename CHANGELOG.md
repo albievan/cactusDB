@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.24 — 2026-11-16
+
+- Advanced query builder: while a query runs, the results area is dimmed under a card
+  with an animation, what is happening (tables read and rows so far, then the query
+  running), a bar, the time since it started and a **Cancel** button.
+
 ## 1.62.23 — 2026-11-16
 
 - README: *Security* says what a project password opens; *Files cactusdb creates* shows

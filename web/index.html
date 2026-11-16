@@ -587,7 +587,25 @@
   .pager select { width: auto; }
   .pager [data-pg=no] { width: 80px; display: inline-block; }
   .pager .pginfo { color: var(--muted); font-size: 12px; }
-  .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; }
+  .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; position: relative; }
+  /* While a query runs: a dimmed results area with what is happening, the time and Cancel. */
+  .prjbusy { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding-top: 28px;
+    background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(2px); border-radius: 6px; min-height: 230px; }
+  .prjbusy[hidden] { display: none; }
+  .prjbusy .card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 26px; min-width: 300px; max-width: 90%;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); text-align: center; }
+  .prjbusy .what { font-weight: 600; }
+  .prjbusy .detail { font-size: 12.5px; color: var(--muted); }
+  .prjbusy .time { font: 12px var(--mono); color: var(--muted); }
+  .prjbusy .spin { display: flex; gap: 6px; height: 18px; align-items: flex-end; }
+  .prjbusy .spin i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: prjhop .9s ease-in-out infinite; }
+  .prjbusy .spin i:nth-child(2) { animation-delay: .15s; } .prjbusy .spin i:nth-child(3) { animation-delay: .3s; }
+  @keyframes prjhop { 0%, 100% { transform: translateY(0); opacity: .45; } 40% { transform: translateY(-9px); opacity: 1; } }
+  .prjbusy .bar { width: 240px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+  .prjbusy .bar span { display: block; height: 100%; width: 30%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+  .prjbusy .bar.indef span { width: 30%; animation: prjslide 1.2s ease-in-out infinite; }
+  @keyframes prjslide { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+  @media (prefers-reduced-motion: reduce) { .prjbusy .spin i, .prjbusy .bar.indef span { animation: none; opacity: 1; } }
   .prjresbar .info { font-size: 12px; color: var(--muted); }
   .prjexpnote { font-size: 12px; }
   .prjret { margin-top: 2px; }
@@ -1762,6 +1780,16 @@
           <div class="prjdesign" id="prjDesign"></div>
           <div class="prjprog" id="prjProg" hidden></div>
           <div class="prjres">
+            <div class="prjbusy" id="prjBusy" hidden role="status" aria-live="polite">
+              <div class="card">
+                <div class="spin" aria-hidden="true"><i></i><i></i><i></i></div>
+                <div class="what" id="prjBusyWhat">Running the query…</div>
+                <div class="detail" id="prjBusyDetail"></div>
+                <div class="bar" aria-hidden="true"><span id="prjBusyBar"></span></div>
+                <div class="time" id="prjBusyTime">0.0 s</div>
+                <button type="button" class="btn btn-outline-danger" id="prjBusyCancel"><i class="bi bi-stop-fill" aria-hidden="true"></i> Cancel</button>
+              </div>
+            </div>
             <div class="prjresbar">
               <button type="button" class="prjfold flabel" data-fold="res" aria-expanded="true" aria-controls="prjExpNote prjGrid" title="Show or hide the results and the export buttons"><i class="bi bi-chevron-down" aria-hidden="true"></i> Results and export</button>
               <span class="info" id="prjInfo"></span>
@@ -5528,19 +5556,20 @@ async function prjRun(limit) {
   if (!sql) { toast("Write a query first", true); return; }
   if (prjDirty()) { toast("Save the project first: the query runs on its saved tables", true); return; }
   prj.running = true; $("prjRun").disabled = true; $("prjCancel").hidden = false; prjSetExport();
+  prjBusy(true);
   $("prjExpNote").hidden = true; $("prjInfo").textContent = "";
   let st;
   try {
     st = await api("POST", "/api/project/run", { project: prj.open.project, sql, limit: typeof limit === "number" ? limit : +$("prjLimit").value });
     const seq = ++prj.poll;
     while (st.state === "loading" || st.state === "querying") {
-      prjProgress(st);
+      prjProgress(st); prjBusy(true, st);
       await new Promise((r) => setTimeout(r, 300));
       if (seq !== prj.poll || !prj.open) return;
       st = await api("GET", "/api/project/run?" + new URLSearchParams({ project: prj.open.project }));
     }
   } catch (e) { st = { state: "failed", error: e.message, errorKind: e.data && e.data.errorKind, addTable: e.data && e.data.addTable }; }
-  finally { prj.running = false; $("prjRun").disabled = false; $("prjCancel").hidden = true; }
+  finally { prj.running = false; $("prjRun").disabled = false; $("prjCancel").hidden = true; prjBusy(false); }
   prjProgress(st);
   if (st.state === "done") {
     const res = st.result;
@@ -5555,10 +5584,37 @@ async function prjRun(limit) {
 $("prjRun").addEventListener("click", () => prjRun());
 $("prjSql").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); prjRun(); } });
 $("prjSql").addEventListener("input", () => { prjSetExport(); prjMark(); });
+// prjBusy shows (or hides) the overlay of a running query: the step, the tables read and
+// their rows, the time since it started, and Cancel.
+function prjBusy(on, st) {
+  const b = $("prjBusy");
+  if (!on) { b.hidden = true; clearInterval(prj.busyTimer); prj.busyTimer = 0; return; }
+  if (b.hidden) {
+    if (document.querySelector(".prjquery").classList.contains("fold-res")) prjFold("res", false);
+    b.hidden = false; prj.busyAt = Date.now();
+    clearInterval(prj.busyTimer);
+    prj.busyTimer = setInterval(() => { $("prjBusyTime").textContent = ((Date.now() - prj.busyAt) / 1000).toFixed(1) + " s"; }, 100);
+    $("prjBusyWhat").textContent = "Starting the query…"; $("prjBusyDetail").textContent = ""; $("prjBusyBar").parentElement.classList.add("indef");
+  }
+  if (!st) return;
+  const ts = st.tables || [], done = ts.filter((t) => t.done).length, rows = ts.reduce((n, t) => n + (t.rows || 0), 0);
+  if (st.state === "loading") {
+    $("prjBusyWhat").textContent = "Reading the rows the query needs…";
+    $("prjBusyDetail").textContent = ts.length ? `${done} of ${ts.length} table${ts.length === 1 ? "" : "s"} read · ${rows.toLocaleString()} row${rows === 1 ? "" : "s"} so far` : "";
+    const bar = $("prjBusyBar");
+    bar.parentElement.classList.toggle("indef", !ts.length);
+    bar.style.width = ts.length ? Math.max(4, Math.round(done / ts.length * 100)) + "%" : "";
+  } else {
+    $("prjBusyWhat").textContent = "Running the query on the copies…";
+    $("prjBusyDetail").textContent = `${ts.length} table${ts.length === 1 ? "" : "s"} · ${rows.toLocaleString()} row${rows === 1 ? "" : "s"} read`;
+    $("prjBusyBar").style.width = ""; $("prjBusyBar").parentElement.classList.add("indef");
+  }
+}
+$("prjBusyCancel").addEventListener("click", () => $("prjCancel").click());
 $("prjCancel").addEventListener("click", async () => {
   prj.poll++;
   try { await api("POST", "/api/project/cancel", { project: prj.open.project }); } catch (e) { toast(e.message, true); }
-  prj.running = false; $("prjRun").disabled = false; $("prjCancel").hidden = true;
+  prj.running = false; $("prjRun").disabled = false; $("prjCancel").hidden = true; prjBusy(false);
   prjProgress({ state: "cancelled" }); prj.result = null; prj.ran = ""; prjRenderGrid(); prjSetExport();
 });
 $("prjProg").addEventListener("click", async (ev) => {
