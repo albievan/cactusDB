@@ -309,6 +309,27 @@ button next to a command, paste it in a terminal on that computer, in cactusdb's
 restart cactusdb. The check reads one small file from GitHub: [`VERSION`](VERSION). If the
 cactusdb server has no internet access, your browser reads it instead.
 
+**Updating a server by hand** (no internet on the server, versions before 1.61 whose
+Install button can't, or when you'd rather not run a script from the internet): download
+the binary for the server's system from the [release](https://github.com/albievan/cactusDB/releases)
+and its `SHA256SUMS`, copy the binary next to the running one under another name, check it
+and swap it in, then restart cactusdb with the options it runs with now (the first line of
+`cactusdb-<port>.running` and `ps` show them):
+
+```sh
+scp cactusdb-linux-amd64 root@server:/data/cactusdb/cactusdb.new
+ssh root@server
+cd /data/cactusdb
+sha256sum cactusdb.new                      # the same as cactusdb-linux-amd64 in SHA256SUMS
+chmod 755 cactusdb.new && ./cactusdb.new --version
+cp -p cactusdb cactusdb.previous && mv -f cactusdb.new cactusdb
+kill <pid>                                  # from cactusdb-<port>.running; it stops cleanly
+./cactusdb --host 0.0.0.0 --port 8087 --remotelogin --runas background   # its own options
+```
+
+The connection file, key, exports and logs stay where they are; `cactusdb.previous` is the
+way back.
+
 <a id="install-update"></a>
 **Installing an update from the browser.** When a newer version is out, the dialog also
 has **Install *x.y.z* and restart** (click it twice: the second click confirms). It shows

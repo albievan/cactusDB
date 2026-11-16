@@ -9,6 +9,8 @@
   without one open as before.
 - Advanced query builder: **New project** is an icon button (+) that asks the name and the
   description in a form; in the projects grid, edit, duplicate and delete sit next to Open.
+- README: updating a server by hand (copy the binary, check it against `SHA256SUMS`, swap
+  it in and restart with the same options), for servers without internet or before 1.61.
 
 ## 1.62.14 — 2026-11-16
 
