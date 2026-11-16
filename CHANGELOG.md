@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.62.26 — 2026-11-16
+
+- Sign-in page (`--remotelogin`): **Install or upgrade cactusdb on your own computer or
+  server**, in three tabs with a copy button for every command: *Standalone* (setup
+  scripts, a download per system, starting it), *Container* (step by step with
+  `deploy/deploy.sh` on Docker Desktop, Docker CE, Podman, k3s or Kubernetes, from Linux,
+  macOS or Windows) and *Upgrade* (from the page, by hand, or a container).
+
 ## 1.62.25 — 2026-11-16
 
 - README: *Save query* on the Data tab is the 💾 icon beside ▶ and ⟳ (it has been an icon

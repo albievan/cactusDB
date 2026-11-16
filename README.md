@@ -814,7 +814,12 @@ signed-in users can see the events.
 Start cactusdb with **`--remotelogin`** and nothing of it can be seen or used before signing
 in: opening it shows the sign-in page, and every request without a sign-in is refused. The
 sign-in page shows, on the left in green, what cactusdb does and its
-source on GitHub; on the right the form, and the version. Each password box has a small eye button in it
+source on GitHub, and **Install or upgrade cactusdb on your own computer or server**: three
+tabs with every command and a copy button each (the row of the visitor's own system
+marked). *Standalone*: the setup scripts, one download per system, and how to start it.
+*Container*: step by step with `deploy/deploy.sh` for Docker Desktop, Docker CE, Podman,
+k3s or Kubernetes, from Linux, macOS or Windows (in WSL). *Upgrade*: from the page, by hand,
+or a container. On the right the form, and the version. Each password box has a small eye button in it
 that shows what is typed there, and hides it again.
 
 ```sh

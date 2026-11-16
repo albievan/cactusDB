@@ -55,6 +55,49 @@
   .hero .src a { white-space: nowrap; }
   .hero .waves { position: absolute; left: 0; bottom: 0; width: 100%; height: 33.333%; pointer-events: none; }
   .hero .mobilemark { display: none; margin-bottom: 2.5rem; }
+  /* Install or upgrade: three tabs of commands, each with a copy button. */
+  .hero .inner:has(.install[open]) { max-width: 62rem; }
+  .install { margin-top: 1.5rem; font-size: 14px; }
+  .install > summary { display: block; cursor: pointer; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 6px; font-weight: 600; color: #fff; list-style: none; }
+  .install > summary::-webkit-details-marker { display: none; }
+  .install > summary::before { content: "▸"; display: inline-block; width: 1.1em; }
+  .install[open] > summary::before { content: "▾"; }
+  .install > summary:hover, .install > summary:focus-visible { border-color: rgba(255, 255, 255, .7); outline: none; }
+  .install .ilead { margin: .9rem 0 0; font-size: 14px; }
+  .itabs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .itabs button { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 15px;
+    border: 1px solid rgba(255, 255, 255, .55); background: transparent; color: #fff; }
+  .itabs button[aria-selected=true] { background: #fff; color: #1d2420; border-color: #fff; }
+  .itabs button:focus-visible { outline: 2px solid #d9c89f; outline-offset: 2px; }
+  .ipane { margin-top: 14px; }
+  .ipane p { margin: 0 0 10px; font-size: 14px; line-height: 1.55; }
+  .ipane a { color: #fff; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, .5); }
+  .ipane .ihead { margin: 14px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cream-muted); }
+  .ipane ul { display: block; list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .ipane li { display: flex; align-items: center; gap: 10px; border: 0; border-radius: 8px; padding: 7px 8px; }
+  .ipane li.mine { background: rgba(255, 255, 255, .1); }
+  .ipane .lbl { font-weight: 600; font-size: 13px; color: #fff; }
+  .ipane .lbl .mine { margin-left: 8px; font-size: 11px; font-weight: 600; border: 1px solid rgba(255, 255, 255, .6); border-radius: 999px; padding: 1px 8px; }
+  .ipane code { display: block; font: 12.5px var(--mono); color: var(--cream); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ipane .cmd { flex: 1; min-width: 0; }
+  .ipane .copy { flex: none; width: 44px; height: 44px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .55); background: transparent; color: #fff; }
+  .ipane .copy:hover { background: rgba(255, 255, 255, .12); }
+  .ipane .choice { margin: 4px 0 12px; }
+  .ipane .choice .lg { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cream-muted); margin-bottom: 6px; }
+  .ipane .choice .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ipane .choice button { padding: 5px 12px; border-radius: 8px; font-size: 13.5px; border: 1px solid rgba(255, 255, 255, .5); background: transparent; color: #fff; }
+  .ipane .choice button[aria-pressed=true] { background: #fff; color: #1d2420; border-color: #fff; font-weight: 600; }
+  .ipane ol.steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: s; }
+  .ipane ol.steps > li { display: flex; align-items: flex-start; gap: 12px; padding: 0; }
+  .ipane ol.steps > li::before { counter-increment: s; content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(255, 255, 255, .22); color: #fff; font-weight: 600; font-size: 13px; }
+  .ipane .sbody { flex: 1; min-width: 0; }
+  .ipane .sbody .st { font-weight: 600; color: #fff; font-size: 14px; }
+  .ipane .sbody p { margin: 3px 0 6px; font-size: 13.5px; }
+  .ipane .sbody .box { display: flex; align-items: flex-start; gap: 8px; background: rgba(0, 0, 0, .25); border-radius: 8px; padding: 6px 6px 6px 10px; margin-top: 6px; }
+  .ipane .sbody .box .cl { font-size: 12.5px; font-weight: 600; color: #fff; }
+  .ipane .sbody pre { margin: 2px 0 0; font: 12.5px var(--mono); color: var(--cream); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ipane .sbody pre code { display: inline; white-space: pre-wrap; overflow: visible; text-overflow: clip; }
   /* The form side. */
   /* The eye button inside a password box. */
   .pwbox { position: relative; }
@@ -117,6 +160,16 @@
         <li>Saved queries with versions</li><li>Compare &amp; migrate databases</li><li>Backups &amp; DDL scripts</li>
       </ul>
       <p class="src">Free and open source: <a href="https://github.com/albievan/cactusDB" target="_blank" rel="noreferrer"><i class="bi bi-github" aria-hidden="true"></i> github.com/albievan/cactusDB</a></p>
+      <details class="install" id="install">
+        <summary>Install or upgrade cactusdb on your own computer or server</summary>
+        <p class="ilead">As a standalone program, or in a container on Docker Desktop, Docker CE, Podman, k3s or Kubernetes, step by step for Linux, macOS and Windows; and how to upgrade to a new version.</p>
+        <div class="itabs" role="tablist" aria-label="How to install">
+          <button type="button" role="tab" data-itab="standalone" aria-selected="true"><i class="bi bi-download" aria-hidden="true"></i> Standalone</button>
+          <button type="button" role="tab" data-itab="container" aria-selected="false"><i class="bi bi-box" aria-hidden="true"></i> Container</button>
+          <button type="button" role="tab" data-itab="upgrade" aria-selected="false"><i class="bi bi-arrow-up-circle" aria-hidden="true"></i> Upgrade</button>
+        </div>
+        <div class="ipane" id="iPane" role="tabpanel"></div>
+      </details>
     </div>
     <svg class="waves" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true" id="waves"></svg>
   </section>
@@ -252,6 +305,110 @@ document.querySelectorAll("input[type=password]").forEach((i) => {
   b.addEventListener("click", () => { eyeSet(b, i.type === "password"); i.focus(); });
 });
 const eyesOff = () => document.querySelectorAll(".pwbox .eye").forEach((b) => eyeSet(b, false));
+// ---- Install or upgrade cactusdb: the commands of each way, with a copy button each ----
+const RAW = "https://raw.githubusercontent.com/albievan/cactusDB/main", LATEST = "https://github.com/albievan/cactusDB/releases/latest/download";
+const unixFile = (a) => `curl -fL -o cactusdb ${LATEST}/${a} && chmod +x cactusdb`;
+const winFile = (a) => `Invoke-WebRequest -UseBasicParsing -OutFile cactusdb.exe ${LATEST}/${a}`;
+const IM = {
+  setup: [["Linux and macOS · any processor", "linux darwin", `curl -fsSL ${RAW}/setup.sh | sh`],
+    ["Windows (PowerShell) · any processor", "windows", `irm ${RAW}/setup.ps1 | iex`]],
+  files: [["Linux · Intel/AMD 64-bit (amd64, x86_64)", "linux/amd64", unixFile("cactusdb-linux-amd64")],
+    ["Linux · ARM 64-bit (arm64, aarch64: Raspberry Pi 4/5, Graviton)", "linux/arm64", unixFile("cactusdb-linux-arm64")],
+    ["macOS · Apple Silicon (M1–M4, darwin arm64)", "darwin/arm64", unixFile("cactusdb-darwin-arm64")],
+    ["macOS · Intel (darwin amd64)", "darwin/amd64", unixFile("cactusdb-darwin-amd64")],
+    ["Windows · Intel/AMD 64-bit (amd64, x64)", "windows/amd64", winFile("cactusdb-windows-amd64.exe")],
+    ["Windows · ARM 64-bit (arm64: Snapdragon, Surface Pro X)", "windows/arm64", winFile("cactusdb-windows-arm64.exe")]],
+  start: [["Linux and macOS", "linux darwin", "./cactusdb --port 8080 --runas background"],
+    ["Windows (PowerShell)", "windows", ".\\cactusdb.exe --port 8080 --runas background"],
+    ["With sign-in (users and e-mailed codes, like this page)", "", "./cactusdb --port 8080 --runas background --remotelogin"]],
+};
+// The browser's own system: its row is marked (the processor is often not known).
+const myOS = /Windows/.test(navigator.userAgent) ? "windows" : /Mac OS X|Macintosh/.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent) ? "darwin" : /Linux/.test(navigator.userAgent) ? "linux" : "";
+const myArch = /arm64|aarch64/i.test(navigator.userAgent) ? "arm64" : /x86_64|Win64|x64|amd64/i.test(navigator.userAgent) && myOS !== "darwin" ? "amd64" : "";
+const isMine = (p) => !!myOS && p.split(" ").some((x) => x === myOS || x === myOS + "/" + myArch);
+const iesc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const copyBtn = (cmd, what) => `<button type="button" class="copy" data-copy="${iesc(cmd)}" title="Copy" aria-label="Copy the command: ${iesc(what)}"><i class="bi bi-clipboard" aria-hidden="true"></i></button>`;
+const rows = (list) => `<ul>${list.map(([l, p, c]) => `<li class="${isMine(p) ? "mine" : ""}"><div class="cmd"><div class="lbl">${iesc(l)}${isMine(p) ? `<span class="mine">your system</span>` : ""}</div><code title="${iesc(c)}">${iesc(c)}</code></div>${copyBtn(c, l)}</li>`).join("")}</ul>`;
+const steps = (list) => `<ol class="steps">${list.map((s) => `<li><div class="sbody"><div class="st">${iesc(s.t)}</div>${s.p ? `<p>${s.p}</p>` : ""}` +
+  (s.c || []).map(([l, c]) => `<div class="box"><div class="cmd">${l ? `<div class="cl">${iesc(l)}</div>` : ""}<pre><code>${iesc(c)}</code></pre></div>${copyBtn(c, s.t + (l ? " (" + l + ")" : ""))}</div>`).join("") + `</div></li>`).join("")}</ol>`;
+
+// The container ways: deploy/deploy.sh (in cactusdb's repository) does the work on each.
+const CPLAT = [["dd", "Docker Desktop", ["linux", "darwin", "windows"]], ["ce", "Docker CE", ["linux", "darwin", "windows"]], ["podman", "Podman", ["linux", "darwin", "windows"]],
+  ["k3s", "k3s", ["linux", "darwin", "windows"]], ["k8s", "Kubernetes", ["linux", "darwin", "windows"]]];
+const COS = [["linux", "Linux"], ["darwin", "macOS"], ["windows", "Windows"]];
+let cPlat = "dd", cOS = myOS || "linux", uWay = "page";
+function containerSteps(plat, os) {
+  const win = os === "windows", target = plat === "podman" ? "dd" : plat;
+  const out = [];
+  if (win) out.push({ t: "Open a WSL terminal", p: `The deploy script is a bash script: run it in <b>WSL 2</b> (Ubuntu). In PowerShell, once: <code style="display:inline">wsl --install</code>, then open <i>Ubuntu</i>. ${plat === "dd" ? "Turn on Docker Desktop's <i>Use the WSL 2 based engine</i> and its integration with your Ubuntu." : ""}` });
+  out.push({ t: "Get the deploy scripts", p: "cactusdb's repository holds them (deploy/), with the Dockerfile.", c: [["", "git clone https://github.com/albievan/cactusDB.git && cd cactusDB"]] });
+  out.push({ t: "Download the program for the container", p: "The image is built from the Linux program of the newest release (both processors: the image is made for the machine it runs on).",
+    c: [["", `mkdir -p release && for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done`]] });
+  if (plat === "dd") out.push({ t: "Install Docker Desktop", p: `From <a href="https://docs.docker.com/desktop/" target="_blank" rel="noreferrer">docs.docker.com/desktop</a>${os === "linux" ? " (or Docker Engine)" : ""}; start it, then check that it answers:`, c: [["", "docker version"]] });
+  if (plat === "podman") out.push({ t: "Install Podman", p: `From <a href="https://podman.io/docs/installation" target="_blank" rel="noreferrer">podman.io</a>.${os === "linux" ? "" : " On macOS and Windows it runs in a small virtual machine: create and start it once."}`,
+    c: os === "linux" ? [["", "podman version"]] : [["", "podman machine init && podman machine start"], ["Check", "podman version"]] });
+  if (plat === "ce") out.push({ t: "A Linux server with Docker CE", p: "cactusdb runs on a Linux server; this computer drives it over SSH. You need SSH access with a key, and the <code style=\"display:inline\">docker</code> command here (Docker Desktop, or just the Docker CLI). Docker CE on the server can be installed for you (next step)." ,
+    c: [["Check the SSH access", "ssh admin@server true"]] });
+  if (plat === "k3s") out.push({ t: "A k3s server", p: "k3s on a Linux server, and Docker or Podman where you run the deploy script (to build the image). Simplest: run the next steps on the k3s server itself. From another computer, let kubectl reach the server with its kubeconfig (and SSH with sudo to load the image there).",
+    c: [["On the server", "curl -sfL https://get.k3s.io | sh -"], ["Check, on the server", "sudo k3s kubectl get nodes"], ["Only from another computer: its kubeconfig", "mkdir -p ~/.kube && ssh admin@server sudo cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/server/' > ~/.kube/config"]] });
+  if (plat === "k8s") out.push({ t: "A Kubernetes cluster", p: "kubectl that reaches the cluster, Docker or Podman to build the image, and a registry the cluster pulls from (Docker Desktop's own Kubernetes needs none).", c: [["Check", "kubectl get nodes"]] });
+  const env = { dd: ["CACTUSDB_PORT=8080", "DD_CONN_DIR=~/cactusdb/conn", "DD_EXPORT_DIR=~/cactusdb/export"], podman: ["CONTAINER_RUNTIME=podman", "CACTUSDB_PORT=8080"],
+    ce: ["CE_HOST=admin@server", "CE_INSTALL_DOCKER=yes      # installs Docker CE on the server if it's missing", "CACTUSDB_PORT=8080"],
+    k3s: ["K3S_SSH=                   # empty on the k3s server; admin@server from another computer", "K8S_SERVICE_TYPE=NodePort  # or LoadBalancer (k3s has one built in)"],
+    k8s: ["K8S_CONTEXT=my-cluster", "K8S_REGISTRY=registry.example.com/cactusdb", "K8S_SERVICE_TYPE=LoadBalancer"] }[plat];
+  out.push({ t: "Settings", p: "Copy the example settings and change these lines in <code style=\"display:inline\">deploy/.env</code> (every setting is explained in the file):", c: [["", "cp deploy/.env.example deploy/.env"], ["In deploy/.env", env.join("\n")]] });
+  out.push({ t: "Install", p: "Builds the image and starts cactusdb; run it again later to deploy a new version over it (the data stays).", c: [["", `deploy/deploy.sh --docker ${target} --env deploy/.env --install`]] });
+  out.push({ t: "Check and open it", p: "It prints the address to open (with k3s and Kubernetes also a <code style=\"display:inline\">kubectl port-forward</code> command when none answers from here). To remove it: <code style=\"display:inline\">--uninstall</code> (keeps the data).", c: [["", "deploy/deploy.sh --env deploy/.env --status"]] });
+  return out;
+}
+const UWAY = [["page", "From the page"], ["standalone", "Standalone, by hand"], ["container", "Container"]];
+function upgradeSteps(way) {
+  if (way === "page") return [
+    { t: "Check for update", p: "In cactusdb, the cloud button at the top right (a dot on it means a newer version is out) shows the version you have and the newest." },
+    { t: "Install and restart", p: "<b>Install <i>x.y.z</i> and restart</b> (click twice) downloads the new program, checks its signature, keeps the old one as <code style=\"display:inline\">cactusdb.old</code> and starts the new one with the same options. Open pages reload themselves." },
+    { t: "Before 1.61", p: "Versions older than 1.61.0 can't do this: upgrade them once by hand (<i>Standalone, by hand</i>); after that the button works." }];
+  if (way === "standalone") return [
+    { t: "In cactusdb's folder, download the new version", p: "The same command as installing: the setup script replaces the program (a running cactusdb keeps running).", c: [["Linux and macOS", `curl -fsSL ${RAW}/setup.sh | sh`], ["Windows (PowerShell)", `irm ${RAW}/setup.ps1 | iex`]] },
+    { t: "Stop the running cactusdb", p: "With ⏻ Shutdown in its menu (a background one), Ctrl+C in its terminal, or by its process id:", c: [["Linux and macOS", "kill $(cat cactusdb.pid)"]] },
+    { t: "Start it again with the same options", c: [["For example", "./cactusdb --port 8080 --runas background"]] }];
+  return [
+    { t: "Update the deploy scripts", c: [["In the cactusDB folder", "git pull"]] },
+    { t: "Download the new program", c: [["", `for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a ${LATEST}/cactusdb-linux-$a; done`]] },
+    { t: "Install it over the running one", p: "The same settings; the data (connections, exports) stays.", c: [["", "deploy/deploy.sh --env deploy/.env --install"]] }];
+}
+const choice = (legend, list, val, key) => `<div class="choice"><div class="lg">${legend}</div><div class="opts">${list.map(([k, l]) => `<button type="button" data-${key}="${k}" aria-pressed="${k === val}">${iesc(l)}</button>`).join("")}</div></div>`;
+function renderInstall(tab) {
+  document.querySelectorAll(".itabs [data-itab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.itab === tab)));
+  let h = "";
+  if (tab === "standalone") h = `<p>Run one command in the folder you want cactusdb in. The setup scripts pick the right file for the system and check its signature; the other commands download one particular file. Then start it, and open <b>http://&lt;this computer&gt;:8080</b>.</p>` +
+    `<div class="ihead">Setup script: picks the right file itself and checks it</div>${rows(IM.setup)}<div class="ihead">One particular file</div>${rows(IM.files)}<div class="ihead">Then start it</div>${rows(IM.start)}`;
+  else if (tab === "container") {
+    const osOK = CPLAT.find((p) => p[0] === cPlat)[2], os = osOK.includes(cOS) ? cOS : "linux";
+    h = `<p>Step by step with <code style="display:inline">deploy/deploy.sh</code> from cactusdb's repository: choose where it runs and the system you work on.</p>` +
+      choice("Where it runs", CPLAT.map((p) => [p[0], p[1]]), cPlat, "cplat") + choice("Your computer", COS.filter((o) => osOK.includes(o[0])), os, "cos") + steps(containerSteps(cPlat, os));
+  } else h = `<p>How to move to a newer version, by the way cactusdb was installed. Every way keeps your saved connections and exports.</p>` + choice("Installed", UWAY, uWay, "uway") + steps(upgradeSteps(uWay));
+  $("iPane").innerHTML = h;
+  $("iPane").dataset.tab = tab;
+}
+renderInstall("standalone");
+document.querySelector(".itabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-itab]"); if (b) renderInstall(b.dataset.itab); });
+$("iPane").addEventListener("click", async (ev) => {
+  const t = ev.target.closest("button");
+  if (!t) return;
+  if (t.dataset.cplat) { cPlat = t.dataset.cplat; renderInstall("container"); return; }
+  if (t.dataset.cos) { cOS = t.dataset.cos; renderInstall("container"); return; }
+  if (t.dataset.uway) { uWay = t.dataset.uway; renderInstall("upgrade"); return; }
+  if (t.dataset.copy === undefined) return;
+  let ok = false;
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t.dataset.copy); ok = true; } } catch (e) { /* the old way */ }
+  if (!ok) {
+    const a = document.createElement("textarea"); a.value = t.dataset.copy; a.style.position = "fixed"; a.style.opacity = "0";
+    document.body.appendChild(a); a.select(); try { ok = document.execCommand("copy"); } catch (e) { ok = false; } a.remove();
+  }
+  t.firstElementChild.className = ok ? "bi bi-clipboard-check" : "bi bi-clipboard-x"; t.title = ok ? "Copied" : "Could not copy: select the command and copy it";
+  setTimeout(() => { t.firstElementChild.className = "bi bi-clipboard"; t.title = "Copy"; }, 2000);
+});
+
 // The wavy lines at the bottom of the green side.
 $("waves").innerHTML = Array.from({ length: 14 }, (_, i) =>
   `<path d="M0 ${120 + i * 12} C 300 ${40 + i * 14}, 600 ${220 + i * 6}, 900 ${110 + i * 10} S 1200 ${150 + i * 9}, 1200 ${150 + i * 9}" fill="none" stroke="#d9c89f" stroke-opacity="${(0.08 + i * 0.012).toFixed(3)}" stroke-width="1"/>`).join("");
