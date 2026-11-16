@@ -1854,7 +1854,8 @@ cactusdb/
 ├── cactusdb.old(.exe)   the previous version, after an update installed from the web UI
 ├── cactus.conn.db       your saved connections, the chosen export folder, the usage log and
 │                        the startup options (for installing an update from the web UI),
-│                        the events and the --remotelogin users (encrypted)
+│                        the events, the --remotelogin users, and the advanced query
+│                        builder's projects and their saved queries (encrypted)
 │                        (an SQLite database; can be moved: ☰ → Folder setup)
 ├── cactus.conn.db.location  where it was moved to, if it was
 ├── cactus.key           the key that encrypts saved usernames and passwords
@@ -1866,6 +1867,8 @@ cactusdb/
 ├── cactusdb-crash.log   what Go printed when cactusdb crashed, if it ever did (also a
 │                        file per day: cactusdb-crash-YYYY-MM-DD.log)
 └── export/              your exported files, one folder per connection
+    ├── projects/        the advanced query builder's exports, a folder per project:
+    │   └── Sales 2026/xlsx/orders_20261116-120000.xlsx   (and csv/, json/, xml/)
     └── optimo-prod/     named after the connection
         ├── backup/      database backups (.zip)
         ├── csv/
@@ -2001,7 +2004,10 @@ is sent and how to set it up. In short:
 - **Projects** are sealed with a key of their own (AES-256-GCM), split into one share per
   linked connection (XOR: every share is needed), each share sealed with that
   connection's key. Opening a project, and so reading its tables and queries, needs the
-  password of every password-protected connection it links, or the superuser password.
+  password of every password-protected connection it links, the superuser password, or
+  the project's own password when it has one: that password seals the linked
+  connections' passwords (a key derived from it with Argon2id, then the store's key), so
+  it opens all of them; it is never stored itself.
   Its exports are protected like those of its first password-protected connection. A
   project query's copies of rows live in a private temporary folder (0700) and are
   deleted when the run is replaced, the project closes or cactusdb stops. See

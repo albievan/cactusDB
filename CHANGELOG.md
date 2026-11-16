@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.23 — 2026-11-16
+
+- README: *Security* says what a project password opens; *Files cactusdb creates* shows
+  the projects in `cactus.conn.db` and their exports in `export/projects/<project>/`.
+  No change to the program.
+
 ## 1.62.22 — 2026-11-16
 
 - Advanced query builder: *Expand all* and *Collapse all* of grouped rows are icon buttons.
