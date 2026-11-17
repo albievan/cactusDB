@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.31 — 2026-11-17
+
+- Advanced query builder: *Column definitions* scrolls to the right inside its own box
+  (the page stays as wide as the window), with the column's name and type frozen on the
+  left so they stay in view.
+
 ## 1.62.30 — 2026-11-17
 
 - Advanced query builder: the card of a running query (with Cancel) is in the middle of the

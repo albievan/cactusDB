@@ -461,7 +461,10 @@
   .prjsetup > summary .cnt { color: var(--muted); font-weight: 400; }
   .prjquery { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 8px 12px; gap: 6px; }
   /* Nothing is squeezed to fit the window (the page scrolls instead); Results takes what is left. */
-  .prjquery > * { flex-shrink: 0; }
+  .prjquery > * { flex-shrink: 0; min-width: 0; }
+  /* The page stays as wide as the window: a wide grid scrolls inside its own box. */
+  #prjWork, .prjquery { min-width: 0; max-width: 100%; }
+  .prjdesign { max-width: 100%; }
   .prjqbar, .prjresbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .prjqbar select { width: auto; }
   .prjdialect { font-size: 12px; color: var(--muted); }
@@ -545,7 +548,11 @@
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
   .prjdesign .coltype { color: var(--muted); font-size: 11px; }
-  .prjdesign .grip { cursor: grab; color: var(--muted); user-select: none; width: 14px; padding: 2px 2px 2px 4px; letter-spacing: -2px; }
+  /* The grip and the column's name and type stay put while the grid scrolls to the right. */
+  .prjdesign tr > :nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--panel); width: 16px; min-width: 16px; max-width: 16px; }
+  .prjdesign tr > :nth-child(2) { position: sticky; left: 16px; z-index: 2; background: var(--panel); box-shadow: inset -1px 0 0 var(--border); }
+  .prjdesign thead tr > :nth-child(1), .prjdesign thead tr > :nth-child(2) { z-index: 3; }
+  .prjdesign .grip { cursor: grab; color: var(--muted); user-select: none; box-sizing: border-box; width: 16px; padding: 2px 0 2px 3px; letter-spacing: -2px; }
   .prjdesign tr.dragging { opacity: .45; }
   .prjdesign tr.dropabove td { box-shadow: inset 0 2px 0 var(--accent); }
   .prjdesign tr.dropbelow td { box-shadow: inset 0 -2px 0 var(--accent); }
