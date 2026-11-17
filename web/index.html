@@ -590,9 +590,9 @@
   .pager [data-pg=no] { width: 80px; display: inline-block; }
   .pager .pginfo { color: var(--muted); font-size: 12px; }
   .prjres { display: flex; flex-direction: column; flex: 1; min-height: 200px; gap: 4px; position: relative; }
-  /* While a query runs: a dimmed results area with what is happening, the time and Cancel. */
-  .prjbusy { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding-top: 28px;
-    background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(2px); border-radius: 6px; min-height: 230px; }
+  /* While a query runs: the page dimmed, and in the middle of the screen what is happening, the time and Cancel. */
+  .prjbusy { position: fixed; inset: 0; z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(2px); }
   .prjbusy[hidden] { display: none; }
   .prjbusy .card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 26px; min-width: 300px; max-width: 90%;
     background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); text-align: center; }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.62.30 — 2026-11-17
+
+- Advanced query builder: the card of a running query (with Cancel) is in the middle of the
+  screen over the dimmed page, wherever the page is scrolled; it was over the results area.
+
 ## 1.62.29 — 2026-11-17
 
 - Advanced query builder: every column shows its type after its name, in the diagram's

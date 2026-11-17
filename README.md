@@ -1089,8 +1089,8 @@ than 15 digits).
 - **Limits** (the project's *Limits*): 1,000,000 rows per table, 2 GB of copies, 10
   minutes per run. A query that would need more **stops, naming the table**: you never
   get a result built from part of a table.
-- **Progress and Cancel**: while a query runs, the results area is dimmed under a card
-  that says what is happening (reading the rows, *n of m tables read*, the rows so far,
+- **Progress and Cancel**: while a query runs, the page is dimmed and a card in the middle
+  of the screen says what is happening (reading the rows, *n of m tables read*, the rows so far,
   then running the query on the copies), with a bar, the time since it started and a big
   **Cancel**; the rows read per table are listed above it. *Cancel* (there or ■ beside ▶)
   stops the reads and deletes the copies. When the query has run, a last line says how
