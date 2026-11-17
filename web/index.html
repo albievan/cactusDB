@@ -525,6 +525,7 @@
   .pq-fk { fill: none; stroke: var(--muted, #888); stroke-width: 1.2; stroke-dasharray: 2 4; opacity: .8; }
   .pq-fkline { cursor: pointer; }
   .pq-fkline:hover .pq-fk { stroke: var(--accent, #2f6f4f); opacity: 1; stroke-width: 2; }
+  .pq-type { fill: var(--muted, #888); font-size: 10.5px; font-weight: 400; }
   .pq-fkmark { fill: var(--muted, #888); font-size: 10px; font-weight: 400; }
   .pq-cmp { cursor: pointer; }
   .pq-cmp path { fill: none; stroke: var(--muted, #888); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -543,6 +544,7 @@
   .prjdesign td input[data-k=val] { margin-left: 3px; }
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
+  .prjdesign .coltype { color: var(--muted); font-size: 11px; }
   .prjdesign .grip { cursor: grab; color: var(--muted); user-select: none; width: 14px; padding: 2px 2px 2px 4px; letter-spacing: -2px; }
   .prjdesign tr.dragging { opacity: .45; }
   .prjdesign tr.dropabove td { box-shadow: inset 0 2px 0 var(--accent); }
@@ -6012,6 +6014,10 @@ const PQ_COLORS = ["#2f6fb0", "#c0632b", "#2e8b57", "#8e44ad", "#b8860b", "#c039
 const pqColor = (db) => { const i = prj.open ? prj.open.links.findIndex((l) => l.alias.toLowerCase() === String(db).toLowerCase()) : -1; return i < 0 ? "#999" : PQ_COLORS[i % PQ_COLORS.length]; };
 const pqKey = (s) => String(s).toLowerCase();
 const pqColsOf = (t) => pq.cols[pqKey(t.db + "." + t.name)];
+// A column's type as its database names it (varchar(100), int, …), else its kind.
+const pqColType = (c) => (c && (c.type || c.kind) || "").toLowerCase();
+// The column of a table of the query (by its alias), or undefined.
+const pqColOf = (alias, col) => { const t = pq.model.tables.find((x) => pqKey(x.alias) === pqKey(alias)); return t && (pqColsOf(t) || []).find((x) => pqKey(x.name) === pqKey(col)); };
 const pqInProject = (t) => prj.open && prj.open.tables.some((x) => pqKey(x.alias) === pqKey(t.db) && pqKey(x.name) === pqKey(t.name));
 const pqKind = (alias, col) => { const t = pq.model.tables.find((x) => pqKey(x.alias) === pqKey(alias)); const c = t && (pqColsOf(t) || []).find((x) => pqKey(x.name) === pqKey(col)); return c ? c.kind : ""; };
 function pqComparable(a, b) {
@@ -6226,7 +6232,7 @@ function pqDraw() {
     const fks = pq.fks[pqKey(t.db + "." + t.name)] || [], fkOf = {};
     for (const fk of fks) fk.cols.forEach((c, i) => { fkOf[pqKey(c)] = `${fk.table || fk.refSource}.${fk.refCols[i] || ""}`; });
     const title = `${t.name}${pqKey(t.alias) !== pqKey(t.name) ? " " + t.alias : ""}`;
-    const w = Math.max(150, pqMeasure(title, true) + 66, ...shown.map((c) => pqMeasure(c.name + (fkOf[pqKey(c.name)] ? " → " + fkOf[pqKey(c.name)] : "")) + 40));
+    const w = Math.max(150, pqMeasure(title, true) + 66, ...shown.map((c) => pqMeasure(c.name + " : " + pqColType(c) + (fkOf[pqKey(c.name)] ? " → " + fkOf[pqKey(c.name)] : "")) + 40));
     return { t, k, x: pos.x, y: pos.y, w, h: 34 + shown.length * 16 + (shown.length ? 4 : 0) + (more || hidden ? 16 : 0), cols: shown, used, joined, fks, fkOf, title, more, hidden, all: !!pos.all, compact: !!pos.compact };
   });
   const byK = Object.fromEntries(nodes.map((n) => [n.k, n]));
@@ -6289,7 +6295,7 @@ function pqDraw() {
         const y = n.y + 34 + i * 16, on = n.used.has(pqKey(c.name));
         return `<g data-col="${esc(c.name)}" data-k="${esc(n.k)}"><rect class="pq-colbg" x="${n.x + 1}" y="${y}" width="${n.w - 2}" height="16"/>` +
           `<rect class="pq-check" data-check="${esc(c.name)}" x="${n.x + 8}" y="${y + 3}" width="10" height="10" rx="2" fill="${on ? col : "none"}" stroke="${on ? col : "#999"}" pointer-events="all"><title>${on ? "Remove from" : "Add to"} the output</title></rect>` +
-          `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}${n.fkOf[pqKey(c.name)] ? `<tspan class="pq-fkmark"> → ${esc(n.fkOf[pqKey(c.name)])}</tspan>` : ""}<title>${esc(c.name + " · " + (c.type || c.kind) + (n.fkOf[pqKey(c.name)] ? " · foreign key to " + n.fkOf[pqKey(c.name)] : "") + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
+          `<text class="pq-col${n.joined.has(pqKey(c.name)) ? " on" : ""}" x="${n.x + 24}" y="${y + 12}">${c.key ? "🔑 " : ""}${esc(c.name)}<tspan class="pq-type"> : ${esc(pqColType(c))}</tspan>${n.fkOf[pqKey(c.name)] ? `<tspan class="pq-fkmark"> → ${esc(n.fkOf[pqKey(c.name)])}</tspan>` : ""}<title>${esc(c.name + " · " + (c.type || c.kind) + (n.fkOf[pqKey(c.name)] ? " · foreign key to " + n.fkOf[pqKey(c.name)] : "") + (ro ? "" : " — drag onto another table's column to join"))}</title></text></g>`;
       }).join("") +
       (n.hidden ? `<text class="pq-more" data-compact="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>Show all the columns</title>▾ +${n.hidden} hidden</text>` : "") +
       (n.more ? `<text class="pq-more" data-more="${esc(n.k)}" x="${n.x + 8}" y="${n.y + n.h - 6}" role="button"><title>${n.all ? "Show the first 60 columns only" : "Show all the columns"}</title>${n.all ? "▴ show fewer" : `▾ +${n.more} more`}</text>` : "") + `</g>`;
@@ -6602,7 +6608,7 @@ function pqDesign() {
         `<input type="text" class="form-control form-control-sm" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
         `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</span></td>`;
     }).join("");
-    return `<tr data-f="${i}">${grip}<td title="${esc(fname(f))}">${esc(fname(f).slice(0, 60))}</td>
+    return `<tr data-f="${i}">${grip}<td title="${esc(fname(f) + (pqColOf(f.table, f.col) ? " : " + pqColType(pqColOf(f.table, f.col)) : ""))}">${esc(fname(f).slice(0, 60))}${!f.expr && pqColOf(f.table, f.col) ? `<span class="coltype"> : ${esc(pqColType(pqColOf(f.table, f.col)))}</span>` : ""}</td>
       <td><input type="checkbox" data-k="show"${f.show ? " checked" : ""} aria-label="Show ${esc(fname(f))}"></td>
       <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
       <td>${ex || f.agg ? "" : pqFnCell(f.fns, "fn")}</td>

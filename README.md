@@ -1130,6 +1130,8 @@ per line). Each is as tall as you drag its bottom-right corner.
   written `LEFT OUTER JOIN`; one typed as `LEFT JOIN` keeps its spelling. Joins from
   foreign keys and from names like `customer_id` → `customer.id` are offered when a table
   is added, never applied without a click.
+- Every column shows its **type** as its database names it, in the diagram and in
+  *Column definitions* (`brn_no : varchar(100)`, `total : numeric(10,2)`).
 - **Foreign keys**: a column that is one shows where it points (`cust_id → cust.id`).
   When both tables of a foreign key are in the diagram and the query doesn't join on it,
   a dotted line links them; click it to join on it.

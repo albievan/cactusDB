@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.62.29 — 2026-11-17
+
+- Advanced query builder: every column shows its type after its name, in the diagram's
+  tables and in *Column definitions* (`brn_no : varchar(100)`).
+
 ## 1.62.28 — 2026-11-17
 
 - README, *Deploying to Docker, k3s or Kubernetes*: where the container's program comes from
