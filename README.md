@@ -1727,9 +1727,16 @@ The log looks like this:
 
 `deploy/deploy.sh` installs cactusdb as a container on **Docker** (Docker Desktop, Docker Engine or
 Podman), **Docker CE** on a Linux server (this one, or another one over SSH), **k3s** or any
-**Kubernetes** cluster, with all settings in an env file:
+**Kubernetes** cluster, with all settings in an env file. It builds the image from the Linux
+program in `release/`, which a fresh copy of the repository doesn't have: download it from
+the newest release first (both processors; the image is made for the machine it runs on),
+or add `--from-source` to compile it with Go instead. The sign-in page (with
+`--remotelogin`) has these steps for every platform and system, with what to install first.
 
 ```sh
+git clone https://github.com/albievan/cactusDB.git && cd cactusDB
+mkdir -p release
+for a in amd64 arm64; do curl -fL -o release/cactusdb-linux-$a https://github.com/albievan/cactusDB/releases/latest/download/cactusdb-linux-$a; done
 cp deploy/.env.example deploy/.env   # then edit deploy/.env
 deploy/deploy.sh --docker dd --env deploy/.env --install
 deploy/deploy.sh --docker ce --env deploy/.env --install     # CE_HOST=admin@server in .env, or empty for this machine

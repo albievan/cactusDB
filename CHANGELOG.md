@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.28 — 2026-11-17
+
+- README, *Deploying to Docker, k3s or Kubernetes*: where the container's program comes from
+  (download the Linux program of the newest release into `release/`, or `--from-source`),
+  as a fresh copy of the repository has none. No change to the program.
+
 ## 1.62.27 — 2026-11-16
 
 - Sign-in page: the install guide goes step by step for every container platform (Docker
