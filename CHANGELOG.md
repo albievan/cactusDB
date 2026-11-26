@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.41 — 2026-11-26
+
+- Advanced query builder: the **Calculated column** form has **Totals**: *Number of rows*
+  (`COUNT(*)`), and COUNT, SUM, AVG, MIN, MAX of a column. The columns ticked Group become
+  `GROUP BY`, so it counts the items per group (one row per group).
+
 ## 1.62.40 — 2026-11-26
 
 - Advanced query builder: **Export all queries** icons in the project's bar, before Delete

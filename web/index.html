@@ -5434,10 +5434,13 @@ function pqCaseDialog(c, f, opts = {}) {
     if (opts.calc) {
       $("pqCalcName").value = "";
       $("pqCalcFn").innerHTML = `<option value="CASE">CASE: if the value is … then …</option><optgroup label="Functions">${PQ_FNS.filter((x) => x.p === undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</optgroup>` +
-        `<optgroup label="Formats">${PQ_FN_PRESETS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</optgroup>`;
+        `<optgroup label="Formats">${PQ_FN_PRESETS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</optgroup>` +
+        `<optgroup label="Totals: one row per group (the Group columns)"><option value="ROWS">Number of rows: COUNT(*)</option>` +
+        `<option value="AGG|COUNT">COUNT: values of the column (not NULL)</option><option value="AGG|SUM">SUM of the column</option><option value="AGG|AVG">AVG: average of the column</option>` +
+        `<option value="AGG|MIN">MIN of the column</option><option value="AGG|MAX">MAX of the column</option></optgroup>`;
     }
     const isCase = () => !opts.calc || $("pqCalcFn").value === "CASE";
-    const mode = () => { $("pqCaseBody").hidden = !isCase(); $("pqCaseTitle").textContent = opts.calc ? "Calculated column" : "CASE: if the value is … then …"; };
+    const mode = () => { $("pqCaseBody").hidden = !isCase(); $("pqCaseColRow").hidden = !opts.pick || (opts.calc && $("pqCalcFn").value === "ROWS"); $("pqCaseTitle").textContent = opts.calc ? "Calculated column" : "CASE: if the value is … then …"; };
     mode();
     for (const [w, t] of (c ? c.w : [["", ""]])) row(show(w, lit), show(t, lit2));
     $("pqCaseElse").value = c && c.e ? show(c.e, lit2) : "";
@@ -6927,6 +6930,18 @@ $("prjDesign").addEventListener("change", (ev) => {
     t.value = "";
     pqCaseDialog(null, null, { pick: true, calc: true }).then((r) => {
       if (!r) return;
+      // A total: COUNT(*) or COUNT/SUM/… of the column; the rows grouped by the Group
+      // columns become one row per group (GROUP BY), as with the Total list.
+      if (r.fn === "ROWS" || r.fn.startsWith("AGG|")) {
+        const agg = r.fn === "ROWS" ? "COUNT" : r.fn.slice(4);
+        m.fields.push({ table: r.fn === "ROWS" ? "" : r.table, col: r.fn === "ROWS" ? "*" : r.col, show: true, alias: r.name || (r.fn === "ROWS" ? "Count" : agg.toLowerCase() + "_" + r.col), agg, group: false, sort: "", sortPos: 0, crit: [] });
+        for (const x of m.fields) if (pqGroupsRows(m, x)) x.group = true;
+        m.groupRows = [];
+        const loose = m.fields.filter((x) => x.show && !x.agg && !x.group && !x.expr && x.col !== "*").map(pqOutName);
+        if (!m.fields.some((x) => x.group)) toast("Tick Group on the columns to count per group: without one the total is of all rows", false);
+        else if (loose.length) toast(`${loose.join(", ")}: neither grouped nor a total, so each group shows one of their values (tick Group, choose a Total or untick Show)`, false);
+        pqCommit(); return;
+      }
       const fn = r.fn === "CASE" ? "CASE|" + JSON.stringify(r.c) : r.fn;
       m.fields.push({ table: r.table, col: r.col, fns: [fn], show: true, alias: r.name || r.col + "_" + r.fn.split("|")[0].toLowerCase(), agg: "", group: false, sort: "", sortPos: 0, crit: [] });
       pqCommit();

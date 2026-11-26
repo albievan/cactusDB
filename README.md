@@ -1173,7 +1173,11 @@ per line). Each is as tall as you drag its bottom-right corner.
 - **Calculated column** (first in **Add column…**): a form takes its name in the output, its
   function (CASE, or any function or format of the **ƒ** list) and the column it works on,
   and for CASE the values; it is added as a row of its own, e.g. `CASE o.coded_tag WHEN
-  '034' THEN 'Scale' … END AS "Coded Type"` or `UPPER(o.coded_a) AS name`.
+  '034' THEN 'Scale' … END AS "Coded Type"` or `UPPER(o.coded_a) AS name`. Its **Totals**
+  count or add up per group: *Number of rows* (`COUNT(*) AS Count`), or COUNT, SUM, AVG,
+  MIN or MAX of a column. The columns ticked **Group** then become `GROUP BY`, one row per
+  group with its count; a shown column neither grouped nor a total shows one value of its
+  group, and cactusdb says which.
 - **CASE** (the **CASE** column of *Column definitions*, or *if the value is … then …* in
   the **ƒ** list; it shows as *CASE (2)*, click to change it, × removes it) turns a column's values into
   others: a form takes each value and what it becomes, and *Otherwise* for the rest (empty:
