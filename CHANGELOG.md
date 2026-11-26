@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.34 — 2026-11-26
+
+- Advanced query builder: a **Refresh** icon button in the query bar reads the project's
+  saved queries again, adding those saved since in another window or by someone else; the
+  query in the editor stays as it is (one deleted elsewhere stays as a new query).
+
 ## 1.62.33 — 2026-11-26
 
 - Advanced query builder: a **Rename** icon button in the query bar (beside Save as)

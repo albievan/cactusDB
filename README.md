@@ -1192,7 +1192,9 @@ per line). Each is as tall as you drag its bottom-right corner.
   the query returned. The browser remembers which are folded.
 
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
-diagram's layout. The icon buttons beside it: **New query** (a form asks for its name and
+diagram's layout. The icon buttons beside it: **Refresh** (reads the saved queries again:
+those saved since in another window or by someone else are added; the query in the editor
+stays as it is, and one deleted elsewhere stays there as a new query), **New query** (a form asks for its name and
 description, then the editor is empty), **Save**, **Save as** (the same form, for a new
 saved query), **Rename** and **Delete**. Rename asks for the new name (and description)
 and saves it at once as a new version of the query as it was last saved; changes in the

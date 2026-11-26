@@ -1742,6 +1742,7 @@
             <select class="form-select form-select-sm" id="prjQSel" aria-label="Saved query of the project" title="The project's saved queries"><option value="">New query (not saved)</option></select>
             <select class="form-select form-select-sm" id="prjQVers" hidden aria-label="Version" title="Every save of the query is kept: pick one to put it in the editor"></select>
             <span class="prjqbtns">
+            <button class="btn btn-sm btn-outline-secondary" id="prjQRefresh" title="Refresh the list of saved queries: new ones, and changes saved elsewhere" aria-label="Refresh the saved queries"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="prjQNew" title="New query: give it a name and a description, then write it" aria-label="New query"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="prjQSave" title="Save the query (and its diagram) in the project" aria-label="Save the query"><i class="bi bi-floppy" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="prjQSaveAs" title="Save as a new saved query, with its own name and description" aria-label="Save as a new query"><i class="bi bi-copy" aria-hidden="true"></i></button>
@@ -6960,6 +6961,20 @@ async function prjQSave(asNew) {
   } catch (e) { toast(e.message, true); return false; }
 }
 $("prjQSel").addEventListener("change", () => prjQOpen(+$("prjQSel").value));
+// Refresh reads the saved queries again: those saved since (in another window, by
+// someone else) are added; the query in the editor stays as it is.
+$("prjQRefresh").addEventListener("click", async () => {
+  const had = new Set(prj.queries.map((q) => q.id));
+  await prjQLoadList(prj.qid);
+  if (prj.qid && !prj.queries.some((q) => q.id === prj.qid)) {
+    toast(`The query “${$("prjQName").value.trim()}” was deleted elsewhere: it stays in the editor as a new query`, true);
+    prj.qid = 0; prj.qOrig = ""; $("prjQSel").value = "0"; $("prjQDel").hidden = true; $("prjQVers").hidden = true; prjMark();
+    return;
+  }
+  if (prj.qid) prjQVersions(prj.qid);
+  const added = prj.queries.filter((q) => !had.has(q.id)).length;
+  toast(`${prj.queries.length} saved quer${prj.queries.length === 1 ? "y" : "ies"}${added ? `, ${added} new` : ""}`);
+});
 $("prjQSave").addEventListener("click", () => prjQSave(false));
 $("prjQSaveAs").addEventListener("click", () => prjQSave(true));
 // New query: its name and description first, then an empty editor.
