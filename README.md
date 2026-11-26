@@ -1170,6 +1170,10 @@ per line). Each is as tall as you drag its bottom-right corner.
   differ), BETWEEN / NOT BETWEEN (two boxes: from and to), IS / IS NOT (equal or not,
   NULL equal to NULL) and IS (NOT) NULL. Each filter has its own **ƒ** functions on the
   column before it is compared (e.g. LOWER and TRIM: `LOWER(TRIM(c.name)) = 'ann'`).
+- **Calculated column** (first in **Add column…**): a form takes its name in the output, its
+  function (CASE, or any function or format of the **ƒ** list) and the column it works on,
+  and for CASE the values; it is added as a row of its own, e.g. `CASE o.coded_tag WHEN
+  '034' THEN 'Scale' … END AS "Coded Type"` or `UPPER(o.coded_a) AS name`.
 - **CASE** (the **CASE** column of *Column definitions*, or *if the value is … then …* in
   the **ƒ** list; it shows as *CASE (2)*, click to change it, × removes it) turns a column's values into
   others: a form takes each value and what it becomes, and *Otherwise* for the rest (empty:
@@ -1180,7 +1184,8 @@ per line). Each is as tall as you drag its bottom-right corner.
   its CASE. It works on filters as well. After a run the form shows the values the column
   holds in the result (and offers them as you type); **Add every value** gives each its row
   (up to 50 values), and OK warns when none of the CASE's values is among them, the sign of
-  a CASE on the wrong column.
+  a CASE on the wrong column. The **CASE** column's form can also move the CASE to another
+  column (*Column it works on*).
   Type values plainly (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers,
   `NULL`, a column (`c.id`) and a function call (`lower(trim('aaa   '))`) stay as they are.
   A value typed without an operator gets one: `LIKE` when it holds `%`, `=` otherwise. An

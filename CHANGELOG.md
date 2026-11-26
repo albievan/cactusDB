@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.38 — 2026-11-26
+
+- Advanced query builder: **Add column… → Calculated column**: a form takes the name in the
+  output, the function (CASE, or any function or format of the **ƒ** list) and the column it
+  works on, and for CASE its values, and adds it as a row of *Column definitions*. The form of
+  the **CASE** column can move a CASE to another column.
+
 ## 1.62.37 — 2026-11-26
 
 - Advanced query builder: *Column definitions* has a **CASE** column: its button builds a
