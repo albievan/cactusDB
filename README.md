@@ -1174,7 +1174,9 @@ per line). Each is as tall as you drag its bottom-right corner.
   `NULL`, a column (`c.id`) and a function call (`lower(trim('aaa   '))`) stay as they are.
   A value typed without an operator gets one: `LIKE` when it holds `%`, `=` otherwise. An
   operator still waiting for its value is kept (its box has an orange border) while you
-  change other columns, and the filter is used once the value is typed.
+  change other columns, and the filter is used once the value is typed. The SQL box follows
+  a filter's value as you type it, so Run (Ctrl+Enter works in the grid too) and Save
+  always use what the grid shows.
 - A join of a text column with a number (or a date with a number) is shown in red, as
   is a table joined to nothing or one that isn't in the project.
 - SQL the designer can't hold (a subquery, `WITH`, `UNION`, a window function) makes it
@@ -1192,8 +1194,10 @@ per line). Each is as tall as you drag its bottom-right corner.
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
 diagram's layout. The icon buttons beside it: **New query** (a form asks for its name and
 description, then the editor is empty), **Save**, **Save as** (the same form, for a new
-saved query) and **Delete**. The name and description show under the bar as text; the
-pencil changes them (Save keeps the change). The green ▶ (**Run**, or Ctrl+Enter) runs
+saved query), **Rename** and **Delete**. Rename asks for the new name (and description)
+and saves it at once as a new version of the query as it was last saved; changes in the
+editor stay there, still to be saved. A name is unique in the project. The name and
+description show under the bar as text; the pencil changes them (Save keeps the change). The green ▶ (**Run**, or Ctrl+Enter) runs
 the query in the editor.
 
 **Closing a project**: ✕ in the project's bar, or the × beside its name in the tab row

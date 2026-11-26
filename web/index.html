@@ -1745,6 +1745,7 @@
             <button class="btn btn-sm btn-outline-secondary" id="prjQNew" title="New query: give it a name and a description, then write it" aria-label="New query"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="prjQSave" title="Save the query (and its diagram) in the project" aria-label="Save the query"><i class="bi bi-floppy" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="prjQSaveAs" title="Save as a new saved query, with its own name and description" aria-label="Save as a new query"><i class="bi bi-copy" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" id="prjQRename" title="Rename the query (and change its description)" aria-label="Rename the query"><i class="bi bi-input-cursor-text" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-outline-danger" id="prjQDel" hidden title="Delete the saved query (asks first)" aria-label="Delete the saved query"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </span>
             <span class="spacer"></span>
@@ -5560,8 +5561,11 @@ function prjProgress(st) {
   p.innerHTML = head + `<div class="prjprogbody" id="prjProgBody">${rows.join("")}</div>` + ret + err;
   p.hidden = !(what || rows.length || ret || err);
 }
+// pqFlush finishes an edit still in a box of the grid (its change is taken), before a run or a save.
+function pqFlush() { const a = document.activeElement; if (a && $("prjDesign").contains(a)) a.blur(); }
 async function prjRun(limit) {
   if (!prj.open || prj.running) return;
+  pqFlush();
   const sql = $("prjSql").value.trim();
   if (!sql) { toast("Write a query first", true); return; }
   if (prjDirty()) { toast("Save the project first: the query runs on its saved tables", true); return; }
@@ -5593,6 +5597,7 @@ async function prjRun(limit) {
 }
 $("prjRun").addEventListener("click", () => prjRun());
 $("prjSql").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); prjRun(); } });
+$("prjDesign").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); prjRun(); } });
 $("prjSql").addEventListener("input", () => { prjSetExport(); prjMark(); });
 // prjBusy shows (or hides) the overlay of a running query: the step, the tables read and
 // their rows, the time since it started, and Cancel.
@@ -6691,6 +6696,17 @@ $("prjDesign").addEventListener("change", (ev) => {
   else if (k === "op" || k === "val" || k === "val2") { if (!pqCritUpdate(tr, f, +t.dataset.r, k)) return; }
   pqCommit();
 });
+// A filter's value is in the SQL while it is typed (the grid is redrawn when the box is left),
+// so Run, Save and the SQL box always hold what the grid shows.
+$("prjDesign").addEventListener("input", (ev) => {
+  const t = ev.target, tr = t.closest("tr[data-f]");
+  if (!tr || (t.dataset.k !== "val" && t.dataset.k !== "val2")) return;
+  const f = pq.model.fields[+tr.dataset.f];
+  if (!f || !pqCritUpdate(tr, f, +t.dataset.r, "input")) return;
+  $("prjSql").value = pqSql(pq.model);
+  clearTimeout(pq.htimer); pq.htimer = setTimeout(pqPush, 700);
+  prjSetExport(); prjMark();
+});
 // pqFnPick is the function chosen in a list: a format (ready-made or of the user's
 // own) is shown first, to be changed (R to Zl, the decimals…) or taken as it is.
 async function pqFnPick(v) {
@@ -6726,7 +6742,7 @@ function pqCritUpdate(tr, f, r, k) {
   if ((!op && fns.length) || missing) f.pend[r] = { op, val, val2, fns }; else delete f.pend[r];
   v1.classList.toggle("pqwait", missing);
   if (!op && fns.length) return false;
-  if (missing && (k === "op" || k === "cfnadd" || k === "cfnclr" || (btw && (val || val2)))) { (!val ? v1 : v2).focus(); return false; }
+  if (missing && k !== "input" && (k === "op" || k === "cfnadd" || k === "cfnclr" || (btw && (val || val2)))) { (!val ? v1 : v2).focus(); return false; }
   f.crit = f.crit.filter((c) => c.row !== r);
   // Values are made SQL: text is quoted for you ('%ES'), numbers and columns stay; an IN list gets its brackets.
   if (op && !missing) f.crit.push({ op, value: pqNoValue(op) ? "" : btw ? `${pqLiteral(val, op)} AND ${pqLiteral(val2, op)}` : op.endsWith("IN") ? pqList(val) : pqLiteral(val, op), row: r, ...(fns.length ? { fns } : {}) });
@@ -6925,6 +6941,7 @@ $("prjQVers").addEventListener("change", () => {
   if (v !== prj.versions[0]) toast(`Version ${v.version} is in the editor: Save to make it the current version`);
 });
 async function prjQSave(asNew) {
+  pqFlush();
   const sql = $("prjSql").value.trim();
   if (!sql) { toast("Write a query first", true); return false; }
   let name = $("prjQName").value.trim(), description = $("prjQDesc").value.trim();
@@ -6958,6 +6975,21 @@ $("prjQNew").addEventListener("click", async () => {
 $("prjQEdit").addEventListener("click", async () => {
   const m = await prjQAskMeta("Name and description", $("prjQName").value, $("prjQDesc").value);
   if (m) { prjQMeta(m.name, m.description); prjMark(); }
+});
+// Rename: a saved query is saved under its new name at once, as it was last saved
+// (changes in the editor stay there, still to be saved); a new one just gets the name.
+$("prjQRename").addEventListener("click", async () => {
+  const q = prj.qid && prj.queries.find((x) => x.id === prj.qid);
+  const m = await prjQAskMeta("Rename the query", $("prjQName").value, $("prjQDesc").value);
+  if (!m) return;
+  if (!q) { prjQMeta(m.name, m.description); prjMark(); return; }
+  try {
+    const r = await api("POST", "/api/project/queries", { project: prj.open.project, id: q.id, name: m.name, description: m.description, sql: q.sql, layout: q.layout });
+    prjQMeta(m.name, m.description); prj.queryName = m.name;
+    prj.qOrig = JSON.stringify({ n: m.name, d: m.description, s: q.sql.trim() });
+    await prjQLoadList(q.id); prjQVersions(q.id); prjMark();
+    toast(`Renamed the query “${q.name}” to “${m.name}” (version ${r.version})`);
+  } catch (e) { toast(e.message, true); }
 });
 $("prjQDel").addEventListener("click", async () => {
   const name = $("prjQName").value.trim();

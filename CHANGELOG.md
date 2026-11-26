@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.33 — 2026-11-26
+
+- Advanced query builder: a **Rename** icon button in the query bar (beside Save as)
+  renames the saved query, and can change its description, at once: it is saved as a new
+  version of the query as last saved, and changes in the editor are kept, still to be saved.
+- Advanced query builder: a filter's value goes into the SQL as you type it, so the SQL box,
+  **Run** (also Ctrl+Enter in *Column definitions*) and **Save** always use the filters the
+  grid shows; an edit still in a box of the grid is taken before a run or a save.
+
 ## 1.62.32 — 2026-11-26
 
 - Advanced query builder: a filter no longer disappears when you move away from it. A
