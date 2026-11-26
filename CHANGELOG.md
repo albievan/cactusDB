@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.62.44 — 2026-11-26
+
+- Advanced query builder: **Export all queries** runs the queries several at once, one per CPU
+  core and at least 5, each on a staging copy of its own, so a long query doesn't hold up the
+  others. The form shows how many run at once, each query's time, and the total; a query that
+  fails doesn't stop the others; Cancel stops them all. The query in the editor and its result
+  in the grid are left as they are.
+
 ## 1.62.43 — 2026-11-26
 
 - Advanced query builder: the projects list has the **Export all queries** icons (Excel, CSV,

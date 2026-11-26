@@ -1218,11 +1218,13 @@ per line). Each is as tall as you drag its bottom-right corner.
 
 **Export all queries.** The export icons in the project's bar, before *Delete*, and in each
 row of the projects list, as a group of their own right after *Open* (Excel, CSV, JSON, XML,
-all four; from the list, the project is opened first), run every saved query of the project at its latest version, one after
-the other, and export all its rows, one file per query and format (in the project's export
-folder, also on the *Exported files* page). A form shows each query's progress, its row count
-and a download per file, and a query that fails, with its error; **Cancel** stops after the
-running one. The query in the editor needs **Run** again before it is exported on its own.
+all four; from the list, the project is opened first), run every saved query of the project at its latest version and export all its rows, one file
+per query and format (in the project's export folder, also on the *Exported files* page).
+The queries run **several at once**: one per CPU core of the machine cactusdb runs on, and at
+least 5, each on a staging copy of its own, so a long query doesn't hold up the others. A
+form shows how many run at once, each query's progress, its row count, time and a download
+per file, and a query that fails, with its error (the others carry on); **Cancel** stops
+them all. The query in the editor and its result in the grid are left as they are.
 
 **Project queries** in the left panel: while a project is open, its saved queries (and only
 its own) are listed above *Project tables*, with their version; a click opens one in the
@@ -2321,6 +2323,7 @@ CACTUSDB_ACCESS_DIR=~/mdbtestdata/data go test -run TestAccessFiles ./...
 | `projects.go`, `projects_store.go` | Projects: storage (`projects`, `project_links` tables; the project key split over the linked connections), opening (every linked connection unlocked and connected), linking, tables (`/api/projects`, `/api/project/…`) |
 | `projectsql.go` | A project query read just enough: the tables and columns it uses, the conditions that can go to the source (pushdown), and the stricter read-only check |
 | `projectrun.go` | Running a project query: the staging (a SQLite file per alias, attached read-only), type mapping, limits, progress, cancel, exports to `projects/<project>/` |
+| `exportall.go` | Export all queries of a project: the queries run and export several at once (one per CPU core, at least 5), each on its own staging copy, with progress and cancel |
 | `projects_queries.go` | A project's saved queries and versions (`project_queries`, `project_query_versions`), columns and keys for the designer, join suggestions |
 | `projects_password.go` | The project password: the linked connections' passwords sealed with it (`projects.pw_lock`, `pw_seal`), opened and kept up to date when the project opens |
 | `projectgroups.go` | Rows grouped for reading (`-- group rows by`): the grouped exports (Excel outline, nested JSON and XML, sorted CSV) |

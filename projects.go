@@ -30,17 +30,18 @@ type projectSession struct {
 	projectID int64
 	key       []byte
 
-	mu       sync.Mutex
-	name     string
-	data     projectData
-	boxes    map[int64]*secretBox // the key of each linked connection (nil: it has no password)
-	conns    map[int64]SavedConn  // each linked connection, unlocked (for Retry)
-	links    map[string]*session  // by alias: the connected ones
-	failed   map[string]string    // by alias: why it isn't connected
-	broken   map[string]bool      // by alias: its saved connection was deleted
-	lastUsed time.Time
-	run      *projectRun        // the last run (projectrun.go)
-	cols     map[string]*mTable // each table's columns, read once (until Refresh)
+	mu        sync.Mutex
+	name      string
+	data      projectData
+	boxes     map[int64]*secretBox // the key of each linked connection (nil: it has no password)
+	conns     map[int64]SavedConn  // each linked connection, unlocked (for Retry)
+	links     map[string]*session  // by alias: the connected ones
+	failed    map[string]string    // by alias: why it isn't connected
+	broken    map[string]bool      // by alias: its saved connection was deleted
+	lastUsed  time.Time
+	run       *projectRun        // the last run (projectrun.go)
+	exportAll *exportAllJob      // the last Export all queries (exportall.go)
+	cols      map[string]*mTable // each table's columns, read once (until Refresh)
 }
 
 // linkable says whether a database type can be linked into a project: the
@@ -99,6 +100,9 @@ func (s *server) closeProject(id string) {
 		ps.run.close()
 		ps.run = nil
 	}
+	if ps.exportAll != nil {
+		ps.exportAll.cancel()
+	}
 	ps.closeLinks()
 }
 
@@ -108,7 +112,7 @@ func (s *server) closeIdleProjects(idle time.Duration) {
 	var old []string
 	for id, ps := range s.projectMap() {
 		ps.mu.Lock()
-		busy := ps.run != nil && ps.run.running()
+		busy := ps.run != nil && ps.run.running() || ps.exportAll != nil && ps.exportAll.running()
 		if !busy && time.Since(ps.lastUsed) >= idle {
 			old = append(old, id)
 		}

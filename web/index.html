@@ -5897,52 +5897,59 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
 // query and format. The query in the editor needs a Run again before its own export.
 document.querySelectorAll(".qallexp").forEach((b) => b.addEventListener("click", () => prjQAllExport(b.dataset.qfmt, b.dataset.label)));
 async function prjQAllExport(fmt, label) {
-  if (!prj.open || prj.running) return;
+  if (!prj.open || prj.qAllBusy) return;
   if (prjDirty()) { toast("Save the project first: the queries run on its saved tables", true); return; }
   await prjQLoadList(prj.qid);
   const qs = prj.queries.slice();
   if (!qs.length) { toast("The project has no saved queries", true); return; }
-  const d = $("prjQAllDialog"), list = $("prjQAllList");
-  let cancelled = false;
-  const dl = (f) => { const x = f.file.split(".").pop(); return `<a class="btn btn-sm btn-link exp-icon dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download title="Download ${esc(f.file)}" aria-label="Download ${esc(f.file)}"><i class="bi bi-filetype-${esc(x)} fmt-${esc(x)}" aria-hidden="true"></i></a>`; };
+  const project = prj.open.project, d = $("prjQAllDialog"), list = $("prjQAllList");
+  const dl = (f) => { const x = f.file.split(".").pop(); return `<a class="btn btn-sm btn-link exp-icon dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(project)}&errors=in-header" download title="Download ${esc(f.file)}" aria-label="Download ${esc(f.file)}"><i class="bi bi-filetype-${esc(x)} fmt-${esc(x)}" aria-hidden="true"></i></a>`; };
+  const secs = (ms) => ms >= 1000 ? (ms / 1000).toFixed(1) + " s" : ms + " ms";
   list.innerHTML = qs.map((q, i) => `<div><span class="n" title="${esc(q.name)}">${esc(q.name)} · v${q.version}</span><span class="st" id="prjQAll${i}">waiting</span></div>`).join("");
-  $("prjQAllText").textContent = `${qs.length} quer${qs.length === 1 ? "y" : "ies"}, the latest version of each, to ${label}: each runs, then every row is exported.`;
+  const head = `${qs.length} quer${qs.length === 1 ? "y" : "ies"}, the latest version of each, to ${label}`;
+  $("prjQAllText").textContent = head + ": starting…";
   $("prjQAllClose").disabled = true; $("prjQAllCancel").hidden = false;
-  const cancel = async () => { cancelled = true; $("prjQAllCancel").hidden = true; try { await api("POST", "/api/project/cancel", { project: prj.open.project }); } catch (e) { /* nothing running */ } };
+  const cancel = async () => { $("prjQAllCancel").hidden = true; try { await api("POST", "/api/project/exportall/cancel", { project }); } catch (e) { /* finished */ } };
   $("prjQAllCancel").onclick = cancel;
   $("prjQAllClose").onclick = () => d.close();
   d.oncancel = (ev) => { if ($("prjQAllClose").disabled) ev.preventDefault(); };
   d.showModal();
-  prj.running = true; $("prjRun").disabled = true; prjSetExport();
+  prj.qAllBusy = true;
   document.querySelectorAll(".qallexp").forEach((x) => (x.disabled = true));
-  let ok = 0, files = 0;
+  // Each query runs and is exported on the server, several at once (one per CPU
+  // core, at least 5), each on a copy of its own: the grid's query is left as it is.
+  const show = (st) => {
+    st.items.forEach((it, i) => {
+      const el = $("prjQAll" + i);
+      if (!el) return;
+      el.className = "st" + (it.state === "done" ? " ok" : it.state === "failed" ? " bad" : "");
+      el.title = (it.files || []).map((f) => f.path).join("\n");
+      el.innerHTML = it.state === "done" ? `${it.rows.toLocaleString()} row${it.rows === 1 ? "" : "s"} · ${secs(it.elapsedMs || 0)} · ` + it.files.map(dl).join("")
+        : it.state === "failed" ? esc("failed: " + it.error)
+        : it.state === "loading" ? `reading the tables… ${(it.tables || []).filter((t) => t.done).length}/${(it.tables || []).length}`
+        : it.state === "querying" ? "running the query…" : it.state === "exporting" ? "exporting…" : esc(it.state);
+    });
+  };
+  let st = null;
   try {
-    for (let i = 0; i < qs.length; i++) {
-      const q = qs[i], st$ = $("prjQAll" + i);
-      if (cancelled) { st$.textContent = "cancelled"; continue; }
-      st$.className = "st"; st$.textContent = "running…";
-      try {
-        let st = await api("POST", "/api/project/run", { project: prj.open.project, sql: q.sql, limit: 1 });
-        while (st.state === "loading" || st.state === "querying") {
-          st$.textContent = st.state === "loading" ? `reading the tables… ${(st.tables || []).filter((t) => t.done).length}/${(st.tables || []).length}` : "running the query…";
-          await new Promise((r) => setTimeout(r, 300));
-          st = await api("GET", "/api/project/run?" + new URLSearchParams({ project: prj.open.project }));
-        }
-        if (st.state !== "done") throw new Error(st.state === "cancelled" ? "cancelled" : st.error || st.state);
-        st$.textContent = "exporting…";
-        const res = await api("POST", "/api/project/export", { project: prj.open.project, sql: q.sql, format: fmt, name: q.name });
-        st$.className = "st ok";
-        st$.innerHTML = `${res.files[0].rows.toLocaleString()} row${res.files[0].rows === 1 ? "" : "s"} · ` + res.files.map(dl).join("");
-        st$.title = res.files.map((f) => f.path).join("\n");
-        ok++; files += res.files.length;
-      } catch (e) { st$.className = "st bad"; st$.textContent = e.message === "cancelled" ? "cancelled" : "failed: " + e.message; }
+    st = await api("POST", "/api/project/exportall", { project, format: fmt, queries: qs.map((q) => ({ name: q.name, sql: q.sql })) });
+    for (;;) {
+      show(st);
+      const n = st.items.filter((it) => it.state === "done" || it.state === "failed" || it.state === "cancelled").length;
+      $("prjQAllText").textContent = `${head}: ${st.threads} at once · ${st.active} running · ${n} of ${qs.length} finished · ${secs(st.elapsedMs)}`;
+      if (!st.running) break;
+      await new Promise((r) => setTimeout(r, 400));
+      st = await api("GET", "/api/project/exportall?" + new URLSearchParams({ project }));
     }
-  } finally {
-    prj.running = false; $("prjRun").disabled = false;
-    prj.ran = ""; prjSetExport();
+  } catch (e) { $("prjQAllText").textContent = "Export failed: " + e.message; st = null; }
+  finally {
+    prj.qAllBusy = false;
     document.querySelectorAll(".qallexp").forEach((x) => (x.disabled = false));
     $("prjQAllCancel").hidden = true; $("prjQAllClose").disabled = false;
-    $("prjQAllText").textContent = `${ok} of ${qs.length} quer${qs.length === 1 ? "y" : "ies"} exported, ${files} file${files === 1 ? "" : "s"} (also on the Exported files page). The query in the editor: Run it again to export it on its own.`;
+    if (st) {
+      const ok = st.items.filter((it) => it.state === "done"), files = ok.reduce((a, it) => a + it.files.length, 0);
+      $("prjQAllText").textContent = `${ok.length} of ${qs.length} quer${qs.length === 1 ? "y" : "ies"} exported, ${files} file${files === 1 ? "" : "s"}, ${st.threads} at once, in ${secs(st.elapsedMs)} (also on the Exported files page).`;
+    }
   }
 }
 

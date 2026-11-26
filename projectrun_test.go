@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -126,6 +127,51 @@ ORDER BY o.id`
 		}
 	}
 
+	// Export all queries: several at once, each on its own copy; one that
+	// fails doesn't stop the others, and the grid's run is left as it was.
+	var qs []map[string]string
+	for i := range 8 {
+		qs = append(qs, map[string]string{"name": fmt.Sprintf("q%d", i), "sql": fmt.Sprintf(`SELECT * FROM maria.orders WHERE id >= %d ORDER BY id`, 10+i%4)})
+	}
+	qs = append(qs, map[string]string{"name": "bad", "sql": `SELECT nope FROM maria.orders`})
+	st = call("POST", "/api/project/exportall", map[string]any{"project": ps, "format": "csv", "queries": qs}, 200)
+	if st["threads"].(float64) < exportAllMinThreads {
+		t.Errorf("threads: %v", st["threads"])
+	}
+	call("POST", "/api/project/exportall", map[string]any{"project": ps, "format": "csv", "queries": qs}, 409) // one at a time
+	for i := 0; st["running"] == true && i < 500; i++ {
+		time.Sleep(20 * time.Millisecond)
+		st = call("GET", "/api/project/exportall?project="+ps, nil, 200)
+	}
+	items := st["items"].([]any)
+	for i, it := range items {
+		m := it.(map[string]any)
+		if i < 8 && (m["state"] != "done" || m["rows"].(float64) != float64(4-i%4) || len(m["files"].([]any)) != 1) {
+			t.Errorf("export all %d: %v", i, m)
+		}
+		if i == 8 && (m["state"] != "failed" || !strings.Contains(m["error"].(string), "nope")) {
+			t.Errorf("export all, the broken query: %v", m)
+		}
+	}
+	call("POST", "/api/project/export", map[string]any{"project": ps, "sql": `SELECT * FROM maria.orders ORDER BY id`, "format": "csv", "name": "orders"}, 200)
+	// Cancel: what hasn't finished is cancelled, and the job ends.
+	call("POST", "/api/project/exportall", map[string]any{"project": ps, "format": "json", "queries": append(qs[:8:8], qs[:8]...)}, 200)
+	call("POST", "/api/project/exportall/cancel", map[string]any{"project": ps}, 200)
+	for i := 0; i < 500; i++ {
+		if st = call("GET", "/api/project/exportall?project="+ps, nil, 200); st["running"] != true {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if st["running"] == true {
+		t.Fatal("export all didn't stop after Cancel")
+	}
+	for _, it := range st["items"].([]any) {
+		if m := it.(map[string]any); m["state"] != "done" && m["state"] != "cancelled" {
+			t.Errorf("after Cancel: %v", m)
+		}
+	}
+
 	// Downloading needs the open project (it links password-protected
 	// connections); the files are listed under Exported files, protected.
 	link := files[0].(map[string]any)["download"].(string)
@@ -150,7 +196,7 @@ ORDER BY o.id`
 			listed++
 		}
 	}
-	if listed != 4 {
+	if listed < 4+8+1 { // all four formats, the 8 of Export all, one more csv (and what the cancelled one wrote)
 		t.Errorf("listed under Exported files: %d", listed)
 	}
 	if _, ok := s.protectedFolders()["projects/Sales"]; !ok {

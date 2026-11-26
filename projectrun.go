@@ -222,6 +222,7 @@ func (s *server) projectRunRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/project/run", s.handleProjectRunState)
 	mux.HandleFunc("POST /api/project/cancel", s.handleProjectCancel)
 	mux.HandleFunc("POST /api/project/export", s.handleProjectExport)
+	s.exportAllRoutes(mux)
 	mux.HandleFunc("POST /api/project/refresh", s.handleProjectRefresh)
 }
 
@@ -290,6 +291,27 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 	}
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
+	run, jobs, rctx, fail := ps.prepareRun(r.Context(), q, req.Limit)
+	if fail != nil {
+		writeJSON(w, 400, fail)
+		return
+	}
+	if ps.run != nil {
+		ps.run.close()
+	}
+	ps.run = run
+	limits := ps.data.Limits
+	logAction(r, "[project %s] run: %s", ps.name, oneLine(q))
+	s.event(r, "query", false, "[project %s] run: %s", ps.name, oneLine(q))
+	go run.execute(rctx, jobs, limits)
+	writeJSON(w, 200, run.snapshot())
+}
+
+// prepareRun plans a run of the query q: each table to read, its columns
+// and the conditions sent to the source. The caller holds ps.mu and starts
+// it (go run.execute(rctx, jobs, ps.data.Limits)); on a problem, the answer
+// for the client.
+func (ps *projectSession) prepareRun(ctx context.Context, q string, limit int) (*projectRun, []stageJob, context.Context, map[string]any) {
 	pq, err := analyzeProjectQuery(q, &ps.data)
 	if err != nil {
 		m := map[string]any{"error": err.Error(), "errorKind": "query"}
@@ -297,8 +319,7 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &nip) {
 			m["addTable"] = map[string]string{"alias": nip.Alias, "table": nip.Table}
 		}
-		writeJSON(w, 400, m)
-		return
+		return nil, nil, nil, m
 	}
 	// Every database the query needs must be connected.
 	for _, ref := range pq.refs {
@@ -307,13 +328,11 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 			if ps.broken[ref.table.Alias] {
 				why = "its saved connection was deleted"
 			}
-			writeJSON(w, 400, map[string]any{"error": fmt.Sprintf("the database %s isn't connected (%s): %s.%s can't be read", ref.table.Alias,
-				cmpOr(why, "not connected"), ref.table.Alias, ref.table.Name), "errorKind": "source"})
-			return
+			return nil, nil, nil, map[string]any{"error": fmt.Sprintf("the database %s isn't connected (%s): %s.%s can't be read", ref.table.Alias,
+				cmpOr(why, "not connected"), ref.table.Alias, ref.table.Name), "errorKind": "source"}
 		}
 	}
 	// What to read: each table once, its needed columns, conditions pushed down.
-	ctx := r.Context()
 	type plan struct {
 		pt   *projectTable
 		t    *mTable
@@ -327,8 +346,7 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 		}
 		t, err := ps.columnsOf(ctx, ref.table)
 		if err != nil {
-			writeJSON(w, 400, map[string]any{"error": err.Error(), "errorKind": "source"})
-			return
+			return nil, nil, nil, map[string]any{"error": err.Error(), "errorKind": "source"}
 		}
 		kinds[ref.table] = t
 		all := make([]string, len(t.Cols))
@@ -346,12 +364,9 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 		return "", false
 	}, func(pt *projectTable) bool { return ps.links[pt.Alias].engine == EngineSQLite })
 
-	if ps.run != nil {
-		ps.run.close()
-	}
 	limits := ps.data.Limits
 	rctx, cancel := context.WithTimeout(context.Background(), time.Duration(limits.TimeoutSec)*time.Second)
-	run := &projectRun{sql: q, state: "loading", started: time.Now(), cancel: cancel, done: make(chan struct{}), limit: req.Limit}
+	run := &projectRun{sql: q, state: "loading", started: time.Now(), cancel: cancel, done: make(chan struct{}), limit: limit}
 	for _, p := range plans {
 		rt := &runTable{Alias: p.pt.Alias, Name: p.pt.Name, Cols: len(p.cols)}
 		for _, c := range push[p.pt] {
@@ -359,7 +374,6 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 		}
 		run.tables = append(run.tables, rt)
 	}
-	ps.run = run
 	links := map[string]*session{}
 	for a, ss := range ps.links {
 		links[a] = ss
@@ -368,10 +382,7 @@ func (s *server) handleProjectRun(w http.ResponseWriter, r *http.Request) {
 	for i, p := range plans {
 		jobs[i] = stageJob{pt: p.pt, t: p.t, cols: p.cols, conds: push[p.pt], ss: links[p.pt.Alias], rt: run.tables[i]}
 	}
-	logAction(r, "[project %s] run: %s", ps.name, oneLine(q))
-	s.event(r, "query", false, "[project %s] run: %s", ps.name, oneLine(q))
-	go run.execute(rctx, jobs, limits)
-	writeJSON(w, 200, run.snapshot())
+	return run, jobs, rctx, nil
 }
 
 type stageJob struct {
@@ -760,12 +771,24 @@ func (s *server) handleProjectExport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 409, errors.New("the query changed since it ran: run it again, then export"))
 		return
 	}
-	formats := []string{req.Format}
-	if req.Format == "all" {
+	files, err := s.exportProjectResult(r, r.Context(), name, qdb, ran, req.Format, req.Name)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"files": files})
+}
+
+// exportProjectResult writes all the rows of a finished run's query ran (on
+// its read-only connection qdb) as format (xlsx, csv, xml, json or all) to
+// <export folder>/projects/<project>/<format>/.
+func (s *server) exportProjectResult(r *http.Request, ctx context.Context, project string, qdb *sql.DB, ran, format, base string) ([]map[string]any, error) {
+	formats := []string{format}
+	if format == "all" {
 		formats = []string{"xlsx", "csv", "xml", "json"}
 	}
-	dir := filepath.Join(s.exportFolder(), projectsSubdir, connFolderName(name))
-	base := strings.TrimSpace(req.Name)
+	dir := filepath.Join(s.exportFolder(), projectsSubdir, connFolderName(project))
+	base = strings.TrimSpace(base)
 	if base == "" {
 		base = "query"
 	}
@@ -776,20 +799,19 @@ func (s *server) handleProjectExport(w http.ResponseWriter, r *http.Request) {
 		var rows int
 		var err error
 		if len(groups) > 0 {
-			path, rows, err = exportGroupedToDir(r.Context(), dir, qdb, ran, f, base, groups)
+			path, rows, err = exportGroupedToDir(ctx, dir, qdb, ran, f, base, groups)
 		} else {
-			path, rows, err = exportToDir(r.Context(), dir, EngineSQLite, qdb, ran, f, base, nil)
+			path, rows, err = exportToDir(ctx, dir, EngineSQLite, qdb, ran, f, base, nil)
 		}
 		if err != nil {
-			logAction(r, "[project %s] export %s FAILED: %v", name, f, err)
-			writeErr(w, 400, err)
-			return
+			logAction(r, "[project %s] export %s FAILED: %v", project, f, err)
+			return files, err
 		}
-		logAction(r, "[project %s] export %s: %d row(s) to %s", name, f, rows, path)
-		s.event(r, "export", false, "[project %s] export %s: %d row(s) to %s", name, f, rows, path)
+		logAction(r, "[project %s] export %s: %d row(s) to %s", project, f, rows, path)
+		s.event(r, "export", false, "[project %s] export %s: %d row(s) to %s", project, f, rows, path)
 		files = append(files, map[string]any{"path": path, "file": filepath.Base(path), "folder": filepath.Dir(path), "rows": rows, "download": downloadURL(path)})
 	}
-	writeJSON(w, 200, map[string]any{"files": files})
+	return files, nil
 }
 
 // findProjectExport finds an export of a project in the export folders
