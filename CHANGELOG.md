@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.42 — 2026-11-26
+
+- Advanced query builder: in the CASE form (and the Calculated column form) *then show* and
+  *Otherwise* take a value of your own or another column's value, picked in a list beside the
+  box or found by typing; no table and column name to type. A column shows in green; other
+  text, even with a dot (`Mr.Smith`), is quoted.
+
 ## 1.62.41 — 2026-11-26
 
 - Advanced query builder: the **Calculated column** form has **Totals**: *Number of rows*

@@ -1183,7 +1183,10 @@ per line). Each is as tall as you drag its bottom-right corner.
   others: a form takes each value and what it becomes, and *Otherwise* for the rest (empty:
   NULL), e.g. `CASE o.coded_tag WHEN '034' THEN 'Scale' WHEN '043' THEN 'Area code' ELSE
   NULL END`. Values are typed plainly; for a text column a number stays text (`034` is
-  `'034'`). Click *CASE (2 values)* in the grid to change it; a CASE written in the SQL box
+  `'034'`). What a value shows can also be another column's value: pick it in the list beside
+  its box (or beside *Otherwise*), or type in the box to search the columns; a column shows
+  in green and goes into the SQL as a column, other text (even `Mr.Smith`) as text. Click
+  *CASE (2 values)* in the grid to change it; a CASE written in the SQL box
   shows in the grid too. Add the column twice (**Add column**) to show both the value and
   its CASE. It works on filters as well. After a run the form shows the values the column
   holds in the result (and offers them as you type); **Add every value** gives each its row

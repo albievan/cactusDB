@@ -557,7 +557,7 @@
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
   .prjdesign .coltype { color: var(--muted); font-size: 11px; }
-  dialog.pqcase { width: min(560px, calc(100vw - 32px)); }
+  dialog.dlg.pqcase { width: min(660px, calc(100vw - 32px)); }
   dialog.pqcase #pqCalcTop .form-label, dialog.pqcase #pqCaseColRow .form-label { margin: 6px 0 2px; font-size: 13px; }
   dialog.pqcase #pqCaseColRow { margin-bottom: 8px; }
   .pqcaserows { width: 100%; margin-bottom: 8px; border-collapse: collapse; }
@@ -566,6 +566,11 @@
   .pqcaserows td { padding: 2px 4px; }
   .pqcaserows td:nth-child(2) { color: var(--muted); width: 1%; }
   .pqcaserows td:last-child { width: 1%; }
+  .pqthen { display: flex; gap: 4px; align-items: center; }
+  .pqthen input { flex: 1; min-width: 0; }
+  .pqthen .pqcolpick { width: 2.6em; flex: none; padding-right: 0; color: transparent; background-position: center; }
+  .pqthen .pqcolpick option { color: var(--fg, #222); }
+  input.iscol { color: var(--accent); font-family: var(--bs-font-monospace); font-size: 12px; }
   #pqCaseErr { color: var(--bs-danger, #c0392b); font-size: 13px; margin-top: 6px; }
   .prjdesign .pqcasebtn { --bs-btn-padding-x: 6px; --bs-btn-padding-y: 1px; white-space: nowrap; }
   .prjdesign .pqcasebtn.on { font-size: 12px; color: var(--accent); }
@@ -2648,14 +2653,15 @@
       <select class="form-select form-select-sm" id="pqCaseColSel"></select>
     </div>
     <div id="pqCaseBody">
-    <p class="sdtext">Each value of <code id="pqCaseCol"></code> shows as what you give it; any other value as <i>Otherwise</i> (empty: NULL). Type values plainly: text is quoted for you; <code>NULL</code>, a column (<code>c.name</code>) or a function call stay as they are.</p>
+    <p class="sdtext">Each value of <code id="pqCaseCol"></code> shows as what you give it; any other value as <i>Otherwise</i> (empty: NULL). What it shows is a value of your own (typed plainly: text is quoted for you; <code>NULL</code> and a function call stay as they are) or another column's value: pick it in the list beside the box, or type to search the columns.</p>
     <p class="sdtext" id="pqCaseHint" hidden></p>
     <datalist id="pqCaseVals"></datalist>
     <table class="pqcaserows"><thead><tr><th>If the value is</th><th></th><th>then show</th><th></th></tr></thead><tbody id="pqCaseRows"></tbody></table>
     <button class="btn btn-sm btn-outline-secondary" type="button" id="pqCaseAdd"><i class="bi bi-plus" aria-hidden="true"></i> Add a value</button>
     <button class="btn btn-sm btn-outline-secondary" type="button" id="pqCaseAll" hidden title="A row for each value of the column in the last result"><i class="bi bi-list-check" aria-hidden="true"></i> Add every value</button>
     <label class="form-label mt-2" for="pqCaseElse">Otherwise</label>
-    <input class="form-control form-control-sm" id="pqCaseElse" placeholder="NULL" spellcheck="false">
+    <span class="pqthen"><input class="form-control form-control-sm" id="pqCaseElse" placeholder="NULL" list="pqCaseColsList" spellcheck="false" aria-label="Otherwise: a value, or a column"><select class="form-select form-select-sm pqcolpick" id="pqCaseElsePick" title="Show the value of a column instead" aria-label="Otherwise, show the value of a column"></select></span>
+    <datalist id="pqCaseColsList"></datalist>
     </div>
     <div class="err" id="pqCaseErr" role="alert" hidden></div>
     <div class="dactions">
@@ -5414,7 +5420,18 @@ function pqCaseDialog(c, f, opts = {}) {
   let cur = f && !f.expr ? { table: f.table, col: f.col } : null;
   const num = () => ["int16", "int32", "int64", "decimal", "float32", "float64", "bool"].includes(cur ? pqKind(cur.table, cur.col) : "");
   const lit = (v) => { v = String(v).trim(); return /^[-+]?0\d/.test(v) || (!num() && /^[-+]?(\d+\.?\d*|\.\d+)$/.test(v)) ? "'" + v + "'" : pqLiteral(v, "="); };
-  const lit2 = (v) => { v = String(v).trim(); return /^[-+]?0\d/.test(v) ? "'" + v + "'" : pqLiteral(v, "="); };
+  // What a value shows: a column of the query's tables (picked or typed) stays a column;
+  // any other text, even one with a dot (Mr.Smith), is quoted.
+  const allCols = pq.model.tables.flatMap((t) => (pqColsOf(t) || []).map((x) => [t.alias, x.name]));
+  const colNames = new Map(allCols.map(([a, n]) => [pqKey(a + "." + n), a + "." + n]));
+  const isCol = (v) => colNames.has(pqKey(String(v).trim().replace(/\s*\.\s*/, ".")));
+  const lit2 = (v) => {
+    v = String(v).trim();
+    if (isCol(v)) return colNames.get(pqKey(v.replace(/\s*\.\s*/, ".")));
+    return /^[-+]?0\d/.test(v) || (/^[A-Za-z_"][\w$" ]*\s*\.\s*[A-Za-z_"]/.test(v) && !v.includes("(")) ? "'" + v.replace(/'/g, "''") + "'" : pqLiteral(v, "=");
+  };
+  const pickCol = (k, r = "") => `<select class="form-select form-select-sm pqcolpick" data-c="${k}"${r} title="Show the value of a column instead" aria-label="Show the value of a column"><option value="">column…</option>` +
+    allCols.map(([a, n]) => `<option value="${esc(a + "." + n)}">${esc(a)}.${esc(n)}</option>`).join("") + `</select>`;
   // A quoted value is shown without its quotes when typing it so gives it back.
   const show = (v, l) => { const m = /^'((?:[^']|'')*)'$/.exec(v || ""); if (!m) return v || ""; const t = m[1].replace(/''/g, "'"); return l(t) === v ? t : v; };
   return new Promise((resolve) => {
@@ -5422,12 +5439,14 @@ function pqCaseDialog(c, f, opts = {}) {
     const row = (w = "", t = "") => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td><input class="form-control form-control-sm" data-c="w" value="${esc(w)}" list="pqCaseVals" aria-label="If the value is" spellcheck="false"></td><td>→</td>` +
-        `<td><input class="form-control form-control-sm" data-c="t" value="${esc(t)}" aria-label="then show" spellcheck="false"></td>` +
+        `<td><span class="pqthen"><input class="form-control form-control-sm${isCol(t) ? " iscol" : ""}" data-c="t" value="${esc(t)}" list="pqCaseColsList" aria-label="then show: a value, or a column" spellcheck="false">${pickCol("tc")}</span></td>` +
         `<td><button type="button" class="btn btn-sm btn-link" data-c="rm" aria-label="Remove this value" title="Remove this value">×</button></td>`;
       body.append(tr); return tr;
     };
     body.innerHTML = "";
-    const allCols = pq.model.tables.flatMap((t) => (pqColsOf(t) || []).map((x) => [t.alias, x.name]));
+    $("pqCaseColsList").innerHTML = allCols.map(([a, n]) => `<option value="${esc(a + "." + n)}">column</option>`).join("");
+    $("pqCaseElsePick").innerHTML = pickCol("ec").replace(/^<select[^>]*>|<\/select>$/g, "");
+    $("pqCaseElse").classList.toggle("iscol", !!(c && c.e && isCol(c.e)));
     if (opts.pick && !cur && allCols.length) cur = { table: allCols[0][0], col: allCols[0][1] };
     $("pqCaseColRow").hidden = !opts.pick; $("pqCalcTop").hidden = !opts.calc;
     $("pqCaseColSel").innerHTML = allCols.map(([a, n]) => `<option value="${esc(JSON.stringify([a, n]))}"${cur && pqKey(a) === pqKey(cur.table) && pqKey(n) === pqKey(cur.col) ? " selected" : ""}>${esc(a)}.${esc(n)}</option>`).join("");
@@ -5464,8 +5483,16 @@ function pqCaseDialog(c, f, opts = {}) {
       const e = [...body.querySelectorAll("[data-c=t]")].find((x) => !x.value); if (e) e.focus();
     };
     const add = () => row().querySelector("input").focus();
+    // A column picked from the list goes into its box (marked as a column); typing marks it too.
+    const colpick = (ev) => {
+      const sel = ev.target.closest(".pqcolpick");
+      if (!sel || !sel.value) return;
+      const inp = sel.parentElement.querySelector("input");
+      inp.value = sel.value; inp.classList.add("iscol"); sel.value = ""; inp.focus();
+    };
+    const coltype = (ev) => { const t = ev.target; if (t.matches && t.matches("[data-c=t], #pqCaseElse")) t.classList.toggle("iscol", isCol(t.value)); };
     const rm = (ev) => { const b = ev.target.closest("[data-c=rm]"); if (b) { b.closest("tr").remove(); if (!body.rows.length) add(); } };
-    const done = (v) => { d.close(); $("pqCaseColSel").removeEventListener("change", pick); $("pqCalcFn").removeEventListener("change", mode); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); $("pqCaseAll").removeEventListener("click", all); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
+    const done = (v) => { d.close(); d.removeEventListener("change", colpick); d.removeEventListener("input", coltype); $("pqCaseColSel").removeEventListener("change", pick); $("pqCalcFn").removeEventListener("change", mode); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); $("pqCaseAll").removeEventListener("click", all); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
     const ok = (ev) => {
       ev.preventDefault();
       if (opts.pick && !cur) { $("pqCaseErr").textContent = "Choose the column it works on"; $("pqCaseErr").hidden = false; return; }
@@ -5483,6 +5510,7 @@ function pqCaseDialog(c, f, opts = {}) {
       done({ c: { w: w.map(([a, b]) => [lit(a), lit2(b)]), e: e ? lit2(e) : "" }, fn: "CASE", table: cur && cur.table, col: cur && cur.col, name });
     };
     const no = (ev) => { if (ev) ev.preventDefault(); done(null); };
+    d.addEventListener("change", colpick); d.addEventListener("input", coltype);
     $("pqCaseColSel").addEventListener("change", pick); $("pqCalcFn").addEventListener("change", mode); $("pqCaseForm").addEventListener("submit", ok); $("pqCaseCancel").addEventListener("click", no); $("pqCaseAdd").addEventListener("click", add); $("pqCaseAll").addEventListener("click", all); body.addEventListener("click", rm); d.addEventListener("cancel", no);
     d.showModal(); (opts.calc ? $("pqCalcName") : body.querySelector("input")).focus();
   });
