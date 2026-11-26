@@ -548,6 +548,7 @@
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
   .prjdesign .coltype { color: var(--muted); font-size: 11px; }
+  .prjdesign .pqwait { border-color: #d9822b; box-shadow: 0 0 0 1px #d9822b; }
   /* The grip and the column's name and type stay put while the grid scrolls to the right. */
   .prjdesign tr > :nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--panel); width: 16px; min-width: 16px; max-width: 16px; }
   .prjdesign tr > :nth-child(2) { position: sticky; left: 16px; z-index: 2; background: var(--panel); box-shadow: inset -1px 0 0 var(--border); }
@@ -6600,7 +6601,7 @@ function pqFnCell(fns, key, r = "") {
 function pqDesign() {
   const box = $("prjDesign"), m = pq.model;
   if (m.readOnly) { box.innerHTML = `<div class="ro">The grid is read-only for this query: ${esc(m.readOnly)}.</div>`; return; }
-  const rows = Math.max(1, ...m.fields.flatMap((f) => f.crit.map((c) => c.row + 2)));
+  const rows = Math.max(1, ...m.fields.flatMap((f) => [...f.crit.map((c) => c.row + 2), ...Object.keys(f.pend || {}).map((r) => +r + 2)]));
   const allCols = m.tables.flatMap((t) => (pqColsOf(t) || []).map((c) => [t.alias, c.name]));
   const fname = (f) => f.expr ? f.expr : (f.agg ? f.agg + "(" : "") + (f.table ? f.table + "." : "") + f.col + (f.agg ? ")" : "");
   const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function</th><th>Total</th><th>Group</th><th>Sort</th>` +
@@ -6610,9 +6611,10 @@ function pqDesign() {
     if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${5 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
     const ex = !!f.expr;
     const crit = Array.from({ length: rows }, (_, r) => {
-      const c = f.crit.find((x) => x.row === r) || { op: "", value: "" }, btw = c.op.endsWith("BETWEEN"), [lo, hi] = btw ? pqSplitBetween(c.value) : [c.op.endsWith("IN") ? pqUnlist(c.value) : c.value, ""];
+      const p = !f.crit.some((x) => x.row === r) && f.pend && f.pend[r];
+      const c = p || f.crit.find((x) => x.row === r) || { op: "", value: "" }, btw = c.op.endsWith("BETWEEN"), [lo, hi] = p ? [p.val, p.val2] : btw ? pqSplitBetween(c.value) : [c.op.endsWith("IN") ? pqUnlist(c.value) : c.value, ""];
       return `<td><span class="critcell">${ex ? "" : pqFnCell(c.fns, "cfn", r) + `<select class="form-select form-select-sm" data-k="op" data-r="${r}" aria-label="Filter operator"><option value=""></option>${PQ_OPS.map((o) => `<option${o === c.op ? " selected" : ""} title="${esc(PQ_OP_TITLES[o] || "")}">${esc(o)}</option>`).join("")}</select>` +
-        `<input type="text" class="form-control form-control-sm" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
+        `<input type="text" class="form-control form-control-sm${p && p.op && !pqNoValue(p.op) ? " pqwait" : ""}" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
         `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</span></td>`;
     }).join("");
     return `<tr data-f="${i}">${grip}<td title="${esc(fname(f) + (pqColOf(f.table, f.col) ? " : " + pqColType(pqColOf(f.table, f.col)) : ""))}">${esc(fname(f).slice(0, 60))}${!f.expr && pqColOf(f.table, f.col) ? `<span class="coltype"> : ${esc(pqColType(pqColOf(f.table, f.col)))}</span>` : ""}</td>
@@ -6706,7 +6708,10 @@ async function pqFnEdit(fns) {
 }
 // pqCritUpdate reads filter r of a row into the model: false while it waits for a value (the row isn't redrawn).
 function pqCritUpdate(tr, f, r, k) {
-  const op = tr.querySelector(`[data-k=op][data-r="${r}"]`).value, btw = op.endsWith("BETWEEN");
+  const sel = tr.querySelector(`[data-k=op][data-r="${r}"]`);
+  // A value typed without an operator gets one: LIKE for a pattern with %, = otherwise.
+  if (!sel.value && k === "val") { const v = tr.querySelector(`[data-k=val][data-r="${r}"]`).value.trim(); if (v) sel.value = v.includes("%") ? "LIKE" : "="; }
+  const op = sel.value, btw = op.endsWith("BETWEEN");
   const fns = JSON.parse(tr.querySelector(`[data-k=cfns][data-r="${r}"]`).value || "[]");
   tr.querySelector(`.fnchain[data-r="${r}"]`).textContent = pqFnText(fns);
   tr.querySelector(`[data-k=cfnclr][data-r="${r}"]`).hidden = !fns.length;
@@ -6716,6 +6721,10 @@ function pqCritUpdate(tr, f, r, k) {
   // An operator chosen before its value(s), or half a BETWEEN, waits for the rest; functions
   // wait for an operator; a value emptied removes the condition.
   const missing = !!op && !pqNoValue(op) && (!val || (btw && !val2));
+  // What is still waiting is kept on the column, so the grid redrawn for another change shows it again.
+  f.pend = f.pend || {};
+  if ((!op && fns.length) || missing) f.pend[r] = { op, val, val2, fns }; else delete f.pend[r];
+  v1.classList.toggle("pqwait", missing);
   if (!op && fns.length) return false;
   if (missing && (k === "op" || k === "cfnadd" || k === "cfnclr" || (btw && (val || val2)))) { (!val ? v1 : v2).focus(); return false; }
   f.crit = f.crit.filter((c) => c.row !== r);

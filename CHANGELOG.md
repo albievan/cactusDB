@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.32 — 2026-11-26
+
+- Advanced query builder: a filter no longer disappears when you move away from it. A
+  value typed without an operator gets `=` (or `LIKE` when it holds `%`) instead of being
+  dropped, and an operator chosen before its value is kept, with an orange border on the
+  value box, while other columns are changed.
+
 ## 1.62.31 — 2026-11-17
 
 - Advanced query builder: *Column definitions* scrolls to the right inside its own box

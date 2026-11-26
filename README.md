@@ -1172,6 +1172,9 @@ per line). Each is as tall as you drag its bottom-right corner.
   column before it is compared (e.g. LOWER and TRIM: `LOWER(TRIM(c.name)) = 'ann'`).
   Type values plainly (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers,
   `NULL`, a column (`c.id`) and a function call (`lower(trim('aaa   '))`) stay as they are.
+  A value typed without an operator gets one: `LIKE` when it holds `%`, `=` otherwise. An
+  operator still waiting for its value is kept (its box has an orange border) while you
+  change other columns, and the filter is used once the value is typed.
 - A join of a text column with a number (or a date with a number) is shown in red, as
   is a table joined to nothing or one that isn't in the project.
 - SQL the designer can't hold (a subquery, `WITH`, `UNION`, a window function) makes it
