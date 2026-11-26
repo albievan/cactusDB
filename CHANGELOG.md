@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.36 — 2026-11-26
+
+- Advanced query builder: the CASE form shows the values the column holds in the last result
+  and offers them as you type; **Add every value** gives each its row, and OK warns when none
+  of the CASE's values is in the column (a CASE on the wrong column shows only *Otherwise*).
+
 ## 1.62.35 — 2026-11-26
 
 - Advanced query builder: **CASE** (*if the value is … then …*) in a column's **ƒ** list:

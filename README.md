@@ -1176,7 +1176,10 @@ per line). Each is as tall as you drag its bottom-right corner.
   NULL END`. Values are typed plainly; for a text column a number stays text (`034` is
   `'034'`). Click *CASE (2 values)* in the grid to change it; a CASE written in the SQL box
   shows in the grid too. Add the column twice (**Add column**) to show both the value and
-  its CASE. It works on filters as well.
+  its CASE. It works on filters as well. After a run the form shows the values the column
+  holds in the result (and offers them as you type); **Add every value** gives each its row
+  (up to 50 values), and OK warns when none of the CASE's values is among them, the sign of
+  a CASE on the wrong column.
   Type values plainly (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers,
   `NULL`, a column (`c.id`) and a function call (`lower(trim('aaa   '))`) stay as they are.
   A value typed without an operator gets one: `LIKE` when it holds `%`, `=` otherwise. An

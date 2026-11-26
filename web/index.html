@@ -2607,8 +2607,11 @@
   <form method="dialog" id="pqCaseForm">
     <h3 id="pqCaseTitle">CASE: if the value is … then …</h3>
     <p class="sdtext">Each value of <code id="pqCaseCol"></code> shows as what you give it; any other value as <i>Otherwise</i> (empty: NULL). Type values plainly: text is quoted for you; <code>NULL</code>, a column (<code>c.name</code>) or a function call stay as they are.</p>
+    <p class="sdtext" id="pqCaseHint" hidden></p>
+    <datalist id="pqCaseVals"></datalist>
     <table class="pqcaserows"><thead><tr><th>If the value is</th><th></th><th>then show</th><th></th></tr></thead><tbody id="pqCaseRows"></tbody></table>
     <button class="btn btn-sm btn-outline-secondary" type="button" id="pqCaseAdd"><i class="bi bi-plus" aria-hidden="true"></i> Add a value</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="pqCaseAll" hidden title="A row for each value of the column in the last result"><i class="bi bi-list-check" aria-hidden="true"></i> Add every value</button>
     <label class="form-label mt-2" for="pqCaseElse">Otherwise</label>
     <input class="form-control form-control-sm" id="pqCaseElse" placeholder="NULL" spellcheck="false">
     <div class="err" id="pqCaseErr" role="alert" hidden></div>
@@ -5347,6 +5350,21 @@ function prjNamePrompt(title, text, value) {
 // pqCaseDialog asks for the values of a CASE and what each becomes: {w, e}, or null when
 // cancelled. Values are typed plainly and made SQL as filter values are; for a column of
 // text a number is text too ('034'), as is any number with a leading 0.
+// pqSampleValues: the distinct values (up to 200) of f's column in the last result, read
+// from a column of the grid that shows it as it is (no function, no total).
+function pqSampleValues(f) {
+  const res = prj.result;
+  if (!res || !f || f.expr || !res.rows) return [];
+  for (const x of pq.model.fields) {
+    if (x.expr || x.agg || (x.fns && x.fns.length) || !x.show || pqKey(x.table) !== pqKey(f.table) || pqKey(x.col) !== pqKey(f.col)) continue;
+    const i = res.columns.findIndex((c) => pqKey(c) === pqKey(pqOutName(x)));
+    if (i < 0) continue;
+    const set = new Set();
+    for (const r of res.rows) { if (r[i] !== null && r[i] !== undefined) set.add(String(r[i])); if (set.size >= 200) break; }
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+  return [];
+}
 function pqCaseDialog(c, f) {
   const k = f && !f.expr ? pqKind(f.table, f.col) : "";
   const num = ["int16", "int32", "int64", "decimal", "float32", "float64", "bool"].includes(k);
@@ -5358,7 +5376,7 @@ function pqCaseDialog(c, f) {
     const d = $("pqCaseDialog"), body = $("pqCaseRows");
     const row = (w = "", t = "") => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td><input class="form-control form-control-sm" data-c="w" value="${esc(w)}" aria-label="If the value is" spellcheck="false"></td><td>→</td>` +
+      tr.innerHTML = `<td><input class="form-control form-control-sm" data-c="w" value="${esc(w)}" list="pqCaseVals" aria-label="If the value is" spellcheck="false"></td><td>→</td>` +
         `<td><input class="form-control form-control-sm" data-c="t" value="${esc(t)}" aria-label="then show" spellcheck="false"></td>` +
         `<td><button type="button" class="btn btn-sm btn-link" data-c="rm" aria-label="Remove this value" title="Remove this value">×</button></td>`;
       body.append(tr); return tr;
@@ -5368,18 +5386,37 @@ function pqCaseDialog(c, f) {
     for (const [w, t] of (c ? c.w : [["", ""]])) row(show(w, lit), show(t, lit2));
     $("pqCaseElse").value = c && c.e ? show(c.e, lit2) : "";
     $("pqCaseErr").hidden = true;
+    // The column's values in the last result: to pick from, and to catch a CASE on the wrong column.
+    const vals = pqSampleValues(f);
+    $("pqCaseVals").innerHTML = vals.slice(0, 200).map((v) => `<option value="${esc(v)}">`).join("");
+    $("pqCaseHint").hidden = !vals.length;
+    $("pqCaseHint").textContent = vals.length ? `In the last result it holds ${vals.length > 12 ? vals.slice(0, 12).join(", ") + ", …" : vals.join(", ")} (${vals.length}${vals.length >= 200 ? "+" : ""} value${vals.length === 1 ? "" : "s"}).` : "";
+    $("pqCaseAll").hidden = !vals.length || vals.length > 50;
+    let warned = false;
+    const all = () => {
+      const have = new Set([...body.rows].map((r) => r.querySelector("[data-c=w]").value.trim()));
+      for (const r of [...body.rows]) if (!r.querySelector("[data-c=w]").value.trim() && !r.querySelector("[data-c=t]").value.trim()) r.remove();
+      for (const v of vals) if (!have.has(v)) row(v, "");
+      const e = [...body.querySelectorAll("[data-c=t]")].find((x) => !x.value); if (e) e.focus();
+    };
     const add = () => row().querySelector("input").focus();
     const rm = (ev) => { const b = ev.target.closest("[data-c=rm]"); if (b) { b.closest("tr").remove(); if (!body.rows.length) add(); } };
-    const done = (v) => { d.close(); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
+    const done = (v) => { d.close(); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); $("pqCaseAll").removeEventListener("click", all); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
     const ok = (ev) => {
       ev.preventDefault();
       const w = [...body.rows].map((r) => [r.querySelector("[data-c=w]").value.trim(), r.querySelector("[data-c=t]").value.trim()]).filter(([a, b]) => a || b);
       if (!w.length || w.some(([a, b]) => !a || !b)) { $("pqCaseErr").textContent = w.length ? "Each value needs what it becomes (NULL for nothing)" : "Add a value and what it becomes"; $("pqCaseErr").hidden = false; return; }
       const e = $("pqCaseElse").value.trim();
+      const unq = (v) => { const m = /^'((?:[^']|'')*)'$/.exec(v); return m ? m[1].replace(/''/g, "'") : v; };
+      if (vals.length && !warned && !w.some(([a]) => vals.includes(unq(a)))) {
+        warned = true;
+        $("pqCaseErr").textContent = `None of these values is in ${$("pqCaseCol").textContent} in the last result (${vals.slice(0, 6).join(", ")}${vals.length > 6 ? ", …" : ""}), so every row would show Otherwise. Is it the right column? OK again keeps it.`;
+        $("pqCaseErr").hidden = false; return;
+      }
       done({ w: w.map(([a, b]) => [lit(a), lit2(b)]), e: e ? lit2(e) : "" });
     };
     const no = (ev) => { if (ev) ev.preventDefault(); done(null); };
-    $("pqCaseForm").addEventListener("submit", ok); $("pqCaseCancel").addEventListener("click", no); $("pqCaseAdd").addEventListener("click", add); body.addEventListener("click", rm); d.addEventListener("cancel", no);
+    $("pqCaseForm").addEventListener("submit", ok); $("pqCaseCancel").addEventListener("click", no); $("pqCaseAdd").addEventListener("click", add); $("pqCaseAll").addEventListener("click", all); body.addEventListener("click", rm); d.addEventListener("cancel", no);
     d.showModal(); body.querySelector("input").focus();
   });
 }
