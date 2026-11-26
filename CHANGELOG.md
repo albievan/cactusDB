@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.62.35 — 2026-11-26
+
+- Advanced query builder: **CASE** (*if the value is … then …*) in a column's **ƒ** list:
+  a form takes each value and what it becomes, and what any other value shows (NULL when
+  empty), e.g. `CASE o.coded_tag WHEN '034' THEN 'Scale' WHEN '043' THEN 'Area code' ELSE
+  NULL END`. It is changed by a click on it in the grid, works on filters too, and a CASE
+  typed in the SQL box shows in the grid.
+
 ## 1.62.34 — 2026-11-26
 
 - Advanced query builder: a **Refresh** icon button in the query bar reads the project's

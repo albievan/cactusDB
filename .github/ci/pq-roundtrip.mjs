@@ -29,6 +29,7 @@ const editable = [
   "SELECT c.name FROM fb.customer c WHERE UPPER(c.name) LIKE '%ES' AND c.id IS 3 AND c.city IS NOT NULL",
   "SELECT c.name, c.city AS Town, o.total FROM fb.customer c JOIN maria.orders o ON o.customer_id = c.id ORDER BY c.name\n-- group rows by: [\"Town\",\"name\"]",
   "SELECT cdb_title(TRIM(c.name)) AS name, cdb_camel(c.city), cdb_date(o.d, 'yyyy-MMM-dd ''at'' HH:mm') AS d, cdb_number(o.total, 'R #,##0.00') AS total FROM fb.customer c JOIN maria.orders o ON o.cid = c.id WHERE cdb_title(c.name) = 'Ann'",
+  "SELECT c.code AS \"Coded value\", CASE c.tag WHEN '034' THEN 'Scale' WHEN '043' THEN 'Area code' ELSE NULL END AS kind, UPPER(CASE TRIM(c.x) WHEN 'x''s' THEN 'a, b' ELSE (CASE c.y WHEN 2 THEN 'end' END) END) FROM fb.coded c WHERE CASE c.tag WHEN 1 THEN 'one' END = 'one'",
   "SELECT strftime('%Y', o.d) || '-' || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', o.d) * 3 - 2, 3) || '-' || strftime('%d', o.d) AS d FROM maria.orders o WHERE o.d BETWEEN '2026-01-01' AND '2026-12-31'",
 ]
 const readOnly = ['WITH x AS (SELECT 1) SELECT * FROM x', 'SELECT * FROM maria.orders UNION SELECT * FROM maria.orders',

@@ -1170,6 +1170,13 @@ per line). Each is as tall as you drag its bottom-right corner.
   differ), BETWEEN / NOT BETWEEN (two boxes: from and to), IS / IS NOT (equal or not,
   NULL equal to NULL) and IS (NOT) NULL. Each filter has its own **ƒ** functions on the
   column before it is compared (e.g. LOWER and TRIM: `LOWER(TRIM(c.name)) = 'ann'`).
+- **CASE** (in the **ƒ** list: *if the value is … then …*) turns a column's values into
+  others: a form takes each value and what it becomes, and *Otherwise* for the rest (empty:
+  NULL), e.g. `CASE o.coded_tag WHEN '034' THEN 'Scale' WHEN '043' THEN 'Area code' ELSE
+  NULL END`. Values are typed plainly; for a text column a number stays text (`034` is
+  `'034'`). Click *CASE (2 values)* in the grid to change it; a CASE written in the SQL box
+  shows in the grid too. Add the column twice (**Add column**) to show both the value and
+  its CASE. It works on filters as well.
   Type values plainly (`Ann`, `%ES`, `2026-01-01`): text is quoted for you; numbers,
   `NULL`, a column (`c.id`) and a function call (`lower(trim('aaa   '))`) stay as they are.
   A value typed without an operator gets one: `LIKE` when it holds `%`, `=` otherwise. An

@@ -548,6 +548,14 @@
   .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
   .prjdesign .coltype { color: var(--muted); font-size: 11px; }
+  dialog.pqcase { width: min(560px, calc(100vw - 32px)); }
+  .pqcaserows { width: 100%; margin-bottom: 8px; border-collapse: collapse; }
+  .pqcaserows th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; padding: 2px 4px; }
+  .pqcaserows td, .pqcaserows th { border: 0; background: none; }
+  .pqcaserows td { padding: 2px 4px; }
+  .pqcaserows td:nth-child(2) { color: var(--muted); width: 1%; }
+  .pqcaserows td:last-child { width: 1%; }
+  #pqCaseErr { color: var(--bs-danger, #c0392b); font-size: 13px; margin-top: 6px; }
   .prjdesign .pqwait { border-color: #d9822b; box-shadow: 0 0 0 1px #d9822b; }
   /* The grip and the column's name and type stay put while the grid scrolls to the right. */
   .prjdesign tr > :nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--panel); width: 16px; min-width: 16px; max-width: 16px; }
@@ -2591,6 +2599,23 @@
       <button class="btn btn-outline-secondary" type="button" id="prjNameCancel">Cancel</button>
       <span class="spacer"></span>
       <button class="btn btn-primary" type="submit" id="prjNameOk">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="pqCaseDialog" class="dlg pqcase" aria-labelledby="pqCaseTitle">
+  <form method="dialog" id="pqCaseForm">
+    <h3 id="pqCaseTitle">CASE: if the value is … then …</h3>
+    <p class="sdtext">Each value of <code id="pqCaseCol"></code> shows as what you give it; any other value as <i>Otherwise</i> (empty: NULL). Type values plainly: text is quoted for you; <code>NULL</code>, a column (<code>c.name</code>) or a function call stay as they are.</p>
+    <table class="pqcaserows"><thead><tr><th>If the value is</th><th></th><th>then show</th><th></th></tr></thead><tbody id="pqCaseRows"></tbody></table>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="pqCaseAdd"><i class="bi bi-plus" aria-hidden="true"></i> Add a value</button>
+    <label class="form-label mt-2" for="pqCaseElse">Otherwise</label>
+    <input class="form-control form-control-sm" id="pqCaseElse" placeholder="NULL" spellcheck="false">
+    <div class="err" id="pqCaseErr" role="alert" hidden></div>
+    <div class="dactions">
+      <button class="btn btn-outline-secondary" type="button" id="pqCaseCancel">Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" type="submit">OK</button>
     </div>
   </form>
 </dialog>
@@ -5319,6 +5344,46 @@ function prjNamePrompt(title, text, value) {
   });
 }
 
+// pqCaseDialog asks for the values of a CASE and what each becomes: {w, e}, or null when
+// cancelled. Values are typed plainly and made SQL as filter values are; for a column of
+// text a number is text too ('034'), as is any number with a leading 0.
+function pqCaseDialog(c, f) {
+  const k = f && !f.expr ? pqKind(f.table, f.col) : "";
+  const num = ["int16", "int32", "int64", "decimal", "float32", "float64", "bool"].includes(k);
+  const lit = (v) => { v = String(v).trim(); return /^[-+]?0\d/.test(v) || (!num && /^[-+]?(\d+\.?\d*|\.\d+)$/.test(v)) ? "'" + v + "'" : pqLiteral(v, "="); };
+  const lit2 = (v) => { v = String(v).trim(); return /^[-+]?0\d/.test(v) ? "'" + v + "'" : pqLiteral(v, "="); };
+  // A quoted value is shown without its quotes when typing it so gives it back.
+  const show = (v, l) => { const m = /^'((?:[^']|'')*)'$/.exec(v || ""); if (!m) return v || ""; const t = m[1].replace(/''/g, "'"); return l(t) === v ? t : v; };
+  return new Promise((resolve) => {
+    const d = $("pqCaseDialog"), body = $("pqCaseRows");
+    const row = (w = "", t = "") => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><input class="form-control form-control-sm" data-c="w" value="${esc(w)}" aria-label="If the value is" spellcheck="false"></td><td>→</td>` +
+        `<td><input class="form-control form-control-sm" data-c="t" value="${esc(t)}" aria-label="then show" spellcheck="false"></td>` +
+        `<td><button type="button" class="btn btn-sm btn-link" data-c="rm" aria-label="Remove this value" title="Remove this value">×</button></td>`;
+      body.append(tr); return tr;
+    };
+    body.innerHTML = "";
+    $("pqCaseCol").textContent = f ? (f.table ? f.table + "." : "") + f.col : "";
+    for (const [w, t] of (c ? c.w : [["", ""]])) row(show(w, lit), show(t, lit2));
+    $("pqCaseElse").value = c && c.e ? show(c.e, lit2) : "";
+    $("pqCaseErr").hidden = true;
+    const add = () => row().querySelector("input").focus();
+    const rm = (ev) => { const b = ev.target.closest("[data-c=rm]"); if (b) { b.closest("tr").remove(); if (!body.rows.length) add(); } };
+    const done = (v) => { d.close(); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
+    const ok = (ev) => {
+      ev.preventDefault();
+      const w = [...body.rows].map((r) => [r.querySelector("[data-c=w]").value.trim(), r.querySelector("[data-c=t]").value.trim()]).filter(([a, b]) => a || b);
+      if (!w.length || w.some(([a, b]) => !a || !b)) { $("pqCaseErr").textContent = w.length ? "Each value needs what it becomes (NULL for nothing)" : "Add a value and what it becomes"; $("pqCaseErr").hidden = false; return; }
+      const e = $("pqCaseElse").value.trim();
+      done({ w: w.map(([a, b]) => [lit(a), lit2(b)]), e: e ? lit2(e) : "" });
+    };
+    const no = (ev) => { if (ev) ev.preventDefault(); done(null); };
+    $("pqCaseForm").addEventListener("submit", ok); $("pqCaseCancel").addEventListener("click", no); $("pqCaseAdd").addEventListener("click", add); body.addEventListener("click", rm); d.addEventListener("cancel", no);
+    d.showModal(); body.querySelector("input").focus();
+  });
+}
+
 // The project password: set, changed or removed; the linked connections' passwords
 // it seals are asked for (as when opening) where this page doesn't know them.
 $("prjPwBtn").addEventListener("click", () => {
@@ -5721,6 +5786,44 @@ const PQ_FN_PRESETS = [
   ["NUMF|R #,##0.00", "currency R 1,234.50"], ["NUMF|$#,##0.00", "currency $1,234.50"], ["NUMF|€#,##0.00", "currency €1,234.50"], ["NUMF|£#,##0.00", "currency £1,234.50"],
   ["DATEF|yyyy-MMM-dd", "date 2026-Nov-05"], ["DATEF|dd MMMM yyyy", "date 05 November 2026"], ["DATEF|ddd, d MMM yyyy", "date Thu, 5 Nov 2026"], ["DATEF|dd/MM/yyyy hh:mm tt", "date 05/11/2026 02:07 PM"],
 ];
+// CASE turns the column's values into others ('034' → 'Scale'): "CASE|" and a JSON
+// {w: [[value, result], …], e: otherwise}, each an SQL literal as written; e "" = no ELSE (NULL).
+const pqCaseOf = (k) => { if (!String(k).startsWith("CASE|")) return null; try { const c = JSON.parse(pqFnParam(k)); return c && Array.isArray(c.w) && c.w.length ? c : null; } catch (e) { return null; } };
+const pqCaseSql = (c, e) => `CASE ${e}${c.w.map(([w, t]) => ` WHEN ${w} THEN ${t}`).join("")}${c.e ? ` ELSE ${c.e}` : ""} END`;
+// pqCaseParse reads CASE x WHEN v THEN r … [ELSE r] END (one level; values may hold
+// brackets, quotes and CASEs of their own): {inner, c}, or null for anything else.
+function pqCaseParse(expr) {
+  const s = String(expr).trim();
+  if (!/^case\b/i.test(s)) return null;
+  const kw = [];
+  let d = 0, cd = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "'" || ch === '"') { let j = i + 1; while (j < s.length && !(s[j] === ch && s[j + 1] !== ch)) j += s[j] === ch ? 2 : 1; i = j; continue; }
+    if (ch === "(") { d++; continue; }
+    if (ch === ")") { d--; continue; }
+    if (/[A-Za-z_]/.test(ch) && (i === 0 || !/[\w$]/.test(s[i - 1]))) {
+      const w = /^[A-Za-z_][\w$]*/.exec(s.slice(i))[0], lw = w.toLowerCase();
+      if (!d) {
+        if (lw === "case") cd++;
+        else if (cd === 1 && ["when", "then", "else", "end"].includes(lw)) kw.push({ w: lw, i, n: w.length });
+        if (lw === "end") cd--;
+      }
+      i += w.length - 1;
+    }
+  }
+  if (!kw.length || kw[kw.length - 1].w !== "end" || kw[kw.length - 1].i + 3 !== s.length || kw.filter((k) => k.w === "end").length !== 1) return null;
+  const inner = s.slice(4, kw[0].i).trim(), part = (a) => s.slice(kw[a].i + kw[a].n, kw[a + 1].i).trim();
+  if (!inner) return null;
+  const c = { w: [], e: "" };
+  let a = 0;
+  while (kw[a].w === "when") {
+    if (kw[a + 1].w !== "then" || !part(a) || !part(a + 1)) return null;
+    c.w.push([part(a), part(a + 1)]); a += 2;
+  }
+  if (kw[a].w === "else") { if (!part(a)) return null; c.e = part(a); a++; }
+  return c.w.length && a === kw.length - 1 ? { inner, c } : null;
+}
 // A function in a chain is its key, or "key|format" for one with a format of its own.
 const pqFnOf = (k) => PQ_FNS.find((x) => x.k === String(k).split("|")[0]);
 const pqFnParam = (k) => { const i = String(k).indexOf("|"); return i < 0 ? "" : String(k).slice(i + 1); };
@@ -5737,6 +5840,8 @@ const pqUnq = (x) => x.startsWith('"') ? x.slice(1, -1).replace(/""/g, '"') : x;
 function pqFnParse(expr) {
   const q = PQ_QUAL.exec(expr);
   if (q) return { table: pqUnq(q[1]), col: pqUnq(q[2]), fns: [] };
+  const cs = pqCaseParse(expr), ci = cs && pqFnParse(cs.inner);
+  if (ci) return { ...ci, fns: [...ci.fns, "CASE|" + JSON.stringify(cs.c)] };
   for (const fn of PQ_FNS) {
     const mt = fn.re.exec(expr);
     const inner = mt && pqFnParse(mt.groups.c);
@@ -5744,8 +5849,8 @@ function pqFnParse(expr) {
   }
   return null;
 }
-const pqFnApply = (fns, e) => (fns || []).reduce((x, k) => pqFnOf(k) ? pqFnOf(k).t.replaceAll("{c}", x).replace("{p}", "'" + pqFnParam(k).replace(/'/g, "''") + "'") : x, e);
-const pqFnText = (fns) => (fns || []).map((k) => pqFnParam(k) ? `“${pqFnParam(k)}”` : (pqFnOf(k) || { label: k }).label.replace(/:.*/, "")).join(" → ");
+const pqFnApply = (fns, e) => (fns || []).reduce((x, k) => pqCaseOf(k) ? pqCaseSql(pqCaseOf(k), x) : pqFnOf(k) ? pqFnOf(k).t.replaceAll("{c}", x).replace("{p}", "'" + pqFnParam(k).replace(/'/g, "''") + "'") : x, e);
+const pqFnText = (fns) => (fns || []).map((k) => pqCaseOf(k) ? `CASE (${pqCaseOf(k).w.length} value${pqCaseOf(k).w.length === 1 ? "" : "s"})` : pqFnParam(k) ? `“${pqFnParam(k)}”` : (pqFnOf(k) || { label: k }).label.replace(/:.*/, "")).join(" → ");
 // pqLiteral makes a filter value typed in the grid valid SQL: text is quoted
 // ('%ES'), a number, NULL, TRUE/FALSE, a quoted value, a column (a.b) or a
 // function call is kept; LIKE values are always text.
@@ -6596,11 +6701,11 @@ const pqGroupsRows = (m, f) => !f.expr && !f.agg && (m.groupRows || []).some((x)
 function pqFnCell(fns, key, r = "") {
   const dr = r === "" ? "" : ` data-r="${r}"`;
   return `<span class="fncell">${key === "cfn" ? `<input type="hidden" data-k="cfns"${dr} value="${esc(JSON.stringify(fns || []))}">` : ""}` +
-    `<span class="fnchain${fns && fns.length && pqFnParam(fns[fns.length - 1]) ? " editable" : ""}"${dr} title="${esc(fns && fns.length ? "Applied in this order: " + pqFnText(fns) + (pqFnParam(fns[fns.length - 1]) ? " — click to change the format" : "") : "")}">${esc(pqFnText(fns))}</span>` +
+    `<span class="fnchain${fns && fns.length && pqFnParam(fns[fns.length - 1]) ? " editable" : ""}"${dr} title="${esc(fns && fns.length ? "Applied in this order: " + pqFnText(fns) + (pqFnParam(fns[fns.length - 1]) ? (pqCaseOf(fns[fns.length - 1]) ? " — click to change the CASE" : " — click to change the format") : "") : "")}">${esc(pqFnText(fns))}</span>` +
     `<button type="button" class="btn btn-sm btn-link fnclr" data-k="${key}clr"${dr} title="Remove the last function" aria-label="Remove the last function"${fns && fns.length ? "" : " hidden"}>×</button>` +
     `<select class="form-select form-select-sm fnadd" data-k="${key}add"${dr} aria-label="${key === "cfn" ? "Function on the column before comparing" : "Function on the value shown"}" title="${key === "cfn" ? "A function on the column before it is compared, e.g. LOWER and TRIM to compare without capitals and spaces (the value can be a function too: lower(trim('aaa ')))" : "A function on the value shown; another one goes around it"}">` +
     `<option value="">${fns && fns.length ? "+" : "ƒ"}</option>` +
-    `<optgroup label="Functions">${PQ_FNS.filter((x) => x.p === undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</optgroup>` +
+    `<optgroup label="Functions"><option value="CASE">CASE: if the value is … then …</option>${PQ_FNS.filter((x) => x.p === undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</optgroup>` +
     `<optgroup label="Formats">${PQ_FN_PRESETS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}` +
     PQ_FNS.filter((x) => x.p !== undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("") + `</optgroup></select></span>`;
 }
@@ -6679,7 +6784,7 @@ $("prjDesign").addEventListener("change", (ev) => {
   // A function goes around those before it; the column keeps its name in the output, unless it has one.
   else if (k === "fnadd" || k === "cfnadd") {
     if (!t.value) return;
-    pqFnPick(t.value).then((fn) => {
+    pqFnPick(t.value, f).then((fn) => {
       t.value = "";
       if (!fn) return;
       if (k === "fnadd") { f.fns = [...(f.fns || []), fn]; if (!f.alias) f.alias = f.col; pqCommit(); return; }
@@ -6710,15 +6815,18 @@ $("prjDesign").addEventListener("input", (ev) => {
 });
 // pqFnPick is the function chosen in a list: a format (ready-made or of the user's
 // own) is shown first, to be changed (R to Zl, the decimals…) or taken as it is.
-async function pqFnPick(v) {
+async function pqFnPick(v, f) {
+  if (v === "CASE") { const c = await pqCaseDialog(null, f); return c ? "CASE|" + JSON.stringify(c) : null; }
   const fn = pqFnOf(v);
   if (!fn || fn.p === undefined) return v;
   const p = await prjNamePrompt(fn.k === "DATEF" ? "Date format" : "Number format", fn.ask, pqFnParam(v) || fn.p);
   return p ? `${fn.k}|${p}` : null;
 }
 // pqFnEdit changes the last format of a chain (a click on the chain): null when there is none or it is cancelled.
-async function pqFnEdit(fns) {
-  const last = fns[fns.length - 1], fn = last && pqFnOf(last);
+async function pqFnEdit(fns, f) {
+  const last = fns[fns.length - 1];
+  if (last && pqCaseOf(last)) { const c = await pqCaseDialog(pqCaseOf(last), f); return c ? [...fns.slice(0, -1), "CASE|" + JSON.stringify(c)] : null; }
+  const fn = last && pqFnOf(last);
   if (!fn || fn.p === undefined) return null;
   const p = await prjNamePrompt(fn.k === "DATEF" ? "Change the date format" : "Change the number format", fn.ask, pqFnParam(last));
   return p ? [...fns.slice(0, -1), `${fn.k}|${p}`] : null;
@@ -6784,8 +6892,8 @@ $("prjDesign").addEventListener("click", async (ev) => {
   const ch = ev.target.closest(".fnchain"), ctr = ch && ch.closest("tr[data-f]");
   if (ctr) {
     const f = pq.model.fields[+ctr.dataset.f];
-    if (ch.dataset.r === undefined) { const fns = await pqFnEdit(f.fns || []); if (fns) { f.fns = fns; pqCommit(); } return; }
-    const h = ctr.querySelector(`[data-k=cfns][data-r="${ch.dataset.r}"]`), fns = await pqFnEdit(JSON.parse(h.value));
+    if (ch.dataset.r === undefined) { const fns = await pqFnEdit(f.fns || [], f); if (fns) { f.fns = fns; pqCommit(); } return; }
+    const h = ctr.querySelector(`[data-k=cfns][data-r="${ch.dataset.r}"]`), fns = await pqFnEdit(JSON.parse(h.value), f);
     if (fns) { h.value = JSON.stringify(fns); if (pqCritUpdate(ctr, f, +ch.dataset.r, "cfnadd")) pqCommit(); }
     return;
   }
