@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.40 — 2026-11-26
+
+- Advanced query builder: **Export all queries** icons in the project's bar, before Delete
+  (Excel, CSV, JSON, XML, all four): every saved query runs at its latest version and all its
+  rows are exported, one file per query and format, with each query's progress, rows and
+  downloads (or its error) in a form, and Cancel.
+
 ## 1.62.39 — 2026-11-26
 
 - Speed: answers are gzip-compressed for the browser. The page, scripts and styles (about

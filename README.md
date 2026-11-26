@@ -1207,6 +1207,13 @@ per line). Each is as tall as you drag its bottom-right corner.
   *Read in … · n tables* folds the rows read per table, leaving the line with the rows
   the query returned. The browser remembers which are folded.
 
+**Export all queries.** The export icons in the project's bar, before *Delete* (Excel, CSV,
+JSON, XML, all four), run every saved query of the project at its latest version, one after
+the other, and export all its rows, one file per query and format (in the project's export
+folder, also on the *Exported files* page). A form shows each query's progress, its row count
+and a download per file, and a query that fails, with its error; **Cancel** stops after the
+running one. The query in the editor needs **Run** again before it is exported on its own.
+
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
 diagram's layout. The icon buttons beside it: **Refresh** (reads the saved queries again:
 those saved since in another window or by someone else are added; the query in the editor

@@ -470,6 +470,15 @@
   .prjdialect { font-size: 12px; color: var(--muted); }
   .prjsql { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; min-height: 140px; height: 100%; resize: none; }
   .prjqmeta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .prjqall { display: inline-flex; align-items: center; gap: 0; padding: 0 4px; margin: 0 2px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  dialog.dlg.prjqalldlg { width: min(640px, calc(100vw - 32px)); }
+  .prjqalllist { max-height: 50vh; overflow: auto; font-size: 13px; margin-bottom: 8px; }
+  .prjqalllist > div { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .prjqalllist .n { font-weight: 600; min-width: 0; flex: 0 1 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prjqalllist .st { flex: 1; color: var(--muted); min-width: 0; }
+  .prjqalllist .st.ok { color: var(--accent); }
+  .prjqalllist .st.bad { color: var(--bs-danger, #c0392b); }
+  .prjqalllist .dlbtn { margin-right: 4px; }
   .prjqlabel { flex: 1; min-width: 160px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .prjqlabel b { font-weight: 600; }
   .prjqlabel .d { color: var(--muted); margin-left: 8px; }
@@ -1709,6 +1718,13 @@
           <button class="btn btn-sm btn-primary" id="prjSave" title="Save the project: name, linked databases, tables and limits" aria-label="Save the project"><i class="bi bi-floppy" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-secondary" id="prjPwBtn" title="Project password: one password that opens the project and connects every database it links" aria-label="Project password"><i class="bi bi-key" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-secondary" id="prjDup" title="Duplicate: save a copy of this project under another name" aria-label="Duplicate the project"><i class="bi bi-copy" aria-hidden="true"></i></button>
+          <span class="prjqall" role="group" aria-label="Export all queries">
+            <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="xlsx" data-label="Excel" title="Export all queries: run each saved query (its latest version) and export every row to Excel" aria-label="Export all queries to Excel"><i class="bi bi-filetype-xlsx fmt-xlsx" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="csv" data-label="CSV" title="Export all queries: run each saved query (its latest version) and export every row to CSV" aria-label="Export all queries to CSV"><i class="bi bi-filetype-csv fmt-csv" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="json" data-label="JSON" title="Export all queries: run each saved query (its latest version) and export every row to JSON" aria-label="Export all queries to JSON"><i class="bi bi-filetype-json fmt-json" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="xml" data-label="XML" title="Export all queries: run each saved query (its latest version) and export every row to XML" aria-label="Export all queries to XML"><i class="bi bi-filetype-xml fmt-xml" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="all" data-label="all four formats" title="Export all queries: run each saved query (its latest version) and export every row to Excel, CSV, JSON and XML" aria-label="Export all queries to all four formats"><i class="bi bi-files fmt-all" aria-hidden="true"></i></button>
+          </span>
           <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)" aria-label="Delete the project"><i class="bi bi-trash" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases" aria-label="Close the project"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
           </span>
@@ -2592,6 +2608,17 @@
       <button class="btn btn-primary" type="submit" id="prjQDOk">OK</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="prjQAllDialog" class="dlg prjqalldlg" aria-labelledby="prjQAllTitle">
+  <h3 id="prjQAllTitle">Export all queries</h3>
+  <p class="sdtext" id="prjQAllText"></p>
+  <div class="prjqalllist" id="prjQAllList"></div>
+  <div class="dactions">
+    <button class="btn btn-outline-danger" type="button" id="prjQAllCancel">Cancel</button>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" type="button" id="prjQAllClose" disabled>Close</button>
+  </div>
 </dialog>
 
 <dialog id="prjNameDialog" class="dlg" aria-labelledby="prjNameTitle">
@@ -5809,6 +5836,58 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
   finally { prjSetExport(); }
 }));
 
+// Export all queries: each saved query of the project, at its latest version, is run
+// (the rows it needs are read again) and exported, one after the other, one file per
+// query and format. The query in the editor needs a Run again before its own export.
+document.querySelectorAll(".qallexp").forEach((b) => b.addEventListener("click", async () => {
+  if (!prj.open || prj.running) return;
+  if (prjDirty()) { toast("Save the project first: the queries run on its saved tables", true); return; }
+  await prjQLoadList(prj.qid);
+  const qs = prj.queries.slice();
+  if (!qs.length) { toast("The project has no saved queries", true); return; }
+  const fmt = b.dataset.qfmt, d = $("prjQAllDialog"), list = $("prjQAllList");
+  let cancelled = false;
+  const dl = (f) => { const x = f.file.split(".").pop(); return `<a class="btn btn-sm btn-link exp-icon dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download title="Download ${esc(f.file)}" aria-label="Download ${esc(f.file)}"><i class="bi bi-filetype-${esc(x)} fmt-${esc(x)}" aria-hidden="true"></i></a>`; };
+  list.innerHTML = qs.map((q, i) => `<div><span class="n" title="${esc(q.name)}">${esc(q.name)} · v${q.version}</span><span class="st" id="prjQAll${i}">waiting</span></div>`).join("");
+  $("prjQAllText").textContent = `${qs.length} quer${qs.length === 1 ? "y" : "ies"}, the latest version of each, to ${b.dataset.label}: each runs, then every row is exported.`;
+  $("prjQAllClose").disabled = true; $("prjQAllCancel").hidden = false;
+  const cancel = async () => { cancelled = true; $("prjQAllCancel").hidden = true; try { await api("POST", "/api/project/cancel", { project: prj.open.project }); } catch (e) { /* nothing running */ } };
+  $("prjQAllCancel").onclick = cancel;
+  $("prjQAllClose").onclick = () => d.close();
+  d.oncancel = (ev) => { if ($("prjQAllClose").disabled) ev.preventDefault(); };
+  d.showModal();
+  prj.running = true; $("prjRun").disabled = true; prjSetExport();
+  document.querySelectorAll(".qallexp").forEach((x) => (x.disabled = true));
+  let ok = 0, files = 0;
+  try {
+    for (let i = 0; i < qs.length; i++) {
+      const q = qs[i], st$ = $("prjQAll" + i);
+      if (cancelled) { st$.textContent = "cancelled"; continue; }
+      st$.className = "st"; st$.textContent = "running…";
+      try {
+        let st = await api("POST", "/api/project/run", { project: prj.open.project, sql: q.sql, limit: 1 });
+        while (st.state === "loading" || st.state === "querying") {
+          st$.textContent = st.state === "loading" ? `reading the tables… ${(st.tables || []).filter((t) => t.done).length}/${(st.tables || []).length}` : "running the query…";
+          await new Promise((r) => setTimeout(r, 300));
+          st = await api("GET", "/api/project/run?" + new URLSearchParams({ project: prj.open.project }));
+        }
+        if (st.state !== "done") throw new Error(st.state === "cancelled" ? "cancelled" : st.error || st.state);
+        st$.textContent = "exporting…";
+        const res = await api("POST", "/api/project/export", { project: prj.open.project, sql: q.sql, format: fmt, name: q.name });
+        st$.className = "st ok";
+        st$.innerHTML = `${res.files[0].rows.toLocaleString()} row${res.files[0].rows === 1 ? "" : "s"} · ` + res.files.map(dl).join("");
+        st$.title = res.files.map((f) => f.path).join("\n");
+        ok++; files += res.files.length;
+      } catch (e) { st$.className = "st bad"; st$.textContent = e.message === "cancelled" ? "cancelled" : "failed: " + e.message; }
+    }
+  } finally {
+    prj.running = false; $("prjRun").disabled = false;
+    prj.ran = ""; prjSetExport();
+    document.querySelectorAll(".qallexp").forEach((x) => (x.disabled = false));
+    $("prjQAllCancel").hidden = true; $("prjQAllClose").disabled = false;
+    $("prjQAllText").textContent = `${ok} of ${qs.length} quer${qs.length === 1 ? "y" : "ies"} exported, ${files} file${files === 1 ? "" : "s"} (also on the Exported files page). The query in the editor: Run it again to export it on its own.`;
+  }
+}));
 
 // ---- the project query designer: model ----------------------------------------
 // The SQL and the diagram are two views of one query. pqParse reads the SQL
