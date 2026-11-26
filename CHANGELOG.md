@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.62.37 — 2026-11-26
+
+- Advanced query builder: *Column definitions* has a **CASE** column: its button builds a
+  CASE for the row in the form (no SQL to type), *CASE (2)* changes it and × removes it.
+  A CASE typed in the SQL box shows there too.
+
 ## 1.62.36 — 2026-11-26
 
 - Advanced query builder: the CASE form shows the values the column holds in the last result

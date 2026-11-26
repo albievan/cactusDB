@@ -556,6 +556,8 @@
   .pqcaserows td:nth-child(2) { color: var(--muted); width: 1%; }
   .pqcaserows td:last-child { width: 1%; }
   #pqCaseErr { color: var(--bs-danger, #c0392b); font-size: 13px; margin-top: 6px; }
+  .prjdesign .pqcasebtn { --bs-btn-padding-x: 6px; --bs-btn-padding-y: 1px; white-space: nowrap; }
+  .prjdesign .pqcasebtn.on { font-size: 12px; color: var(--accent); }
   .prjdesign .pqwait { border-color: #d9822b; box-shadow: 0 0 0 1px #d9822b; }
   /* The grip and the column's name and type stay put while the grid scrolls to the right. */
   .prjdesign tr > :nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--panel); width: 16px; min-width: 16px; max-width: 16px; }
@@ -6746,17 +6748,24 @@ function pqFnCell(fns, key, r = "") {
     `<optgroup label="Formats">${PQ_FN_PRESETS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}` +
     PQ_FNS.filter((x) => x.p !== undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("") + `</optgroup></select></span>`;
 }
+// pqCaseCell is a row's CASE: a button that builds it (or changes it), × removes it.
+function pqCaseCell(f) {
+  const c = f.fns && f.fns.length && pqCaseOf(f.fns[f.fns.length - 1]);
+  if (!c) return `<button type="button" class="btn btn-sm btn-outline-secondary pqcasebtn" data-k="case" title="Build a CASE: if the value is … then …" aria-label="Build a CASE for this column"><i class="bi bi-signpost-split" aria-hidden="true"></i></button>`;
+  return `<span class="fncell"><button type="button" class="btn btn-sm btn-link pqcasebtn on" data-k="case" title="${esc(pqCaseSql(c, f.col))} — click to change it" aria-label="Change the CASE">CASE (${c.w.length})</button>` +
+    `<button type="button" class="btn btn-sm btn-link fnclr" data-k="caseclr" title="Remove the CASE" aria-label="Remove the CASE">×</button></span>`;
+}
 function pqDesign() {
   const box = $("prjDesign"), m = pq.model;
   if (m.readOnly) { box.innerHTML = `<div class="ro">The grid is read-only for this query: ${esc(m.readOnly)}.</div>`; return; }
   const rows = Math.max(1, ...m.fields.flatMap((f) => [...f.crit.map((c) => c.row + 2), ...Object.keys(f.pend || {}).map((r) => +r + 2)]));
   const allCols = m.tables.flatMap((t) => (pqColsOf(t) || []).map((c) => [t.alias, c.name]));
   const fname = (f) => f.expr ? f.expr : (f.agg ? f.agg + "(" : "") + (f.table ? f.table + "." : "") + f.col + (f.agg ? ")" : "");
-  const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function</th><th>Total</th><th>Group</th><th>Sort</th>` +
+  const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function</th><th title="CASE: show other values for the column's values ('034' → 'Scale'), built in a form">CASE</th><th>Total</th><th>Group</th><th>Sort</th>` +
     Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}</th>`).join("") + `<th></th></tr>`;
   const body = m.fields.map((f, i) => {
     const grip = `<td class="grip" draggable="true" title="Drag up or down to change the order of the columns" aria-hidden="true">⋮⋮</td>`;
-    if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${5 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
+    if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${6 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
     const ex = !!f.expr;
     const crit = Array.from({ length: rows }, (_, r) => {
       const p = !f.crit.some((x) => x.row === r) && f.pend && f.pend[r];
@@ -6769,6 +6778,7 @@ function pqDesign() {
       <td><input type="checkbox" data-k="show"${f.show ? " checked" : ""} aria-label="Show ${esc(fname(f))}"></td>
       <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
       <td>${ex || f.agg ? "" : pqFnCell(f.fns, "fn")}</td>
+      <td>${ex || f.agg ? "" : pqCaseCell(f)}</td>
       <td>${ex || (f.fns && f.fns.length) ? "" : `<select class="form-select form-select-sm" data-k="agg" aria-label="Total"><option value=""></option>${PQ_AGGS.map((a) => `<option${a === f.agg ? " selected" : ""}>${a}</option>`).join("")}</select>`}</td>
       <td>${ex || f.agg ? "" : `<input type="checkbox" data-k="group"${f.group || pqGroupsRows(m, f) ? " checked" : ""} aria-label="Group by" title="${m.fields.some((x) => x.agg) ? "Group: one row per value, for the totals (GROUP BY)" : "Group: the rows in groups per value, to expand and collapse (choose a Total for one row per group instead)"}">`}</td>
       <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="sort" aria-label="Sort"><option value=""></option><option${f.sort === "ASC" ? " selected" : ""}>ASC</option><option${f.sort === "DESC" ? " selected" : ""}>DESC</option></select>`}</td>
@@ -6937,6 +6947,15 @@ $("prjDesign").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-k]"), tr = b && b.closest("tr[data-f]");
   if (!tr) return;
   const m = pq.model, i = +tr.dataset.f;
+  if (b.dataset.k === "case") {
+    const f = m.fields[i], last = f.fns && f.fns[f.fns.length - 1], c = await pqCaseDialog(pqCaseOf(last), f);
+    if (!c) return;
+    const k = "CASE|" + JSON.stringify(c);
+    f.fns = pqCaseOf(last) ? [...f.fns.slice(0, -1), k] : [...(f.fns || []), k];
+    if (!f.alias) f.alias = f.col;
+    pqCommit(); return;
+  }
+  if (b.dataset.k === "caseclr") { const f = m.fields[i]; f.fns = (f.fns || []).slice(0, -1); if (!f.fns.length) delete f.fns; pqCommit(); return; }
   if (b.dataset.k === "fnclr") { const f = m.fields[i]; f.fns = (f.fns || []).slice(0, -1); if (!f.fns.length) delete f.fns; pqCommit(); return; }
   if (b.dataset.k === "cfnclr") { const h = tr.querySelector(`[data-k=cfns][data-r="${b.dataset.r}"]`); h.value = JSON.stringify(JSON.parse(h.value).slice(0, -1)); if (pqCritUpdate(tr, m.fields[i], +b.dataset.r, "cfnclr")) pqCommit(); return; }
   if (b.dataset.k === "rm") m.fields.splice(i, 1);
