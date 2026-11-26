@@ -483,6 +483,7 @@ func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		fileRef
 		fileUnlock
+		Raw bool `json:"raw"` // a CSV as its text, not as a table
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, 400, err)
@@ -500,7 +501,11 @@ func (s *server) handlePreviewFile(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch f.format() {
 	case "csv":
-		err = previewCSV(f.path, out)
+		if req.Raw {
+			err = previewText(f.path, out)
+		} else {
+			err = previewCSV(f.path, out)
+		}
 	case "xlsx":
 		err = previewXLSX(f.path, out)
 	case "zip", "backup":

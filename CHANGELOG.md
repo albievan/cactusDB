@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.43 — 2026-11-26
+
+- Advanced query builder: the projects list has the **Export all queries** icons (Excel, CSV,
+  JSON, XML, all four) in each row, as a group of their own right after *Open*.
+- Advanced query builder: while a project is open, the left panel lists **Project queries**
+  (that project's saved queries) above its tables; a click opens one in the editor.
+- Exported files: a CSV preview has a **Raw Data View** checkbox before *Download*: ticked, the
+  file's text is shown as written in a text box instead of a table.
+
 ## 1.62.42 — 2026-11-26
 
 - Advanced query builder: in the CASE form (and the Calculated column form) *then show* and

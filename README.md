@@ -671,7 +671,9 @@ and its size (uncompressed).
 - **Select:** tick the files you want, or click their rows. The heading checkbox selects every
   file shown.
 - **Preview** (the 👁 button after a file's checkbox) opens the file in a window:
-  - CSV and Excel files (the first sheet) as a table
+  - CSV and Excel files (the first sheet) as a table; for a CSV file, tick **Raw Data View**
+    (before *Download*) to see its text as written, in a text box, instead of a table (the
+    browser remembers the choice)
   - JSON and XML files in their own format, as they are written in the file, coloured: keys,
     strings, numbers, tags and attributes. A JSON file written on one line is laid out on
     lines of its own, indented, with every value kept exactly as written
@@ -1214,12 +1216,17 @@ per line). Each is as tall as you drag its bottom-right corner.
   *Read in … · n tables* folds the rows read per table, leaving the line with the rows
   the query returned. The browser remembers which are folded.
 
-**Export all queries.** The export icons in the project's bar, before *Delete* (Excel, CSV,
-JSON, XML, all four), run every saved query of the project at its latest version, one after
+**Export all queries.** The export icons in the project's bar, before *Delete*, and in each
+row of the projects list, as a group of their own right after *Open* (Excel, CSV, JSON, XML,
+all four; from the list, the project is opened first), run every saved query of the project at its latest version, one after
 the other, and export all its rows, one file per query and format (in the project's export
 folder, also on the *Exported files* page). A form shows each query's progress, its row count
 and a download per file, and a query that fails, with its error; **Cancel** stops after the
 running one. The query in the editor needs **Run** again before it is exported on its own.
+
+**Project queries** in the left panel: while a project is open, its saved queries (and only
+its own) are listed above *Project tables*, with their version; a click opens one in the
+editor (asking first to save changes to the query there), and the one open is highlighted.
 
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
 diagram's layout. The icon buttons beside it: **Refresh** (reads the saved queries again:

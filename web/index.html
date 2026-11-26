@@ -593,6 +593,14 @@
   #prjJPairs .pr { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; margin-bottom: 4px; }
   #prjJWarn { color: var(--danger, #c0392b); }
   #prjSide .prjsidetitle { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  #prjSideQueries { max-height: 35vh; overflow: auto; margin-bottom: 4px; }
+  #prjSideQueries .q { display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left; font-size: 13px; padding: 2px 8px; border: 0; border-radius: 4px; background: none; color: inherit; }
+  #prjSideQueries .q:hover, #prjSideQueries .q:focus-visible { background: var(--row-hover); outline: none; }
+  #prjSideQueries .q.on { background: var(--row-hover); color: var(--accent); font-weight: 600; }
+  #prjSideQueries .q .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #prjSideQueries .q small { color: var(--muted); font-weight: 400; }
+  #prjSideQueries .empty { font-size: 12px; color: var(--muted); padding: 2px 8px; margin: 0; }
+  #prjSide h2.prjsidetables { margin-top: 12px; }
   #prjSideList .grp { font-size: 12px; font-weight: 600; margin: 8px 0 2px; display: flex; align-items: center; gap: 6px; }
   #prjSideList .grp i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
   #prjSideList .tb { font-size: 13px; padding: 2px 8px; border-radius: 4px; cursor: grab; user-select: none; }
@@ -809,6 +817,11 @@
   .fphead .spacer { flex: 1; }
   .fpmeta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .fpbody { overflow: auto; min-height: 0; background: var(--panel); }
+  .fphead .fpraw { margin: 0 6px 0 0; white-space: nowrap; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .fphead .fpraw[hidden] { display: none; }
+  .fphead .fpraw .form-check-input { margin: 0; float: none; }
+  .fpbody .fprawtext { display: block; width: 100%; height: 100%; border: 0; border-radius: 0; resize: none; padding: 12px 16px; font: 12px/1.5 var(--mono); tab-size: 4; background: var(--panel); color: inherit; }
+  .prjtable .prjqall { margin: 0 6px; }
   .fpbody pre { margin: 0; padding: 12px 16px; font: 12px/1.5 var(--mono); white-space: pre; tab-size: 4; }
   .fpbody table td { font-size: 12px; }
   /* JSON and XML in their own format, coloured. */
@@ -1454,8 +1467,11 @@
       <div class="objstats" id="objStats" hidden></div>
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators: open <b>☰ Connections</b> below.</p></div>
     </section>
-    <section class="box" id="prjSide" hidden aria-label="Tables of the project">
-      <h2><span class="prjsidetitle">Project tables</span><span id="prjSideCount"></span></h2>
+    <section class="box" id="prjSide" hidden aria-label="Queries and tables of the project">
+      <h2><span class="prjsidetitle">Project queries</span><span id="prjSideQCount"></span></h2>
+      <p class="hint">Click a query to open it in the editor.</p>
+      <div id="prjSideQueries" role="list" aria-label="The project's saved queries"></div>
+      <h2 class="prjsidetables"><span class="prjsidetitle">Project tables</span><span id="prjSideCount"></span></h2>
       <p class="hint">Drag a table onto the query designer, or double-click it.</p>
       <div id="prjSideList"></div>
     </section>
@@ -2698,6 +2714,7 @@
   <div class="fphead">
     <div><h3 id="fpTitle"></h3><div class="fpmeta" id="fpMeta"></div></div>
     <span class="spacer"></span>
+    <label class="form-check fpraw" id="fpRawWrap" hidden title="Show the CSV file's text as it is written, not as a table"><input class="form-check-input" type="checkbox" id="fpRaw"> <span class="form-check-label">Raw Data View</span></label>
     <button class="btn btn-outline-secondary" type="button" id="fpDownload" title="Compress this file (highest level) and download it">Download</button>
     <button type="button" class="btn btn-outline-danger" id="fpDelete" title="Delete this file (asks first)">Delete</button>
     <button type="button" class="btn-close" id="fpClose" aria-label="Close preview"></button>
@@ -5135,6 +5152,7 @@ const prjDirty = () => !!prj.open && prjEditable() !== prj.orig;
 function prjMark() {
   if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() || prjQDirty() ? " ●" : "") : "";
   prjTitleClose();
+  pqSideQueries();
 }
 // The × beside the project's name shows on the query builder's tab while a project is open.
 function prjTitleClose() {
@@ -5154,9 +5172,15 @@ async function prjShow() {
   const name = (id) => ((state.saved || []).find((c) => c.id === id) || { name: "deleted connection" }).name;
   // A grid: Open first, the name, its databases, queries and dates, then edit, duplicate and delete.
   const ib = (act, id, icon, t, cls = "btn-outline-secondary") => `<button type="button" class="btn btn-sm ${cls}" data-prjact="${act}" data-id="${id}" title="${t}" aria-label="${t}"><i class="bi ${icon}" aria-hidden="true"></i></button>`;
+  // Export all queries: its own group of format icons, after Open.
+  const QALL = [["xlsx", "Excel", "bi-filetype-xlsx"], ["csv", "CSV", "bi-filetype-csv"], ["json", "JSON", "bi-filetype-json"], ["xml", "XML", "bi-filetype-xml"], ["all", "all four formats", "bi-files"]];
+  const qall = (p) => `<span class="prjqall" role="group" aria-label="Export all queries of ${esc(p.name)}">` + QALL.map(([f, l, icon]) => {
+    const t = `Export all queries: open the project, run each saved query (its latest version) and export every row to ${f === "all" ? "Excel, CSV, JSON and XML" : l}`;
+    return `<button type="button" class="btn btn-sm btn-link exp-icon" data-prjact="qall" data-qfmt="${f}" data-label="${l}" data-id="${p.id}" title="${t}" aria-label="${t}"${p.queries ? "" : " disabled"}><i class="bi ${icon} fmt-${f}" aria-hidden="true"></i></button>`;
+  }).join("") + `</span>`;
   $("prjList").innerHTML = `<thead><tr><th></th><th>Project</th><th>Databases linked</th><th class="num">Queries</th><th>Created</th><th>Changed</th></tr></thead><tbody>` +
     (prj.list.length ? prj.list.map((p) => `<tr data-id="${p.id}">
-      <td class="act"><span class="iconbtns">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}<span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></span></td>
+      <td class="act"><span class="iconbtns">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}${qall(p)}<span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></span></td>
       <td class="pn">${esc(p.name)}${p.hasPassword ? ` <i class="bi bi-key muted" title="Opens with its project password" aria-label="has a project password"></i>` : ""}</td>
       <td class="pd" title="${esc(p.connIds.map(name).join("\n"))}"><span class="badge rounded-pill text-bg-secondary">${p.connIds.length}</span> ${p.connIds.length ? esc(p.connIds.map(name).join(" · ")) : `<span class="muted">none yet</span>`}</td>
       <td class="num">${(p.queries || 0).toLocaleString()}</td>
@@ -5225,7 +5249,7 @@ async function prjOpen(id) {
   } else res = await openWith("");
   if (!res || res.projectLocked) return;
   prjSet(res);
-  pq.cols = {}; pq.fks = {}; prj.qid = 0; prjQMeta("", ""); pqReset("", null); prj.qOrig = prjQState();
+  pq.cols = {}; pq.fks = {}; prj.qid = 0; prj.queries = []; prjQMeta("", ""); pqReset("", null); prj.qOrig = prjQState();
   if (state.tab !== "projects") showTab("projects"); else prjShow();
   prjQLoadList(0); pqLoadCols();
   const down = res.links.filter((l) => l.state !== "connected");
@@ -5563,6 +5587,7 @@ $("prjList").addEventListener("click", async (ev) => {
   if (b.dataset.prjact === "edit") { $("prjSetupWrap").open = true; $("prjName").focus(); $("prjName").select(); }
   else if (b.dataset.prjact === "dup") $("prjDup").click();
   else if (b.dataset.prjact === "del") $("prjDel").click();
+  else if (b.dataset.prjact === "qall") prjQAllExport(b.dataset.qfmt, b.dataset.label);
 });
 $("prjName").addEventListener("input", () => { prj.open.name = $("prjName").value; prjMark(); });
 $("prjDesc").addEventListener("input", () => { prj.open.description = $("prjDesc").value; prjMark(); });
@@ -5870,17 +5895,18 @@ document.querySelectorAll(".pexp").forEach((b) => b.addEventListener("click", as
 // Export all queries: each saved query of the project, at its latest version, is run
 // (the rows it needs are read again) and exported, one after the other, one file per
 // query and format. The query in the editor needs a Run again before its own export.
-document.querySelectorAll(".qallexp").forEach((b) => b.addEventListener("click", async () => {
+document.querySelectorAll(".qallexp").forEach((b) => b.addEventListener("click", () => prjQAllExport(b.dataset.qfmt, b.dataset.label)));
+async function prjQAllExport(fmt, label) {
   if (!prj.open || prj.running) return;
   if (prjDirty()) { toast("Save the project first: the queries run on its saved tables", true); return; }
   await prjQLoadList(prj.qid);
   const qs = prj.queries.slice();
   if (!qs.length) { toast("The project has no saved queries", true); return; }
-  const fmt = b.dataset.qfmt, d = $("prjQAllDialog"), list = $("prjQAllList");
+  const d = $("prjQAllDialog"), list = $("prjQAllList");
   let cancelled = false;
   const dl = (f) => { const x = f.file.split(".").pop(); return `<a class="btn btn-sm btn-link exp-icon dlbtn" href="${esc(f.download)}?project=${encodeURIComponent(prj.open.project)}&errors=in-header" download title="Download ${esc(f.file)}" aria-label="Download ${esc(f.file)}"><i class="bi bi-filetype-${esc(x)} fmt-${esc(x)}" aria-hidden="true"></i></a>`; };
   list.innerHTML = qs.map((q, i) => `<div><span class="n" title="${esc(q.name)}">${esc(q.name)} · v${q.version}</span><span class="st" id="prjQAll${i}">waiting</span></div>`).join("");
-  $("prjQAllText").textContent = `${qs.length} quer${qs.length === 1 ? "y" : "ies"}, the latest version of each, to ${b.dataset.label}: each runs, then every row is exported.`;
+  $("prjQAllText").textContent = `${qs.length} quer${qs.length === 1 ? "y" : "ies"}, the latest version of each, to ${label}: each runs, then every row is exported.`;
   $("prjQAllClose").disabled = true; $("prjQAllCancel").hidden = false;
   const cancel = async () => { cancelled = true; $("prjQAllCancel").hidden = true; try { await api("POST", "/api/project/cancel", { project: prj.open.project }); } catch (e) { /* nothing running */ } };
   $("prjQAllCancel").onclick = cancel;
@@ -5918,7 +5944,7 @@ document.querySelectorAll(".qallexp").forEach((b) => b.addEventListener("click",
     $("prjQAllCancel").hidden = true; $("prjQAllClose").disabled = false;
     $("prjQAllText").textContent = `${ok} of ${qs.length} quer${qs.length === 1 ? "y" : "ies"} exported, ${files} file${files === 1 ? "" : "s"} (also on the Exported files page). The query in the editor: Run it again to export it on its own.`;
   }
-}));
+}
 
 // ---- the project query designer: model ----------------------------------------
 // The SQL and the diagram are two views of one query. pqParse reads the SQL
@@ -7140,10 +7166,27 @@ function pqSide() {
   $("prjSide").hidden = !open; $("objectsBox").hidden = open;
   if (!open) return;
   const o = prj.open;
+  pqSideQueries();
   $("prjSideCount").textContent = ` ${o.tables.length}`;
   $("prjSideList").innerHTML = o.links.map((l) => `<div class="grp"><i style="background:${pqColor(l.alias)}"></i>${esc(l.alias)} <small class="hint">${esc(l.name || "")}</small></div>` +
     o.tables.filter((t) => t.alias === l.alias).map((t) => `<div class="tb" draggable="true" tabindex="0" data-db="${esc(t.alias)}" data-name="${esc(t.name)}" title="${esc(t.source)} — drag onto the diagram, or double-click / Enter to add">${esc(t.name)}</div>`).join("")).join("");
 }
+// The project's saved queries, above its tables: a click opens one in the editor.
+// Drawn again only when the list or the open query changes.
+function pqSideQueries() {
+  if (!prj.open || $("prjSide").hidden) return;
+  const qs = prj.queries || [], sig = prj.open.id + "|" + prj.qid + "|" + qs.map((q) => q.id + ":" + q.version + ":" + q.name).join("|");
+  if ($("prjSideQueries").dataset.sig === sig) return;
+  $("prjSideQueries").dataset.sig = sig;
+  $("prjSideQCount").textContent = ` ${qs.length}`;
+  $("prjSideQueries").innerHTML = qs.length ? qs.map((q) => `<button type="button" role="listitem" class="q${q.id === prj.qid ? " on" : ""}" data-qid="${q.id}" title="${esc(q.name)}${q.description ? "\n" + esc(q.description) : ""}\nClick to open it in the editor"${q.id === prj.qid ? ` aria-current="true"` : ""}><i class="bi bi-filetype-sql" aria-hidden="true"></i><span class="n">${esc(q.name)}</span><small>v${q.version}</small></button>`).join("")
+    : `<p class="empty">No saved queries yet: write one, then Save.</p>`;
+}
+$("prjSideQueries").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-qid]");
+  if (!b || +b.dataset.qid === prj.qid) return;
+  prjQOpen(+b.dataset.qid);
+});
 $("prjSideList").addEventListener("dragstart", (ev) => { const t = ev.target.closest(".tb"); if (t) ev.dataTransfer.setData("text/x-pqtable", t.dataset.db + "\u0000" + t.dataset.name); });
 $("prjSideList").addEventListener("dblclick", (ev) => { const t = ev.target.closest(".tb"); if (t) pqAddTable(t.dataset.db, t.dataset.name); });
 $("prjSideList").addEventListener("keydown", (ev) => { const t = ev.target.closest(".tb"); if (t && ev.key === "Enter") { ev.preventDefault(); pqAddTable(t.dataset.db, t.dataset.name); } });
@@ -7237,6 +7280,7 @@ async function prjQLoadList(select = prj.qid) {
     prj.queries.map((q) => `<option value="${q.id}">${esc(q.name)} · v${q.version}</option>`).join("");
   $("prjQSel").value = String(select || 0);
   $("prjQDel").hidden = !prj.qid;
+  pqSideQueries();
 }
 // prjQAskSave asks to save an edited saved query: false when the user stays.
 async function prjQAskSave() {
@@ -8853,7 +8897,9 @@ async function previewFile(f) {
   $("fpFoot").textContent = "";
   if (!$("fPrevDialog").open) $("fPrevDialog").showModal();
   try {
-    const p = await withFileUnlock((u) => api("POST", "/api/files/preview", { ...fileRef(f), ...u }));
+    const isCSV = f.kind === "csv" || /\.csv$/i.test(f.name), raw = isCSV && $("fpRaw").checked;
+    $("fpRawWrap").hidden = !isCSV;
+    const p = await withFileUnlock((u) => api("POST", "/api/files/preview", { ...fileRef(f), ...u, raw }));
     if (!p) { $("fPrevDialog").close(); return; }
     if (fPrevKey !== fileKey(f)) return; // another file was opened meanwhile
     let foot = "";
@@ -8875,6 +8921,12 @@ async function previewFile(f) {
         let text = p.text;
         const fmt = /\.json$/i.test(f.name) ? "json" : /\.xml$/i.test(f.name) ? "xml" : "";
         if (fmt === "json" && text.trim().indexOf("\n") < 0) text = jsonLayout(text);
+        if (raw) { // the CSV's text, as it is written, in a text box
+          $("fpBody").innerHTML = `<textarea class="form-control fprawtext" readonly spellcheck="false" wrap="off" aria-label="The CSV file's text"></textarea>`;
+          $("fpBody").querySelector("textarea").value = text.replace(/^\ufeff/, "");
+          $("fpFoot").textContent = "CSV, raw" + (p.truncated ? " · showing the first 256 KB" : "");
+          return;
+        }
         $("fpBody").innerHTML = `<pre class="${fmt}">${fmt === "json" ? hlJSON(text) : fmt === "xml" ? hlXML(text) : esc(text)}</pre>`;
         foot = (fmt ? fmt.toUpperCase() + (p.truncated ? " · " : "") : "") + (p.truncated ? "Showing the first 256 KB" : "");
         break;
@@ -8888,6 +8940,12 @@ async function previewFile(f) {
   }
 }
 const prevFile = () => files.list.find((x) => fileKey(x) === fPrevKey);
+// Raw Data View: the CSV's text instead of a table; remembered in this browser.
+try { $("fpRaw").checked = localStorage.getItem("cdb.fpRaw") === "1"; } catch (e) { /* no storage */ }
+$("fpRaw").addEventListener("change", () => {
+  try { localStorage.setItem("cdb.fpRaw", $("fpRaw").checked ? "1" : "0"); } catch (e) { /* no storage */ }
+  const f = prevFile(); if (f) previewFile(f);
+});
 $("fpClose").addEventListener("click", () => $("fPrevDialog").close());
 $("fpDownload").addEventListener("click", () => { const f = prevFile(); if (f) downloadFiles([f]); });
 $("fpDelete").addEventListener("click", () => { const f = prevFile(); if (f) askDelete([f]); });
