@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.62.39 — 2026-11-26
+
+- Speed: answers are gzip-compressed for the browser. The page, scripts and styles (about
+  1.2 MB) arrive as about 260 KB; query results shrink about five times (50,000 rows: 2.3 MB
+  sent as 420 KB), so data shows sooner over a network. Compressed downloads (.zip, .xlsx) and
+  small answers are sent as they are. The page and its files carry an ETag: an unchanged page
+  reloads with a 304 and nothing downloaded; after an upgrade the new page loads at once.
+
 ## 1.62.38 — 2026-11-26
 
 - Advanced query builder: **Add column… → Calculated column**: a form takes the name in the

@@ -37,7 +37,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "1.62.38"
+var version = "1.62.39"
 
 //go:embed web
 var webFS embed.FS
@@ -475,10 +475,14 @@ func main() {
 
 	static, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
-	// no-cache: after an upgrade the browser must load the new page, not keep the old one.
+	// no-cache: after an upgrade the browser must load the new page, not keep the old one;
+	// the ETag lets it keep its copy (a 304) while the page is the same.
 	files := http.FileServerFS(static)
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
+		if et := staticETag(static, r.URL.Path); et != "" {
+			w.Header().Set("Etag", et)
+		}
 		files.ServeHTTP(w, r)
 	}))
 	// The sign-in page of --remotelogin (auth.go).
@@ -488,6 +492,7 @@ func main() {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Etag", staticETag(static, "/login.html"))
 		http.ServeFileFS(w, r, static, "login.html")
 	})
 	mux.HandleFunc("GET /api/auth/me", s.handleAuthMe)
@@ -621,7 +626,7 @@ func main() {
 	// firewall, VPN or NAT between it and cactusdb silently drops it: the
 	// browser would otherwise send the next request into a dead connection
 	// and get no answer ("Failed to fetch").
-	srv := &http.Server{Handler: statusInHeader(logRequests(recoverPanics(sameOriginOnly(s.requireLogin(mux))))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
+	srv := &http.Server{Handler: gzipResponses(statusInHeader(logRequests(recoverPanics(sameOriginOnly(s.requireLogin(mux)))))), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 20 * time.Second}
 	go s.expireSessions()
 	go logUpdate()
 	previous, stopped := trackRun(filepath.Dir(*connDB), *port)

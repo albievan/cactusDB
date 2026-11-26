@@ -2129,6 +2129,14 @@ is sent and how to set it up. In short:
   session id. It isn't encrypted, so give `cactus.conn.db` to someone else only if they
   may see that too.
 
+**Speed: compressed answers.** cactusdb compresses its answers with gzip for every browser
+(they all accept it): the page, its scripts and styles (about 1.2 MB, sent as about 260 KB)
+and the JSON of the API, query results above all (50,000 rows of 2.3 MB arrive as about
+420 KB), so data shows sooner over a network or VPN. Downloads that are compressed already
+(.zip, .xlsx) and small answers are sent as they are. The page and its files also carry a
+fingerprint (ETag): while they are unchanged a reload gets *304 Not Modified* and nothing is
+downloaded again; after an upgrade the new page loads at once.
+
 ## 8. Troubleshooting
 
 | Problem | Fix |
