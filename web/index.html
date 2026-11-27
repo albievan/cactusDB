@@ -551,7 +551,6 @@
   .prjdesign table { border-collapse: collapse; width: 100%; table-layout: fixed; }
   .prjdesign th, .prjdesign td { padding: 2px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
   .prjdesign th { overflow: visible; }
-  .prjdesign td:last-child { text-overflow: clip; }
   .prjdesign th .colrs { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 4; touch-action: none; }
   .prjdesign th .colrs:hover, .prjdesign th .colrs.on { background: linear-gradient(to right, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px); }
   .prjdesign td > input[type=text], .prjdesign td > select { width: 100% !important; min-width: 0; }
@@ -577,6 +576,10 @@
   dialog.dlg.pqcase { width: min(660px, calc(100vw - 32px)); }
   dialog.pqcase #pqCalcTop .form-label, dialog.pqcase #pqCaseColRow .form-label { margin: 6px 0 2px; font-size: 13px; }
   dialog.pqcase #pqCaseColRow { margin-bottom: 8px; }
+  dialog.pqcase .pqcalcpre { display: flex; align-items: center; gap: 6px; }
+  dialog.pqcase .pqcalcpre .fnchain { color: var(--accent); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  dialog.pqcase .pqcalcpre .fnchain:empty { display: none; }
+  dialog.pqcase .pqcalcpre select { flex: 1; min-width: 0; }
   .pqcaserows { width: 100%; margin-bottom: 8px; border-collapse: collapse; }
   .pqcaserows th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; padding: 2px 4px; }
   .pqcaserows td, .pqcaserows th { border: 0; background: none; }
@@ -594,8 +597,12 @@
   .prjdesign .pqwait { border-color: #d9822b; box-shadow: 0 0 0 1px #d9822b; }
   /* The grip and the column's name and type stay put while the grid scrolls to the right. */
   .prjdesign tr > :nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--panel); width: 16px; min-width: 16px; max-width: 16px; }
-  .prjdesign tr > :nth-child(2) { position: sticky; left: 16px; z-index: 2; background: var(--panel); box-shadow: inset -1px 0 0 var(--border); }
-  .prjdesign thead tr > :nth-child(1), .prjdesign thead tr > :nth-child(2) { z-index: 3; }
+  /* Kept in view on the left: the grip, ↑ × and the column's name. */
+  .prjdesign tr > :nth-child(2) { position: sticky; left: 16px; z-index: 2; background: var(--panel); }
+  .prjdesign tr > :nth-child(3) { position: sticky; left: 68px; z-index: 2; background: var(--panel); box-shadow: inset -1px 0 0 var(--border); }
+  .prjdesign thead tr > :nth-child(-n+3) { z-index: 3; }
+  .prjdesign td.act { padding-left: 0; padding-right: 0; text-overflow: clip; }
+  .prjdesign td.act .btn { padding: 0 4px; }
   .prjdesign .grip { cursor: grab; color: var(--muted); user-select: none; box-sizing: border-box; width: 16px; padding: 2px 0 2px 3px; letter-spacing: -2px; }
   .prjdesign tr.dragging { opacity: .45; }
   .prjdesign tr.dropabove td { box-shadow: inset 0 2px 0 var(--accent); }
@@ -2701,6 +2708,10 @@
     <div id="pqCaseColRow" hidden>
       <label class="form-label" for="pqCaseColSel">Column it works on</label>
       <select class="form-select form-select-sm" id="pqCaseColSel"></select>
+      <div id="pqCalcPreRow" hidden>
+        <label class="form-label" for="pqCalcPre">First apply to the column <span class="hint">(optional: the value the function works with, e.g. its length)</span></label>
+        <div class="pqcalcpre"><span class="fnchain" id="pqCalcPreChain"></span><button type="button" class="btn btn-sm btn-link fnclr" id="pqCalcPreClr" title="Remove the last function" aria-label="Remove the last function" hidden>×</button><select class="form-select form-select-sm" id="pqCalcPre" title="A function on the column first; another one goes around it"></select></div>
+      </div>
     </div>
     <div id="pqCaseBody">
     <p class="sdtext">Each value of <code id="pqCaseCol"></code> shows as what you give it; any other value as <i>Otherwise</i> (empty: NULL). What it shows is a value of your own (typed plainly: text is quoted for you; <code>NULL</code> and a function call stay as they are) or another column's value: pick it in the list beside the box, or type to search the columns.</p>
@@ -5184,6 +5195,14 @@ const prj = { list: [], linkable: [], maxLinks: 10, open: null, orig: "", alias:
 const prjEditable = () => { const o = prj.open; return o ? JSON.stringify({ n: o.name, d: o.description || "", l: o.links.map((l) => [l.connId, l.alias]), t: o.tables, m: o.limits }) : ""; };
 const prjDirty = () => !!prj.open && prjEditable() !== prj.orig;
 function prjMark() {
+  // The Save buttons are green while there is something to save: the query's when
+  // the query changed, the project's when the project or the query changed.
+  if (prj.open) {
+    const qc = prjQChanged(), any = qc || prjDirty();
+    $("prjQSave").classList.toggle("btn-primary", qc); $("prjQSave").classList.toggle("btn-outline-secondary", !qc);
+    $("prjSave").classList.toggle("btn-primary", any); $("prjSave").classList.toggle("btn-outline-secondary", !any);
+    $("prjSave").title = any ? "Save the changes: the project (name, linked databases, tables and limits) and the query in the editor" : "Save the project: name, linked databases, tables and limits (nothing changed)";
+  }
   if (state.tab === "projects") $("tabTitle").textContent = prj.open ? "Project " + prj.open.name + (prjDirty() || prjQDirty() ? " ●" : "") : "";
   prjTitleClose();
   pqSideQueries();
@@ -5476,7 +5495,16 @@ function pqSampleValues(f) {
 // (a name, and CASE or another function). It resolves {c: {w, e} for a CASE, table, col, fn, name}.
 function pqCaseDialog(c, f, opts = {}) {
   let cur = f && !f.expr ? { table: f.table, col: f.col } : null;
-  const num = () => ["int16", "int32", "int64", "decimal", "float32", "float64", "bool"].includes(cur ? pqKind(cur.table, cur.col) : "");
+  // pre: functions applied to the column first (a calculated column): the CASE
+  // works on their result, e.g. CASE LENGTH(c.x) WHEN 4 THEN …
+  let pre = [];
+  const PQ_NUM_FNS = ["LENGTH", "ROUND2", "ROUND0", "ABS", "INT"], PQ_KEEP_FNS = ["ZERO"];
+  const num = () => pre.reduce((n, k) => PQ_NUM_FNS.includes(k) ? true : PQ_KEEP_FNS.includes(k) ? n : false,
+    ["int16", "int32", "int64", "decimal", "float32", "float64", "bool"].includes(cur ? pqKind(cur.table, cur.col) : ""));
+  // The sample values through the functions, where the page can work them out.
+  const JS_FNS = { UPPER: (v) => v.toUpperCase(), LOWER: (v) => v.toLowerCase(), TRIM: (v) => v.trim(), LENGTH: (v) => String([...v].length),
+    ABS: (v) => isNaN(+v) ? null : String(Math.abs(+v)), ROUND0: (v) => isNaN(+v) ? null : String(Math.round(+v)), ROUND2: (v) => isNaN(+v) ? null : String(Math.round(+v * 100) / 100),
+    INT: (v) => isNaN(parseInt(v)) ? null : String(parseInt(v)), TEXT: (v) => v, EMPTY: (v) => v, ZERO: (v) => v };
   const lit = (v) => { v = String(v).trim(); return /^[-+]?0\d/.test(v) || (!num() && /^[-+]?(\d+\.?\d*|\.\d+)$/.test(v)) ? "'" + v + "'" : pqLiteral(v, "="); };
   // What a value shows: a column of the query's tables (picked or typed) stays a column;
   // any other text, even one with a dot (Mr.Smith), is quoted.
@@ -5508,6 +5536,8 @@ function pqCaseDialog(c, f, opts = {}) {
     if (opts.pick && !cur && allCols.length) cur = { table: allCols[0][0], col: allCols[0][1] };
     $("pqCaseColRow").hidden = !opts.pick; $("pqCalcTop").hidden = !opts.calc;
     $("pqCaseColSel").innerHTML = allCols.map(([a, n]) => `<option value="${esc(JSON.stringify([a, n]))}"${cur && pqKey(a) === pqKey(cur.table) && pqKey(n) === pqKey(cur.col) ? " selected" : ""}>${esc(a)}.${esc(n)}</option>`).join("");
+    pre = [];
+    $("pqCalcPre").innerHTML = `<option value="">${"add a function…"}</option>` + PQ_FNS.filter((x) => x.p === undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("");
     if (opts.calc) {
       $("pqCalcName").value = "";
       $("pqCalcFn").innerHTML = `<option value="CASE">CASE: if the value is … then …</option><optgroup label="Functions">${PQ_FNS.filter((x) => x.p === undefined).map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</optgroup>` +
@@ -5517,7 +5547,8 @@ function pqCaseDialog(c, f, opts = {}) {
         `<option value="AGG|MIN">MIN of the column</option><option value="AGG|MAX">MAX of the column</option></optgroup>`;
     }
     const isCase = () => !opts.calc || $("pqCalcFn").value === "CASE";
-    const mode = () => { $("pqCaseBody").hidden = !isCase(); $("pqCaseColRow").hidden = !opts.pick || (opts.calc && $("pqCalcFn").value === "ROWS"); $("pqCaseTitle").textContent = opts.calc ? "Calculated column" : "CASE: if the value is … then …"; };
+    const mode = () => { $("pqCaseBody").hidden = !isCase(); $("pqCaseColRow").hidden = !opts.pick || (opts.calc && $("pqCalcFn").value === "ROWS"); $("pqCaseTitle").textContent = opts.calc ? "Calculated column" : "CASE: if the value is … then …";
+      $("pqCalcPreRow").hidden = !opts.calc || $("pqCalcFn").value.startsWith("AGG|"); };
     mode();
     for (const [w, t] of (c ? c.w : [["", ""]])) row(show(w, lit), show(t, lit2));
     $("pqCaseElse").value = c && c.e ? show(c.e, lit2) : "";
@@ -5525,8 +5556,10 @@ function pqCaseDialog(c, f, opts = {}) {
     // The column's values in the last result: to pick from, and to catch a CASE on the wrong column.
     let vals = [], warned = false;
     const colChanged = () => {
-      $("pqCaseCol").textContent = cur ? (cur.table ? cur.table + "." : "") + cur.col : "";
+      $("pqCaseCol").textContent = cur ? pqFnApply(pre, (cur.table ? cur.table + "." : "") + cur.col) : "";
+      $("pqCalcPreChain").textContent = pqFnText(pre); $("pqCalcPreClr").hidden = !pre.length;
       vals = pqSampleValues(cur); warned = false;
+      if (pre.length) vals = pre.every((k) => JS_FNS[k]) ? [...new Set(vals.map((v) => pre.reduce((x, k) => x == null ? null : JS_FNS[k](x), String(v))).filter((v) => v != null))] : [];
       $("pqCaseVals").innerHTML = vals.slice(0, 200).map((v) => `<option value="${esc(v)}">`).join("");
       $("pqCaseHint").hidden = !vals.length;
       $("pqCaseHint").textContent = vals.length ? `In the last result it holds ${vals.length > 12 ? vals.slice(0, 12).join(", ") + ", …" : vals.join(", ")} (${vals.length}${vals.length >= 200 ? "+" : ""} value${vals.length === 1 ? "" : "s"}).` : "";
@@ -5534,6 +5567,8 @@ function pqCaseDialog(c, f, opts = {}) {
     };
     colChanged();
     const pick = () => { const [a, n] = JSON.parse($("pqCaseColSel").value); cur = { table: a, col: n }; colChanged(); };
+    const preAdd = () => { const k = $("pqCalcPre").value; $("pqCalcPre").value = ""; if (k) { pre.push(k); colChanged(); } };
+    const preClr = () => { pre.pop(); colChanged(); };
     const all = () => {
       const have = new Set([...body.rows].map((r) => r.querySelector("[data-c=w]").value.trim()));
       for (const r of [...body.rows]) if (!r.querySelector("[data-c=w]").value.trim() && !r.querySelector("[data-c=t]").value.trim()) r.remove();
@@ -5550,12 +5585,13 @@ function pqCaseDialog(c, f, opts = {}) {
     };
     const coltype = (ev) => { const t = ev.target; if (t.matches && t.matches("[data-c=t], #pqCaseElse")) t.classList.toggle("iscol", isCol(t.value)); };
     const rm = (ev) => { const b = ev.target.closest("[data-c=rm]"); if (b) { b.closest("tr").remove(); if (!body.rows.length) add(); } };
-    const done = (v) => { d.close(); d.removeEventListener("change", colpick); d.removeEventListener("input", coltype); $("pqCaseColSel").removeEventListener("change", pick); $("pqCalcFn").removeEventListener("change", mode); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); $("pqCaseAll").removeEventListener("click", all); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
+    const done = (v) => { d.close(); d.removeEventListener("change", colpick); d.removeEventListener("input", coltype); $("pqCaseColSel").removeEventListener("change", pick); $("pqCalcPre").removeEventListener("change", preAdd); $("pqCalcPreClr").removeEventListener("click", preClr); $("pqCalcFn").removeEventListener("change", mode); $("pqCaseForm").removeEventListener("submit", ok); $("pqCaseCancel").removeEventListener("click", no); $("pqCaseAdd").removeEventListener("click", add); $("pqCaseAll").removeEventListener("click", all); body.removeEventListener("click", rm); d.removeEventListener("cancel", no); resolve(v); };
     const ok = (ev) => {
       ev.preventDefault();
       if (opts.pick && !cur) { $("pqCaseErr").textContent = "Choose the column it works on"; $("pqCaseErr").hidden = false; return; }
       const name = opts.calc ? $("pqCalcName").value.trim() : "";
-      if (!isCase()) { done({ fn: $("pqCalcFn").value, table: cur.table, col: cur.col, name }); return; }
+      const preOf = () => $("pqCalcPreRow").hidden ? [] : pre.slice();
+      if (!isCase()) { done({ fn: $("pqCalcFn").value, table: cur.table, col: cur.col, name, pre: preOf() }); return; }
       const w = [...body.rows].map((r) => [r.querySelector("[data-c=w]").value.trim(), r.querySelector("[data-c=t]").value.trim()]).filter(([a, b]) => a || b);
       if (!w.length || w.some(([a, b]) => !a || !b)) { $("pqCaseErr").textContent = w.length ? "Each value needs what it becomes (NULL for nothing)" : "Add a value and what it becomes"; $("pqCaseErr").hidden = false; return; }
       const e = $("pqCaseElse").value.trim();
@@ -5565,11 +5601,11 @@ function pqCaseDialog(c, f, opts = {}) {
         $("pqCaseErr").textContent = `None of these values is in ${$("pqCaseCol").textContent} in the last result (${vals.slice(0, 6).join(", ")}${vals.length > 6 ? ", …" : ""}), so every row would show Otherwise. Is it the right column? OK again keeps it.`;
         $("pqCaseErr").hidden = false; return;
       }
-      done({ c: { w: w.map(([a, b]) => [lit(a), lit2(b)]), e: e ? lit2(e) : "" }, fn: "CASE", table: cur && cur.table, col: cur && cur.col, name });
+      done({ c: { w: w.map(([a, b]) => [lit(a), lit2(b)]), e: e ? lit2(e) : "" }, fn: "CASE", table: cur && cur.table, col: cur && cur.col, name, pre: preOf() });
     };
     const no = (ev) => { if (ev) ev.preventDefault(); done(null); };
     d.addEventListener("change", colpick); d.addEventListener("input", coltype);
-    $("pqCaseColSel").addEventListener("change", pick); $("pqCalcFn").addEventListener("change", mode); $("pqCaseForm").addEventListener("submit", ok); $("pqCaseCancel").addEventListener("click", no); $("pqCaseAdd").addEventListener("click", add); $("pqCaseAll").addEventListener("click", all); body.addEventListener("click", rm); d.addEventListener("cancel", no);
+    $("pqCaseColSel").addEventListener("change", pick); $("pqCalcPre").addEventListener("change", preAdd); $("pqCalcPreClr").addEventListener("click", preClr); $("pqCalcFn").addEventListener("change", mode); $("pqCaseForm").addEventListener("submit", ok); $("pqCaseCancel").addEventListener("click", no); $("pqCaseAdd").addEventListener("click", add); $("pqCaseAll").addEventListener("click", all); body.addEventListener("click", rm); d.addEventListener("cancel", no);
     d.showModal(); (opts.calc ? $("pqCalcName") : body.querySelector("input")).focus();
   });
 }
@@ -5699,7 +5735,15 @@ $("prjObjs").addEventListener("input", (ev) => {
 });
 $("prjTblAll").addEventListener("click", () => { for (const it of prj.shown || []) prjToggleTable(it, true); prjRenderTables(); prjMark(); });
 $("prjTblNone").addEventListener("click", () => { for (const it of prj.shown || []) prjToggleTable(it, false); prjRenderTables(); prjMark(); });
-$("prjSave").addEventListener("click", () => prjSave());
+// The project's Save saves everything changed: the project, then the query in the
+// editor (a new one is asked its name first).
+$("prjSave").addEventListener("click", async () => {
+  pqFlush();
+  const q = prjQChanged();
+  if ((prjDirty() || !q) && !(await prjSave())) return;
+  if (q) await prjQSave(false);
+  prjMark();
+});
 $("prjCloseBtn").addEventListener("click", () => prjCloseAsk());
 $("prjTitleClose").addEventListener("click", () => prjCloseAsk());
 $("prjDup").addEventListener("click", async () => {
@@ -6866,6 +6910,7 @@ $("projPane").addEventListener("keydown", (ev) => {
 });
 // The editor: typing redraws the diagram (it never rewrites the text).
 $("prjSql").addEventListener("input", () => {
+  prjMark();
   clearTimeout(pq.timer); pq.timer = setTimeout(pqFromText, 250);
   clearTimeout(pq.htimer); pq.htimer = setTimeout(pqPush, 700);
   pqSugUpdate();
@@ -6977,13 +7022,13 @@ function pqDesign() {
   // Each column has its width (drag the edge of its heading; double-click: back to
   // the default), remembered in this browser; the boxes and lists fill it.
   const rs = (c) => `<span class="colrs" data-c="${c}" title="Drag to resize the column; double-click: its default width" aria-hidden="true"></span>`;
-  const keys = ["grip", "col", "show", "name", "fn", "case", "agg", "group", "sort", ...Array.from({ length: rows }, () => "crit"), "act"];
+  const keys = ["grip", "act", "col", "show", "name", "fn", "case", "agg", "group", "sort", ...Array.from({ length: rows }, () => "crit")];
   const cols = `<colgroup>${keys.map((k) => `<col data-c="${k}">`).join("")}</colgroup>`;
-  const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column${rs("col")}</th><th title="In the output">Show${rs("show")}</th><th>Name in the output${rs("name")}</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function${rs("fn")}</th><th title="CASE: show other values for the column's values ('034' → 'Scale'), built in a form">CASE${rs("case")}</th><th>Total${rs("agg")}</th><th>Group${rs("group")}</th><th>Sort${rs("sort")}</th>` +
-    Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}${rs("crit")}</th>`).join("") + `<th></th></tr>`;
+  const head = `<tr><th class="grip" aria-hidden="true"></th><th class="act"></th><th>Column${rs("col")}</th><th title="In the output">Show${rs("show")}</th><th>Name in the output${rs("name")}</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function${rs("fn")}</th><th title="CASE: show other values for the column's values ('034' → 'Scale'), built in a form">CASE${rs("case")}</th><th>Total${rs("agg")}</th><th>Group${rs("group")}</th><th>Sort${rs("sort")}</th>` +
+    Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}${rs("crit")}</th>`).join("") + `</tr>`;
   const body = m.fields.map((f, i) => {
     const grip = `<td class="grip" draggable="true" title="Drag up or down to change the order of the columns" aria-hidden="true">⋮⋮</td>`;
-    if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${6 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
+    if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td class="act"><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td><td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${6 + rows}"></td></tr>`;
     const ex = !!f.expr;
     const crit = Array.from({ length: rows }, (_, r) => {
       const p = !f.crit.some((x) => x.row === r) && f.pend && f.pend[r];
@@ -6992,7 +7037,8 @@ function pqDesign() {
         `<input type="text" class="form-control form-control-sm${p && p.op && !pqNoValue(p.op) ? " pqwait" : ""}" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" placeholder="value" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
         `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</span></td>`;
     }).join("");
-    return `<tr data-f="${i}">${grip}<td title="${esc(fname(f) + (pqColOf(f.table, f.col) ? " : " + pqColType(pqColOf(f.table, f.col)) : ""))}">${esc(fname(f).slice(0, 60))}${!f.expr && pqColOf(f.table, f.col) ? `<span class="coltype"> : ${esc(pqColType(pqColOf(f.table, f.col)))}</span>` : ""}</td>
+    const act = `<td class="act"><button type="button" class="btn btn-sm btn-link" data-k="up" aria-label="Move up" title="Move up">↑</button><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td>`;
+    return `<tr data-f="${i}">${grip}${act}<td title="${esc(fname(f) + (pqColOf(f.table, f.col) ? " : " + pqColType(pqColOf(f.table, f.col)) : ""))}">${esc(fname(f).slice(0, 60))}${!f.expr && pqColOf(f.table, f.col) ? `<span class="coltype"> : ${esc(pqColType(pqColOf(f.table, f.col)))}</span>` : ""}</td>
       <td><input type="checkbox" data-k="show"${f.show ? " checked" : ""} aria-label="Show ${esc(fname(f))}"></td>
       <td><input type="text" class="form-control form-control-sm" data-k="alias" value="${esc(f.alias)}" size="10" aria-label="Name in the output"></td>
       <td>${ex || f.agg ? "" : pqFnCell(f.fns, "fn")}</td>
@@ -7000,7 +7046,7 @@ function pqDesign() {
       <td>${ex || (f.fns && f.fns.length) ? "" : `<select class="form-select form-select-sm" data-k="agg" aria-label="Total"><option value=""></option>${PQ_AGGS.map((a) => `<option${a === f.agg ? " selected" : ""}>${a}</option>`).join("")}</select>`}</td>
       <td>${ex || f.agg ? "" : `<input type="checkbox" data-k="group"${f.group || pqGroupsRows(m, f) ? " checked" : ""} aria-label="Group by" title="${m.fields.some((x) => x.agg) ? "Group: one row per value, for the totals (GROUP BY)" : "Group: the rows in groups per value, to expand and collapse (choose a Total for one row per group instead)"}">`}</td>
       <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="sort" aria-label="Sort"><option value=""></option><option${f.sort === "ASC" ? " selected" : ""}>ASC</option><option${f.sort === "DESC" ? " selected" : ""}>DESC</option></select>`}</td>
-      ${crit}<td><button type="button" class="btn btn-sm btn-link" data-k="up" aria-label="Move up" title="Move up">↑</button><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td></tr>`;
+      ${crit}</tr>`;
   }).join("");
   box.innerHTML = `<table>${cols}<thead>${head}</thead><tbody>${body}</tbody></table>
     <div class="dfoot">
@@ -7025,7 +7071,7 @@ function pqColWidths() {
   let sum = 0;
   t.querySelectorAll("col").forEach((c) => {
     const k = c.dataset.c;
-    if (k === "act") { c.style.width = "72px"; sum += 72; return; }
+    if (k === "act") { c.style.width = "52px"; sum += 52; return; }
     const w = Math.max(k === "grip" ? 16 : 30, +pqColW[k] || PQ_COLW[k]);
     c.style.width = w + "px"; sum += w;
   });
@@ -7083,7 +7129,7 @@ $("prjDesign").addEventListener("change", (ev) => {
         pqCommit(); return;
       }
       const fn = r.fn === "CASE" ? "CASE|" + JSON.stringify(r.c) : r.fn;
-      m.fields.push({ table: r.table, col: r.col, fns: [fn], show: true, alias: r.name || r.col + "_" + r.fn.split("|")[0].toLowerCase(), agg: "", group: false, sort: "", sortPos: 0, crit: [] });
+      m.fields.push({ table: r.table, col: r.col, fns: [...(r.pre || []), fn], show: true, alias: r.name || r.col + "_" + r.fn.split("|")[0].toLowerCase(), agg: "", group: false, sort: "", sortPos: 0, crit: [] });
       pqCommit();
     });
     return;
@@ -7393,6 +7439,9 @@ function prjQAskMeta(title, name, desc) {
 }
 const prjQState = () => JSON.stringify({ n: $("prjQName").value.trim(), d: $("prjQDesc").value.trim(), s: $("prjSql").value.trim() });
 const prjQDirty = () => !!prj.open && !!prj.qid && prjQState() !== prj.qOrig;
+// prjQChanged: the query in the editor has changes to save (a saved one edited, or
+// a new one written).
+const prjQChanged = () => !!prj.open && prjQState() !== prj.qOrig && (!!prj.qid || $("prjSql").value.trim() !== "");
 const prjQUses = (alias) => prj.queries.filter((q) => new RegExp(`(^|[^\\w."])${alias.replace(/\W/g, "\\$&")}\\s*\\.`, "i").test(q.sql));
 
 async function prjQLoadList(select = prj.qid) {

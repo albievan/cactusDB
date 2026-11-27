@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.62.48 — 2026-11-27
+
+- Advanced query builder: the query's **Save** turns green while the query has changes to
+  save (the project's too, while the project or the query has); the project's Save saves
+  the project and the query in the editor.
+- Advanced query builder, exports: every row of the query (the grid's *Show* doesn't limit
+  them); a query with a `LIMIT` of its own gets `.limited-export` in the file's name. Files
+  are named after the query in CamelCase words joined by dots
+  (`034, 043 - Coded name` → `034.043.Coded.Name_….csv`).
+- Advanced query builder, *Column definitions*: ↑ and × are the first column of each row.
+- Advanced query builder, *Calculated column*: **First apply to the column**: functions on
+  the column before the CASE or function works on it, e.g. `CASE LENGTH(o.rep_a) WHEN 7 …`.
+
 ## 1.62.47 — 2026-11-27
 
 - Advanced query builder, exports: the column names in the files have no spaces and are

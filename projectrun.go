@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Running a project query: the rows it needs are read from each source
@@ -789,9 +791,12 @@ func (s *server) exportProjectResult(r *http.Request, ctx context.Context, proje
 		formats = []string{"xlsx", "csv", "xml", "json"}
 	}
 	dir := filepath.Join(s.exportFolder(), projectsSubdir, connFolderName(project))
-	base = strings.TrimSpace(base)
-	if base == "" {
-		base = "query"
+	// The file's name: the query's name in CamelCase words joined by dots
+	// ("034, 043 - Coded Name" → 034.043.Coded.Name), and .limited-export when the
+	// query has a LIMIT of its own (otherwise every row is exported).
+	base = exportFileBase(base)
+	if queryHasLimit(ran) {
+		base += ".limited-export"
 	}
 	var files []map[string]any
 	groups := projectGroupRows(ran) // "-- group rows by": the exports keep the groups
@@ -813,6 +818,42 @@ func (s *server) exportProjectResult(r *http.Request, ctx context.Context, proje
 		files = append(files, map[string]any{"path": path, "file": filepath.Base(path), "folder": filepath.Dir(path), "rows": rows, "download": downloadURL(path)})
 	}
 	return files, nil
+}
+
+// exportFileBase is a query's name as an export's file name: its words (letters
+// and digits; spaces and punctuation between them dropped) each starting with a
+// capital, joined by dots. "034, 043 - Coded name" → "034.043.Coded.Name".
+func exportFileBase(name string) string {
+	words := strings.FieldsFunc(name, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	for i, w := range words {
+		r, n := utf8.DecodeRuneInString(w)
+		words[i] = string(unicode.ToUpper(r)) + w[n:]
+	}
+	if len(words) == 0 {
+		return "Query"
+	}
+	return strings.Join(words, ".")
+}
+
+// queryHasLimit says whether a query limits its rows itself: a LIMIT of the
+// outer query (one in a subquery doesn't count).
+func queryHasLimit(q string) bool {
+	toks, err := ptokens(q)
+	if err != nil {
+		return false
+	}
+	depth := 0
+	for _, t := range toks {
+		switch {
+		case t.kind == 'p' && t.text == "(":
+			depth++
+		case t.kind == 'p' && t.text == ")":
+			depth--
+		case depth == 0 && t.is("LIMIT"):
+			return true
+		}
+	}
+	return false
 }
 
 // findProjectExport finds an export of a project in the export folders

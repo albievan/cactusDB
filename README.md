@@ -1113,6 +1113,10 @@ than 15 digits).
   `This Is A Col` is written `thisisacol`, as an Excel or CSV heading, a JSON key and an
   XML `name`; the grid and the query keep the name as written. Two names that become the
   same are kept apart (`ab`, `ab_2`).
+  An export holds **every row** the query returns (*Show n rows* is for the grid only),
+  unless the query has a `LIMIT` of its own: then the file's name says so
+  (`….limited-export_…`). A file is named after the query, its words in CamelCase joined by
+  dots: `034, 043 - Coded name` → `034.043.Coded.Name_20261127-150000.csv`.
 
 **The query designer.** The SQL sits above the diagram; they are two views of one query:
 typing redraws the diagram, and every change in the diagram rewrites the SQL (one clause
@@ -1187,7 +1191,10 @@ per line). Each is as tall as you drag its bottom-right corner.
   count or add up per group: *Number of rows* (`COUNT(*) AS Count`), or COUNT, SUM, AVG,
   MIN or MAX of a column. The columns ticked **Group** then become `GROUP BY`, one row per
   group with its count; a shown column neither grouped nor a total shows one value of its
-  group, and cactusdb says which.
+  group, and cactusdb says which. **First apply to the column** puts functions on the
+  column before the function works on it: LENGTH, then CASE gives
+  `CASE LENGTH(o.rep_a) WHEN 7 THEN 'Seven' ELSE 'Other' END` (the values are numbers then,
+  as LENGTH gives; the values of the last result shown are worked out the same way).
 - **CASE** (the **CASE** column of *Column definitions*, or *if the value is … then …* in
   the **ƒ** list; it shows as *CASE (2)*, click to change it, × removes it) turns a column's values into
   others: a form takes each value and what it becomes, and *Otherwise* for the rest (empty:
@@ -1244,6 +1251,12 @@ shorter (a double-click: back to its default height, also remembered), and the s
 **New query** button beside the heading starts a new query, as *New* in *Query* does. The
 fold buttons (▸ Query, SQL, Diagram, Column definitions, Results and export) are bold,
 like *Databases and tables*.
+
+**Saving.** The query's **Save** (and the project's, in its bar) turns green while there is
+something to save. The project's Save saves everything changed: the project (name,
+databases, tables, limits), then the query in the editor (a new one is asked its name
+first). In *Column definitions* each row starts with **↑** (move up) and **×** (remove),
+kept in view on the left with the column's name.
 
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
 diagram's layout. The icon buttons beside it: **Refresh** (reads the saved queries again:
