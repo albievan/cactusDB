@@ -601,6 +601,9 @@
   #prjSideQueries .q small { color: var(--muted); font-weight: 400; }
   #prjSideQueries .empty { font-size: 12px; color: var(--muted); padding: 2px 8px; margin: 0; }
   #prjSide h2.prjsidetables { margin-top: 12px; }
+  #prjSide .prjsidefold { display: inline-flex; align-items: center; gap: 4px; }
+  #prjSide.fold-q .sfold-q, #prjSide.fold-t .sfold-t { display: none !important; }
+  #prjSide.fold-t #prjSideQueries { max-height: none; }
   #prjSideList .grp { font-size: 12px; font-weight: 600; margin: 8px 0 2px; display: flex; align-items: center; gap: 6px; }
   #prjSideList .grp i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
   #prjSideList .tb { font-size: 13px; padding: 2px 8px; border-radius: 4px; cursor: grab; user-select: none; }
@@ -1468,12 +1471,12 @@
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators: open <b>☰ Connections</b> below.</p></div>
     </section>
     <section class="box" id="prjSide" hidden aria-label="Queries and tables of the project">
-      <h2><span class="prjsidetitle">Project queries</span><span id="prjSideQCount"></span></h2>
-      <p class="hint">Click a query to open it in the editor.</p>
-      <div id="prjSideQueries" role="list" aria-label="The project's saved queries"></div>
-      <h2 class="prjsidetables"><span class="prjsidetitle">Project tables</span><span id="prjSideCount"></span></h2>
-      <p class="hint">Drag a table onto the query designer, or double-click it.</p>
-      <div id="prjSideList"></div>
+      <h2><button type="button" class="prjfold prjsidefold" data-sfold="q" aria-expanded="true" aria-controls="prjSideQHint prjSideQueries" title="Show or hide the project's queries"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span class="prjsidetitle">Project queries</span></button><span id="prjSideQCount"></span></h2>
+      <p class="hint sfold-q" id="prjSideQHint">Click a query to open it in the editor.</p>
+      <div id="prjSideQueries" class="sfold-q" role="list" aria-label="The project's saved queries"></div>
+      <h2 class="prjsidetables"><button type="button" class="prjfold prjsidefold" data-sfold="t" aria-expanded="true" aria-controls="prjSideTHint prjSideList" title="Show or hide the project's tables"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span class="prjsidetitle">Project tables</span></button><span id="prjSideCount"></span></h2>
+      <p class="hint sfold-t" id="prjSideTHint">Drag a table onto the query designer, or double-click it.</p>
+      <div id="prjSideList" class="sfold-t"></div>
     </section>
     <!-- Connections and settings live in a pop-up menu, opened from the bar at
          the bottom, so the sidebar shows only the database's objects. -->
@@ -1737,8 +1740,8 @@
           <span class="spacer"></span>
           <span class="iconbtns">
           <button class="btn btn-sm btn-primary" id="prjSave" title="Save the project: name, linked databases, tables and limits" aria-label="Save the project"><i class="bi bi-floppy" aria-hidden="true"></i></button>
-          <button class="btn btn-sm btn-outline-secondary" id="prjPwBtn" title="Project password: one password that opens the project and connects every database it links" aria-label="Project password"><i class="bi bi-key" aria-hidden="true"></i></button>
-          <button class="btn btn-sm btn-outline-secondary" id="prjDup" title="Duplicate: save a copy of this project under another name" aria-label="Duplicate the project"><i class="bi bi-copy" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjPwBtn" hidden title="Project password: one password that opens the project and connects every database it links" aria-label="Project password"><i class="bi bi-key" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" id="prjDup" hidden title="Duplicate: save a copy of this project under another name" aria-label="Duplicate the project"><i class="bi bi-copy" aria-hidden="true"></i></button>
           <span class="prjqall" role="group" aria-label="Export all queries">
             <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="xlsx" data-label="Excel" title="Export all queries: run each saved query (its latest version) and export every row to Excel" aria-label="Export all queries to Excel"><i class="bi bi-filetype-xlsx fmt-xlsx" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="csv" data-label="CSV" title="Export all queries: run each saved query (its latest version) and export every row to CSV" aria-label="Export all queries to CSV"><i class="bi bi-filetype-csv fmt-csv" aria-hidden="true"></i></button>
@@ -1746,7 +1749,7 @@
             <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="xml" data-label="XML" title="Export all queries: run each saved query (its latest version) and export every row to XML" aria-label="Export all queries to XML"><i class="bi bi-filetype-xml fmt-xml" aria-hidden="true"></i></button>
             <button class="btn btn-sm btn-link exp-icon qallexp" data-qfmt="all" data-label="all four formats" title="Export all queries: run each saved query (its latest version) and export every row to Excel, CSV, JSON and XML" aria-label="Export all queries to all four formats"><i class="bi bi-files fmt-all" aria-hidden="true"></i></button>
           </span>
-          <button class="btn btn-sm btn-outline-danger" id="prjDel" title="Delete this project and its queries (asks first)" aria-label="Delete the project"><i class="bi bi-trash" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-outline-danger" id="prjDel" hidden title="Delete this project and its queries (asks first)" aria-label="Delete the project"><i class="bi bi-trash" aria-hidden="true"></i></button>
           <button class="btn btn-sm btn-outline-secondary" id="prjCloseBtn" title="Close the project: disconnect its databases" aria-label="Close the project"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
           </span>
         </div>
@@ -5180,7 +5183,7 @@ async function prjShow() {
   }).join("") + `</span>`;
   $("prjList").innerHTML = `<thead><tr><th></th><th>Project</th><th>Databases linked</th><th class="num">Queries</th><th>Created</th><th>Changed</th></tr></thead><tbody>` +
     (prj.list.length ? prj.list.map((p) => `<tr data-id="${p.id}">
-      <td class="act"><span class="iconbtns">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}${qall(p)}<span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></span></td>
+      <td class="act"><span class="iconbtns">${ib("open", p.id, "bi-box-arrow-in-right", "Open the project: connect its databases", "btn-primary")}${qall(p)}<span class="btn-group btn-group-sm" role="group" aria-label="${esc(p.name)}">${ib("edit", p.id, "bi-pencil", "Edit: open the project to change its name, databases and tables")}${ib("pw", p.id, "bi-key", "Project password: open the project and set the one password that opens it and connects every database it links")}${ib("dup", p.id, "bi-copy", "Duplicate: open the project and save a copy of it")}${ib("del", p.id, "bi-trash", "Delete: open the project and delete it (asks first)", "btn-outline-danger")}</span></span></td>
       <td class="pn">${esc(p.name)}${p.hasPassword ? ` <i class="bi bi-key muted" title="Opens with its project password" aria-label="has a project password"></i>` : ""}</td>
       <td class="pd" title="${esc(p.connIds.map(name).join("\n"))}"><span class="badge rounded-pill text-bg-secondary">${p.connIds.length}</span> ${p.connIds.length ? esc(p.connIds.map(name).join(" · ")) : `<span class="muted">none yet</span>`}</td>
       <td class="num">${(p.queries || 0).toLocaleString()}</td>
@@ -5585,6 +5588,7 @@ $("prjList").addEventListener("click", async (ev) => {
   await prjOpen(id);
   if (!prj.open || prj.open.id !== id) return;
   if (b.dataset.prjact === "edit") { $("prjSetupWrap").open = true; $("prjName").focus(); $("prjName").select(); }
+  else if (b.dataset.prjact === "pw") $("prjPwBtn").click();
   else if (b.dataset.prjact === "dup") $("prjDup").click();
   else if (b.dataset.prjact === "del") $("prjDel").click();
   else if (b.dataset.prjact === "qall") prjQAllExport(b.dataset.qfmt, b.dataset.label);
@@ -7193,6 +7197,19 @@ $("prjSideQueries").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-qid]");
   if (!b || +b.dataset.qid === prj.qid) return;
   prjQOpen(+b.dataset.qid);
+});
+// Fold the project's queries or tables in the left panel; remembered in this browser.
+const PRJ_SIDE_FOLD_KEY = "cactusdb.prjSideFold";
+function prjSideFold(name, folded) {
+  $("prjSide").classList.toggle("fold-" + name, folded);
+  $("prjSide").querySelector(`[data-sfold="${name}"]`).setAttribute("aria-expanded", String(!folded));
+}
+try { for (const n of JSON.parse(localStorage.getItem(PRJ_SIDE_FOLD_KEY) || "[]")) if (n === "q" || n === "t") prjSideFold(n, true); } catch (e) { /* all open */ }
+$("prjSide").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-sfold]");
+  if (!b) return;
+  prjSideFold(b.dataset.sfold, !$("prjSide").classList.contains("fold-" + b.dataset.sfold));
+  try { localStorage.setItem(PRJ_SIDE_FOLD_KEY, JSON.stringify(["q", "t"].filter((n) => $("prjSide").classList.contains("fold-" + n)))); } catch (e) { /* not remembered */ }
 });
 $("prjSideList").addEventListener("dragstart", (ev) => { const t = ev.target.closest(".tb"); if (t) ev.dataTransfer.setData("text/x-pqtable", t.dataset.db + "\u0000" + t.dataset.name); });
 $("prjSideList").addEventListener("dblclick", (ev) => { const t = ev.target.closest(".tb"); if (t) pqAddTable(t.dataset.db, t.dataset.name); });

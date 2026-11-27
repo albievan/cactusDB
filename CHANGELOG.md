@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.62.45 — 2026-11-27
+
+- Advanced query builder: the open project's bar keeps only Save, the *Export all queries*
+  icons and Close. Project password (🔑), duplicate and delete are in each row of the
+  projects list (the password button is new there).
+- Advanced query builder: the *Project queries* and *Project tables* headings in the left
+  panel fold their list away and open it again; the browser remembers which are folded.
+
 ## 1.62.44 — 2026-11-26
 
 - Advanced query builder: **Export all queries** runs the queries several at once, one per CPU

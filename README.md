@@ -1040,11 +1040,12 @@ only ever reads them.
 
 1. **New project** (**+**): a form asks for its name and a description. Projects are kept
    in `cactus.conn.db`, sealed (see below); they refer to your saved connections. The
-   projects are listed in a grid: **open**, **edit**, **duplicate** and **delete** first
-   (the last three open the project, then act), the name (🔑 when it has a project
+   projects are listed in a grid: **open**, the *Export all queries* icons, then **edit**,
+   **project password** (🔑), **duplicate** and **delete** (these open the project, then
+   act; the open project's bar keeps only Save, the export icons and Close), the name (🔑 when it has a project
    password), the databases linked, the number of saved queries, when it was created and
    last changed.
-   - **Project password** (🔑 in an open project): one password that opens the project and
+   - **Project password** (🔑 in the projects list): one password that opens the project and
      connects every database it links, without asking their own passwords. Setting it
      needs those passwords once (they are asked for where the page doesn't know them):
      the project password keeps them, sealed with a key derived from it (Argon2id) and
@@ -1216,7 +1217,7 @@ per line). Each is as tall as you drag its bottom-right corner.
   *Read in … · n tables* folds the rows read per table, leaving the line with the rows
   the query returned. The browser remembers which are folded.
 
-**Export all queries.** The export icons in the project's bar, before *Delete*, and in each
+**Export all queries.** The export icons in the project's bar, before ✕ (Close), and in each
 row of the projects list, as a group of their own right after *Open* (Excel, CSV, JSON, XML,
 all four; from the list, the project is opened first), run every saved query of the project at its latest version and export all its rows, one file
 per query and format (in the project's export folder, also on the *Exported files* page).
@@ -1228,7 +1229,9 @@ them all. The query in the editor and its result in the grid are left as they ar
 
 **Project queries** in the left panel: while a project is open, its saved queries (and only
 its own) are listed above *Project tables*, with their version; a click opens one in the
-editor (asking first to save changes to the query there), and the one open is highlighted.
+editor (asking first to save changes to the query there), and the one open is highlighted. A click
+on the *Project queries* or *Project tables* heading folds that list away (▾), or opens it
+again; the browser remembers which are folded.
 
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
 diagram's layout. The icon buttons beside it: **Refresh** (reads the saved queries again:
