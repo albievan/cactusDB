@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/xuri/excelize/v2"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -126,6 +127,43 @@ ORDER BY o.id`
 			t.Errorf("export file: %v %v", fi, err)
 		}
 	}
+
+	// The column names in the files: no spaces and lowercase (thisisacol), in
+	// every format; the grid keeps them as written.
+	nq := `SELECT o.id AS "This Is A Col", o.total AS "Order  Total" FROM maria.orders o ORDER BY o.id`
+	if st = run(nq); toJSON(st["result"].(map[string]any)["columns"]) != `["This Is A Col","Order  Total"]` {
+		t.Errorf("grid names: %v", st["result"].(map[string]any)["columns"])
+	}
+	ex = call("POST", "/api/project/export", map[string]any{"project": ps, "sql": nq, "format": "all", "name": "names"}, 200)
+	for _, f := range ex["files"].([]any) {
+		p := f.(map[string]any)["path"].(string)
+		var head string
+		if strings.HasSuffix(p, ".xlsx") {
+			xf, err := excelize.OpenFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a, _ := xf.GetCellValue(xf.GetSheetList()[0], "A1")
+			b, _ := xf.GetCellValue(xf.GetSheetList()[0], "B1")
+			xf.Close()
+			head = a + "," + b
+		} else {
+			raw, _ := os.ReadFile(p)
+			head = string(raw)
+		}
+		want := map[string][]string{".csv": {"thisisacol,ordertotal"}, ".xlsx": {"thisisacol,ordertotal"},
+			".json": {`"thisisacol": 10`, `"ordertotal":`}, ".xml": {`name="thisisacol"`, `name="ordertotal"`}}[filepath.Ext(p)]
+		for _, w := range want {
+			if !strings.Contains(head, w) {
+				t.Errorf("%s: no %q in %.200s", filepath.Base(p), w, head)
+			}
+		}
+		if strings.Contains(head, "This Is") || strings.Contains(head, "Order  Total") {
+			t.Errorf("%s: a name with spaces: %.200s", filepath.Base(p), head)
+		}
+	}
+
+	run(`SELECT * FROM maria.orders ORDER BY id`) // the grid's query again, for the exports below
 
 	// Export all queries: several at once, each on its own copy; one that
 	// fails doesn't stop the others, and the grid's run is left as it was.

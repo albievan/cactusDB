@@ -134,6 +134,7 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 		bw.WriteString("\xEF\xBB\xBF") // BOM so Excel detects UTF-8
 		cw := csv.NewWriter(bw)
 		err := streamQuery(ctx, engine, db, q, func(cols []string) error {
+			cols = exportColNames(ctx, "csv", cols)
 			head := make([]string, len(cols))
 			for i, c := range cols {
 				head[i] = csvText(c)
@@ -166,7 +167,7 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 		var keys [][]byte
 		bw.WriteString("[")
 		err := streamQuery(ctx, engine, db, q, func(cols []string) error {
-			for _, c := range cols {
+			for _, c := range exportColNames(ctx, "json", cols) {
 				k, err := marshalJSON(c)
 				if err != nil {
 					return err
@@ -210,7 +211,7 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 		xml.EscapeText(bw, []byte(name))
 		bw.WriteString("\">\n")
 		err := streamQuery(ctx, engine, db, q, func(c []string) error {
-			cols = c
+			cols = exportColNames(ctx, "xml", c)
 			return nil
 		}, func(row []any) (bool, error) {
 			n++
@@ -242,6 +243,39 @@ func export(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, form
 	return 0, fmt.Errorf("unknown export format %q", format)
 }
 
+// compactNamesKey marks an export (of a project query) whose column names are
+// written without spaces and in lowercase ("This Is A Col" → "thisisacol"),
+// in every format: Excel and CSV headings, JSON keys, XML names. Only the file
+// changes: the query and its result keep their names.
+type compactNamesKey struct{}
+
+func withCompactNames(ctx context.Context) context.Context {
+	return context.WithValue(ctx, compactNamesKey{}, true)
+}
+
+// exportColNames gives the column names an export of format writes.
+func exportColNames(ctx context.Context, format string, cols []string) []string {
+	if on, _ := ctx.Value(compactNamesKey{}).(bool); !on {
+		return cols
+	}
+	out := make([]string, len(cols))
+	seen := map[string]bool{}
+	for i, c := range cols {
+		n := strings.ToLower(strings.Join(strings.Fields(c), ""))
+		if n == "" {
+			n = fmt.Sprintf("column%d", i+1)
+		}
+		// Two names that become one ("A B", "AB") stay apart: ab, ab_2.
+		base := n
+		for k := 2; seen[strings.ToLower(n)]; k++ {
+			n = fmt.Sprintf("%s_%d", base, k)
+		}
+		seen[strings.ToLower(n)] = true
+		out[i] = n
+	}
+	return out
+}
+
 func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, name string, progress func(rows int)) (int, error) {
 	xf := excelize.NewFile()
 	defer xf.Close()
@@ -258,6 +292,7 @@ func exportXLSX(ctx context.Context, w io.Writer, engine string, db *sql.DB, q, 
 	bold, _ := xf.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
 	n := 0
 	err = streamQuery(ctx, engine, db, q, func(cols []string) error {
+		cols = exportColNames(ctx, "xlsx", cols)
 		hdr := make([]any, len(cols))
 		for i, c := range cols {
 			hdr[i] = excelize.Cell{Value: c, StyleID: bold}

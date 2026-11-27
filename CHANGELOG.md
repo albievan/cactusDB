@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.47 — 2026-11-27
+
+- Advanced query builder, exports: the column names in the files have no spaces and are
+  lowercase, in every format (*Name in the output* `This Is A Col` → `thisisacol` as the
+  Excel or CSV heading, JSON key and XML name); the grid and the query keep the name as
+  written. Two names that become the same are kept apart (`ab`, `ab_2`).
+- Advanced query builder, left panel: the list of project tables scrolls on its own in the
+  panel's height, like the list of queries.
+
 ## 1.62.46 — 2026-11-27
 
 - Advanced query builder, *Column definitions*: columns are resized by dragging the edge of

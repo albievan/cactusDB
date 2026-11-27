@@ -138,13 +138,13 @@ func exportGroupedToDir(ctx context.Context, dir string, db *sql.DB, q, format, 
 	return writeExportFile(dir, name, ext, func(w io.Writer) (int, error) {
 		switch format {
 		case "csv":
-			return len(all), groupedCSV(w, cols, idx, tree)
+			return len(all), groupedCSV(w, exportColNames(ctx, "csv", cols), idx, tree)
 		case "json":
-			return len(all), groupedJSON(w, cols, idx, tree)
+			return len(all), groupedJSON(w, exportColNames(ctx, "json", cols), idx, tree)
 		case "xml":
-			return len(all), groupedXML(w, cols, idx, tree, name)
+			return len(all), groupedXML(w, exportColNames(ctx, "xml", cols), idx, tree, name)
 		case "xlsx":
-			return len(all), groupedXLSX(w, cols, idx, tree, name)
+			return len(all), groupedXLSX(w, exportColNames(ctx, "xlsx", cols), idx, tree, name)
 		}
 		return 0, fmt.Errorf("unknown export format %q", format)
 	})

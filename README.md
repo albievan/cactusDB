@@ -1109,6 +1109,10 @@ than 15 digits).
   Excel, CSV, JSON, XML and all four formats) hold exactly the rows shown, all of them. Exports go to
   `<export folder>/projects/<project>/xlsx|csv|xml|json/` and appear under *Exported
   files*; each file's path is shown with a **Download** button (⤓, before it).
+  In the files the column names have no spaces and are lowercase: *Name in the output*
+  `This Is A Col` is written `thisisacol`, as an Excel or CSV heading, a JSON key and an
+  XML `name`; the grid and the query keep the name as written. Two names that become the
+  same are kept apart (`ab`, `ab_2`).
 
 **The query designer.** The SQL sits above the diagram; they are two views of one query:
 typing redraws the diagram, and every change in the diagram rewrites the SQL (one clause
@@ -1234,7 +1238,8 @@ them all. The query in the editor and its result in the grid are left as they ar
 its own) are listed above *Project tables*, with their version; a click opens one in the
 editor (asking first to save changes to the query there), and the one open is highlighted. A click
 on the *Project queries* or *Project tables* heading folds that list away (▾), or opens it
-again; the browser remembers which are folded. The line under the queries is dragged to make their list taller or
+again; the browser remembers which are folded. Each list scrolls on its own: the queries as tall as set, the
+tables in the rest of the panel's height. The line under the queries is dragged to make their list taller or
 shorter (a double-click: back to its default height, also remembered), and the small
 **New query** button beside the heading starts a new query, as *New* in *Query* does. The
 fold buttons (▸ Query, SQL, Diagram, Column definitions, Results and export) are bold,

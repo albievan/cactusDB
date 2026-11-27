@@ -783,6 +783,7 @@ func (s *server) handleProjectExport(w http.ResponseWriter, r *http.Request) {
 // its read-only connection qdb) as format (xlsx, csv, xml, json or all) to
 // <export folder>/projects/<project>/<format>/.
 func (s *server) exportProjectResult(r *http.Request, ctx context.Context, project string, qdb *sql.DB, ran, format, base string) ([]map[string]any, error) {
+	ctx = withCompactNames(ctx) // "This Is A Col" is thisisacol in the files
 	formats := []string{format}
 	if format == "all" {
 		formats = []string{"xlsx", "csv", "xml", "json"}
