@@ -548,13 +548,30 @@
   .pq-drag { stroke: var(--accent, #2f6f4f); stroke-width: 2; stroke-dasharray: 4 3; fill: none; pointer-events: none; }
   .prjdesign { overflow: auto; resize: vertical; min-height: 60px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
   .prjdesign[hidden] { display: none; }
-  .prjdesign table { border-collapse: collapse; width: 100%; }
-  .prjdesign th, .prjdesign td { padding: 2px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+  .prjdesign table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  .prjdesign th, .prjdesign td { padding: 2px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  .prjdesign th { overflow: visible; }
+  .prjdesign td:last-child { text-overflow: clip; }
+  .prjdesign th .colrs { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 4; touch-action: none; }
+  .prjdesign th .colrs:hover, .prjdesign th .colrs.on { background: linear-gradient(to right, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px); }
+  .prjdesign td > input[type=text], .prjdesign td > select { width: 100% !important; min-width: 0; }
+  .prjdesign .fncell, .prjdesign .critcell { display: flex !important; width: 100%; min-width: 0; }
+  .prjdesign .critcell > select[data-k=op] { flex: 1 1 40%; min-width: 96px; }
+  .prjdesign .critcell > input { flex: 1 1 60%; min-width: 30px; width: auto !important; }
+  .prjdesign .fncell > select.fnadd { flex: 1 1 auto; min-width: 46px; }
+  .prjdesign .fncell > .fnchain { flex: 0 1 auto; min-width: 0; }
+  .prjdesign .critcell > .fncell { flex: 0 0 auto; width: auto; }
+  .prjdesign .critcell > .fncell > select.fnadd { flex: 0 0 46px; }
+  .prjdesign select[data-k=op]:invalid { color: var(--muted); }
+  .prjdesign select[data-k=op] option { color: var(--bs-body-color); }
   .prjdesign th { position: sticky; top: 0; background: var(--panel); font-weight: 600; z-index: 1; }
   .prjdesign input[type=text], .prjdesign select { font-size: 12px; padding: 0 4px; height: 24px; width: auto; display: inline-block; vertical-align: middle; }
   .prjdesign select.form-select { padding-right: 22px; background-position: right 4px center; }
   .prjdesign td input[data-k=val] { margin-left: 3px; }
-  .prjdesign .dfoot { display: flex; gap: 12px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
+  .prjdesign .dfoot { display: flex; gap: 14px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
+  .prjdesign .dfoot > label { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 0; min-height: 0; line-height: 24px; }
+  .prjdesign .dfoot .form-check-input { float: none; margin: 0; }
+  .prjdesign .dfoot #pqLimit { width: 70px !important; }
   .prjdesign .ro { color: var(--muted); padding: 6px; }
   .prjdesign .coltype { color: var(--muted); font-size: 11px; }
   dialog.dlg.pqcase { width: min(660px, calc(100vw - 32px)); }
@@ -587,13 +604,18 @@
   .prjdesign .fnchain { font-size: 11px; color: var(--accent); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
   .prjdesign .fnchain:empty { display: none; }
   .prjdesign .fnchain.editable { cursor: pointer; text-decoration: underline dotted; }
-  .prjdesign select.fnadd { width: 46px !important; padding-right: 14px; }
+  .prjdesign select.fnadd { padding-right: 14px; }
   .prjdesign .fnclr { padding: 0 3px; }
   .prjjrow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; margin-bottom: 8px; }
   #prjJPairs .pr { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; margin-bottom: 4px; }
   #prjJWarn { color: var(--danger, #c0392b); }
   #prjSide .prjsidetitle { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  #prjSideQueries { max-height: 35vh; overflow: auto; margin-bottom: 4px; }
+  #prjSideQueries { max-height: 35vh; overflow: auto; }
+  #prjSideQueries.sized { max-height: none; }
+  #prjSide .prjsidesplit { height: 7px; margin: 0 0 4px; cursor: row-resize; touch-action: none; border-bottom: 1px solid var(--border); }
+  #prjSide .prjsidesplit:hover, #prjSide .prjsidesplit.on { border-bottom: 2px solid var(--accent); }
+  #prjSide .prjsideqr { display: inline-flex; align-items: center; gap: 6px; }
+  #prjSide .prjsidenew { --bs-btn-padding-x: 4px; --bs-btn-padding-y: 0; font-size: 12px; line-height: 18px; }
   #prjSideQueries .q { display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left; font-size: 13px; padding: 2px 8px; border: 0; border-radius: 4px; background: none; color: inherit; }
   #prjSideQueries .q:hover, #prjSideQueries .q:focus-visible { background: var(--row-hover); outline: none; }
   #prjSideQueries .q.on { background: var(--row-hover); color: var(--accent); font-weight: 600; }
@@ -603,7 +625,7 @@
   #prjSide h2.prjsidetables { margin-top: 12px; }
   #prjSide .prjsidefold { display: inline-flex; align-items: center; gap: 4px; }
   #prjSide.fold-q .sfold-q, #prjSide.fold-t .sfold-t { display: none !important; }
-  #prjSide.fold-t #prjSideQueries { max-height: none; }
+  #prjSide.fold-t #prjSideQueries:not(.sized) { max-height: none; }
   #prjSideList .grp { font-size: 12px; font-weight: 600; margin: 8px 0 2px; display: flex; align-items: center; gap: 6px; }
   #prjSideList .grp i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
   #prjSideList .tb { font-size: 13px; padding: 2px 8px; border-radius: 4px; cursor: grab; user-select: none; }
@@ -611,7 +633,10 @@
   .prjprog { font-size: 12px; display: grid; gap: 2px; }
   .prjprog .bad { color: var(--danger, #c0392b); white-space: pre-wrap; }
   .prjfold { border: 0; background: none; padding: 0 2px; cursor: pointer; color: inherit; }
-  .prjfold .bi { display: inline-block; font-size: 11px; transition: transform .15s; }
+  .prjfold { font-weight: 700; }
+  .prjfold.flabel, #prjSide .prjsidefold, #prjSide .prjsidefold .prjsidetitle { color: var(--bs-body-color); font-weight: 700; }
+  .prjfold.flabel { font-size: 13px; text-transform: none; letter-spacing: 0; }
+  .prjfold .bi { display: inline-block; font-size: 10px; transition: transform .15s; }
   .prjfold[aria-expanded=false] .bi { transform: rotate(-90deg); }
   .prjfold:hover { color: var(--accent, #2f6f4f); }
   .prjfoldbar[hidden] { display: none; }
@@ -1471,10 +1496,11 @@
       <div id="objTree"><p class="empty">Connect to a database to see its tables, views, procedures, triggers, generators: open <b>☰ Connections</b> below.</p></div>
     </section>
     <section class="box" id="prjSide" hidden aria-label="Queries and tables of the project">
-      <h2><button type="button" class="prjfold prjsidefold" data-sfold="q" aria-expanded="true" aria-controls="prjSideQHint prjSideQueries" title="Show or hide the project's queries"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span class="prjsidetitle">Project queries</span></button><span id="prjSideQCount"></span></h2>
+      <h2><button type="button" class="prjfold prjsidefold" data-sfold="q" aria-expanded="true" aria-controls="prjSideQHint prjSideQueries" title="Show or hide the project's queries"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> <span class="prjsidetitle">Project queries</span></button><span class="prjsideqr"><button type="button" class="btn btn-sm btn-outline-secondary prjsidenew" id="prjSideNew" title="New query: give it a name, then write it" aria-label="New query"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i></button><span id="prjSideQCount"></span></span></h2>
       <p class="hint sfold-q" id="prjSideQHint">Click a query to open it in the editor.</p>
       <div id="prjSideQueries" class="sfold-q" role="list" aria-label="The project's saved queries"></div>
-      <h2 class="prjsidetables"><button type="button" class="prjfold prjsidefold" data-sfold="t" aria-expanded="true" aria-controls="prjSideTHint prjSideList" title="Show or hide the project's tables"><i class="bi bi-chevron-down" aria-hidden="true"></i> <span class="prjsidetitle">Project tables</span></button><span id="prjSideCount"></span></h2>
+      <div class="prjsidesplit sfold-q" id="prjSideSplit" role="separator" aria-orientation="horizontal" aria-label="Resize the list of queries" title="Drag to make the list of queries taller or shorter; double-click: its default height"></div>
+      <h2 class="prjsidetables"><button type="button" class="prjfold prjsidefold" data-sfold="t" aria-expanded="true" aria-controls="prjSideTHint prjSideList" title="Show or hide the project's tables"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> <span class="prjsidetitle">Project tables</span></button><span id="prjSideCount"></span></h2>
       <p class="hint sfold-t" id="prjSideTHint">Drag a table onto the query designer, or double-click it.</p>
       <div id="prjSideList" class="sfold-t"></div>
     </section>
@@ -1790,7 +1816,7 @@
         </details>
         <div class="prjquery">
           <div class="prjqbar">
-            <button type="button" class="prjfold flabel" data-fold="query" aria-expanded="true" aria-controls="prjQMeta prjSplit" title="Show or hide the SQL and the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Query</button>
+            <button type="button" class="prjfold flabel" data-fold="query" aria-expanded="true" aria-controls="prjQMeta prjSplit" title="Show or hide the SQL and the diagram"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> Query</button>
             <select class="form-select form-select-sm" id="prjQSel" aria-label="Saved query of the project" title="The project's saved queries"><option value="">New query (not saved)</option></select>
             <select class="form-select form-select-sm" id="prjQVers" hidden aria-label="Version" title="Every save of the query is kept: pick one to put it in the editor"></select>
             <span class="prjqbtns">
@@ -1815,12 +1841,12 @@
             <span class="prjdialect" title="The query runs in SQLite, on copies of the rows it needs: SQLite's functions, date handling and text comparison apply, not those of the source databases">SQLite's SQL · tables as <code>alias.table</code> · <a href="https://github.com/albievan/cactusDB#projects" target="_blank" rel="noopener">how it works</a></span>
           </div>
           <div class="prjsplit" id="prjSplit">
-            <div class="prjfoldbar"><button type="button" class="prjfold flabel" data-fold="sql" aria-expanded="true" aria-controls="prjEdWrap" title="Show or hide the SQL"><i class="bi bi-chevron-down" aria-hidden="true"></i> SQL</button></div>
+            <div class="prjfoldbar"><button type="button" class="prjfold flabel" data-fold="sql" aria-expanded="true" aria-controls="prjEdWrap" title="Show or hide the SQL"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> SQL</button></div>
             <div class="prjedwrap" id="prjEdWrap">
               <textarea class="form-control prjsql" id="prjSql" spellcheck="false" autocomplete="off" aria-label="Project query" aria-autocomplete="list" aria-controls="prjSug" placeholder="SELECT c.name, o.order_date&#10;FROM   fb.customer c&#10;JOIN   maria.orders o ON o.customer_id = c.id"></textarea>
               <ul class="prjsug" id="prjSug" hidden role="listbox" aria-label="Suggestions"></ul>
             </div>
-            <div class="prjfoldbar" id="prjDiagBar"><button type="button" class="prjfold flabel" data-fold="diag" aria-expanded="true" aria-controls="prjDiag" title="Show or hide the diagram"><i class="bi bi-chevron-down" aria-hidden="true"></i> Diagram</button></div>
+            <div class="prjfoldbar" id="prjDiagBar"><button type="button" class="prjfold flabel" data-fold="diag" aria-expanded="true" aria-controls="prjDiag" title="Show or hide the diagram"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> Diagram</button></div>
             <div class="prjdiag" id="prjDiag">
               <div class="prjdbar">
                 <span class="prjtsearch"><input type="search" class="form-control form-control-sm" id="prjTblSearch" placeholder="Search tables…" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="prjTblHits" aria-autocomplete="list" aria-label="Search the tables to add" title="Type part of a table's name: the matching tables are listed; ↑ ↓ and Enter, or a click, adds one">
@@ -1840,7 +1866,7 @@
               <div class="prjdbody" id="prjDiagBody" tabindex="-1" aria-label="Query diagram: Tab to a table or join; arrow keys move a table, Delete removes it, Enter opens its joins"></div>
             </div>
           </div>
-          <div class="prjfoldbar" id="prjDesignBar"><button type="button" class="prjfold flabel" data-fold="cols" aria-expanded="true" aria-controls="prjDesign" title="Show or hide the column definitions: output columns, totals, grouping, sorting and filters"><i class="bi bi-chevron-down" aria-hidden="true"></i> Column definitions</button></div>
+          <div class="prjfoldbar" id="prjDesignBar"><button type="button" class="prjfold flabel" data-fold="cols" aria-expanded="true" aria-controls="prjDesign" title="Show or hide the column definitions: output columns, totals, grouping, sorting and filters"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> Column definitions</button></div>
           <div class="prjdesign" id="prjDesign"></div>
           <div class="prjprog" id="prjProg" hidden></div>
           <div class="prjres">
@@ -1855,7 +1881,7 @@
               </div>
             </div>
             <div class="prjresbar">
-              <button type="button" class="prjfold flabel" data-fold="res" aria-expanded="true" aria-controls="prjExpNote prjGrid" title="Show or hide the results and the export buttons"><i class="bi bi-chevron-down" aria-hidden="true"></i> Results and export</button>
+              <button type="button" class="prjfold flabel" data-fold="res" aria-expanded="true" aria-controls="prjExpNote prjGrid" title="Show or hide the results and the export buttons"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> Results and export</button>
               <span class="info" id="prjInfo"></span>
               <span class="spacer"></span>
               <span class="flabel">Export</span>
@@ -5784,7 +5810,7 @@ function prjProgress(st) {
   const ret = r ? `<div class="prjret">✓ <b>Query returned ${r.totalMore ? "more than " : ""}${tot.toLocaleString()} row${tot === 1 ? "" : "s"}</b>` +
     (tot > r.rows.length ? ` (${r.rows.length.toLocaleString()} shown; exports hold every row)` : "") + `, ${r.columns.length} column${r.columns.length === 1 ? "" : "s"}</div>` : "";
   // The heading folds the lines per table; the query's own line and errors always show.
-  const head = !what ? "" : rows.length ? `<div><button type="button" class="prjfold" data-fold="prog" aria-expanded="${!prjFolded("prog")}" aria-controls="prjProgBody" title="Show or hide the rows read per table"><i class="bi bi-chevron-down" aria-hidden="true"></i> ${esc(what)} · ${rows.length} table${rows.length === 1 ? "" : "s"}</button></div>` : `<div>${esc(what)}</div>`;
+  const head = !what ? "" : rows.length ? `<div><button type="button" class="prjfold" data-fold="prog" aria-expanded="${!prjFolded("prog")}" aria-controls="prjProgBody" title="Show or hide the rows read per table"><i class="bi bi-caret-down-fill" aria-hidden="true"></i> ${esc(what)} · ${rows.length} table${rows.length === 1 ? "" : "s"}</button></div>` : `<div>${esc(what)}</div>`;
   p.innerHTML = head + `<div class="prjprogbody" id="prjProgBody">${rows.join("")}</div>` + ret + err;
   p.hidden = !(what || rows.length || ret || err);
 }
@@ -6943,8 +6969,13 @@ function pqDesign() {
   const rows = Math.max(1, ...m.fields.flatMap((f) => [...f.crit.map((c) => c.row + 2), ...Object.keys(f.pend || {}).map((r) => +r + 2)]));
   const allCols = m.tables.flatMap((t) => (pqColsOf(t) || []).map((c) => [t.alias, c.name]));
   const fname = (f) => f.expr ? f.expr : (f.agg ? f.agg + "(" : "") + (f.table ? f.table + "." : "") + f.col + (f.agg ? ")" : "");
-  const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column</th><th title="In the output">Show</th><th>Name in the output</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function</th><th title="CASE: show other values for the column's values ('034' → 'Scale'), built in a form">CASE</th><th>Total</th><th>Group</th><th>Sort</th>` +
-    Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}</th>`).join("") + `<th></th></tr>`;
+  // Each column has its width (drag the edge of its heading; double-click: back to
+  // the default), remembered in this browser; the boxes and lists fill it.
+  const rs = (c) => `<span class="colrs" data-c="${c}" title="Drag to resize the column; double-click: its default width" aria-hidden="true"></span>`;
+  const keys = ["grip", "col", "show", "name", "fn", "case", "agg", "group", "sort", ...Array.from({ length: rows }, () => "crit"), "act"];
+  const cols = `<colgroup>${keys.map((k) => `<col data-c="${k}">`).join("")}</colgroup>`;
+  const head = `<tr><th class="grip" aria-hidden="true"></th><th>Column${rs("col")}</th><th title="In the output">Show${rs("show")}</th><th>Name in the output${rs("name")}</th><th title="A function on the value in the output: capitals, a date format… (filters and sorting use the column's own value)">Function${rs("fn")}</th><th title="CASE: show other values for the column's values ('034' → 'Scale'), built in a form">CASE${rs("case")}</th><th>Total${rs("agg")}</th><th>Group${rs("group")}</th><th>Sort${rs("sort")}</th>` +
+    Array.from({ length: rows }, (_, r) => `<th title="${r ? "Rows of this column are ORed with the columns before" : "Conditions in the same column are ANDed"}">${r ? "or" : "Filter"}${rs("crit")}</th>`).join("") + `<th></th></tr>`;
   const body = m.fields.map((f, i) => {
     const grip = `<td class="grip" draggable="true" title="Drag up or down to change the order of the columns" aria-hidden="true">⋮⋮</td>`;
     if (f.col === "*" && !f.agg) return `<tr data-f="${i}">${grip}<td>${esc(f.table)}.*</td><td><input type="checkbox" data-k="show" checked aria-label="Show"></td><td colspan="${6 + rows}"></td><td><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove">×</button></td></tr>`;
@@ -6952,8 +6983,8 @@ function pqDesign() {
     const crit = Array.from({ length: rows }, (_, r) => {
       const p = !f.crit.some((x) => x.row === r) && f.pend && f.pend[r];
       const c = p || f.crit.find((x) => x.row === r) || { op: "", value: "" }, btw = c.op.endsWith("BETWEEN"), [lo, hi] = p ? [p.val, p.val2] : btw ? pqSplitBetween(c.value) : [c.op.endsWith("IN") ? pqUnlist(c.value) : c.value, ""];
-      return `<td><span class="critcell">${ex ? "" : pqFnCell(c.fns, "cfn", r) + `<select class="form-select form-select-sm" data-k="op" data-r="${r}" aria-label="Filter operator"><option value=""></option>${PQ_OPS.map((o) => `<option${o === c.op ? " selected" : ""} title="${esc(PQ_OP_TITLES[o] || "")}">${esc(o)}</option>`).join("")}</select>` +
-        `<input type="text" class="form-control form-control-sm${p && p.op && !pqNoValue(p.op) ? " pqwait" : ""}" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
+      return `<td><span class="critcell">${ex ? "" : pqFnCell(c.fns, "cfn", r) + `<select class="form-select form-select-sm" data-k="op" data-r="${r}" required aria-label="Filter operator" title="The comparison: =, <>, IN, LIKE, BETWEEN, IS NULL…"><option value="">operator…</option>${PQ_OPS.map((o) => `<option${o === c.op ? " selected" : ""} title="${esc(PQ_OP_TITLES[o] || "")}">${esc(o)}</option>`).join("")}</select>` +
+        `<input type="text" class="form-control form-control-sm${p && p.op && !pqNoValue(p.op) ? " pqwait" : ""}" data-k="val" data-r="${r}" value="${esc(lo)}" size="10" placeholder="value" aria-label="${btw ? "From" : "Filter value"}" title="A value: 42, Ann (quoted for you), 2026-01-01, or a function: lower(trim('aaa ')); IN: 1, 2, 3; LIKE: % any text, _ one character"${pqNoValue(c.op) ? " disabled" : ""}>` +
         `<input type="text" class="form-control form-control-sm" data-k="val2" data-r="${r}" value="${esc(hi)}" size="8" aria-label="To" title="BETWEEN: the highest value"${btw ? "" : " hidden"}>`}</span></td>`;
     }).join("");
     return `<tr data-f="${i}">${grip}<td title="${esc(fname(f) + (pqColOf(f.table, f.col) ? " : " + pqColType(pqColOf(f.table, f.col)) : ""))}">${esc(fname(f).slice(0, 60))}${!f.expr && pqColOf(f.table, f.col) ? `<span class="coltype"> : ${esc(pqColType(pqColOf(f.table, f.col)))}</span>` : ""}</td>
@@ -6966,7 +6997,7 @@ function pqDesign() {
       <td>${ex ? "" : `<select class="form-select form-select-sm" data-k="sort" aria-label="Sort"><option value=""></option><option${f.sort === "ASC" ? " selected" : ""}>ASC</option><option${f.sort === "DESC" ? " selected" : ""}>DESC</option></select>`}</td>
       ${crit}<td><button type="button" class="btn btn-sm btn-link" data-k="up" aria-label="Move up" title="Move up">↑</button><button type="button" class="btn btn-sm btn-link" data-k="rm" aria-label="Remove" title="Remove from the query">×</button></td></tr>`;
   }).join("");
-  box.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>
+  box.innerHTML = `<table>${cols}<thead>${head}</thead><tbody>${body}</tbody></table>
     <div class="dfoot">
       <select class="form-select form-select-sm" id="pqAddField" aria-label="Add a column" style="width:auto"><option value="">Add column…</option><option value="calc">＋ Calculated column (CASE or a function)…</option><optgroup label="Columns">${allCols.map(([a, c]) => `<option value="${esc(JSON.stringify([a, c]))}">${esc(a)}.${esc(c)}</option>`).join("")}</optgroup></select>
       <label class="form-check"><input type="checkbox" class="form-check-input" id="pqStar"${m.star ? " checked" : ""}> All columns (*)</label>
@@ -6974,8 +7005,47 @@ function pqDesign() {
       <label>Limit <input type="text" class="form-control form-control-sm d-inline-block" id="pqLimit" value="${esc(m.limit)}" size="6" aria-label="Limit"></label>
       ${m.whereExtra ? `<span class="hint">Kept as written: WHERE ${esc(m.whereExtra.slice(0, 80))}</span>` : ""}${m.having ? `<span class="hint">HAVING ${esc(m.having.slice(0, 60))}</span>` : ""}
     </div>`;
+  pqColWidths();
   pqDesignSize();
 }
+const PQ_COLW_KEY = "cactusdb.pqColWidths";
+const PQ_COLW = { grip: 16, col: 230, show: 46, name: 150, fn: 130, case: 80, agg: 90, group: 52, sort: 76, crit: 340 };
+let pqColW = {};
+try { pqColW = JSON.parse(localStorage.getItem(PQ_COLW_KEY) || "{}") || {}; } catch (e) { /* the defaults */ }
+// pqColWidths sets each column's width; the table is as wide as its columns, the
+// last one (↑ ×) taking what is left.
+function pqColWidths() {
+  const t = $("prjDesign").querySelector("table");
+  if (!t) return;
+  let sum = 0;
+  t.querySelectorAll("col").forEach((c) => {
+    const k = c.dataset.c;
+    if (k === "act") { c.style.width = "72px"; sum += 72; return; }
+    const w = Math.max(k === "grip" ? 16 : 30, +pqColW[k] || PQ_COLW[k]);
+    c.style.width = w + "px"; sum += w;
+  });
+  t.style.width = `max(100%, ${sum}px)`;
+}
+$("prjDesign").addEventListener("pointerdown", (ev) => {
+  const h = ev.target.closest(".colrs");
+  if (!h) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const k = h.dataset.c, x0 = ev.clientX, w0 = h.parentElement.getBoundingClientRect().width;
+  h.setPointerCapture(ev.pointerId); h.classList.add("on");
+  const move = (e) => { pqColW[k] = Math.max(30, Math.round(w0 + e.clientX - x0)); pqColWidths(); };
+  const up = () => {
+    h.removeEventListener("pointermove", move); h.classList.remove("on");
+    try { localStorage.setItem(PQ_COLW_KEY, JSON.stringify(pqColW)); } catch (e) { /* not remembered */ }
+  };
+  h.addEventListener("pointermove", move);
+  h.addEventListener("pointerup", up, { once: true }); h.addEventListener("pointercancel", up, { once: true });
+});
+$("prjDesign").addEventListener("dblclick", (ev) => {
+  const h = ev.target.closest(".colrs");
+  if (!h) return;
+  delete pqColW[h.dataset.c]; pqColWidths();
+  try { localStorage.setItem(PQ_COLW_KEY, JSON.stringify(pqColW)); } catch (e) { /* not remembered */ }
+});
 // Column definitions is as tall as its rows, up to 230 pixels, until its corner is
 // dragged: from then on it keeps the height it was given.
 function pqDesignSize() {
@@ -7205,6 +7275,30 @@ function prjSideFold(name, folded) {
   $("prjSide").querySelector(`[data-sfold="${name}"]`).setAttribute("aria-expanded", String(!folded));
 }
 try { for (const n of JSON.parse(localStorage.getItem(PRJ_SIDE_FOLD_KEY) || "[]")) if (n === "q" || n === "t") prjSideFold(n, true); } catch (e) { /* all open */ }
+$("prjSideNew").addEventListener("click", () => $("prjQNew").click());
+// The list of queries: its height dragged at the line under it, remembered here.
+const PRJ_SIDE_QH_KEY = "cactusdb.prjSideQHeight";
+function prjSideQHeight(h) {
+  const q = $("prjSideQueries");
+  q.classList.toggle("sized", !!h); q.style.height = h ? h + "px" : "";
+}
+try { const h = +localStorage.getItem(PRJ_SIDE_QH_KEY); if (h > 0) prjSideQHeight(h); } catch (e) { /* the default */ }
+$("prjSideSplit").addEventListener("pointerdown", (ev) => {
+  const sp = ev.currentTarget, q = $("prjSideQueries"), y0 = ev.clientY, h0 = q.getBoundingClientRect().height;
+  ev.preventDefault(); sp.setPointerCapture(ev.pointerId); sp.classList.add("on");
+  let h = h0;
+  const move = (e) => { h = Math.max(40, Math.round(h0 + e.clientY - y0)); prjSideQHeight(h); };
+  sp.addEventListener("pointermove", move);
+  const up = () => {
+    sp.removeEventListener("pointermove", move); sp.classList.remove("on");
+    try { localStorage.setItem(PRJ_SIDE_QH_KEY, String(h)); } catch (e) { /* not remembered */ }
+  };
+  sp.addEventListener("pointerup", up, { once: true }); sp.addEventListener("pointercancel", up, { once: true });
+});
+$("prjSideSplit").addEventListener("dblclick", () => {
+  prjSideQHeight(0);
+  try { localStorage.removeItem(PRJ_SIDE_QH_KEY); } catch (e) { /* nothing kept */ }
+});
 $("prjSide").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-sfold]");
   if (!b) return;

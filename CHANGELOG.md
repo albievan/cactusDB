@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.62.46 — 2026-11-27
+
+- Advanced query builder, *Column definitions*: columns are resized by dragging the edge of
+  their heading (double-click: the default width), remembered in the browser; *Name in the
+  output*, the lists and the filter boxes fill their column; an empty filter list reads
+  *operator…*, its box *value*; the row with *Add column…*, *All columns*, *Distinct rows*
+  and *Limit* is aligned.
+- Advanced query builder, left panel: a **New query** button beside *Project queries*, and
+  the list of queries is resized by dragging the line under it (remembered).
+- Advanced query builder: the fold buttons (Query, SQL, Diagram, Column definitions,
+  Results and export, Project queries, Project tables) are bold with a solid arrow, like
+  *Databases and tables*.
+
 ## 1.62.45 — 2026-11-27
 
 - Advanced query builder: the open project's bar keeps only Save, the *Export all queries*

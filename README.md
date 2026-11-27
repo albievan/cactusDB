@@ -1136,7 +1136,10 @@ per line). Each is as tall as you drag its bottom-right corner.
 - Every column shows its **type** as its database names it, in the diagram and in
   *Column definitions* (`brn_no : varchar(100)`, `total : numeric(10,2)`).
   A wide *Column definitions* scrolls to the right inside its box, with each column's name
-  and type kept in view on the left.
+  and type kept in view on the left. Its columns are **resized** by dragging the right edge of their
+  heading (a double-click on it gives the column its default width back); the boxes and
+  lists fill their column, and the browser remembers the widths. An empty filter list
+  reads *operator…*, its box *value*.
 - **Foreign keys**: a column that is one shows where it points (`cust_id → cust.id`).
   When both tables of a foreign key are in the diagram and the query doesn't join on it,
   a dotted line links them; click it to join on it.
@@ -1231,7 +1234,11 @@ them all. The query in the editor and its result in the grid are left as they ar
 its own) are listed above *Project tables*, with their version; a click opens one in the
 editor (asking first to save changes to the query there), and the one open is highlighted. A click
 on the *Project queries* or *Project tables* heading folds that list away (▾), or opens it
-again; the browser remembers which are folded.
+again; the browser remembers which are folded. The line under the queries is dragged to make their list taller or
+shorter (a double-click: back to its default height, also remembered), and the small
+**New query** button beside the heading starts a new query, as *New* in *Query* does. The
+fold buttons (▸ Query, SQL, Diagram, Column definitions, Results and export) are bold,
+like *Databases and tables*.
 
 **Saved queries** of a project: pick one in *Query*; every version is kept, with the
 diagram's layout. The icon buttons beside it: **Refresh** (reads the saved queries again:
